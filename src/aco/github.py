@@ -428,14 +428,6 @@ class GitHubForge:
         )
         return self._json_lines(raw, description)
 
-    def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        return github_graphql.read_batched(
-            github_graphql.ITEM_REFERENCE_READ,
-            numbers,
-            fetch=self._graphql_block,
-            concurrency=PARALLEL_FETCH_CONCURRENCY,
-        )
-
     def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
         return github_graphql.read_batched(
             github_graphql.REOPENED_AT_READ,

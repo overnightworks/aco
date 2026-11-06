@@ -85,15 +85,13 @@ layers = [
     "workboard",
     "items | expectations",
     "body",
-    "metrics | expectation_grammar",
+    "expectation_grammar",
     "card_rules",
     "usage",
     "lineage_stamp",
     "protocol | process",
 ]
-# `metrics` sits below `body` so the body-block codec can reach `metrics.Size` for its own
-# `size`/`[[expectation]]` schema, while `items` may still import `body`,
-# never the reverse.
+# `items` may import `body`, never the reverse.
 # The five cmd_* -> cmd_* edges: land.spec cites the release rules;
 # start.spec cites the claim rules CLM-05/06/18; adopt.spec ADOPT-14 cites CLM-18
 # and CLAIM-31; brief.spec BRIEF-26 cites
@@ -177,23 +175,6 @@ forbidden_modules = [
     "aco.github_graphql",
     "aco.report",
 ]
-allow_indirect_imports = true
-as_packages = false
-
-[[tool.importlinter.contracts]]
-name = "items does not import metrics"
-type = "forbidden"
-# The Layers contract above now places `metrics` below `items` (so `body`,
-# also below `items`, can reach it), which would otherwise let `items`
-# import `metrics` too -- a permission the layer order held before `body`
-# existed and had no reason to grant. This contract keeps that narrower
-# restriction on top of the wider layer order.
-# true checks only the direct edge: items legitimately reaches metrics
-# through the allowed items -> body -> metrics chain, so checking
-# indirectly would flag that permitted chain along with a genuine direct
-# items -> metrics import.
-source_modules = ["aco.items"]
-forbidden_modules = ["aco.metrics"]
 allow_indirect_imports = true
 as_packages = false
 

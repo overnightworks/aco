@@ -15,7 +15,7 @@ from itertools import chain
 from pathlib import Path
 from typing import NoReturn, TypeGuard, cast
 
-from . import items, metrics, protocol
+from . import items, protocol
 
 # The body-block codec: parsed, validated,
 # and rendered in `body.py`, one layer below this module. Every reader
@@ -32,6 +32,7 @@ from .body import (
     ItemKind,
     LocatedBlock,
     ParsedBody,
+    Size,
     SliceRow,
     Storage,
     body_defect_text,
@@ -533,7 +534,6 @@ class BoardConfig:
 # command, so forgetting it here would refuse `claim` and `release` there.
 BODY_CONTRACT_KEY = "body_contract"
 BODY_CONTRACT_BLOCK = "block"
-BODY_CONTRACT_PROSE = "prose"
 # Every key `.aco/board.toml` defines; anything else is a typo, and
 # `_refuse_unknown_config_keys` names it rather than reading past it.
 CONFIG_KEYS = frozenset({setting.name for setting in fields(BoardConfig)}) | {BODY_CONTRACT_KEY}
@@ -601,53 +601,13 @@ class BoardItem:
     # decided once here by `_childless_container_verdict` so `next`'s action
     # and its `SKIPPED` reason read one answer; `None` for every other item.
     childless_verdict: ChildlessContainerVerdict | None
-    # This item's own top-level `size`, exactly `ParsedBody.size`
-    # -- carried here too so a renderer can tell "no size at all" apart from
-    # "sized, but its class has no measured lane yet", which `estimate`
-    # alone (`None` in both cases) cannot.
-    size: metrics.Size | None
+    # This item's own top-level `size`, exactly `ParsedBody.size`.
+    size: Size | None
     # Whether the body still carries any `[[slice]]` row:
     # `scope is None` alone cannot tell a truly unscoped item apart from one
     # that names no top-level scope yet but still cuts one from a row, so
     # `_buildable` reads both rather than `scope` alone.
     has_slices: bool
-    # This item's own size class's measured estimate, or
-    # `None` when the item names no size, or names one no measured lane has
-    # reached yet -- an unmeasured class is exactly as unestimated as an
-    # unsized item, never a guessed number.
-    estimate: metrics.Estimate | None
-
-
-@dataclass(frozen=True)
-class SizeClassMeasurement:
-    """One size class's own row in the board's measurements section:
-    `metrics.SizeClassStats`' median/p80/n/weak, plus the first and
-    last measured lane's own timestamp -- dates `metrics.py` never computes
-    (it holds no clock), so `workboard.py` joins them from the same lane events
-    `metrics.measure` read to build `stats`."""
-
-    stats: metrics.SizeClassStats
-    first_event_at: datetime
-    last_event_at: datetime
-
-
-@dataclass(frozen=True)
-class Measurements:
-    """The board's own measured-lane section: `classes` is
-    `metrics.MetricsReport.classes` plus each class's own date range,
-    `unfinished` is `metrics.MetricsReport.incomplete` (a still-open claim,
-    counted but never measured), `unparsed` is
-    `BoardBuildInputs.unparsed_lifecycle_commits` (a claim-shaped commit
-    `store.claim_lifecycle` could not read at all), and
-    `since` is the earliest lane event this build read at all -- `None`
-    only when there is none, the one case the board's own "keine Messungen
-    seit <Datum>" sentence reads a render-time date instead."""
-
-    classes: tuple[SizeClassMeasurement, ...]
-    unfinished: int
-    unparsed: int
-    since: datetime | None
-    as_of: date
 
 
 @dataclass(frozen=True)
@@ -679,7 +639,6 @@ class Board:
     uncut: tuple[UncutSlices, ...]
     repository: str
     requests: int
-    measurements: Measurements
 
 
 def _validated_priority_labels(raw: dict[str, object]) -> tuple[str, ...]:
@@ -709,18 +668,10 @@ def _refuse_unpinned_body_contract(raw: dict[str, object], path: Path) -> None:
     """Refuse any body pin but the one grammar this tool reads.
 
     An absent key means the block, so an unpinned repository needs no edit.
-    `"prose"` is refused by name rather than as an unknown value: a
-    repository still carrying it is not making a typo, it is asking for a
-    reader that no longer exists.
     """
     pinned = raw.get(BODY_CONTRACT_KEY)
     if pinned is None or pinned == BODY_CONTRACT_BLOCK:
         return
-    if pinned == BODY_CONTRACT_PROSE:
-        raise protocol.ClaimError(
-            f"board configuration {path} pins {BODY_CONTRACT_KEY} "
-            f"{BODY_CONTRACT_PROSE!r}: prose bodies are no longer supported"
-        )
     raise protocol.ClaimError(
         f"board configuration {path} {BODY_CONTRACT_KEY} must be {BODY_CONTRACT_BLOCK!r}"
     )
@@ -1582,7 +1533,6 @@ class _BoardBuildContext:
     child_container: dict[int, int]
     nesting_parents: Mapping[int, IssueReference]
     repository: str
-    estimate_by_number: Mapping[int, metrics.Estimate]
     unreadable_numbers: frozenset[int]
 
 
@@ -1769,7 +1719,6 @@ def _board_item(
         childless_verdict=childless_verdict,
         size=parsed.size,
         has_slices=bool(parsed.slices),
-        estimate=context.estimate_by_number.get(issue.number),
     )
 
 
@@ -1805,111 +1754,6 @@ class BoardBuildInputs:
     # claim with a branch) but no landed one, so the two stay independent
     # booleans instead of one storage-shaped flag.
     open_pull_requests_supported: bool = True
-    # Every claim's ref-history lifecycle (`store.claim_lifecycle`), `size` still
-    # `None`: `build_board` joins the item's current size before `metrics.measure`.
-    lane_events: tuple[metrics.LaneEvent, ...] = ()
-    # The current size of each completed lane's item that is no longer among
-    # `issues` (closed or vanished), read once by the caller for the numbers
-    # `lane_events` names outside `issues`. An open item's size comes from
-    # `issues`; this map is consulted only for a number that map lacks.
-    closed_item_sizes: Mapping[int, metrics.Size | None] = field(default_factory=dict)
-    # Claim-shaped `refs/aco/state` commits `store.claim_lifecycle` could not parse
-    # (history predating its `item:` trailer, or a foreign commit shaped like one),
-    # counted rather than dropped and shown beside `Measurements.unfinished`.
-    unparsed_lifecycle_commits: int = 0
-
-
-def _joined_lane_event(
-    event: metrics.LaneEvent,
-    size_by_number: Mapping[int, metrics.Size | None],
-) -> metrics.LaneEvent:
-    """`event`, its `size` filled in from this build's own already-fetched
-    data: a historical claim's size is read
-    from its item's *current* size, open or closed -- `size_by_number` is
-    `build_board`'s own union of every open item's parsed size and
-    `inputs.closed_item_sizes` (read once through the forge/state for exactly
-    the numbers not among the open ones). A lane claim (`docs/`/`fix/`, no
-    issue number) never matches and is returned unchanged, still counted by
-    `metrics.measure` but never sorted into a size class."""
-    number = protocol.decimal_number_or_none(event.item)
-    if number is None:
-        return event
-    return replace(event, size=size_by_number.get(number))
-
-
-def _class_measurement(
-    stats: metrics.SizeClassStats, events: Iterable[metrics.LaneEvent]
-) -> SizeClassMeasurement:
-    measured = [
-        event for event in events if event.size is stats.size and event.released_at is not None
-    ]
-    return SizeClassMeasurement(
-        stats=stats,
-        first_event_at=min(event.claimed_at for event in measured),
-        last_event_at=max(cast(datetime, event.released_at) for event in measured),
-    )
-
-
-def _measurements(
-    events: tuple[metrics.LaneEvent, ...],
-    report: metrics.MetricsReport,
-    observed_at: datetime,
-    *,
-    unparsed: int,
-) -> Measurements:
-    since = min((event.claimed_at for event in events), default=None)
-    classes = tuple(_class_measurement(stats, events) for stats in report.classes)
-    return Measurements(
-        classes=classes,
-        unfinished=report.incomplete,
-        unparsed=unparsed,
-        since=since,
-        as_of=observed_at.date(),
-    )
-
-
-def _summed_lane_event(claims: Sequence[metrics.LaneEvent]) -> metrics.LaneEvent:
-    """One item's own completed claims, summed into a single measured lane:
-    their wall-clock durations added, never spanned or
-    averaged, so an item worked across several claims -- a builder, then a
-    fixer, each its own claim -- contributes exactly one sample to its size
-    class rather than `len(claims)` independent ones that would inflate `n`
-    and skew the median. `size`/`item` are shared across every claim of
-    one item (`_joined_lane_event` already set `size` from the same
-    lookup), so the earliest claim's own values carry through unchanged;
-    only `claimed_at`/`released_at` become a synthetic pair whose
-    difference is the summed total, and `rescopes` sums too."""
-    first = min(claims, key=lambda claim: claim.claimed_at)
-    total_hours = sum(
-        (cast(datetime, claim.released_at) - claim.claimed_at).total_seconds() / 3600
-        for claim in claims
-    )
-    return replace(
-        first,
-        released_at=first.claimed_at + timedelta(hours=total_hours),
-        rescopes=sum(claim.rescopes for claim in claims),
-    )
-
-
-def _measurement_feed(events: tuple[metrics.LaneEvent, ...]) -> tuple[metrics.LaneEvent, ...]:
-    """`events`, prepared for `metrics.measure`: every
-    item's own completed claims summed into one lane by `_summed_lane_event`
-    -- still-open claims (`released_at is None`) pass through unchanged,
-    since each is already its own still-running lane and
-    `metrics.MetricsReport.incomplete` counts them without help from this
-    function. `_measurements` itself still reads the caller's original,
-    unsummed `events` for its own first/last measured-lane dates, so this
-    synthetic feed is consulted only for the class statistics and
-    per-item estimates `metrics.measure` computes."""
-    completed_by_item: dict[str, list[metrics.LaneEvent]] = {}
-    open_events: list[metrics.LaneEvent] = []
-    for event in events:
-        if event.released_at is None:
-            open_events.append(event)
-        else:
-            completed_by_item.setdefault(event.item, []).append(event)
-    summed = (_summed_lane_event(claims) for claims in completed_by_item.values())
-    return (*summed, *open_events)
 
 
 def build_board(inputs: BoardBuildInputs) -> Board:
@@ -1946,21 +1790,6 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         for container_number, progress in container_progress.items()
         for child in progress.open_children
     }
-    size_by_number = {number: parsed.size for number, parsed in parsed_bodies.items()}
-    historical_size_by_number = {**inputs.closed_item_sizes, **size_by_number}
-    joined_events = tuple(
-        _joined_lane_event(event, historical_size_by_number) for event in inputs.lane_events
-    )
-    number_by_item = {item_argument(issue.number, config.storage): issue.number for issue in issues}
-    open_items = tuple(
-        metrics.OpenItem(item=item, size=size_by_number[number])
-        for item, number in number_by_item.items()
-    )
-    report = metrics.measure(_measurement_feed(joined_events), open_items)
-    measurements = _measurements(
-        joined_events, report, observed_at, unparsed=inputs.unparsed_lifecycle_commits
-    )
-    estimate_by_number = {number_by_item[estimate.item]: estimate for estimate in report.estimates}
     context = _BoardBuildContext(
         contracts=contracts,
         parsed_bodies=parsed_bodies,
@@ -1984,7 +1813,6 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         child_container=child_container,
         nesting_parents=inputs.nesting_parents,
         repository=repository,
-        estimate_by_number=estimate_by_number,
         unreadable_numbers=frozenset(
             issue.number for issue in issues if issue.unreadable is not None
         ),
@@ -2022,7 +1850,6 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         uncut=uncut,
         repository=repository,
         requests=inputs.requests,
-        measurements=measurements,
     )
 
 
@@ -2513,21 +2340,7 @@ def board_payload(board: Board) -> dict[str, object]:
         _project_landing_row(row)
     for finding in cast(_JsonRows, payload["uncut"]):
         _project_uncut_row_scope(finding)
-    _project_measurements(cast(_JsonObject, payload["measurements"]))
     return cast(_JsonObject, _tuples_to_lists(payload))
-
-
-def _project_measurements(measurements: dict[str, object]) -> None:
-    """`Measurements`' own `datetime`/`date` fields, turned into ISO text --
-    everything else in `payload["measurements"]` (`n`,
-    `median_hours`, `p80_hours`, `weak`, the `Size` string) is already
-    JSON-ready, since `metrics.py` carries no clock of its own."""
-    measurements["as_of"] = cast(date, measurements["as_of"]).isoformat()
-    since = cast("datetime | None", measurements["since"])
-    measurements["since"] = None if since is None else since.astimezone(UTC).isoformat()
-    for entry in cast(_JsonRows, measurements["classes"]):
-        for key in ("first_event_at", "last_event_at"):
-            entry[key] = cast(datetime, entry[key]).astimezone(UTC).isoformat()
 
 
 # The forge form an item takes under `GITHUB`: text for a label or a
@@ -3073,23 +2886,6 @@ def merged_pull_request_floor(issues: tuple[Issue, ...], now: datetime) -> datet
     the credit for an early slice of an open epic.
     """
     return oldest_created_at(issues) or now
-
-
-def closed_item_numbers(
-    lane_events: tuple[metrics.LaneEvent, ...], open_numbers: frozenset[int]
-) -> frozenset[int]:
-    """Every numbered item `lane_events` names that is not among this board
-    build's own open issues -- a completed lane whose item
-    has since closed, or one this walk can no longer resolve to a live
-    issue at all. A `docs/`/`fix/` lane claim's own `item`, like any other
-    trailer that is no `protocol.decimal_number_or_none` number, is silently
-    excluded."""
-    numbers = {
-        number
-        for event in lane_events
-        if (number := protocol.decimal_number_or_none(event.item)) is not None
-    }
-    return frozenset(numbers - open_numbers)
 
 
 def selected_store_claim(

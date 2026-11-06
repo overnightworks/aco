@@ -37,8 +37,7 @@ reason text.
 | an uncut `[[slice]]` row | — | BOARD-14 |
 | a completed run | — | BOARD-11, BOARD-13 |
 | `--json`'s success/refusal envelope | — | BOARD-11, BOARD-43 (OUT-nn cited) |
-| an item with a `size`, measured or not | — | BOARD-26, BOARD-27, BOARD-31 |
-| a claim commit whose `item:` trailer is no ASCII number of at most 18 digits | — | BOARD-56 |
+| an item with a `size` | — | BOARD-26 |
 | an item carries the idea label | — | BOARD-57 |
 | a container whose child-count summary disagrees with its sub-issue list | — | BOARD-58 |
 
@@ -47,6 +46,7 @@ reason text.
 - BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52 (retired 04.10.2026): `--html`'s static page and `--serve`'s loopback server -- the page itself, its token subsystem, and its request/response wire contract -- no longer exist; `aco serve` (`specs/serve.spec.md`) is the one decision board now, reading its own rulings through `aco rulings --json` and writing through `aco rule` instead of this command's `--json`.
 
 - BOARD-55 (retired 23.10.2026): the `--serve` refusal pointing at `aco-board serve` went with the flag itself; `aco board --serve` is now an unknown argument like any other.
+- BOARD-27, BOARD-31, BOARD-56 (retired 06.11.2026, issue #665): `board --json` no longer computes size statistics, so the top-level `measurements` object, its `classes` entries and the lane-history trailer rule that fed them are gone; BOARD-26 keeps an item's own `size`.
 
 - [ ] [BOARD-44] `aco board` naming no `--json` refuses `aco board requires --json`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
 
@@ -61,11 +61,11 @@ does, before either reads a single issue -- cited there, not restated.
 - [ ] [BOARD-01] `board` reaches the same absent- or untracked-`.aco/board.toml` refusal `specs/storage-pin.spec.md` owns (PIN-01/PIN-32), exit `2`, before the host check above ever runs.
 - [ ] [BOARD-42] Under `storage = "state-ref"`, `board`/`next`/`rulings` resolve the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
 
-- BOARD-03, BOARD-04, BOARD-05, BOARD-06, BOARD-07, BOARD-09, BOARD-10, BOARD-24, BOARD-25, BOARD-29, BOARD-30 (retired 20.09.2026): the fixed-width text table (`board.render`) they described no longer exists; `--json`'s own item fields, `landings` array, `uncut` array, and `measurements` object (BOARD-11..14, BOARD-26, BOARD-27, BOARD-31) carried the equivalent facts, `--html`'s own sections (retired in turn, 04.10.2026) alongside them while that page still existed.
+- BOARD-03, BOARD-04, BOARD-05, BOARD-06, BOARD-07, BOARD-09, BOARD-10, BOARD-24, BOARD-25, BOARD-29, BOARD-30 (retired 20.09.2026): the fixed-width text table (`board.render`) they described no longer exists; `--json`'s own item fields, `landings` array, and `uncut` array (BOARD-11..14, BOARD-26) carried the equivalent facts, `--html`'s own sections (retired in turn, 04.10.2026) alongside them while that page still existed.
 
 ## `--json`
 
-- [ ] [BOARD-11] `board --json` wraps OUT-nn (`reason: "projected"`) around `items`, `ready_now`, `stale`, `recovery`, `landings`, `uncut`, `requests`, `measurements` only, never `repository` (E-BOARD-04).
+- [ ] [BOARD-11] `board --json` wraps OUT-nn (`reason: "projected"`) around `items`, `ready_now`, `stale`, `recovery`, `landings`, `uncut`, `requests` only, never `repository` (E-BOARD-04).
 - [ ] [BOARD-43] `--json` on a dispatched refusal (BOARD-02, BOARD-42, BOARD-53) prints that envelope with the sentence as `message` and `reason` below, exit `2` (see E-BOARD-15).
 - [ ] [BOARD-08] An item the forge reports no `kind` for, or a non-`container` `kind`, carries `"container": null` even with child counts of its own: never guessed at (see E-BOARD-03).
 - [ ] [BOARD-54] A state-ref item PIN-14/PIN-15 refuses is listed, open, with BODY-50's reason and its read defect, e.g. `body malformed: record: no [record] table`; every other item reads as before (NEXT-36).
@@ -79,15 +79,12 @@ does, before either reads a single issue -- cited there, not restated.
 - [ ] [BOARD-12] Each `landings` row carries `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null` (LAND-54).
 - [ ] [BOARD-13] Each item's `open_blockers` is split into a same-repository `int` list plus a sibling `foreign_blockers` list of `"<repository>#<n>"` strings, never one mixed list.
 - [ ] [BOARD-14] An `uncut` row's own `scope` key is present, canonical and non-empty only when that row carries a `scope` of its own; a scopeless row's object carries no `scope` key at all, never `"scope": null`.
-- [ ] [BOARD-26] Each item object carries `size` (`"S"`/`"M"`/`"L"`/`null`) and `estimate` (`null`, or the fields below) alongside its other fields.
+- [ ] [BOARD-26] Each item object carries `size` (`"S"`/`"M"`/`"L"`/`null`) alongside its other fields.
 
   ```
-  {"size": "M", "estimate": {"item": "aco-000001", "size": "M", "median_hours": 5, "n": 4, "weak": false}}
-  {"size": null, "estimate": null}
+  {"size": "M"}
+  {"size": null}
   ```
-- [ ] [BOARD-27] The top-level `measurements` object carries exactly `{"classes", "unfinished", "unparsed", "since", "as_of"}` (see E-BOARD-04).
-- [ ] [BOARD-31] Each `classes` entry carries `{"stats": {"size", "n", "median_hours", "p80_hours", "weak"}, "first_event_at", "last_event_at"}`; `since` is `null` only with no lane event read.
-- [ ] [BOARD-56] A claim commit on the state ref whose `item:` trailer is no ASCII number of at most 18 digits reads like a lane's: left out of the measurements, not counted in `unparsed`; `board` and `next` exit `0`.
 - [ ] [BOARD-57] An item labelled `idea_label` carries `"idea": true` in `--json`, `"actionable": false` and `"actionable_reason": "idea"`, whatever its body, `body malformed` included (NEXT-43).
 - [ ] [BOARD-58] A container whose summary counts a child takes its `container` closed and total counts and open children from its sub-issue list; a summary that disagrees refuses nothing, exit `0`.
 
@@ -144,7 +141,7 @@ Setup: bare-remote, fake `gh`, one open issue `#10`
 
 ```console
 $ aco board --json
-{"ok": true, "reason": "projected", "items": [...], "ready_now": [...], "stale": [], "recovery": [], "landings": [], "uncut": [], "requests": 3, "measurements": {"classes": [], "unfinished": 0, "unparsed": 0, "since": null, "as_of": "<date>"}}
+{"ok": true, "reason": "projected", "items": [...], "ready_now": [...], "stale": [], "recovery": [], "landings": [], "uncut": [], "requests": 3}
 exit 0
 ```
 
