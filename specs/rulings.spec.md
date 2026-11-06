@@ -50,7 +50,7 @@ it, `<k>` an expectation line's 1-based index.
 
 - [ ] [RUL-24] `aco rulings <item>` reads that one issue, open or closed, and prints it alone in RUL-01's and RUL-05's shapes; with no expectation line, RUL-07's or RUL-08's empty output (see E-RUL-09).
 - [ ] [RUL-25] An `<item>` in neither number space prints `REFUSED: <label> does not exist in <repository>` on stderr, exit `2`; `--json` is CHECK-03's `missing` envelope (see E-RUL-10).
-- [ ] [RUL-26] An `<item>` naming a pull request prints `ERROR: #<n> is a pull request, not an issue; rulings needs an issue`, exit `2`; `--json` reason `not_an_issue` (see E-RUL-10).
+- [ ] [RUL-26] An `<item>` naming a pull request prints `ERROR: #<n> is a pull request, not an issue; rulings needs an issue`, exit `2`; `--json` reason `invalid_item` (see E-RUL-10).
 
 ## `--json`
 
@@ -80,7 +80,7 @@ An option line's keys after `returned_note` are `question`, `problem`, `picture`
 |---|---|
 | PIN-04 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | RUL-25 (`<item>` in neither number space) | `missing` |
-| RUL-26 (`<item>` is a pull request) | `not_an_issue` |
+| RUL-26 (`<item>` is a pull request) | `invalid_item` |
 | BOARD-02 (no forge adapter for host), PIN-05 (no resolvable default branch) | `unavailable` |
 
 ## Empty board
@@ -91,7 +91,7 @@ An option line's keys after `returned_note` are `question`, `problem`, `picture`
 ## Never
 
 - `aco rulings` never changes an item or a claim.
-- Under `storage = "github"` `aco rulings` reads only the open-item listing. Under `storage = "state-ref"` it reads the state snapshot and lists the items as the store does (BOARD-42), the store's own child counts included. It makes no further board-projection read (dependencies, parent lookups, pull requests, landings, claim history) and validates no record link (RUL-21).
+- Without `<item>`, under `storage = "github"` `aco rulings` reads only the open-item listing; with `<item>` it makes the one single-item read (RUL-24) and nothing else. Under `storage = "state-ref"` it reads the state snapshot and lists the items as the store does (BOARD-42), the store's own child counts included. Either form makes no further board-projection read (dependencies, parent lookups, pull requests, landings, claim history) and validates no record link (RUL-21).
 - `aco rulings` never re-scans an item's stale prose for its progress counts: a `## Erwartungen` heading left beside the block plays no part -- only the block's own `[[expectation]]` entries are read.
 
 ## Examples

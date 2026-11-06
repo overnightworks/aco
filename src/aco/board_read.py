@@ -453,6 +453,11 @@ def observed_board(
     return _ObservedBoard(projected, live_claims)
 
 
+def pull_request_sentence(number: int, *, command: str) -> str:
+    """The refusal sentence for a pull request named where `command` needs an issue."""
+    return f"#{number} is a pull request, not an issue; {command} needs an issue"
+
+
 def item_or_refuse(
     client: forge.ForgeReader, number: int, *, command: str, storage: body.Storage
 ) -> forge.ItemReference:
@@ -466,9 +471,7 @@ def item_or_refuse(
             f"{workboard.item_label(number, storage)} does not exist"
         )
     if reference.is_landing:
-        raise protocol.ClaimUnavailableError(
-            f"#{number} is a pull request, not an issue; {command} needs an issue"
-        )
+        raise protocol.ClaimUnavailableError(pull_request_sentence(number, command=command))
     return reference
 
 

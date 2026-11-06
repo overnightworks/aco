@@ -124,6 +124,6 @@ def test_rulings_refuses_a_pull_request_number(
     if flags:
         assert json.loads(result.stdout) == {
             "ok": False,
-            "reason": "not_an_issue",
+            "reason": "invalid_item",
             "message": sentence,
         }

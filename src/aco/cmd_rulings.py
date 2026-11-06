@@ -8,7 +8,7 @@ import sys
 from collections.abc import Iterable
 from enum import StrEnum
 
-from . import body, forge, protocol, report, rulings, workboard
+from . import board_read, body, forge, protocol, report, rulings, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -29,15 +29,17 @@ def _rulings(issues: Iterable[workboard.Issue], *, as_json: bool, storage: body.
 
 class _RulingsReason(StrEnum):
     """`aco rulings`' own `--json` `reason` vocabulary
-    (`specs/rulings.spec.md`): `listed` the only success. `invalid_usage`
-    covers `--repo` under `storage = state-ref` (PIN-04); every other
-    refusal -- an unsupported forge host (BOARD-02), a state-ref checkout
-    with no resolvable default branch (PIN-05) -- falls to `unavailable`,
-    matching `ask`/`rule`/`brief`'s own catch-all."""
+    (`specs/rulings.spec.md`): `listed` the only success. `missing` is a
+    named number in neither number space (RUL-25) and `invalid_item` a named
+    pull request (RUL-26, `rule`'s and `withdraw`'s token for it);
+    `invalid_usage` covers `--repo` under `storage = state-ref` (PIN-04);
+    every other refusal -- an unsupported forge host (BOARD-02), a state-ref
+    checkout with no resolvable default branch (PIN-05) -- falls to
+    `unavailable`, matching `ask`/`rule`/`brief`'s own catch-all."""
 
     LISTED = "listed"
     MISSING = "missing"
-    NOT_AN_ISSUE = "not_an_issue"
+    INVALID_ITEM = "invalid_item"
     INVALID_USAGE = "invalid_usage"
     UNAVAILABLE = "unavailable"
 
@@ -49,7 +51,7 @@ def _one_item(client: forge.ForgeReader, number: int) -> tuple[workboard.Issue] 
     if reference.state is forge.ItemState.MISSING:
         return _RulingsReason.MISSING
     if reference.is_landing:
-        return _RulingsReason.NOT_AN_ISSUE
+        return _RulingsReason.INVALID_ITEM
     return (
         workboard.Issue(
             number=number,
@@ -74,7 +76,7 @@ def _refuse_named_item(
             print(f"REFUSED: {label} {finding}", file=sys.stderr)
         return 2
     return report.refuse(
-        reason, f"{label} is a pull request, not an issue; rulings needs an issue", as_json=as_json
+        reason, board_read.pull_request_sentence(number, command="rulings"), as_json=as_json
     )
 
 
