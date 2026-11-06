@@ -1,9 +1,9 @@
 # `aco start`
 
 `aco start <item> [--scope PATH]... [--slug SLUG] [--whole REASON] [--out-of-order REASON]`
-runs the four steps of starting a lane -- `git fetch`, `git worktree
-add ../<repo>-worktrees/issue-<n>-<slug> -b <prefix>/issue-<n>-<slug>`, `cd`, `aco claim <n>` --
-with one command. This file owns the worktree/branch it builds or resumes, the slug and prefix
+fetches, adds the worktree `../<repo>-worktrees/issue-<n>-<slug>` on branch
+`<prefix>/issue-<n>-<slug>` and runs `aco claim <n>` inside it, in one command; the caller's own
+directory stays where it was (START-05). This file owns the worktree/branch it builds or resumes, the slug and prefix
 it derives, its own refusals, and how it mints or reuses the claim id underneath. It never
 restates `aco claim`'s own preconditions, checks, or `CLAIMED ...`/cost-line grammar
 (`specs/claim.spec.md`, `specs/body-block.spec.md`): `start` acquires that same claim, inside the
