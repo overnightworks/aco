@@ -982,7 +982,7 @@ class TestStateRefBoardMethods:
         ("unsupported_call", "sentence"),
         [
             pytest.param(
-                lambda adapter: adapter.landing(CHILD_A_NUMBER), "not yet derived", id="landing"
+                lambda adapter: adapter.landing(CHILD_A_NUMBER), "request landings", id="landing"
             ),
             pytest.param(
                 lambda adapter: adapter.pull_request_changes(CHILD_A_NUMBER),
@@ -5660,7 +5660,7 @@ class TestCliStateRefForge:
             ],
             capsys,
         ).expect_success()
-        # `claim`'s own success line now prints the state-ref id too.
+        # `claim`'s own success line prints the state-ref id too.
         assert claim_out.splitlines()[0] == f"CLAIMED issue {child_id}: state-ref-claim"
 
         assert f"CLAIMED issue {child_id}" in run_cli(["status", child_id], capsys).expect_success()

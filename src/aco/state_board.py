@@ -99,9 +99,9 @@ class ItemWriter(Protocol):
         ...
 
 
-NO_LANDINGS_YET = (
-    "landings are not yet derived from the state ref; "
-    "#230 slice 6 adds merge-commit-derived landings"
+NO_PULL_REQUEST_LANDINGS = (
+    "storage = state-ref has no pull request landings; "
+    "release --merged <sha> checks the local trunk"
 )
 NO_BARE_ISSUE = "a state-ref item is created by aco item new, never as a bare forge issue"
 _BLOCKER_ITSELF = "is listed as its own blocker"
@@ -484,7 +484,7 @@ class StateRefBoard:
         raise forge.ForgeUnsupportedError("storage = state-ref has no pull request file listings")
 
     def landing(self, number: int) -> forge.Landing:
-        raise forge.ForgeUnsupportedError(NO_LANDINGS_YET)
+        raise forge.ForgeUnsupportedError(NO_PULL_REQUEST_LANDINGS)
 
     def parent_number(self, number: int) -> int | None:
         """`number`'s recorded parent, off its own record alone: never
