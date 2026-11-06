@@ -2,54 +2,6 @@
 mandatory_jobs = ["check (3.14)", "Package smoke (wheel, sdist, tool install without Node)", "Frontend (svelte-check, lint, knip, vitest, assets fresh)", "E2E (Playwright, desktop)"]
 legacy = "fail"
 
-[[gate.loosened]]
-what = 'mandatory job "Test-efficiency gates (test-budget, similar-methods, test-inventory, spec-lint)" removed'
-item = "#334"
-date = 2026-10-24
-reason = "the operator ruled the unused efficiency gates and the spec-lint exemption ledger out; spec-lint stays a pytest test in the check job"
-
-[[gate.loosened]]
-what = 'mandatory job "check (3.11)" removed'
-item = "#560"
-date = 2026-10-29
-reason = "the Python floor rose to 3.14, so the check job runs on that one version"
-
-[[gate.loosened]]
-what = 'mandatory job "check (3.12)" removed'
-item = "#560"
-date = 2026-10-29
-reason = "the Python floor rose to 3.14, so the check job runs on that one version"
-
-[[gate.loosened]]
-what = 'mandatory job "check (3.13)" removed'
-item = "#560"
-date = 2026-10-29
-reason = "the Python floor rose to 3.14, so the check job runs on that one version"
-
-[[gate.loosened]]
-what = 'import contract "Layers" changes layers'
-item = "#601"
-date = 2026-10-30
-reason = "the decision board runs aco's library in process (#564 line 1 A), so board leaves the bottom row for its own row between the commands and decide; two direct-import forbidden contracts keep it off aco's session, writer, forge transports, store and output except through its one adapter"
-
-[[gate.loosened]]
-what = 'import contract "Decision board layers" changes layers'
-item = "#601"
-date = 2026-10-30
-reason = "the in-process adapter aco_source takes the deleted command-line adapter's place in the same layer, beside the board's rules and token store"
-
-[[gate.loosened]]
-what = 'import contract "Decision board transport does not reach the aco adapter" changes forbidden_modules'
-item = "#601"
-date = 2026-10-30
-reason = "the forbidden adapter is renamed with its swap: server, static and api may not import aco_source, as they could not import the command-line adapter before it"
-
-[[gate.loosened]]
-what = 'import contract "The decision board reaches aco only through its command line" removed'
-item = "#601"
-date = 2026-10-30
-reason = "the board no longer runs the aco command line (#564's adopted board-to-library direction); two forbidden contracts replace it: only aco_source imports aco's session and ruling writer, and no board module imports a forge transport, the store or report"
-
 [[root.allow]]
 entry = "frontend/"
 reason = "the web client, built apart from the Python package"

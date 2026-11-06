@@ -140,7 +140,7 @@ class TestRuleUnclear:
 
     @pytest.mark.parametrize(
         "arguments",
-        [decide("A", "board"), other_arguments("Anders", "board")],
+        [decide("A", "chat"), other_arguments("Anders", "chat")],
         ids=["letter", "other"],
     )
     def test_a_ruling_takes_a_line_with_its_head(

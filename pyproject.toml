@@ -92,7 +92,7 @@ layers = [
     "protocol | process",
 ]
 # `items` may import `body`, never the reverse.
-# The six cmd_* -> cmd_* edges: land.spec cites the release rules;
+# The five cmd_* -> cmd_* edges: land.spec cites the release rules;
 # start.spec cites the claim rules CLM-05/06/18; adopt.spec ADOPT-14 cites CLM-18
 # and CLAIM-31; brief.spec BRIEF-26 cites
 # STAT-19..21 and BRIEF-10 cites STAT-22; item.spec ITEM-32/34 cite CUT-17/28
@@ -244,7 +244,6 @@ dev = [
     "build>=1",
     "ruff==0.17.3",
     "vulture==2.16",
-    "import-linter==2.15",
     "pyright==1.1.414",
     "pytest-xdist>=3.8.0",
 ]

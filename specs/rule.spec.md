@@ -1,12 +1,12 @@
 # `aco rule`
 
-`aco rule ITEM --line N --option X --via board|chat|default --card-hash HASH` or
-`aco rule ITEM --line N --other TEXT --via board|chat --card-hash HASH`, or
+`aco rule ITEM --line N --option X --via chat|default --card-hash HASH` or
+`aco rule ITEM --line N --other TEXT --via chat --card-hash HASH`, or
 `aco rule ITEM --line N --unclear [--note TEXT] --card-hash HASH`, moves one
 proposed `[[expectation]]` line to ruled (or, with `--unclear`, sends an open
 option line back to its head), transcribing the operator's own word (a head proposes by editing the body and withdraws with `aco withdraw`; this command decides); `--line` may repeat to rule several lines of one item in one body write, all or none. `--via` says how the
-decision reached aco: `board` the operator clicked, `chat` a head transcribes
-his word, `default` he left the card unanswered and its recommendation stands.
+decision reached aco: `chat` a head transcribes his word, `default` he left the
+card unanswered and its recommendation stands. `--via board` is not a choice: only `aco serve`'s decision board writes `board`, in process.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This command's writer is the
 one write path for a ruling (`board --serve`'s own
 `POST /rule` form is retired; `aco serve`'s decision board writes through this
@@ -48,6 +48,7 @@ withdrawn one.
 | a misplaced `--option` or `--card-hash`, one `--line` included | RULE-34 | RULE-09 | — |
 | a named line without its own `--option` or `--card-hash` | RULE-15 | RULE-09 | — |
 | `--other`, `--note` or `--via` given twice | RULE-35 | RULE-09 | — |
+| `--via board` | RULE-39 | OUT-06 | — |
 | line `N` is a yes/no line, `--option`, `--other` or `--unclear` | RULE-16 | RULE-09 | — |
 | its card changed since it was shown | RULE-17 | RULE-09 | — |
 | line `N` was withdrawn by its head | RULE-37 | RULE-09 | — |
@@ -111,7 +112,9 @@ withdrawn one.
 - [ ] [RULE-34] A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
   - with several `--line`, one written before the first `--line`: `<flag> before the first --line belongs to no line`
   - a second one for the same line, with one `--line` too: `line <k> has a second <flag>`; `--line 2 --option A --option B` refuses `line 2 has a second --option`
-- [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call and any other refusal of this file (see E-RULE-13).
+- [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call (see E-RULE-13):
+  - and before every other refusal of this file but RULE-39 and the parser's own
+- [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
 - [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 
@@ -122,7 +125,7 @@ withdrawn one.
 | RULE-04 (already ruled) | `already_ruled` |
 | RULE-05 (out of range) | `line_out_of_range` |
 | RULE-07 (missing item), RULE-08 (pull-request target), RULE-28 (malformed body) | `invalid_item` |
-| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-38 (asked after today's UTC date), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice) | `invalid_usage` |
+| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-38 (asked after today's UTC date), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice), RULE-39 (`--via board`), the parser's own refusals | `invalid_usage` |
 | RULE-17 (the card changed), RULE-37 (the line was withdrawn) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
 | RULE-11 (the write itself fails) | `unavailable` |
@@ -131,7 +134,7 @@ withdrawn one.
 
 - `aco rule` never accepts two kinds of outcome, or none: `--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other`, `--unclear`, `--via` and `--card-hash` appear in `--help` with a help line each.
 - `aco rule --unclear` never stores `via` or `card_hash`: it decides nothing.
-- `aco rule` never checks who typed `--via`: it records what the writer was told. By operator ruling it is a tripwire for cooperative agents; an agent of the operator's own user that types `--via board` is not stopped, and the forge's edit history is the record after the fact.
+- `aco rule` never checks who typed `--via`: it records what the writer was told. By operator ruling it is a tripwire for cooperative agents; an agent of the operator's own user that types `--via chat` for a word the operator never spoke is not stopped, and the forge's edit history is the record after the fact.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entries: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.
@@ -238,13 +241,17 @@ exit 2
 $ aco rule 7 --line 2 --option A --card-hash <hash>
 2> ERROR: --option needs --via and --card-hash
 exit 2
+$ aco rule 7 --line 2 --option A --via board --card-hash <hash>
+2> usage: aco rule [-h] --line N ...
+2> aco rule: error: argument --via: invalid choice: 'board' (choose from chat, default)
+exit 2
 $ aco rule 7 --line 2 --option A --via chat --card-hash <hash> --note "Ja."
 2> ERROR: --note does not go with --option; keep the operator's word in the item's journal
 exit 2
 $ aco rule 7 --line 1 --option A --via chat --card-hash <hash>
 2> ERROR: line 1 is a yes/no line; --option rules only an option line
 exit 2
-$ aco rule 7 --line 2 --option A --via board --card-hash <stale> --json
+$ aco rule 7 --line 2 --option A --via chat --card-hash <stale> --json
 2> ERROR: line 2 changed since its card was shown; show it again and rule what it shows now
 {"ok": false, "reason": "card_changed", "message": "line 2 changed since its card was shown; show it again and rule what it shows now"}
 exit 2
@@ -283,7 +290,7 @@ exit 2
 $ aco rule 7 --line 1 --other "Nur am Desktop." --via chat --card-hash <hash>
 2> ERROR: line 1 is a yes/no line; --other rules only an option line
 exit 2
-$ aco rule 7 --line 2 --other "Nur am Desktop." --via board --card-hash <stale> --json
+$ aco rule 7 --line 2 --other "Nur am Desktop." --via chat --card-hash <stale> --json
 2> ERROR: line 2 changed since its card was shown; show it again and rule what it shows now
 {"ok": false, "reason": "card_changed", "message": "line 2 changed since its card was shown; show it again and rule what it shows now"}
 exit 2
