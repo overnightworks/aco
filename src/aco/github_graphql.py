@@ -17,7 +17,7 @@ from . import forge, protocol
 # GraphQL aliases every number into one query field, so a block this size
 # stays one round trip; GitHub's own guidance keeps a query's alias count in
 # the 50-100 range rather than one huge query per repository.
-GRAPHQL_ITEM_REFERENCE_BATCH_SIZE = 100
+GRAPHQL_BATCH_SIZE = 100
 
 
 # One round trip: the query and what the response is called in a refusal, answering
@@ -119,7 +119,7 @@ def not_found_batch_nodes(message: str, numbers: Sequence[int]) -> Mapping[str, 
 def _read_block[Value](
     read: BatchedRead[Value], numbers: tuple[int, ...], fetch: FetchBlock
 ) -> dict[int, Value]:
-    """One round trip for at most `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE` numbers."""
+    """One round trip for at most `GRAPHQL_BATCH_SIZE` numbers."""
     try:
         values = fetch(_query(read, numbers), f"batched {read.subject}")
     except forge.ForgeError as error:
@@ -135,15 +135,15 @@ def _read_block[Value](
 def read_batched[Value](
     read: BatchedRead[Value], numbers: Iterable[int], *, fetch: FetchBlock, concurrency: int
 ) -> dict[int, Value]:
-    """Every one of `numbers`, in blocks of `GRAPHQL_ITEM_REFERENCE_BATCH_SIZE`
+    """Every one of `numbers`, in blocks of `GRAPHQL_BATCH_SIZE`
     fetched concurrently, at most `concurrency` at once. Nothing requested costs
     no round trip."""
     ordered = tuple(dict.fromkeys(numbers))
     if not ordered:
         return {}
     blocks = tuple(
-        ordered[start : start + GRAPHQL_ITEM_REFERENCE_BATCH_SIZE]
-        for start in range(0, len(ordered), GRAPHQL_ITEM_REFERENCE_BATCH_SIZE)
+        ordered[start : start + GRAPHQL_BATCH_SIZE]
+        for start in range(0, len(ordered), GRAPHQL_BATCH_SIZE)
     )
     with ThreadPoolExecutor(max_workers=min(len(blocks), concurrency)) as pool:
         results = list(pool.map(lambda block: _read_block(read, block, fetch), blocks))
@@ -151,51 +151,6 @@ def read_batched[Value](
     for result in results:
         merged.update(result)
     return merged
-
-
-# `Repository.issueOrPullRequest`'s own `state` enum spans both `Issue`
-# (`OPEN`/`CLOSED`) and `PullRequest` (`OPEN`/`CLOSED`/`MERGED`); `forge.
-# ItemReference.state` only ever distinguishes open from not, matching the
-# REST issues endpoint `item_reference` reads a single number through, so a
-# merged pull request reads exactly like a closed one here too. GraphQL's own
-# schema has `MERGED` solely on `PullRequestState`, so an `Issue` node
-# claiming it is impossible on the wire and a malformed response, never a
-# state to normalize.
-_ITEM_STATES_BY_TYPENAME: dict[str, dict[str, forge.ItemState]] = {
-    "Issue": {"OPEN": forge.ItemState.OPEN, "CLOSED": forge.ItemState.CLOSED},
-    "PullRequest": {
-        "OPEN": forge.ItemState.OPEN,
-        "CLOSED": forge.ItemState.CLOSED,
-        "MERGED": forge.ItemState.CLOSED,
-    },
-}
-
-
-def _parsed_item_reference_node(node: object) -> forge.ItemReference:
-    """One alias's value: `MISSING` for a number that is neither an issue nor a
-    pull request, a malformed shape raised loud."""
-    if node is None:
-        return forge.ItemReference(forge.ItemState.MISSING)
-    if not isinstance(node, dict):
-        raise malformed_response(_ITEM_REFERENCE_SUBJECT)
-    typename = node.get("__typename")
-    state = node.get("state")
-    title = node.get("title")
-    body = node.get("body")
-    if (
-        not isinstance(typename, str)
-        or not isinstance(state, str)
-        or state not in _ITEM_STATES_BY_TYPENAME.get(typename, {})
-        or not isinstance(title, str)
-        or (body is not None and not isinstance(body, str))
-    ):
-        raise malformed_response(_ITEM_REFERENCE_SUBJECT)
-    return forge.ItemReference(
-        _ITEM_STATES_BY_TYPENAME[typename][state],
-        title,
-        body or "",
-        typename == "PullRequest",
-    )
 
 
 def _parsed_reopened_node(node: object) -> datetime | None:
@@ -217,14 +172,7 @@ def _parsed_reopened_node(node: object) -> datetime | None:
     return datetime.fromisoformat(created_at)
 
 
-_ITEM_REFERENCE_SUBJECT = "item reference"
 _REOPENED_SUBJECT = "reopen time"
-ITEM_REFERENCE_READ = BatchedRead(
-    "issueOrPullRequest",
-    "__typename ... on Issue { state title body } ... on PullRequest { state title body }",
-    _ITEM_REFERENCE_SUBJECT,
-    _parsed_item_reference_node,
-)
 REOPENED_AT_READ = BatchedRead(
     "issue",
     "timelineItems(itemTypes: [REOPENED_EVENT], last: 1) "
