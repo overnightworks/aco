@@ -85,12 +85,12 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-31] Within a repository, Decided lists the newest date first, then item number and line index descending; with no ruled line and no failed repository it reads `Nothing decided yet`.
 - [ ] [ABRD-32] Opening Decided selects its first row: its card on desktop, the list on phones. Returning to Open keeps its selection, list position and phone view; a background decision displaces neither view.
 - [ ] [ABRD-33] During undo a question stays open; only its stored answer, applied in place without a read, moves it to Decided.
-- [ ] [ABRD-36] A one-point card shows: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, `Asked` (ABRD-106), question, Problem, Today (ABRD-43), options, Recommendation and Decide (ABRD-44).
+- [ ] [ABRD-36] A one-point card has: repository, area, kind, `with head` (ABRD-61), `reversible` or `final`, `Asked` (ABRD-106), question, Problem, Today (ABRD-43), options A-D, Recommendation and Decide (ABRD-44).
 - [ ] [ABRD-37] A selected ruled line shows the decided card: meta, question, Decided (`A — name`, `Ja`, `Nein`, `Später` or ABRD-57), How (ABRD-54) and Contract behind `Show` with its binding sentences and source.
 - [ ] [ABRD-54] How reads `Board`, `From chat` or `Recommendation kept – no answer` for an option line's `via` (ABRD-53), `not recorded` for a yes/no line; then ` · ` and the ruling date as `DD.MM.YYYY`.
 - [ ] [ABRD-57] A line ruled `other` shows Decided as `Other: „<answer>“` and binds that answer alone behind Contract's `Show`; How reads as ABRD-54; Open never lists it, Decided does (ABRD-30).
 - [ ] [ABRD-38] Each option on an option card is a button opening its Result (picture or `= TODAY`; none when it gives neither), You notice, Cost, Undo and Contract behind `Show`; opening one closes the other.
-- [ ] [ABRD-43] A card without a Today picture has no Today row. Each picture on an option card is an `Enlarge picture` button showing it with its caption in a modal; `Close` or `Esc` closes it and returns focus.
+- [ ] [ABRD-43] A card without a Today picture has no Today row. Each option-card picture is an `Enlarge picture` button showing it with caption in a modal; `Close` or `Esc` closes it, returning focus to that button.
 - [ ] [ABRD-44] A one-point card's Decide row has one pick per option, the recommended one in the accent; a pick waits out the undo window (ABRD-99), then posts the card (ABRD-77); once stored, it moves to Decided.
 - [ ] [ABRD-45] A refused post shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide picks and `Accept all` behind `Neu laden`, whose read locks only that card; other failures keep them.
 - [ ] [ABRD-46] A `final` pick first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` records it, and the window starts once every point is chosen (ABRD-87).
