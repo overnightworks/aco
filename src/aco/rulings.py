@@ -47,7 +47,7 @@ def _order(row: Row) -> tuple[int, int, int]:
 
 
 def rows(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[Row, ...]:
-    """Every readable open item that carries at least one `[[expectation]]`
+    """Every readable item among `issues` that carries at least one `[[expectation]]`
     line, fully ruled ones included, in RUL-03's order. An unreadable item is
     skipped before any parse. `storage` is forwarded to `body.parse_body` and
     `expectations.expectation_lines` unchanged: a state-ref body's `[record]`
