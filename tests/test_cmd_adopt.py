@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -24,6 +25,7 @@ from cli_fixtures import (
     real_git,
     run_cli,
     run_context_over,
+    sealed_git_environment,
     track_board_config,
     worktrees_and_branches,
 )
@@ -46,8 +48,28 @@ OVERLONG_ISSUE_NUMBER = "1" * 4301
 
 def _publish_branch_tip(clone: Path, message: str) -> str:
     """A fresh commit on top of `clone`'s `HEAD`, forced onto the remote as the
-    pull request's head branch; no local branch or ref moves."""
-    tree = real_git(clone, "rev-parse", "HEAD^{tree}").stdout.strip()
+    pull request's head branch; no local branch or ref moves. The commit adds a file named
+    for `message`, so squashing the branch onto the default branch leaves a change to commit."""
+    index = clone.parent / f"{clone.name}-publish-index"
+    index_environment = sealed_git_environment() | {"GIT_INDEX_FILE": str(index)}
+
+    def index_git(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", *arguments],
+            cwd=clone,
+            env=index_environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    try:
+        index_git("read-tree", "HEAD")
+        blob_id = real_git(clone, "hash-object", "-w", "--no-filters", "/dev/null").stdout.strip()
+        index_git("update-index", "--add", "--cacheinfo", f"100644,{blob_id},{message}.txt")
+        tree = index_git("write-tree")
+    finally:
+        index.unlink(missing_ok=True)
     tip = real_git(clone, "commit-tree", tree, "-p", "HEAD", "-m", message).stdout.strip()
     real_git(clone, "push", "-q", "--force", "origin", f"{tip}:refs/heads/{ADOPTED_BRANCH}")
     return tip
