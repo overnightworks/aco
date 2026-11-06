@@ -1,0 +1,8 @@
+claim_id = "ad0f5236340b4bd5b979a2b95ffacce6"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "4432e4d1b9be8c6c7d42da80d959adfa9011f7fb"
+branch = "claude/issue-681-strip-provenance-from-the-specs"
+scope = ["scripts/spec_lint.py", "specs/adopt.spec.md", "specs/board.spec.md", "specs/body-block.spec.md", "specs/check.spec.md", "specs/claim-record.spec.md", "specs/cut.spec.md", "specs/landing-grammar.spec.md", "specs/output.spec.md", "specs/ref-store-cas.spec.md", "specs/reset.spec.md", "specs/rule.spec.md", "specs/serve.spec.md", "specs/start.spec.md", "specs/storage-pin.spec.md"]
+opened_commit = "774b2b521e8b858399678f0dc634c3dba1a8276c"
+whole_reason = "One standard applied line by line across the specs, together with the lint comment that shows the retired-note shape; split, each slice would review the same pattern again."
