@@ -115,7 +115,7 @@ again for that claim.
 
 Both storages judge REL-48 and REL-53 alike, before anything is written, closed or removed.
 
-Residual, owned by agent-coordination#310 finding 356: a same-branch claim based off the trunk, such as START-11 or
+Residual: a same-branch claim based off the trunk, such as START-11 or
 `aco claim` in a lane worktree still standing, passes both REL-48 and REL-53; a rerun releases that
 claim and closes its reopened item.
 

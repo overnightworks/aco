@@ -227,7 +227,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 repository with `main` at one commit, a git identity, `origin/HEAD`, and
 `ACO_AGENT` set to `Ada`; `<remote>`, `<tmp>` and `<home>` are the runner's own
 paths. A session for `check <pr>`/`release --merged` also names a fixed,
-deterministic fake `gh` as a setup precondition (the shape agent-coordination#320 lays out) —
+deterministic fake `gh` as a setup precondition —
 named here, not built by this spec.
 
 ### E-LAND-01 — a trunk trailer lands an item with no pull request in sight

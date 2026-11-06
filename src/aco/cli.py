@@ -148,7 +148,7 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
-    report.add_json_flag(commands.add_parser(name, help="project the open work board, read-only"))
+    report.add_json_flag(commands.add_parser(name, help="project the open work board"), "JSON only")
 
 
 def _add_serve_parser(commands: usage.Subcommands, name: str) -> None:
@@ -165,7 +165,7 @@ def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
 def _add_next_parser(commands: usage.Subcommands, name: str) -> None:
     next_command = commands.add_parser(
         name,
-        help="name the board's top-priority item to pull",
+        help="name the one next action: pull, cut, check or close an item",
         description=NEXT_PULL_DESCRIPTION,
     )
     report.add_json_flag(next_command)
@@ -535,7 +535,7 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
         "--origin",
         type=items.parse_origin,
         metavar="FORGE#N",
-        help="bind this lane to a foreign forge issue, e.g. gitlab#42",
+        help="bind this item to a foreign forge issue, e.g. gitlab#42 (state-ref storage only)",
     )
     new.add_argument(
         "--scope",

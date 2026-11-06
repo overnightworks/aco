@@ -38,8 +38,9 @@ flowchart LR
     merge -->|aco next| item
 ```
 
-Set `ACO_AGENT` to the agent's name once: `start` refuses in a plain
-shell without it. A repository adopts aco by landing one commit that adds an
+Identity comes from `ACO_AGENT`, else `GROK_SESSION_ID`, else
+`CLAUDE_CODE_SESSION_ID`; `start` refuses only when none is set (START-03).
+A repository adopts aco by landing one commit that adds an
 empty `.aco/board.toml` and nothing else, then runs `aco bootstrap` once to
 create the state ref (`specs/bootstrap.spec.md`, `specs/storage-pin.spec.md`).
 After that: `aco next` names the item to pull, `aco start <n>` creates its

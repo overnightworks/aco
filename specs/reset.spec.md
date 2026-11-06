@@ -76,7 +76,7 @@ documents. `<repo>`/`<sha>`/`<tip>`/`<remote>` are the runner's own values;
 
 ## Never
 
-- `aco reset` never accepts `--json`: its own parser defines only `--confirm`, `--no-export`, `--export-dir`, and `--force-unreadable` (README, "Refusals and `--json`").
+- `aco reset` never accepts `--json`: its own parser defines only `--confirm`, `--no-export`, `--export-dir`, and `--force-unreadable` (`specs/output.spec.md`, the entry on commands that never gain `--json`).
 - A rejected `--force-with-lease` delete never leaves the local ref deleted while the remote one survives: RESET-05..07 all raise before the local-delete step runs.
 - A remote-delete repair sentence never names a manual `--force-with-lease` command: RESET-05 and RESET-06 both name only re-running `aco reset --confirm` itself.
 - An export failure never leaves a bundle file at the destination path: the temporary file it was staged to is always removed on the way out.

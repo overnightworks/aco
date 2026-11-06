@@ -23,12 +23,12 @@ JSON_FLAG = "--json"
 _JSON_HELP = "print the result as JSON instead of the human lines"
 
 
-def add_json_flag(parser: argparse.ArgumentParser) -> None:
+def add_json_flag(parser: argparse.ArgumentParser, help_text: str = _JSON_HELP) -> None:
     """The one place `--json` is declared: a command that never calls this
     has no JSON mode at all, and `cli.main` matches this same spelling when
     argparse refuses before any namespace is filled, so the flag needs a
-    single owner."""
-    parser.add_argument(JSON_FLAG, action="store_true", help=_JSON_HELP)
+    single owner. A command with no human output passes its own `help_text`."""
+    parser.add_argument(JSON_FLAG, action="store_true", help=help_text)
 
 
 def _stdin_file_mode() -> int | None:
