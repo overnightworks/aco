@@ -90,8 +90,8 @@ class Storage(StrEnum):
 # and relations a GitHub issue would otherwise carry through its native
 # type, sub-issue, and blocked-by relations. Legal only under
 # `storage = "state-ref"` -- `_block_schema_defects` refuses it by name as
-# an unknown top-level key under `storage = "github"` (decision record 0001
-# §2: blockers and parentage on GitHub, never duplicated in the body).
+# an unknown top-level key under `storage = "github"` (blockers and parentage
+# live on the forge's relations there, never duplicated in the body).
 RECORD_KEY = "record"
 RECORD_STATES = frozenset({"open", "closed"})
 RECORD_KEYS = frozenset(
@@ -135,7 +135,7 @@ ORIGIN_GRAMMAR_HINT = "forge#n or host/owner/repo#n, e.g. gitlab#42"
 
 class ItemKind(StrEnum):
     """An item's kind, read from the forge's native issue type -- the one
-    owner for "is this a container" (decision record 0001 ruling D3)."""
+    owner for "is this a container"."""
 
     TASK = "task"
     BUG = "bug"

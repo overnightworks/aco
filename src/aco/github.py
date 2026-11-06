@@ -40,7 +40,7 @@ API_ISSUE_STATES: dict[str, workboard.BlockerState] = {
     "open": workboard.BlockerState.OPEN,
     "closed": workboard.BlockerState.CLOSED,
 }
-# The organization's native issue types (decision record 0001 ruling D3):
+# The organization's native issue types:
 # casefolded so an org's own casing of the type name never matters. An
 # unrecognized type name maps to no kind at all -- never guessed from a
 # label -- so a repository whose org renames a type loses that item's
