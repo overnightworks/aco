@@ -390,3 +390,28 @@ def test_a_trunk_that_cannot_be_resolved_makes_the_list_unavailable_never_no_fil
 
     assert isinstance(reading, ahead_of_caller.Unavailable)
     assert reading.sentence.startswith(f"{LIST_PATH} cannot be read: cannot determine the trunk")
+
+
+def test_a_list_that_is_no_utf8_is_unavailable_and_the_rest_of_the_output_prints(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: AHEAD-02 (matrix row 10)."""
+    world.commit_list(b"\xff\xfe[[code]]\n")
+    world.serve()
+
+    printed = run_cli(["next"], capsys)
+    status, payload = next_json(capsys)
+
+    sentence = (
+        f"{LIST_PATH} cannot be read: 'utf-8' codec can't decode byte 0xff in position 0: "
+        "invalid start byte"
+    )
+    assert (printed.status, printed.stdout) == (
+        0,
+        TOP_WORK_LINES + f"ahead of caller: unavailable ({sentence})\n",
+    )
+    assert (status, payload["ahead_of_caller"], payload["ahead_of_caller_unavailable"]) == (
+        0,
+        [],
+        sentence,
+    )

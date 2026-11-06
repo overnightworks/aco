@@ -440,7 +440,7 @@ def ahead_of_caller_reading(
         text = checkout.file_at_revision(
             ahead_of_caller.LIST_PATH, revision=context.trunk_ref, directory=context.toplevel
         )
-    except protocol.ClaimError as error:
+    except (protocol.ClaimError, UnicodeDecodeError) as error:
         return ahead_of_caller.Unavailable(f"{ahead_of_caller.LIST_PATH} cannot be read: {error}")
     parsed = ahead_of_caller.parse(text or "")
     if isinstance(parsed, ahead_of_caller.Unavailable):
