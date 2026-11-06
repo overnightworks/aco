@@ -1,0 +1,7 @@
+claim_id = "a55cd74723df4b768d4c791bb3079e93"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "cd8e99f3e525232342fe4e2de5c61abfe8c6b56e"
+branch = "docs/keep-unused-features"
+scope = ["README.md", "docs/decisions/0002-the-item-store-and-the-board-stay-unused.md"]
+opened_commit = "9ae236b753b049438505ca6391bae6e0dc4dd896"
