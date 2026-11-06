@@ -1,0 +1,8 @@
+claim_id = "e3694e129c4249369fffd68075472cac"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "16232ff81d9801dc1d27fd4135724da5c715a76e"
+branch = "claude/issue-688-drop-from-future-import-annotations-from"
+scope = ["quality/baseline.toml", "scripts", "src/aco", "tests"]
+opened_commit = "8af575310256b7e1a9548ec6482962d862587c23"
+whole_reason = "One import line leaves every module at once; split, the repository would carry two annotation styles and pay one review per batch for the same mechanical line."
