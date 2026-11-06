@@ -66,7 +66,8 @@ the peer and its claim id, never the meeting paths.
 
 - [ ] [STAT-19] Text `aco status` over a claim ends with one line `lane-shared: <entry>, <entry>`, each entry the trunk's committed `lane_shared` names (PIN-37); none configured or no trunk (STAT-31), no such line.
 - [ ] [STAT-20] An entry naming no file the trunk tracks -- a directory, a missing file -- shows as `<entry> (names no file)`, never as a bare grant (see E-STAT-06).
-- [ ] [STAT-21] A trunk copy that refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
+- [ ] [STAT-21] A trunk copy whose content refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
+- [ ] [STAT-33] A trunk path that holds no file (a directory, say) refuses `aco status` whole, before any claim prints.
 - [ ] [STAT-22] `--json`, also with `--path`, ends with `"lane_shared": [{"path", "names_a_file"}, ...]` and `"lane_shared_unavailable": null`; on STAT-21's defect `null` and `"<sentence>"`.
 - [ ] [STAT-23] `aco status --path P` with no holder prints `LANE-SHARED P` when P is a file an entry names (STAT-20); STAT-21's line follows the answer (see E-STAT-06).
 

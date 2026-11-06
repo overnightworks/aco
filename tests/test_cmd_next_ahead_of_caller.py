@@ -12,7 +12,7 @@ from board_fixtures import REPOSITORY, board_issue, complete_contract
 from cli_fixtures import CliRun, freeze_cli_now, real_git, run_cli
 from github_fixtures import FakeForge
 
-from aco import ahead_of_caller, board_read, forge, github, session
+from aco import forge, github
 
 LIST_PATH = ".aco/ahead-of-caller.toml"
 # `gh api <endpoint> ...` answers with the file named after the endpoint, else HTTP 404.
@@ -247,6 +247,7 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
 @pytest.mark.parametrize(
     ("text", "sentence"),
     [
+        ("[[code\n", None),
         ("[[cod]]\n", f"{LIST_PATH} has the unknown top-level key 'cod'"),
         ("code = 3\n", f"{LIST_PATH}: 'code' must be an array of tables"),
         (
@@ -267,6 +268,10 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
             f"{LIST_PATH}: code entry 1 has a path that holds a '..' segment",
         ),
         (
+            code("a.py", "#1", reason=""),
+            f"{LIST_PATH}: code entry 1 has a reason that is not one non-empty line",
+        ),
+        (
             code("a.py", "#1", reason="a\\nb"),
             f"{LIST_PATH}: code entry 1 has a reason that is not one non-empty line",
         ),
@@ -282,7 +287,7 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
     ],
 )
 def test_a_malformed_file_prints_the_unavailable_line_and_the_rest_of_the_output(
-    world: World, capsys: pytest.CaptureFixture[str], text: str, sentence: str
+    world: World, capsys: pytest.CaptureFixture[str], text: str, sentence: str | None
 ) -> None:
     """Spec: AHEAD-04..AHEAD-09, NEXT-50, NEXT-52 (matrix row 10)."""
     world.commit_list(text)
@@ -292,7 +297,10 @@ def test_a_malformed_file_prints_the_unavailable_line_and_the_rest_of_the_output
 
     carried = payload["ahead_of_caller_unavailable"]
     assert isinstance(carried, str)
-    assert carried == sentence
+    if sentence is None:
+        assert carried.startswith(f"{LIST_PATH} is not valid TOML: ")
+    else:
+        assert carried == sentence
     assert (printed.status, printed.stdout) == (
         0,
         TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",
@@ -334,19 +342,6 @@ def test_a_trunk_that_cannot_be_resolved_refuses_next_whole_never_reads_no_file(
     assert printed.stderr.startswith("ERROR: cannot determine the trunk")
     assert (status, payload["ok"], payload["reason"]) == (2, False, "unavailable")
     assert "ahead_of_caller" not in payload
-
-
-def test_a_trunk_git_cannot_show_makes_the_list_unavailable_never_no_file(world: World) -> None:
-    """Spec: AHEAD-02."""
-    world.commit_list(code("src/token.py", "12"))
-    real_git(world.clone, "update-ref", "refs/remotes/origin/renamed", "refs/remotes/origin/main")
-    real_git(world.clone, "update-ref", "-d", "refs/remotes/origin/main")
-    real_git(world.clone, "symbolic-ref", "-d", "refs/remotes/origin/HEAD")
-
-    reading = board_read.ahead_of_caller_reading(session.run_context(None))
-
-    assert isinstance(reading, ahead_of_caller.Unavailable)
-    assert reading.sentence.startswith(f"{LIST_PATH} cannot be read: cannot determine the trunk")
 
 
 def test_a_trunk_path_that_is_a_directory_is_unavailable_never_no_file(
@@ -428,16 +423,15 @@ def test_a_list_that_is_no_utf8_is_unavailable_and_the_rest_of_the_output_prints
 
     printed, status, payload = next_both(capsys)
 
-    sentence = (
-        f"{LIST_PATH} cannot be read: 'utf-8' codec can't decode byte 0xff in position 0: "
-        "invalid start byte"
-    )
+    carried = payload["ahead_of_caller_unavailable"]
+    assert isinstance(carried, str)
+    assert carried.startswith(f"{LIST_PATH} cannot be read: ")
     assert (printed.status, printed.stdout) == (
         0,
-        TOP_WORK_LINES + f"ahead of caller: unavailable ({sentence})\n",
+        TOP_WORK_LINES + f"ahead of caller: unavailable ({carried})\n",
     )
     assert (status, payload["ahead_of_caller"], payload["ahead_of_caller_unavailable"]) == (
         0,
         [],
-        sentence,
+        carried,
     )

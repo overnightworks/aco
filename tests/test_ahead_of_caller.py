@@ -103,7 +103,7 @@ def test_an_item_takes_the_forms_of_this_repository_or_another(
     ],
 )
 def test_a_malformed_file_is_refused_with_its_spec_sentence(text: str, sentence: str) -> None:
-    """Spec: AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-19."""
+    """Spec: AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-22."""
     assert unavailable_sentence(text) == sentence
 
 

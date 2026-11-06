@@ -285,7 +285,7 @@ def file_at_revision(path: str, *, revision: str, directory: Path) -> str | None
     tree, read from `directory` via `-C` -- `None` only when that tree holds
     no such file (the trunk's committed board configuration,
     which no lane can change from its own worktree). A `revision` that does
-    not resolve, or a file git cannot show, is a git failure, never an
+    not resolve, or a path that holds no file git can read, is a git failure, never an
     absent file."""
     if not path_is_tracked(path, directory=directory, revision=revision):
         return None
