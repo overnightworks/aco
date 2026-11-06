@@ -57,5 +57,7 @@ class TestAskedAfterToday:
         client = serve_item(monkeypatch, item_body(line))
         ruled = run_cli(["rule", "7", *decide("A", "chat")], capsys)
         assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 0 line(s) still open\n")
-        written = body.locate_block(client.item_bodies[7]).data["expectation"][1]
+        expectations = body.locate_block(client.item_bodies[7]).data["expectation"]
+        assert isinstance(expectations, list)
+        written = expectations[1]
         assert (written["asked_on"], written["ruled_on"]) == (today, today)
