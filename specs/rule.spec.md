@@ -9,7 +9,7 @@ decision reached aco: `chat` a head transcribes his word, `default` he left the
 card unanswered and its recommendation stands. `--via board` is not a choice: only `aco serve`'s decision board writes `board`, in process.
 `--help` lists every flag here, `--unclear` included, each with a help line. A yes/no line cannot be ruled by this command. `--card-hash` names the card the decider saw (`specs/rulings.spec.md` RUL-14). This command's writer is the
 one write path for a ruling; `aco serve`'s decision board writes through this
-command's writer in process, `specs/serve.spec.md` ABRD-78). This
+command's writer in process (`specs/serve.spec.md` ABRD-78). This
 file owns the ruling's own refusals -- an already-ruled
 line, an out-of-range one -- the `RULED` line, its own `reason` vocabulary,
 and the target refusals: a missing item, a pull-request target and a
