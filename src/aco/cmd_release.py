@@ -862,7 +862,7 @@ class _ReleaseReport:
     outcome, bundled so the printer itself takes one argument
     instead of PLR0913's five-scalar ceiling: the just-released claim, the
     caller identity that performed it, the outcome it recorded, and the
-    merged-landing board read, or the hint that replaced it,
+    merged-landing board read, or a hint when that read refused,
     `None` for a release that runs no board read. `worktree` is the merged
     outcome's own cleanup result, `None` for
     `--abandoned`, which never attempts cleanup at all."""

@@ -35,7 +35,7 @@ from .protocol import (
     item_id_of_filename,
 )
 
-# Refuse rather than silently widen (ruling 16.09.2026): an id
+# Refuse rather than silently widen: an id
 # never grows a seventh hex character just because the id space (16.7
 # million values per repository) is filling up. Three tries against real
 # randomness is already astronomically unlikely to collide even once; a
@@ -103,8 +103,8 @@ def format_item_id(number: int) -> str:
     header prints under every
     storage pin, `github` included -- so an id this tool prints is always a
     valid reference back into `workboard.parse_item_reference`, regardless of
-    which forge actually owns the number (decision D4, 16.09.2026:
-    an id is identity, not just display)."""
+    which forge actually owns the number (an id is identity, not just
+    display)."""
     return f"aco-{number:06x}"
 
 

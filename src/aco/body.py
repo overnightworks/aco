@@ -5,7 +5,7 @@ fenced block -- the `[[expectation]]`/`[[slice]]` arrays, `scope`/`size`/
 codec for its own board-builder domain (`Contract`, `ParsedBody`,
 `BodyReadState`, `Storage`, `ItemKind`, ... are all board-domain field types
 too, read straight off a parsed body); `items.py` and `state_board.py`
-import it for the same one schema `workboard.py` used to own alone. This module
+import it for the same one schema. This module
 never imports `workboard`, `items`, or `state_board` back (Layers contract):
 `items` may import this module, never the reverse, so a value both this
 codec and `items.py` need (`ORIGIN_PATTERN`) is owned here instead.
@@ -1025,7 +1025,7 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     """The canonical `aco` block interior for `data`:
     schema key order, TOML-safe strings, unquoted dates, ending in
     `newline` so a following fence line starts clean. Production caller:
-    block-mode `cut`; there is no standalone validator."""
+    `cut`; there is no standalone validator."""
     lines = [f"version = {data['version']}"]
     lines.extend(
         f"{key} = {protocol.toml_string(data[key])}" for key in ("now", "next", "done_when")

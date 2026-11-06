@@ -945,9 +945,9 @@ def item_id_of_filename(filename: str) -> str | None:
 class ResourceRecord:
     """`resources/<name>.toml`: the never-reuse set for one resource name.
 
-    `occupied` never shrinks: a released value stays in it forever (today's
-    contract), so neither an auto nor an explicit intent can ever reassign a
-    value this resource has already given out.
+    `occupied` never shrinks: a released value stays in it forever, so neither
+    an auto nor an explicit intent can ever reassign a value this resource
+    has already given out.
     """
 
     name: str
@@ -1272,7 +1272,7 @@ def _resolved_resource(
     Auto intent (`resource_value` omitted): the least positive integer not
     yet in `occupied`. Explicit intent: refuse when the value is already in
     `occupied` -- live or released, since a released value is never reused
-    (§1 "one allocation owner: this file is the never-reuse set") -- naming
+    (claim-record.spec.md: a released claim record is never reused) -- naming
     the current holder when there is one.
     """
     if intent.resource_name is None:
@@ -1599,7 +1599,7 @@ def _toml_int_array(values: tuple[int, ...]) -> str:
 
 
 def serialize_claim_toml(claim: ActiveClaim) -> str:
-    """The `claims/<key>.toml` content for one live claim (§1)."""
+    """The `claims/<key>.toml` content for one live claim (CLAIM-05)."""
     lines = [
         f"claim_id = {toml_string(claim.claim_id)}",
         f"agent = {toml_string(claim.agent)}",
@@ -1732,7 +1732,7 @@ def parse_claim_toml(content: str, *, key: str, tip: ObjectId) -> ActiveClaim:
 
 
 def serialize_resource_toml(record: ResourceRecord) -> str:
-    """The `resources/<name>.toml` content for one resource's occupied set (§1)."""
+    """The `resources/<name>.toml` content for one resource's occupied set (CAS-35)."""
     return f"occupied = {_toml_int_array(record.occupied)}\n"
 
 

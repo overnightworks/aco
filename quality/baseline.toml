@@ -23,8 +23,8 @@
 "src/aco/github.py" = 1572
 "src/aco/protocol.py" = 1874
 "src/aco/state_board.py" = 928
-"src/aco/store.py" = 1802
-"src/aco/workboard.py" = 2904
+"src/aco/store.py" = 1800
+"src/aco/workboard.py" = 2902
 "tests/support/cli_fixtures.py" = 890
 "tests/support/github_fixtures.py" = 832
 "tests/test_board.py" = 3590

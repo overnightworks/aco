@@ -1169,7 +1169,7 @@ class GitHubForge:
                 f"repos/{self.repository}/issues?state=open&per_page={ISSUES_PER_PAGE}&page={page}",
                 "--jq",
                 (
-                    # No `select` here (unlike the old single `--paginate` call):
+                    # No `select` here (unlike a single `--paginate` call):
                     # a page must report its true raw item count so a short page
                     # still correctly signals "no more pages" even when some of
                     # its items are pull requests, filtered out below instead.
@@ -1309,8 +1309,8 @@ class GitHubForge:
         # GraphQL cursor pagination (measured ~4-9s for a three-week, ~630-PR
         # window) into independent single-page requests fetched in parallel
         # (~1-2s for the same window). A day whose own shard fills its limit
-        # is now the only way a merged pull request can go missing (the old
-        # single query's cap instead truncated the *whole* window), so that is
+        # is the only way a merged pull request can go missing (a single query's
+        # cap would truncate the *whole* window), so that is
         # what the residual warning below watches for.
         saturated_days = tuple(
             day
@@ -1541,8 +1541,8 @@ class GitHubForge:
 
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
         """Closes `number` itself instead of refusing:
-        `release --merged <pr>` used to require the item already closed on
-        the forge; now it closes a still-open one here -- not part of the
+        `release --merged <pr>` accepts a still-open item and closes it here, not
+        only one already closed on the forge -- not part of the
         generic `ForgeWriter` port, since `storage = "state-ref"` closes its
         own item through `state_board.StateRefBoard.prepare_landing`'s
         atomic `protocol.LandingIntent` instead, never through a forge

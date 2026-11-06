@@ -345,9 +345,9 @@ class _StoreAndIssues:
 
 def _store_observation_and_issues(context: RunContext) -> _StoreAndIssues:
     """The claim-state fetch (`ls-remote` + `fetch`) and the open-issue list
-    overlapped on separate threads: a board build that needs
+    overlap on separate threads: a board build that needs
     both -- every one that has not already been handed a pre-fetched
-    `issues` tuple -- used to pay their wait times back to back. The forge
+    `issues` tuple -- pays the longer wait, not the sum. The forge
     is resolved first, on this thread, so its refusals keep their order and
     the context's facts are read once, before either thread asks for them;
     the state-ref board already reads the context's one observation there,
@@ -365,8 +365,8 @@ def observed_board(
     issues: tuple[workboard.Issue, ...] | None = None,
 ) -> _ObservedBoard:
     """`board`/`next` share this: the store's live claims, projected
-    onto forge board data (claims no longer come from the
-    ledger; the forge is still the board's own data source)."""
+    onto forge board data (claims come from the store; the
+    forge is the board's own data source)."""
     if issues is None:
         fetched = _store_observation_and_issues(context)
         observed, issues = fetched.observed, fetched.issues

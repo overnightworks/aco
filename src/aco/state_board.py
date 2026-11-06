@@ -903,7 +903,7 @@ class StateRefBoard:
         transition actually commits, to fold it into this instance's own
         in-memory view -- this method itself writes nothing. Unlike
         `close_item`, it refuses beside an entry that names no item, before
-        any write (PIN-13; head ruling 01.10.2026)."""
+        any write (PIN-13)."""
         self._refuse_a_foreign_entry()
         return self._closing_write(number)
 

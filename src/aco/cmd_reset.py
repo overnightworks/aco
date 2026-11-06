@@ -21,7 +21,7 @@ _RESET_BUNDLE_SHA_LENGTH = 12
 
 class _ResetStep(StrEnum):
     """The five lines `reset` prints, in the one order the dry run and the
-    real run share (plan review, 19.09.2026): export, delete the remote
+    real run share: export, delete the remote
     ref, delete the local one if present, clear every worktree's lineage
     stamp and fetch anchor, bootstrap fresh."""
 
@@ -50,7 +50,7 @@ class _ResetExportTarget:
 @dataclass(frozen=True)
 class _ResetPlan:
     """Every fact `reset`'s five lines are built from, read once before
-    anything is exported or deleted (plan review, 19.09.2026). The dry run
+    anything is exported or deleted. The dry run
     prints this verbatim with a `would: ` prefix; the real run prints the
     same per-step text as each action completes -- the two share the exact
     same line-building functions below, so they cannot say different things
