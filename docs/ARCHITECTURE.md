@@ -18,9 +18,8 @@ flowchart LR
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
-  (`canonical_remote` in `.aco/board.toml`; its default is PIN-50 in
-  `specs/storage-pin.spec.md`). Its
-  tree is the current state: `claims/`, `resources/`, `ids/` and, for a
+  (`canonical_remote` in `.aco/board.toml`; its default is set by PIN-50 in
+  `specs/storage-pin.spec.md`). Its tree is the current state: `claims/`, `resources/`, `ids/` and, for a
   repository without a forge, items. The commit message names the transition.
   A released claim is absent from the tree and readable at the parent commit,
   so there is no second history ref.
@@ -28,10 +27,9 @@ flowchart LR
   to a new tree (`protocol.apply`). The store commits it on the observed tip
   and pushes with a plain fast-forward `git push`, never `--force` and never
   `--force-with-lease`, because a matching lease can replace history. A
-  rejected push is retried: the store re-reads the ref and re-applies the
-  original intent. A push rejected while the ref never moves points to a stale
-  lock or missing push rights, not a race. The wire contract and the retry and
-  failure semantics are in `specs/ref-store-cas.spec.md`.
+  rejected push is not a failure by itself. The wire contract and the retry
+  and failure semantics, including rejections that are not a race, are in
+  `specs/ref-store-cas.spec.md`.
 - A resource (a number that must stay unique repository-wide) is allocated in
   the same commit as the claim that requests it, so two lanes racing for it
   serialize on the one ref and the loser gets the next value.
@@ -41,8 +39,7 @@ flowchart LR
   forge's sub-issue and blocked-by relations. The body repeats neither, except
   the `Parent:` recovery line `cut` writes; its owners are
   `specs/cut.spec.md` (CUT-25) and `specs/body-block.spec.md`. An item's
-  contract is one fenced TOML
-  block whose keys are protocol and whose values are the operator's prose
+  contract is one fenced TOML block whose keys are protocol and whose values are the operator's prose
   (`specs/body-block.spec.md`).
 - Wide-scope thresholds are constants of the protocol, not configuration, so
   two fleets in one repository cannot disagree on what "too wide" means.
@@ -51,10 +48,12 @@ flowchart LR
   `ForgePermissionDeniedError`, `ForgeTransientError` and the rest of its
   family), so no caller matches error text. An adapter that cannot do an
   operation raises `ForgeUnsupportedError`. The one capability a caller
-  branches on is `BoardSource.lists_pull_requests`. GitHub is the only adapter.
-  The seam is not exclusive: `cmd_land` and `cmd_release` call `GitHubForge`
-  directly for merge and close operations, so another forge needs its own
-  contract for them before it can attach (the module docstring of `forge.py`).
+  branches on is `BoardSource.lists_pull_requests`. GitHub is the only forge
+  adapter; the state-ref item store implements the same port. The seam is not
+  exclusive: `cmd_land` depends on `GitHubForge` for the whole landing,
+  `cmd_item` on `StateRefBoard` and `cmd_release` on both, so another forge
+  needs its own contract for them before it can attach (the module docstring
+  of `forge.py`).
 
 ## Kept although unused
 
