@@ -20,8 +20,8 @@ flowchart LR
 - The **state ref** is one git ref on the configured canonical remote
   (`canonical_remote` in `.aco/board.toml`; its default is set by PIN-50 in
   `specs/storage-pin.spec.md`). Its tree is the current state: `claims/`,
-  `resources/`, `ids/` and, for a repository without a forge, items. The
-  commit message names the transition.
+  `resources/`, `ids/`, `schema.toml` (the format version) and, for a repository
+  without a forge, items. The commit message names the transition.
   A released claim is absent from the tree and readable at the parent commit,
   so there is no second history ref.
 - A transition is a pure function from the observed state and a typed intent
@@ -35,15 +35,15 @@ flowchart LR
   `specs/ref-store-cas.spec.md`.
 - A resource (a number that must stay unique repository-wide) is allocated in
   the same commit as the claim that requests it, so two lanes racing for it
-  serialize on the one ref and the loser gets the next value.
+  serialize on the one ref. `specs/claim-record.spec.md` owns the allocation
+  outcomes.
 - Ownership of item facts on GitHub: kind is the forge's native issue type
   (`Container`, `Task`, `Bug` or `Feature`; an unrecognized type maps to no
   kind, never guessed from a label), and parent and blocker relations are the
   forge's sub-issue and blocked-by relations. The body repeats neither, except
   the `Parent:` recovery line `cut` writes; its owners are
   `specs/cut.spec.md` (CUT-25) and `specs/body-block.spec.md`. An item's
-  contract is one fenced TOML block whose keys are protocol and whose values
-  are the operator's prose (`specs/body-block.spec.md`).
+  contract is one fenced TOML block, specified in `specs/body-block.spec.md`.
 - Wide-scope thresholds are constants of the protocol, not configuration, so
   two fleets in one repository cannot disagree on what "too wide" means.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
@@ -76,7 +76,9 @@ A later ballast audit names both as kept and refreshes the numbers in #658
 (size, usage, upkeep); it does not raise them as new findings. Every change to
 `session`, `store` and the item commands still carries both storage paths.
 
-## Trust
+## Crosscutting Concepts
+
+### Trust
 
 The trust model is cooperating clients: the state ref and `aco rule --via` are
 aids for cooperative agents (`specs/rule.spec.md` declares `--via` a tripwire),
