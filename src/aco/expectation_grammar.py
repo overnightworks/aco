@@ -443,6 +443,15 @@ def _returned_defects(
     return [*_field_defect(on_path, on_reason), *_field_defect(note_path, note_reason)]
 
 
+def _ruled_before_asked(entry: dict[str, object]) -> str | None:
+    """A line cannot be ruled before the day it was asked; a ruled line
+    without `asked_on` has nothing to compare."""
+    asked_on, ruled_on = entry.get(ASKED_ON), entry["ruled_on"]
+    if type(asked_on) is not date or type(ruled_on) is not date or ruled_on >= asked_on:
+        return None
+    return f"{ruled_on.isoformat()} is before asked_on {asked_on.isoformat()}"
+
+
 def _option_line_decision_defects(
     prefix: str, entry: dict[str, object], letters: tuple[str, ...]
 ) -> list[FieldDefect]:
@@ -457,7 +466,7 @@ def _option_line_decision_defects(
     ruled_on_reason = None if type(entry["ruled_on"]) is date else NOT_A_LOCAL_DATE
     return [
         *_field_defect(f"{prefix}.ruling", _ruling_defect(letters)(entry["ruling"])),
-        *_field_defect(f"{prefix}.ruled_on", ruled_on_reason),
+        *_field_defect(f"{prefix}.ruled_on", ruled_on_reason or _ruled_before_asked(entry)),
         *_field_defect(f"{prefix}.card_hash", _card_hash_defect(entry["card_hash"])),
         *_field_defect(f"{prefix}.via", _member_defect(tuple(RulingVia))(entry["via"])),
         *_other_defects(prefix, entry),
