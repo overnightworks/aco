@@ -460,7 +460,7 @@ class TestRefusedBeforeAnyForgeCall:
 def test_via_board_is_refused_as_an_invalid_choice(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: RULE-09 -- the board writes `board` rulings in process; the command offers chat and default."""
+    """Spec: RULE-39 -- the command offers chat and default; the board writes `board` in process."""
     client = serve_item(monkeypatch, group_body())
     command = ["rule", "7", *lines_of("option", (2, "A", HASH_2), via="board")]
     refused = run_cli(command, capsys)
