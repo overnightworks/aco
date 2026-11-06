@@ -78,14 +78,20 @@ class ResultPicture:
 
 
 @dataclass(frozen=True)
+class SameAsToday:
+    """An option whose result is marked as the same as today."""
+
+
+@dataclass(frozen=True)
 class CardOption:
     """One option of an option line; `letter` is derived from its position,
-    and `result` is `None` when the result is the same as today."""
+    and `result` is `None` when the option gives neither a picture nor the
+    same-as-today mark."""
 
     letter: str
     name: str
     effect: str
-    result: ResultPicture | None
+    result: ResultPicture | SameAsToday | None
     notice: str
     cost: str
     undo: Undo
@@ -136,8 +142,8 @@ class OptionLine:
     asked_on: date | None
     question: str
     problem: str
-    picture: str
-    caption: str
+    picture: str | None
+    caption: str | None
     decision_kind: DecisionKind
     area: str
     topic: str
@@ -198,11 +204,11 @@ def is_open(line: ExpectationLine) -> TypeGuard[OptionLine]:
 
 def _card_option(position: int, option: dict[str, object]) -> CardOption:
     picture = option.get("picture")
-    result = (
-        None
-        if picture is None
-        else ResultPicture(cast(str, picture), cast(str | None, option.get("caption")))
-    )
+    result: ResultPicture | SameAsToday | None = None
+    if picture is not None:
+        result = ResultPicture(cast(str, picture), cast(str | None, option.get("caption")))
+    elif option.get("same_as_today") is True:
+        result = SameAsToday()
     return CardOption(
         letter=OPTION_LETTERS[position],
         name=cast(str, option["name"]),
@@ -247,8 +253,8 @@ def _option_line(index: int, entry: dict[str, object]) -> OptionLine:
         asked_on=cast(date | None, entry.get(ASKED_ON)),
         question=cast(str, entry["question"]),
         problem=cast(str, entry["problem"]),
-        picture=cast(str, entry["picture"]),
-        caption=cast(str, entry["caption"]),
+        picture=cast(str | None, entry.get("picture")),
+        caption=cast(str | None, entry.get("caption")),
         decision_kind=DecisionKind(cast(str, entry["decision_kind"])),
         area=cast(str, entry["area"]),
         topic=cast(str, entry["topic"]),

@@ -33,7 +33,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
-| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91, BODY-93, BODY-101, BODY-102 | BODY-50 | BODY-52 |
+| option line defective | BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91, BODY-93, BODY-101, BODY-102, BODY-107 | BODY-50 | BODY-52 |
 | complete option line, open or ruled | BODY-85, BODY-89 | — | — |
 | option line ruled `other` | BODY-92 | — | — |
 | an open option line with its head | BODY-94 | — | — |
@@ -121,8 +121,8 @@ line, read-only history judged by BODY-26..BODY-42. Its keys, in the order a rew
 writes them:
 
 - `text`, then `asked_on` (a TOML local date: the day the head asked the line, required until it is ruled, never covered by the card hash; the head writes it with the card, aco never writes or changes it, and a line sent back and asked again carries the day it is asked again), then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open), and `other` exactly when `ruling` is `other`, then `returned_on` and an optional `returned_note` while the line is open and with its head;
-- `question`, `problem`, `picture` (TODAY), `caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required;
-- 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then either `picture` with an optional `caption` or `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
+- `question`, `problem`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required, and `picture` (TODAY) with its `caption`, each optional;
+- 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then at most one of `picture` with an optional `caption` and `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
 
 `decision_kind` names what the choice puts at stake. Pick the first that fits, in this order:
 
@@ -148,7 +148,7 @@ other refusal fired.
 - [ ] [BODY-69] An `option` that is not an array of tables prints `body malformed: expectation[0].option: expectation[0].option must be an array of tables`, exit `2` (see E-BODY-11).
 - [ ] [BODY-70] Fewer than 2 or more than 4 options print `body malformed: expectation[0].option: expectation[0] must carry 2 to 4 options`, exit `2` (see E-BODY-11).
 - [ ] [BODY-71] An option that is not a table prints `body malformed: expectation[0].option[1]: expectation[0].option[1] must be a table`, exit `2` (see E-BODY-11).
-- [ ] [BODY-72] A missing line key, `picture` included, prints `body malformed: expectation[0].<key>: expectation[0].<key> is required`, exit `2` (see E-BODY-11).
+- [ ] [BODY-72] A missing line key other than `picture` and `caption` prints `body malformed: expectation[0].<key>: expectation[0].<key> is required`, exit `2` (see E-BODY-11).
 - [ ] [BODY-73] An option missing a key prints `body malformed: expectation[0].option[1].<key>: expectation[0].option[1].<key> is required`, exit `2` (see E-BODY-11).
 - [ ] [BODY-74] A blank or non-string text key of the line or an option prints `body malformed: <field>: <field> must be a non-empty string`, exit `2`; a long `question` stays BODY-34 (see E-BODY-11).
 - [ ] [BODY-75] Another `decision_kind` prints `body malformed: expectation[0].decision_kind: expectation[0].decision_kind must be product, technical, data_risk, money, access, wording, or release` (see E-BODY-11).
@@ -157,15 +157,15 @@ other refusal fired.
 - [ ] [BODY-78] A `ruling` outside <L> and `other` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be one of <L>, or other`, exit `2`; a bad `ruled_on` keeps BODY-32 (see E-BODY-12).
 - [ ] [BODY-79] An `example` on an option line prints `body malformed: expectation[0].example: expectation[0].example does not belong on an option line`, exit `2`.
 - [ ] [BODY-80] An option's result breaking one rule prints that rule's sentence below, exit `2` (see E-BODY-11):
-  - neither `picture` nor `same_as_today`: `body malformed: expectation[0].option[1].picture: expectation[0].option[1] must carry exactly one of picture and same_as_today = true`
-  - both: the same sentence under `expectation[0].option[1].same_as_today`
+  - both `picture` and `same_as_today`: `body malformed: expectation[0].option[1].same_as_today: expectation[0].option[1] must carry at most one of picture and same_as_today = true`; an option with neither has no result picture and is `body ok`
   - `same_as_today` not `true`: `body malformed: expectation[0].option[1].same_as_today: expectation[0].option[1].same_as_today must be true`
   - a `caption` without a picture: `body malformed: expectation[0].option[1].caption: expectation[0].option[1].caption needs a picture beside it`
+- [ ] [BODY-107] A line `caption` without a line `picture` prints `body malformed: expectation[0].caption: expectation[0].caption needs a picture beside it`, exit `2` (see E-BODY-11).
 - [ ] [BODY-81] Every picture, TODAY's and each option's, keeps BODY-37..BODY-42 under its own path, as `expectation[0].option[0].picture must not contain <script>` (see E-BODY-11).
 - [ ] [BODY-82] All of a line's pictures over 16384 UTF-8 bytes together print `body malformed: expectation[0]: expectation[0] pictures must total at most 16384 bytes`, exit `2` (see E-BODY-11).
 - [ ] [BODY-83] An option-line key (`problem` to `reason`) on a yes/no line prints `body malformed: expectation[0].<key>: expectation[0].<key> belongs to an option line; this line has none` (see E-BODY-11).
 - [ ] [BODY-84] An option key it does not know, `letter` included, prints `body malformed: expectation[0].option[0].<key>: unknown key expectation[0].option[0].<key>`, exit `2` (see E-BODY-11).
-- [ ] [BODY-85] A complete option line, open or ruled with its card's hash, prints `body ok` on stdout, exit `0` (see E-BODY-10).
+- [ ] [BODY-85] A complete option line, open or ruled with its card's hash, prints `body ok` on stdout, exit `0`; one with no picture at all, TODAY's or any option's, is complete too (see E-BODY-10).
 - [ ] [BODY-86] A partial decided state prints exactly one sentence, by which keys it carries, exit `2`; a ruled line's `card_hash` must be `sha256:` and 64 lowercase hex digits (see E-BODY-12):
   - `ruling` without `ruled_on`: `body malformed: expectation[0].ruled_on: expectation[0] carries ruling without ruled_on`
   - `ruling` and `ruled_on`: `body malformed: expectation[0].card_hash: expectation[0] is ruled without card_hash`

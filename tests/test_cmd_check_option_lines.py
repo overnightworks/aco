@@ -123,10 +123,10 @@ class TestOptionLineCheck:
             pytest.param(
                 card(card_head(("picture = ", "drawing = "))),
                 [
-                    malformed(f"{E}.picture", f"{E}.picture is required"),
+                    malformed(f"{E}.caption", f"{E}.caption needs a picture beside it"),
                     malformed(f"{E}.drawing", f"unknown key {E}.drawing"),
                 ],
-                id="BODY-72-today-picture",
+                id="BODY-72-today-picture-renamed",
             ),
             pytest.param(
                 card(None, card_option_a(), card_option_b(("contract = ", "promise = "))),
@@ -213,20 +213,10 @@ class TestOptionLineCheck:
                 [
                     malformed(
                         f"{E}.option[1].same_as_today",
-                        f"{E}.option[1] must carry exactly one of picture and same_as_today = true",
+                        f"{E}.option[1] must carry at most one of picture and same_as_today = true",
                     )
                 ],
                 id="BODY-80-both",
-            ),
-            pytest.param(
-                card(None, card_option_a(), card_option_b(("same_as_today = true\n", ""))),
-                [
-                    malformed(
-                        f"{E}.option[1].picture",
-                        f"{E}.option[1] must carry exactly one of picture and same_as_today = true",
-                    )
-                ],
-                id="BODY-80-neither",
             ),
             pytest.param(
                 card(None, card_option_a(), card_option_b(("= true", "= false"))),

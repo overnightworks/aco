@@ -64,8 +64,10 @@ def rows(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[R
 
 
 def _option_json(option: expectations.CardOption) -> dict[str, object]:
-    result: dict[str, object] = {"same_as_today": True}
-    if option.result is not None:
+    result: dict[str, object] = {}
+    if isinstance(option.result, expectations.SameAsToday):
+        result = {"same_as_today": True}
+    elif option.result is not None:
         result = {"picture": option.result.picture}
         if option.result.caption is not None:
             result["caption"] = option.result.caption
@@ -86,8 +88,7 @@ def _option_line_card_json(line: expectations.OptionLine) -> dict[str, object]:
     return {
         "question": line.question,
         "problem": line.problem,
-        "picture": line.picture,
-        "caption": line.caption,
+        **_present_pairs(("picture", line.picture), ("caption", line.caption)),
         "decision_kind": line.decision_kind.value,
         "area": line.area,
         "topic": line.topic,
@@ -97,16 +98,15 @@ def _option_line_card_json(line: expectations.OptionLine) -> dict[str, object]:
     }
 
 
+def _present_pairs(*pairs: tuple[str, str | None]) -> dict[str, object]:
+    """The `pairs` whose value was given, each as its own key."""
+    return {key: value for key, value in pairs if value is not None}
+
+
 def _yes_no_card_json(line: expectations.YesNoLine) -> dict[str, object]:
-    return {
-        key: value
-        for key, value in (
-            ("question", line.question),
-            ("example", line.example),
-            ("picture", line.picture),
-        )
-        if value is not None
-    }
+    return _present_pairs(
+        ("question", line.question), ("example", line.example), ("picture", line.picture)
+    )
 
 
 def line_json(line: expectations.ExpectationLine) -> dict[str, object]:

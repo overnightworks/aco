@@ -47,7 +47,7 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-05] `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
 - [ ] [RUL-10] A row is `{"number", "title", "open", "total", "lines"}`; a yes/no line is `{"index", "text", "ruling", "ruled_on"}` (see E-RUL-03).
 - [ ] [RUL-12] Only an option line can be open, and an open line has `ruling`/`ruled_on` `null`; a yes/no line is always ruled (see E-RUL-03, E-RUL-05, E-RUL-07).
-- [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` each add their own key, present only when that field was given.
+- [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` each add their own key, present only when that field was given; an option line's `picture` and `caption` and an option's result likewise (RUL-10).
 - [ ] [RUL-13] An option line adds `question` to `reason` and `options`, each option keyed as listed below, its `letter` derived from its position (see E-RUL-07).
 - [ ] [RUL-14] An option line also starts with `"form": "options"`, `"card_hash"` (the card now, BODY-89) and `"stored_card_hash"` (its ruling's, `null` while open); a ruled line's two are equal (BODY-87).
 - [ ] [RUL-15] An option line carries `"via"` (`board`, `chat` or `default`, BODY-90) right after `"stored_card_hash"`, `null` while open; a yes/no line never carries it (see E-RUL-07).
@@ -57,10 +57,10 @@ it, `<k>` an expectation line's 1-based index.
 - [ ] [RUL-19] An option line carries `"asked_on"` right after `"text"`: the day its head asked it (aco never writes it), `null` only on a ruled line stored without it; a yes/no line never has it (E-RUL-07).
 - [ ] [RUL-23] A withdrawn line is exactly `{"index", "form": "withdrawn", "text", "withdrawn_on"}`; it never carries `ruling`, which would read as open (see E-RUL-08).
 
-An option line's keys after `returned_note` are `question`, `problem`, `picture`,
-`caption`, `decision_kind`, `area`, `topic`, `recommended`, `reason`,
+An option line's keys after `returned_note` are `question`, `problem`, `picture` and
+`caption` (each only when given), `decision_kind`, `area`, `topic`, `recommended`, `reason`,
 `options`; each option is `{"letter", "name", "effect", "picture"` or
-`"same_as_today": true`, `"caption"` when stored, `"notice", "cost", "undo",
+`"same_as_today": true` (neither when the option gives no result), `"caption"` when stored, `"notice", "cost", "undo",
 "undo_how", "contract"}`.
 - [ ] [RUL-09] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-RUL-06).
 

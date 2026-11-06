@@ -54,6 +54,7 @@ RETURNED_NOTE = "returned_note"
 WITHDRAWN_ON = "withdrawn_on"
 OPTION_COUNT_MINIMUM = 2
 _CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
+_CAPTION_NEEDS_PICTURE = "needs a picture beside it"
 _PICTURE = "picture"
 _SAME_AS_TODAY = "same_as_today"
 _CAPTION = "caption"
@@ -89,9 +90,10 @@ class RulingVia(StrEnum):
     DEFAULT = "default"
 
 
-# The card keys of an option line, each required, in rendering order after
-# `text` and the decided state; `question` and `picture` are shared with the
-# yes/no line, the others belong to the option line alone.
+# The card keys of an option line in rendering order after `text` and the
+# decided state; all are required except `picture` and `caption`, and
+# `caption` needs a picture beside it. `question` and `picture` are shared
+# with the yes/no line, the others belong to the option line alone.
 OPTION_LINE_KEYS = (
     "question",
     "problem",
@@ -103,6 +105,7 @@ OPTION_LINE_KEYS = (
     "recommended",
     "reason",
 )
+_OPTION_LINE_OPTIONAL_KEYS = frozenset({_PICTURE, _CAPTION})
 _OPTION_LINE_ONLY_KEYS = frozenset(OPTION_LINE_KEYS) - {"question", _PICTURE}
 _OPTION_LINE_REFUSED_KEYS = ("example",)
 # Every key of one `[[expectation.option]]` table, in rendering order; an
@@ -474,11 +477,14 @@ def _option_line_key_defects(
     for key in OPTION_LINE_KEYS:
         path = f"{prefix}.{key}"
         if key not in entry:
-            defects.append(FieldDefect(path, f"{path} is required"))
+            if key not in _OPTION_LINE_OPTIONAL_KEYS:
+                defects.append(FieldDefect(path, f"{path} is required"))
         elif key != _PICTURE:
             defects.extend(
                 _field_defect(path, checks.get(key, _non_empty_string_defect)(entry[key]))
             )
+    if _CAPTION in entry and _PICTURE not in entry:
+        defects.extend(_field_defect(f"{prefix}.{_CAPTION}", _CAPTION_NEEDS_PICTURE))
     defects.extend(
         FieldDefect(f"{prefix}.{key}", f"{prefix}.{key} does not belong on an option line")
         for key in _OPTION_LINE_REFUSED_KEYS
@@ -491,16 +497,15 @@ def _option_result_defects(path: str, option: dict[str, object]) -> list[FieldDe
     has_picture, has_same_as_today = _PICTURE in option, _SAME_AS_TODAY in option
     if has_same_as_today and option[_SAME_AS_TODAY] is not True:
         return _field_defect(f"{path}.{_SAME_AS_TODAY}", "must be true")
-    if has_same_as_today == has_picture:
-        offending = _SAME_AS_TODAY if has_same_as_today else _PICTURE
+    if has_same_as_today and has_picture:
         return [
             FieldDefect(
-                f"{path}.{offending}",
-                f"{path} must carry exactly one of picture and same_as_today = true",
+                f"{path}.{_SAME_AS_TODAY}",
+                f"{path} must carry at most one of picture and same_as_today = true",
             )
         ]
     if _CAPTION in option and not has_picture:
-        return _field_defect(f"{path}.{_CAPTION}", "needs a picture beside it")
+        return _field_defect(f"{path}.{_CAPTION}", _CAPTION_NEEDS_PICTURE)
     return []
 
 
