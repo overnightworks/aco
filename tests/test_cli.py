@@ -4087,7 +4087,8 @@ def test_next_prints_a_cut_command_cut_accepts_for_a_differing_next_line(
     it keeps naming the container's own words. `next
     --json` carries the same split as two fields: `slice` is that human
     step, `cut_title` is the title `cut` accepts -- a JSON consumer must
-    build `--title` from `cut_title`, never `slice`. The child each cut writes carries `cut`'s own fixed `next`
+    build `--title` from `cut_title`, never `slice`.
+    The child each cut writes carries `cut`'s own fixed `next`
     (CUT-25), never the container's `next` line."""
     toml_text = (
         f'version = 1\nnow = "N"\nnext = "{_DIFFERING_NEXT_LINE}"\ndone_when = "D"\n'
