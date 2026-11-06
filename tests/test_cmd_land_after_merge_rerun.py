@@ -336,13 +336,13 @@ class RerunCase:
     identity: protocol.ClaimIdentity = field(default_factory=lambda: protocol.IssueIdentity(72))
     branch: str = "codex/issue-72-claims"
     body: str = "Work-Item: #72\n\nCloses #72"
-    method: workboard.MergeMethod = workboard.MergeMethod.MERGE
+    method: workboard.MergeMethod = workboard.MergeMethod.SQUASH
     title: str = "feat: land the lane (#12)"
     merge_body: str = "Work-Item: #72"
     merge_trailers: str = "Work-Item: #72\n"
     merge_message: str = "feat: land the lane (#12)\n\nWork-Item: #72\n"
-    merge_parents: int = 2
-    lane_ancestor: int = 0
+    merge_parents: int = 1
+    lane_ancestor: int = 1
     off_trunk: bool = False
     close_error: str | None = None
     delete_error: str | None = None
@@ -731,7 +731,7 @@ class TestLandAfterMergeRerun:
                 RerunCase(
                     preparation=RerunPreparation.FAILED_LAND,
                     close_error="forge unreachable (simulated)",
-                    merge_message="Merge pull request #12\n\nCloses #72\n\nWork-Item: #72\n",
+                    merge_message="feat: land the lane (#12)\n\nCloses #72\n\nWork-Item: #72\n",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
                     "release (forge unreachable (simulated)); re-run aco land 12\n",
@@ -747,7 +747,7 @@ class TestLandAfterMergeRerun:
                     body="No-Item: fix",
                     merge_body="No-Item: fix",
                     merge_trailers="No-Item: fix\n",
-                    merge_message="Merge pull request #12\n\nNo-Item: fix\n",
+                    merge_message="feat: land the lane (#12)\n\nNo-Item: fix\n",
                     delete_error="delete branch failed (simulated)",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
@@ -767,15 +767,12 @@ class TestLandAfterMergeRerun:
                     "follow-up incomplete: "
                     "release (forge unreachable (simulated)); re-run aco land 12\n",
                     changed_body="Advances #72",
-                    merge_message="Merge pull request #12\n\nCloses #72\n\nWork-Item: #72\n",
+                    merge_message="feat: land the lane (#12)\n\nCloses #72\n\nWork-Item: #72\n",
                 ),
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
                 RerunCase(
-                    method=workboard.MergeMethod.SQUASH,
-                    merge_parents=1,
-                    lane_ancestor=1,
                     arguments=("land", "12", "--head", "0000000"),
                 ),
                 id="squash-rerun-on-recorded-head",
@@ -831,11 +828,10 @@ class TestLandAfterMergeRerun:
         [
             pytest.param(
                 RerunCase(
-                    title="Merge pull request #12",
                     merge_body="ordinary merge without classification",
                     merge_trailers="",
                     merge_message=(
-                        "Merge pull request #12\n\nordinary merge without classification\n"
+                        "feat: land the lane (#12)\n\nordinary merge without classification\n"
                     ),
                     status=2,
                     stdout="",

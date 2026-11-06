@@ -45,9 +45,12 @@ OVERLONG_ISSUE_NUMBER = "1" * 4301
 
 
 def _publish_branch_tip(clone: Path, message: str) -> str:
-    """A fresh commit on top of `clone`'s `HEAD`, forced onto the remote as the
-    pull request's head branch; no local branch or ref moves."""
-    tree = real_git(clone, "rev-parse", "HEAD^{tree}").stdout.strip()
+    """A fresh commit adding an empty file on top of `clone`'s `HEAD` (a squash landing needs a
+    change), forced onto the remote as the pull request's head branch; no local ref moves."""
+    empty_blob = real_git(clone, "hash-object", "-w", "--no-filters", "/dev/null").stdout.strip()
+    real_git(clone, "update-index", "--add", "--cacheinfo", f"100644,{empty_blob},{message}.txt")
+    tree = real_git(clone, "write-tree").stdout.strip()
+    real_git(clone, "reset", "-q")
     tip = real_git(clone, "commit-tree", tree, "-p", "HEAD", "-m", message).stdout.strip()
     real_git(clone, "push", "-q", "--force", "origin", f"{tip}:refs/heads/{ADOPTED_BRANCH}")
     return tip
@@ -490,9 +493,7 @@ def test_adopt_refuses_a_head_branch_that_moved_around_its_fetch(
 
     result = adopt(capsys, kind="deps")
 
-    assert result.stderr == (
-        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again\n"
-    )
+    assert result.stderr == _refusal("moved while adopt read it; run adopt again")
 
 
 def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkout(
@@ -1029,8 +1030,7 @@ def _a_claim_lands_between_the_observation_and_the_push(
     [
         pytest.param(
             _move_the_remote_tracking_ref_before_the_build,
-            f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; "
-            "run adopt again\n",
+            _refusal("moved while adopt read it; run adopt again"),
             [],
             id="cell-23-built-head-differs",
         ),
@@ -1536,9 +1536,9 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
 
     landed = run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", reviewed_head], capsys)
 
-    refusal = (
-        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} head is {current_head}, "
-        f"not the reviewed {reviewed_head}; review the new head before landing\n"
+    refusal = _refusal(
+        f"head is {current_head}, not the reviewed {reviewed_head}; "
+        "review the new head before landing"
     )
     released_line = _released_line(claim) + f"worktree: {worktree_outcome}\n"
     expected_run = (status, released_line, "") if merged else (status, "", refusal)

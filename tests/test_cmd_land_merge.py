@@ -62,9 +62,9 @@ class DefaultBranch(Enum):
 
 @dataclass(frozen=True)
 class Landed:
-    method: workboard.MergeMethod = workboard.MergeMethod.MERGE
-    title: str = "Merge pull request #12"
-    parents: int = 2
+    method: workboard.MergeMethod = workboard.MergeMethod.SQUASH
+    title: str = "feat: land the lane (#12)"
+    parents: int = 1
     trailer: str = "Work-Item: #72"
     closed: frozenset[int] = frozenset({72})
     release: str = "RELEASED issue #72: landing\n"
@@ -398,7 +398,7 @@ class TestLandMergeMethod:
             ),
             pytest.param(
                 MergeCase(
-                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     methods=frozenset({workboard.MergeMethod.SQUASH, workboard.MergeMethod.REBASE}),
                 ),
@@ -406,16 +406,16 @@ class TestLandMergeMethod:
             ),
             pytest.param(
                 MergeCase(
-                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "squash"\n',
                     methods=frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
                 ),
-                id="pinned-squash-beats-the-default",
+                id="pinned-squash-lands-a-squash",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     methods=frozenset(workboard.MergeMethod),
                     rules=(
@@ -426,7 +426,7 @@ class TestLandMergeMethod:
             ),
             pytest.param(
                 MergeCase(
-                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     rules=(
                         frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.SQUASH}),
@@ -438,7 +438,7 @@ class TestLandMergeMethod:
             ),
             pytest.param(
                 MergeCase(
-                    Landed(),
+                    Landed(workboard.MergeMethod.MERGE, "Merge pull request #12", 2),
                     lane_worktree=LaneWorktree.PRESENT,
                     trunk_config='merge_method = "merge"\n',
                     methods=frozenset(workboard.MergeMethod),
@@ -451,11 +451,19 @@ class TestLandMergeMethod:
                     lane_worktree=LaneWorktree.PRESENT,
                     methods=frozenset(workboard.MergeMethod),
                 ),
-                id="all-three-settings-and-no-rule-pick-a-merge-commit",
+                id="all-three-settings-and-no-rule-pick-a-squash",
             ),
             pytest.param(
                 MergeCase(
-                    Landed(workboard.MergeMethod.SQUASH, "feat: land the lane (#12)", 1),
+                    Landed(workboard.MergeMethod.MERGE, "Merge pull request #12", 2),
+                    lane_worktree=LaneWorktree.PRESENT,
+                    methods=frozenset({workboard.MergeMethod.MERGE, workboard.MergeMethod.REBASE}),
+                ),
+                id="merge-commit-where-no-squash-is-allowed",
+            ),
+            pytest.param(
+                MergeCase(
+                    Landed(),
                     lane_worktree=LaneWorktree.PRESENT,
                     default_branch=DefaultBranch.TRUNK_WITHOUT_MAIN,
                     methods=frozenset(workboard.MergeMethod),
@@ -662,7 +670,7 @@ class TestLandMergeForgeAnswer:
             {
                 "request.count": 1,
                 "request.head": world.head,
-                "request.method": workboard.MergeMethod.MERGE,
+                "request.method": workboard.MergeMethod.SQUASH,
                 "entry.stamp": None,
                 "entry.anchor": None,
             }
