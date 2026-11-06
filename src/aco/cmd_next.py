@@ -6,7 +6,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from . import board_read, body, checkout, expectations, policy, protocol, report, session, workboard
+from . import (
+    ahead_of_caller,
+    board_read,
+    body,
+    checkout,
+    expectations,
+    policy,
+    protocol,
+    report,
+    session,
+    workboard,
+)
 
 
 def _checkout_scope_is_wide(scope: tuple[str, ...], context: session.RunContext) -> bool:
@@ -253,6 +264,67 @@ class _NextReport:
     ideas: tuple[int, ...]
     with_head: tuple[tuple[int, tuple[int, ...]], ...]
     site: _PullSite
+    ahead: tuple[ahead_of_caller.JudgedEntry, ...] | ahead_of_caller.Unavailable
+
+
+def _ahead_item_name(target: ahead_of_caller.ItemTarget, storage: body.Storage) -> str:
+    if target.repository is None:
+        return workboard.item_argument(target.number, storage)
+    return f"{target.repository.path}#{target.number}"
+
+
+def _ahead_state_phrase(judged: ahead_of_caller.JudgedEntry) -> str:
+    match judged.state:
+        case ahead_of_caller.ItemState.CLOSED:
+            return "is closed"
+        case ahead_of_caller.ItemState.MISSING:
+            return "is not found or not accessible"
+        case ahead_of_caller.ItemState.PULL_REQUEST:
+            return "is a pull request"
+        case _:
+            return f"is unreadable: {protocol.terminal_text(str(judged.error))}"
+
+
+def _ahead_lines(
+    ahead: tuple[ahead_of_caller.JudgedEntry, ...] | ahead_of_caller.Unavailable,
+    storage: body.Storage,
+) -> list[str]:
+    """One line per red entry, or the one `unavailable` line."""
+    if isinstance(ahead, ahead_of_caller.Unavailable):
+        return [f"ahead of caller: unavailable ({protocol.terminal_text(ahead.sentence)})"]
+    return [
+        f"ahead of caller: {protocol.terminal_text(judged.entry.path)}: "
+        f"item {protocol.terminal_text(_ahead_item_name(judged.entry.item, storage))} "
+        f"{_ahead_state_phrase(judged)} ({protocol.terminal_text(judged.entry.reason)})"
+        for judged in ahead
+        if ahead_of_caller.is_red(judged.state)
+    ]
+
+
+def _ahead_json(
+    ahead: tuple[ahead_of_caller.JudgedEntry, ...] | ahead_of_caller.Unavailable,
+    storage: body.Storage,
+) -> dict[str, object]:
+    entries = () if isinstance(ahead, ahead_of_caller.Unavailable) else ahead
+    return {
+        "ahead_of_caller": [
+            {
+                "path": judged.entry.path,
+                "item": (
+                    workboard.item_json_reference(judged.entry.item.number, storage)
+                    if judged.entry.item.repository is None
+                    else _ahead_item_name(judged.entry.item, storage)
+                ),
+                "reason": judged.entry.reason,
+                "state": judged.state,
+                "error": judged.error,
+            }
+            for judged in entries
+        ],
+        "ahead_of_caller_unavailable": (
+            ahead.sentence if isinstance(ahead, ahead_of_caller.Unavailable) else None
+        ),
+    }
 
 
 def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
@@ -288,6 +360,7 @@ def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
             }
             for number, line_indexes in next_report.with_head
         ],
+        **_ahead_json(next_report.ahead, storage),
     }
     if next_report.action is not None:
         payload.update(_next_action_payload(next_report.action, storage, site=next_report.site))
@@ -366,6 +439,7 @@ def _next(next_report: _NextReport, storage: body.Storage) -> None:
             for index in line_indexes
         )
         lines.append(f"with head: {named}")
+    lines.extend(_ahead_lines(next_report.ahead, storage))
     if next_report.skipped:
         skipped_lines = (
             f"{workboard.item_label(skipped_item.number, storage)}: "
@@ -429,6 +503,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
         ideas=ideas,
         with_head=with_head,
         site=site,
+        ahead=board_read.ahead_of_caller_reading(context),
     )
     if as_json:
         _next_json(next_report, storage)
