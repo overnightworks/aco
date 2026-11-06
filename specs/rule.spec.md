@@ -240,7 +240,6 @@ $ aco rule 7 --line 2 --option A --card-hash <hash>
 2> ERROR: --option needs --via and --card-hash
 exit 2
 $ aco rule 7 --line 2 --option A --via board --card-hash <hash>
-2> usage: aco rule [-h] ...
 2> aco rule: error: argument --via: invalid choice: 'board' (choose from chat, default)
 exit 2
 $ aco rule 7 --line 2 --option A --via chat --card-hash <hash> --note "Ja."
