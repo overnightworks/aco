@@ -100,7 +100,7 @@ def test_next_names_a_container_closable_whose_summary_lags_its_closed_children(
 ) -> None:
     """Spec: BOARD-58, NEXT-07"""
     assert_github_world(github_clone, bare_remote)
-    track_board_config(github_clone, 'body_contract = "block"\nidea_label = "idea"\n')
+    track_board_config(github_clone, 'idea_label = "idea"\n')
     freeze_cli_now(monkeypatch)
     listed, children = container_with_children(
         CONTAINER, closed=2, body=complete_contract("keiner")

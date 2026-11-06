@@ -6,7 +6,6 @@ projection `rule --line` and `rulings` share. CLI wiring lives in
 from __future__ import annotations
 
 import json
-import re
 import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -1845,35 +1844,19 @@ def test_board_configuration_reads_and_validates_the_idea_label(tmp_path: Path) 
         workboard.load_config(config_path)
 
 
-def test_board_configuration_keeps_body_contract_as_a_known_block_only_key(
-    tmp_path: Path,
+@pytest.mark.parametrize("value", ["block", "prose"])
+def test_board_configuration_refuses_body_contract_as_an_unknown_key(
+    tmp_path: Path, value: str
 ) -> None:
-    """The pin survives with one legal value. A repository that
-    carries `"block"` loads unchanged, an absent key means the block, and
-    any other value, a retired `"prose"` included, is refused with the one
-    sentence -- never as an unknown key, which would
-    refuse every store command in the repositories that still pin it."""
     config_path = tmp_path / "board.toml"
-    assert workboard.load_config(config_path) == BoardConfig()
+    config_path.write_text(f'body_contract = "{value}"\n')
 
-    config_path.write_text('body_contract = "block"\n')
-    assert workboard.load_config(config_path) == BoardConfig()
-
-    config_path.write_text('body_contract = "prose"\n')
-    with pytest.raises(
-        ClaimError, match=f"{re.escape(str(config_path))} body_contract must be 'block'"
-    ):
+    with pytest.raises(ClaimError) as refused:
         workboard.load_config(config_path)
 
-    config_path.write_text('body_contract = "sideways"\n')
-    with pytest.raises(
-        ClaimError, match=f"{re.escape(str(config_path))} body_contract must be 'block'"
-    ):
-        workboard.load_config(config_path)
-
-    config_path.write_text("body_contract = true\n")
-    with pytest.raises(ClaimError, match="body_contract must be 'block'"):
-        workboard.load_config(config_path)
+    assert str(refused.value) == (
+        f"board configuration {config_path} has unknown top-level key body_contract"
+    )
 
 
 def test_board_configuration_reads_and_validates_storage(tmp_path: Path) -> None:
@@ -1910,7 +1893,7 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
     config_path = tmp_path / "board.toml"
     config_path.write_text(
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
-        'body_contract = "block"\ncanonical_remote = "upstream"\n'
+        'canonical_remote = "upstream"\n'
         'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py"]\n'
         'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
     )

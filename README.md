@@ -71,7 +71,6 @@ other key is refused by name (`specs/storage-pin.spec.md`).
 | `priority_labels` | ordered labels ranking critical work (`security`, `data`, `ci`, `product`, `ux`, `cleanup`) |
 | `idea_label` | label marking an idea, never proposed by `next` (`idea`) |
 | `merge_method` | `"merge"` or `"squash"` for `aco land`; absent, a squash where the forge allows one, else a merge commit (`specs/land.spec.md`) |
-| `body_contract` | only `"block"` is accepted; absent means the same |
 | `lane_shared` | repository files a lane may change beyond its scope |
 | `dependency_paths` | paths a `No-Item: deps` pull request may change; a trailing `/` covers a directory |
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-from pathlib import Path
 
 import pytest
 from board_fixtures import (
@@ -16,7 +15,7 @@ from board_fixtures import (
     complete_contract,
     ruled_expectation,
 )
-from cli_fixtures import real_git, run_cli, track_board_config
+from cli_fixtures import run_cli
 from github_fixtures import FakeForge, serve_forge
 from github_pages import raw_board_issue
 from option_cards import (
@@ -34,8 +33,9 @@ from aco import body, github, store, workboard
 pytestmark = pytest.mark.usefixtures("github_world")
 
 
+@pytest.mark.usefixtures("github_clone")
 @pytest.mark.parametrize(
-    "issues, expected, config",
+    "issues, expected",
     [
         pytest.param(
             (
@@ -56,7 +56,6 @@ pytestmark = pytest.mark.usefixtures("github_world")
                 "  1 open: Open decision 0.\n"
                 f"  2 ruled yes {RULED_ON.isoformat()}: Settled decision 0.\n"
             ),
-            None,
             id="open-text",
         ),
         pytest.param(
@@ -78,7 +77,6 @@ pytestmark = pytest.mark.usefixtures("github_world")
                 f"  1 ruled yes {RULED_ON.isoformat()}: Settled decision 0.\n"
                 f"  2 ruled yes {RULED_ON.isoformat()}: Settled decision 1.\n"
             ),
-            None,
             id="ruled-text",
         ),
         pytest.param(
@@ -98,14 +96,12 @@ pytestmark = pytest.mark.usefixtures("github_world")
                 ),
             ),
             "#400 0/1: Block-only expectations\n  1 ruled later 2026-08-28: Deferred\n",
-            'body_contract = "block"\n',
             id="stale-prose-text",
         ),
-        pytest.param((), "No expectation lines.\n", None, id="empty-text"),
+        pytest.param((), "No expectation lines.\n", id="empty-text"),
         pytest.param(
             (board_issue(99, "Without lines", complete_contract("Ship #99.")),),
             "No expectation lines.\n",
-            None,
             id="without-lines-text",
         ),
         pytest.param(
@@ -119,7 +115,6 @@ pytestmark = pytest.mark.usefixtures("github_world")
                 ),
             ),
             "#10 1/1: Before\\u202eAfter\n  1 open: " + "A" * 98 + "\\u202e…\n",
-            None,
             id="long-text",
         ),
     ],
@@ -127,15 +122,10 @@ pytestmark = pytest.mark.usefixtures("github_world")
 def test_rulings_lists_items_and_lines(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    github_clone: Path,
     issues: tuple[workboard.Issue, ...],
     expected: str,
-    config: str | None,
 ) -> None:
     """Spec: RUL-01, RUL-02, RUL-04, RUL-07, RUL-11 -- exact rows; Never 2: block progress."""
-    if config is not None:
-        track_board_config(github_clone, config)
-        assert real_git(github_clone, "show", "HEAD:.aco/board.toml").stdout == config
     serve_forge(monkeypatch, FakeForge(board_issues=issues))
     capsys.readouterr()
     result = run_cli(["rulings"], capsys)
