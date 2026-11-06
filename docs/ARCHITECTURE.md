@@ -74,5 +74,6 @@ The trust model is cooperating clients: the state ref and `aco rule --via` are
 aids for cooperative agents (`specs/rule.spec.md` declares `--via` a tripwire),
 and the forge's permissions and edit history are the boundary against anyone
 else.
-Claimants need push rights to the canonical remote. No other trust boundary is
-declared yet.
+Claimants need push rights to the canonical remote. The board adds its own
+boundary: every `/api/` request must carry the token before any forge request
+is made (`specs/serve.spec.md`).
