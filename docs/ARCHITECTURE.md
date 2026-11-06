@@ -16,7 +16,7 @@ flowchart LR
     Head --> Helper["helper agents<br/>(lane workflow, skills)"]
     Head --> ACO["aco"]
     Helper --> ACO
-    Operator -.->|"decides by page (frozen board)"| ACO
+    Operator -.->|"decides on the board or in chat"| ACO
     ACO -->|"fetch, CAS push"| Remote[("canonical remote<br/>refs/aco/state")]
     ACO -->|"gh"| Forge[("forge: GitHub<br/>issues, pull requests")]
 ```
@@ -35,10 +35,11 @@ flowchart LR
     CLI --> Port["forge port<br/>forge.py"]
     Port --> GitHub["GitHub adapter<br/>github.py"]
     Port --> StateBoard["state-ref item store<br/>state_board.py"]
+    Board["board (aco serve)<br/>board/, frontend/"]
     Board -->|"same library code, in process"| Session
     Board --> Protocol
     Board --> Port
-    Board --> Decisions["decide, rulings,<br/>expectations, expectation_grammar"]
+    Board --> Decisions["decide, rulings,<br/>expectations, grammar"]
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
@@ -147,12 +148,12 @@ but not grow.
   fleets in one repository cannot disagree on what "too wide" means.
 - `.aco/board.toml` gains a setting only when that setting has a caller,
   because an option without one is upkeep with no user.
-- The state-ref item store and the board are kept although nobody uses them.
-  The store keeps items as files in the state ref for a repository without a
-  forge (`specs/storage-pin.spec.md`). The board (`aco serve`,
-  `src/aco/board/`, `frontend/`) lets the operator decide by page; it is
-  frozen, and nothing more is built at it. Every change to `session`, `store`
-  and the item commands still carries both storage paths. Both are known and
+- The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
+  decision surface: it shows only the questions that are his, from several
+  repositories (`specs/serve.spec.md` ABRD-14); frozen and unused today.
+- The state-ref item store is kept, unused today, for a repository without a
+  forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
+  the item commands still carries both storage paths. Both are known and
   deliberately kept; they are not unnoticed dead code.
 
 ## Not chosen
@@ -181,9 +182,10 @@ but not grow.
   migration that runs with it.
 - Renaming `.aco/board.toml`: it costs a migration to buy a better name.
   Reopens when a migration is needed anyway.
-- Deleting the state-ref item store and the board: the operator may still take
-  them into use, and a repository without a forge, or deciding by page, would
-  then need a rebuild. Reopens when the operator decides to drop them.
+- Deleting the board: it would remove the operator's decision surface the
+  vision names. Reopens when the operator decides to drop it.
+- Deleting the state-ref item store: a repository without a forge would need
+  a rebuild. Reopens when the operator decides to drop it.
 
 ## Risks and Technical Debt
 

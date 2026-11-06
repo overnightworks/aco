@@ -1,38 +1,40 @@
 # Vision
 
-aco lets several coding agents and the people who steer them work in one
-repository without colliding, and without anyone having to keep the shared
-state in their head.
+aco is the agents' own tool, built by agents for agents. It lets many coding
+agents work in parallel across many repositories without getting in each
+other's way, and without any of them having to remember what the others do.
+The person who steers them sees only the decisions that are theirs.
 
 ## For whom, today
 
-- The heads of the operator's fleet: Claude, Codex and Grok sessions, one per
-  repository. They pull, claim, cut and land work items with it.
-- Their helpers (builders, reviewers, landers), which work under a head's
-  claim.
-- The operator, who decides in chat and sees which of his decisions are
-  still open.
+- The agents that lead a repository: they pick, claim, split and finish work
+  with it.
+- The agents they delegate to (builders, reviewers, landers), working under
+  their lead.
+- The operator, who steers the fleet. He reads no session to stay informed:
+  each question that is his reaches him as one decision card, with its
+  options and a recommendation.
 
-## What it does
+## What it can do
 
-- It knows who holds which files right now, in one compare-and-swap git ref,
-  so no two lanes build on the same paths unawares.
-- It names the next item to pull, and says why another one is blocked or
-  skipped.
-- It lands exactly the commit the reviewers saw, then reports what the
-  landing freed.
-- It keeps one typed contract per work item that every agent reads the same
-  way, and records each of the operator's decisions in it.
+- It knows who works on which files right now, so no two agents change the
+  same thing unawares.
+- It names the next piece of work, and says why another one has to wait.
+- It merges a change only in the exact state the reviewers saw, then says
+  what that frees up.
+- It keeps one contract per piece of work that every agent reads the same
+  way, with the operator's open questions and his answers in it.
+- It gathers the open questions of all repositories in one place for the
+  operator to decide; an answer he gives in chat counts the same.
 
 ## What it deliberately is not
 
-- Not a forge. Git, `gh` and GitHub own commits, branches, pull requests and
-  issue text; aco reads them and adds only what they cannot hold.
-- Not a service. Coordination needs only git and the forge: no lease
-  server, no daemon, no provider configuration. The board is a local page.
-- Not a project-management tool. An item has a rough size and nothing
-  more: no time tracking, statistics or reports.
-- Not a decider. It records the operator's word; it never rules in his
-  place.
-- Not a growing surface. The board stays as it is, and decisions happen in
-  chat.
+- Not a reading room. Status, transcripts and evidence stay with the agents;
+  what reaches the operator is a decision.
+- Not a code host or issue tracker. It uses the ones a repository already
+  has and adds only what they cannot hold.
+- Not a server. Agents coordinate through the repository itself; nothing
+  else has to run for them.
+- Not a project-management tool. A piece of work has a rough size and
+  nothing more: no time tracking, statistics or reports.
+- Not a decider. It records the operator's word and never rules in his place.

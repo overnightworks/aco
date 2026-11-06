@@ -104,5 +104,4 @@ landing grammar, storage pin, state ref transport) are in
 
 [`docs/VISION.md`](docs/VISION.md) says why aco exists and what it is not,
 `specs/` holds the behaviour contracts, and
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) the mental model and the parts
-kept although unused.
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) how aco works.
