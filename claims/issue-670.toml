@@ -1,0 +1,8 @@
+claim_id = "891d8cc65a3f4bd7bc826d6522a37fae"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "65c9d37cde58b2a7515c474810410dea1ac79a5c"
+branch = "claude/issue-670-list-code-built-ahead-of-its-caller"
+scope = ["README.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/ahead-of-caller.spec.md", "specs/next.spec.md", "src/aco/ahead_of_caller.py", "src/aco/board_read.py", "src/aco/cmd_next.py", "src/aco/session.py", "tests"]
+opened_commit = "9ea72df56bdfa832c177c32b0265b8c9e414e9a4"
+whole_reason = "One format, its one reader and its one printer prove the list end to end only together; a parser without its reader and printer would be code reached only by tests."
