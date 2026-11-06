@@ -8,9 +8,8 @@ exact behaviour is in its spec under `specs/`.
 
 ## What aco is for, and is not
 
-A capability belongs in `aco` only if it holds what an agent would forget or
-cannot know alone and no native tool does it better. GitHub through `gh` is the
-one forge adapter. The rest is in [`docs/VISION.md`](docs/VISION.md).
+GitHub through `gh` is the one forge adapter. Why aco exists and what it is
+not: [`docs/VISION.md`](docs/VISION.md).
 
 ## Install
 

@@ -39,7 +39,7 @@ flowchart LR
     Board -->|"same library code, in process"| Session
     Board --> Protocol
     Board --> Port
-    Board --> Decisions["decide, rulings,<br/>expectations, grammar"]
+    Board --> Decisions["decide, rulings,<br/>expectations,<br/>expectation_grammar"]
 ```
 
 - The **state ref** is one git ref on the configured canonical remote
@@ -150,11 +150,12 @@ but not grow.
   because an option without one is upkeep with no user.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
   decision surface: it shows only the questions that are his, from several
-  repositories (`specs/serve.spec.md` ABRD-14); frozen and unused today.
+  repositories (`specs/serve.spec.md` ABRD-14); frozen and unused today, known and deliberately kept, not unnoticed
+  dead code.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
-  the item commands still carries both storage paths. Both are known and
-  deliberately kept; they are not unnoticed dead code.
+  the item commands still carries both storage paths. It is known and
+  deliberately kept, not unnoticed dead code.
 
 ## Not chosen
 
