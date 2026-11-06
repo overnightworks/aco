@@ -1,0 +1,7 @@
+claim_id = "d9d737a75f2443c384f8d7dfd13b4e3a"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "e9014aabc5e3bc8b2bfc4699e958999cb0029ed3"
+branch = "claude/issue-687-the-state-ref-landing-refusal-promises-a"
+scope = ["src/aco/state_board.py", "tests/test_state_board.py"]
+opened_commit = "000e777b020505aa32f7ce265f9aac19bcc94d4e"
