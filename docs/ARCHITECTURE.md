@@ -28,8 +28,10 @@ flowchart LR
   to a new tree (`protocol.apply`). The store commits it on the observed tip
   and pushes with a plain fast-forward `git push`, never `--force` and never
   `--force-with-lease`, because a matching lease can replace history. A
-  rejected push means the state moved: the store re-reads and re-applies the
-  original intent. The wire contract is `specs/ref-store-cas.spec.md`.
+  rejected push is retried: the store re-reads the ref and re-applies the
+  original intent. A push rejected while the ref never moves points to a stale
+  lock or missing push rights, not a race. The wire contract and the retry and
+  failure semantics are in `specs/ref-store-cas.spec.md`.
 - A resource (a number that must stay unique repository-wide) is allocated in
   the same commit as the claim that requests it, so two lanes racing for it
   serialize on the one ref and the loser gets the next value.
