@@ -119,7 +119,7 @@ def cut_check(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> CutCheck:
-    pin = 'body_contract = "block"\nidea_label = "idea"\n'
+    pin = 'idea_label = "idea"\n'
     track_board_config(github_clone, pin)
     assert real_git(github_clone, "show", "HEAD:.aco/board.toml").stdout == pin
     freeze_cli_now(monkeypatch)

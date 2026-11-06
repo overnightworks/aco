@@ -684,7 +684,6 @@ def test_board_skips_the_dependency_list_for_a_zero_blocker_item_in_block_mode(
     """An
     item whose own count already says 0 must never pay for its dependency
     list, only the one that actually carries a blocker."""
-    write_repository_config(tmp_path, 'body_contract = "block"\n')
     unblocked = board_issue(10, "Unblocked", block_body(MINIMAL_BLOCK_TOML))
     blocked = replace(
         board_issue(11, "Blocked", block_body(MINIMAL_BLOCK_TOML)), blocked_by_count=1
@@ -3946,10 +3945,6 @@ def _one_slice_container() -> Issue:
     return container_issue(CUT_CONTAINER, _cuttable_row_toml("Scheibe 1"))
 
 
-def _write_block_pin(tmp_path: Path) -> None:
-    write_repository_config(tmp_path, 'body_contract = "block"\n')
-
-
 def test_the_container_a_cut_empties_of_rows_still_passes_check_stdin(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
@@ -3964,7 +3959,6 @@ def test_the_container_a_cut_empties_of_rows_still_passes_check_stdin(
         '[[slice]]\nindex = 1\ntitle = "Scheibe 1"\ndone_when = "Scheibe 1 is merged."\n',
     )
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "cut", str(CUT_CONTAINER)])
 
@@ -4005,9 +3999,8 @@ def test_cut_never_adopts_an_orphan_that_is_not_this_containers_recovery_shape(
     child instead of silently re-parenting any of them -- once the caller
     has said the look-alike is no twin."""
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(_one_slice_container(),))
-    _write_block_pin(tmp_path)
     if idea_label is not None:
-        write_repository_config(tmp_path, f'body_contract = "block"\nidea_label = "{idea_label}"\n')
+        write_repository_config(tmp_path, f'idea_label = "{idea_label}"\n')
     monkeypatch.setattr(client, "list_open_board_issues", lambda: (_one_slice_container(), orphan))
 
     exit_code = issue_claim.main(
@@ -4071,7 +4064,6 @@ def test_next_prints_a_cut_command_bash_runs_as_printed_and_cut_accepts(
     )
     container = container_issue(CUT_CONTAINER, toml_text)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
 
     next_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
     advice = capsys.readouterr().out.splitlines()[1].removeprefix("Next: ")
@@ -4104,7 +4096,6 @@ def test_next_prints_a_cut_command_block_mode_accepts_a_differing_next_line(
     )
     container = container_issue(CUT_CONTAINER, toml_text)
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    _write_block_pin(tmp_path)
 
     json_exit_code = issue_claim.main(["--repo", REPOSITORY, "next", "--json"])
     assert json_exit_code == 0
@@ -5130,7 +5121,6 @@ def _rulings_of_titled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, title: s
     """One item titled `title` whose one open expectation line says `title`."""
     contract = complete_contract("Rule it.", expectation=[open_option_entry(title)])
     _configured_board_client(monkeypatch, tmp_path, open_issues=(board_issue(10, title, contract),))
-    _write_block_pin(tmp_path)
     return ["--repo", REPOSITORY, "rulings"]
 
 
@@ -6052,7 +6042,6 @@ def test_board_shows_freed_from_a_sole_closed_local_dependency_and_claim_reaches
         blocked_by_count=1,
     )
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(live_issue,))
-    _write_block_pin(tmp_path)
     client.board_dependencies = {301: closed_dependency}
     monkeypatch.setattr(
         cmd_claim,
@@ -11994,7 +11983,6 @@ def _cut_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun
     _configured_board_client(
         monkeypatch, tmp_path, open_issues=(container_issue(CUT_CONTAINER, toml_text),)
     )
-    _write_block_pin(tmp_path)
     argv = ["--repo", REPOSITORY, "cut", str(CUT_CONTAINER), "--title", "Scheibe 1"]
     return _read_once(argv, toplevel=tmp_path, observes=False)
 

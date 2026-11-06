@@ -218,8 +218,7 @@ class IssueReference:
 class IssueDependency:
     """One `blocked_by` relation GitHub itself records for an issue --
     same- or foreign-repository, open or closed, issue or pull request. The
-    board reads these instead of a `Blocked by:` body section once a
-    repository is pinned to `body_contract = "block"`."""
+    board reads these instead of a `Blocked by:` body section."""
 
     reference: IssueReference
     state: BlockerState
@@ -526,17 +525,9 @@ class BoardConfig:
         )
 
 
-# The body pin is still a key this file defines, but no longer
-# a setting: the typed `aco` block is the one grammar, so `"block"`
-# is its only legal value and there is nothing left for `BoardConfig` to
-# carry. It must stay *known* all the same -- five repositories
-# pin it, and `_refuse_unknown_config_keys` lies on the path of every store
-# command, so forgetting it here would refuse `claim` and `release` there.
-BODY_CONTRACT_KEY = "body_contract"
-BODY_CONTRACT_BLOCK = "block"
 # Every key `.aco/board.toml` defines; anything else is a typo, and
 # `_refuse_unknown_config_keys` names it rather than reading past it.
-CONFIG_KEYS = frozenset({setting.name for setting in fields(BoardConfig)}) | {BODY_CONTRACT_KEY}
+CONFIG_KEYS = frozenset({setting.name for setting in fields(BoardConfig)})
 
 
 class Stage(StrEnum):
@@ -664,19 +655,6 @@ def _validated_idea_label(raw: dict[str, object]) -> str:
     return idea_label
 
 
-def _refuse_unpinned_body_contract(raw: dict[str, object], path: Path) -> None:
-    """Refuse any body pin but the one grammar this tool reads.
-
-    An absent key means the block, so an unpinned repository needs no edit.
-    """
-    pinned = raw.get(BODY_CONTRACT_KEY)
-    if pinned is None or pinned == BODY_CONTRACT_BLOCK:
-        return
-    raise protocol.ClaimError(
-        f"board configuration {path} {BODY_CONTRACT_KEY} must be {BODY_CONTRACT_BLOCK!r}"
-    )
-
-
 def _validated_canonical_remote(raw: dict[str, object], path: Path) -> str:
     remote = raw.get("canonical_remote", DEFAULT_CANONICAL_REMOTE)
     if isinstance(remote, str) and remote.strip() == remote and remote and remote[0] != "-":
@@ -784,7 +762,6 @@ def parse_config(text: str, path: Path) -> BoardConfig:
     except tomllib.TOMLDecodeError as error:
         raise _unreadable_config(path, error) from error
     _refuse_unknown_config_keys(raw, path)
-    _refuse_unpinned_body_contract(raw, path)
     return BoardConfig(
         priority_labels=_validated_priority_labels(raw),
         idea_label=_validated_idea_label(raw),

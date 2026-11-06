@@ -98,7 +98,7 @@ pytestmark = pytest.mark.usefixtures("github_world")
                 ),
             ),
             "#400 0/1: Block-only expectations\n  1 ruled later 2026-08-28: Deferred\n",
-            'body_contract = "block"\n',
+            None,
             id="stale-prose-text",
         ),
         pytest.param((), "No expectation lines.\n", None, id="empty-text"),

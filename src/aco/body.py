@@ -42,9 +42,8 @@ FENCE_CLOSING_PATTERN = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})[ \t]*$")
 # projection keys, never a second schema for a container's own skeleton.
 CONTAINER_SKELETON_PROSE = "Blocked by: nichts"
 
-# The one fenced-block info string a repository pinned to `body_contract =
-# "block"` reads as its typed work-item body -- any other
-# fence's info string is ordinary documentation.
+# The one fenced-block info string read as a work item's typed body -- any
+# other fence's info string is ordinary documentation.
 BLOCK_FENCE_INFO = "aco"
 BLOCK_TOP_LEVEL_KEYS = frozenset(
     {

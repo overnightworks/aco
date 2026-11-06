@@ -112,7 +112,7 @@ class TestCommandRewrites:
         newline: str,
     ) -> None:
         """Spec: BODY-88, CUT-11 -- removing a slice row re-renders the container's block."""
-        track_board_config(github_world, 'body_contract = "block"\n')
+        track_board_config(github_world, 'idea_label = "idea"\n')
         assert real_git(github_world, "ls-files", ".aco/board.toml").stdout == ".aco/board.toml\n"
         row = '\n[[slice]]\nindex = 1\ntitle = "Slice A"\ndone_when = "D"\n'
         raw = item_body(item, newline=newline, extra=row)
