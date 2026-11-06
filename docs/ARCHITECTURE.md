@@ -52,17 +52,18 @@ flowchart LR
 One line per standing choice: the rule, its reason and the rejected
 alternative that keeps coming back.
 
-- Claims live in the state ref, one tree of `claims/` and `resources/`. The
-  ref has one serialization point. Rejected: per-item claim comments, because the comment
-  API has no conditional write, so two agents can both post and neither loses,
-  and a lane without an issue has no comment to hold; the assignee as the
+- Claims live in the state ref, one tree of `claims/` and `resources/`. The ref
+  has one serialization point. Rejected: per-item claim comments, because the
+  comment API has no conditional write, so two agents can both post and neither
+  loses, and a lane without an issue has no comment to hold; the assignee as the
   lock, because it has no compare-and-swap and names a forge account, not the
-  agent and session holding the claim; Projects v2 fields, because they have
-  no demonstrated compare-and-swap and add a synchronisation step and tie the claim path, which is pure git, to
-  a forge API; one ref per key plus a resources ref, because a resource-holding
-  claim would have its hold and its number in two owners that can disagree,
-  and making them one transition needs `git push --atomic` across refs, which
-  is unverified on GitHub.
+  agent and session holding the claim; Projects v2 fields, because they have no
+  demonstrated compare-and-swap and add a synchronisation step and tie the
+  claim's compare-and-swap, which is a pure git push today, to a forge API; one
+  ref per key plus a resources ref, because a resource-holding claim would have
+  its hold and its number in two owners that can disagree, and making them one
+  transition needs `git push --atomic` across refs, which is unverified on
+  GitHub.
 - The state ref advances by a plain fast-forward push. A push already accepts
   fast-forwards and rejects the rest, which is the serialization needed, and a
   matching `--force-with-lease` can replace history. Rejected: the lease,
