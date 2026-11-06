@@ -1,8 +1,6 @@
 """How `aco next` reads the claims live on the state ref: an item under claim is not pulled,
 and a claim's scope is occupied for the parallel walk. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

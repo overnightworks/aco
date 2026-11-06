@@ -4,8 +4,6 @@ wraps. CLI wiring that merely drives a forge through `cli.py` -- including
 tests that build a `GitHubForge` only to hand it to `board_read.build_board`/
 `issue_claim.main` -- stays in `tests/test_cli.py`."""
 
-from __future__ import annotations
-
 import base64
 import dataclasses
 import json

@@ -21,8 +21,6 @@ which the launcher sends on teardown.
 """
 # ruff: noqa: T201 - the server announces its address to the test that starts it
 
-from __future__ import annotations
-
 import json
 import os
 import re

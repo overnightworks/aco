@@ -1,8 +1,6 @@
 """GitHub adapter for the forge port."""
 # ruff: noqa: T201 - the forge adapter's one operator warning goes to stderr
 
-from __future__ import annotations
-
 import base64
 import json
 import os

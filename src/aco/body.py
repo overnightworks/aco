@@ -11,8 +11,6 @@ never imports `workboard`, `items`, or `state_board` back (Layers contract):
 codec and `items.py` need (`ORIGIN_PATTERN`) is owned here instead.
 """
 
-from __future__ import annotations
-
 import re
 import tomllib
 from collections.abc import Mapping

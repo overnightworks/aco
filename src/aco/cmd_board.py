@@ -1,7 +1,5 @@
 """The `board` command (`specs/board.spec.md`)."""
 
-from __future__ import annotations
-
 import argparse
 from enum import StrEnum
 

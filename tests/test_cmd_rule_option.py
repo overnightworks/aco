@@ -2,8 +2,6 @@
 records how the decision reached aco, and refuses a stale card, a wrong
 letter or a wrong flag combination before any write (RULE-14..RULE-19)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

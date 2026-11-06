@@ -2,8 +2,6 @@
 (specs/serve.spec.md: ABRD-61, ABRD-62), driven through the real server, wire form and
 `aco` adapter against the real `aco` over a fake forge."""
 
-from __future__ import annotations
-
 from datetime import date
 from typing import Any, cast
 

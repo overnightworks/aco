@@ -1,8 +1,6 @@
 """`aco next` names the open option lines an operator sent back to their head
 (NEXT-45, NEXT-46)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

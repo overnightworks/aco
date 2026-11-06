@@ -1,7 +1,5 @@
 """`aco --help` as a reader sees it."""
 
-from __future__ import annotations
-
 import re
 
 import pytest

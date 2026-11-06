@@ -2,8 +2,6 @@
 the operator's own answer, stores it verbatim, keeps a later write
 byte-identical and stands (RULE-20, RULE-04, BODY-92, BODY-88, BODY-87, RUL-16)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

@@ -3,8 +3,6 @@ worktrees and the real state ref: whose claim it is, how `--add` and `--drop`
 combine with its scope, what it reports, and the checkout and state-ref
 refusals that come before any write. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from pathlib import Path

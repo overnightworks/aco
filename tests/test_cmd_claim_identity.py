@@ -2,8 +2,6 @@
 records, the agent filled from the documented chain when no flag names one,
 and who may release it. The forge is the only fake."""
 
-from __future__ import annotations
-
 import re
 from pathlib import Path
 

@@ -3,8 +3,6 @@
 read an item through the target gate and write its folded body once, here,
 so every ruling and every withdrawal takes the same path."""
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date

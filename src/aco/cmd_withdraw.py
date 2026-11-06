@@ -2,8 +2,6 @@
 expectation line before anyone has ruled it."""
 # ruff: noqa: T201 - the withdraw command writes its result line to stdout
 
-from __future__ import annotations
-
 import argparse
 from collections.abc import Sequence
 from datetime import date

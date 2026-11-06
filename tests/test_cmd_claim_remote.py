@@ -3,8 +3,6 @@ the state ref, on real temporary git worktrees: a state ref that does not
 exist, a forge target that names another repository than the canonical
 remote, and a remote no forge adapter serves. The forge is the only fake."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

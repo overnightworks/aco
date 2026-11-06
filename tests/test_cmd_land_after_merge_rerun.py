@@ -1,7 +1,5 @@
 """Resume a landed lane using its immutable merge trailer and recorded head."""
 
-from __future__ import annotations
-
 import os
 import shlex
 from dataclasses import dataclass, field, replace

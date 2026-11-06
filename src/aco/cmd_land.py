@@ -1,8 +1,6 @@
 """The `land` command (`specs/land.spec.md`)."""
 # ruff: noqa: T201 - the land command writes its result lines to stdout
 
-from __future__ import annotations
-
 import argparse
 import time
 import tomllib

@@ -2,8 +2,6 @@
 rewrite: `text` and a local-date `withdrawn_on`, nothing else, its index kept
 (BODY-104..BODY-106, BODY-27, BODY-88)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

@@ -1,7 +1,5 @@
 """`aco bootstrap`, driven through the CLI against real git (`specs/bootstrap.spec.md`)."""
 
-from __future__ import annotations
-
 import subprocess
 from collections.abc import Callable
 from pathlib import Path

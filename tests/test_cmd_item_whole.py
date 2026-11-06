@@ -2,8 +2,6 @@
 git worktrees and the real state ref: a flag or a body that breaks it refuses
 before any write. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

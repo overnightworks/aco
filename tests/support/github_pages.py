@@ -1,7 +1,5 @@
 """A forge serving one raw issue page: the `gh api` rows `GitHubForge` parses."""
 
-from __future__ import annotations
-
 import json
 
 from board_fixtures import REPOSITORY

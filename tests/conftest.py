@@ -9,8 +9,6 @@ fixtures resolve by name in every test module, and its autouse
 `_isolate_agent_identity` applies to every test.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

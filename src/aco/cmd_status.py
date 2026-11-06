@@ -1,8 +1,6 @@
 """The `status` command (`specs/status.spec.md`)."""
 # ruff: noqa: T201 - the status command writes its result lines to stdout
 
-from __future__ import annotations
-
 import argparse
 from collections.abc import Mapping
 from dataclasses import dataclass

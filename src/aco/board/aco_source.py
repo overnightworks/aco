@@ -9,8 +9,6 @@ over between calls or threads, and one write's read, check and write share
 that one context.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast

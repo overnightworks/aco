@@ -1,7 +1,5 @@
 """What `aco land` says about the default branch's checks at the merge's first parent."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 

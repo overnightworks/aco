@@ -3,8 +3,6 @@
 refusals before any port call, aco's own refusals relayed once for the card, and that
 aco's writer stores what the board sent in one body write."""
 
-from __future__ import annotations
-
 import json
 import tomllib
 from collections.abc import Callable

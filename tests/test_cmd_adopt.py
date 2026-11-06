@@ -1,8 +1,6 @@
 """`aco adopt` through the real CLI (`specs/adopt.spec.md`): its refusals, the build, the
 claim, the body write and the holder's rerun."""
 
-from __future__ import annotations
-
 import json
 import os
 import re

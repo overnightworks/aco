@@ -1,8 +1,6 @@
 """`aco release` in lane mode, whatever the branch's prefix, on real temporary
 git worktrees and the real state ref. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

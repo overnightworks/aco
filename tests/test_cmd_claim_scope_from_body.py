@@ -4,8 +4,6 @@ differing one refuses, what the claimed line costs, and the refusals that name
 a malformed body, a missing target and a forge outage. The forge is the only
 fake."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from pathlib import Path

@@ -5,8 +5,6 @@ returns `(field, message)` pairs and imports nothing from the expectation
 grammar, which wraps them in its own defect type.
 """
 
-from __future__ import annotations
-
 import re
 from collections.abc import Callable, Iterator, Mapping, Sequence
 

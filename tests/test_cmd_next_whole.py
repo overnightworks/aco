@@ -1,8 +1,6 @@
 """How `aco next` and `aco board` report an item whose `whole` is not one bounded
 line, on a real checkout and the real state ref. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

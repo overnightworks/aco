@@ -1,7 +1,5 @@
 """`aco rule` never stamps a `ruled_on` before the line's `asked_on` (RULE-38)."""
 
-from __future__ import annotations
-
 import pytest
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, run_cli
 from option_cards import (

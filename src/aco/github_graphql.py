@@ -4,8 +4,6 @@ The module never runs `gh`: the adapter hands in a callable that performs one
 round trip, so every round trip stays counted where the adapter counts them.
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor

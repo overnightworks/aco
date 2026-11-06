@@ -1,7 +1,5 @@
 """Remove landed lanes safely and report why a merged lane must stay."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace

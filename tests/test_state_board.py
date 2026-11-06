@@ -8,8 +8,6 @@ there, and reads it into the exact same shapes the GitHub adapter would)
 is proven against a real object database, not an invented one.
 """
 
-from __future__ import annotations
-
 import hashlib
 import io
 import json

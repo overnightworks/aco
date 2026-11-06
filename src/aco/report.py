@@ -3,8 +3,6 @@
 shares."""
 # ruff: noqa: T201 - the one owner of the JSON envelope and the error line
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

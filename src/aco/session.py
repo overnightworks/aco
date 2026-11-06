@@ -21,8 +21,6 @@ observation and the forge built from it, and keeps every other fact it read
 branch, trunk -- so the next ask re-reads only the state ref.
 """
 
-from __future__ import annotations
-
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass

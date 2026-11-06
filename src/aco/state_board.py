@@ -29,8 +29,6 @@ instead, independent of this adapter's own missing
 pull-request data.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime

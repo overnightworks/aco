@@ -1,8 +1,6 @@
 """`aco claim` in lane mode on a branch outside `docs/` and `fix/`, on real
 temporary git worktrees and the real state ref. The forge is the only fake."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

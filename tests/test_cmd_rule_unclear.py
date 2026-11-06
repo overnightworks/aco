@@ -2,8 +2,6 @@
 `returned_on` and `returned_note` (BODY-93/94), `aco rule --unclear` that writes
 them (RULE-22..27) and `aco rulings` that reads them (RUL-17/18)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

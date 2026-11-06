@@ -1,7 +1,5 @@
 """The board token's file: path, creation, reuse and refusal of a foreign shape."""
 
-from __future__ import annotations
-
 import os
 import stat
 from concurrent.futures import ThreadPoolExecutor

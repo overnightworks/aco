@@ -1,7 +1,5 @@
 """Real-pipe CLI proofs for `aco check -`; field grammar lives in test_board."""
 
-from __future__ import annotations
-
 import json
 import sys
 from collections.abc import Callable

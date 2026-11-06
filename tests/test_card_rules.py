@@ -2,8 +2,6 @@
 by `aco check -` (BODY-95..BODY-100); a ruled line is exempt. The pattern table is
 judged on the pure rules, the fields and the exemptions through the real CLI."""
 
-from __future__ import annotations
-
 import re
 import tomllib
 

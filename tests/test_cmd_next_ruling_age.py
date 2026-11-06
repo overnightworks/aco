@@ -1,8 +1,6 @@
 """How many landings on the trunk `aco next` counts since a ruling, read from a real
 trunk history. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from datetime import date
 from pathlib import Path

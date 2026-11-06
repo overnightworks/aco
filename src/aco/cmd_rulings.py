@@ -1,8 +1,6 @@
 """The `rulings` command (`specs/rulings.spec.md`)."""
 # ruff: noqa: T201 - the rulings command writes its result lines to stdout
 
-from __future__ import annotations
-
 import argparse
 import sys
 from collections.abc import Iterable

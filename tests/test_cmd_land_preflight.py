@@ -1,7 +1,5 @@
 """Land entry and readiness through a real GitHub checkout, before any claim exists."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 

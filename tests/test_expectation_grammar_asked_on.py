@@ -2,8 +2,6 @@
 the line is open or returned, a TOML local date, outside the card hash, read by
 `rulings`, and kept when `rule` rewrites the body."""
 
-from __future__ import annotations
-
 import json
 import tomllib
 from datetime import date

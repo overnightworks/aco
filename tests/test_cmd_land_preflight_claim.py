@@ -1,7 +1,5 @@
 """Land classification and checkout refusals with claims published by another clone."""
 
-from __future__ import annotations
-
 import tomllib
 from dataclasses import dataclass, field, replace
 from enum import Enum

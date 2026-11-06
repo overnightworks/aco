@@ -2,8 +2,6 @@
 RUL-10): the checker accepts a card without them, `rulings --json` names none,
 and a caption still needs a picture beside it."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

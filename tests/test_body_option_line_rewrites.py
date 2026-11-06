@@ -3,8 +3,6 @@ rendering itself, then each command that rewrites a block -- `rule`,
 `cut`, `rescope`, `item new`/`edit` and the state-ref `[record]` write -- on
 old-only, new-only and mixed items, LF and CRLF, `github` and `state-ref`."""
 
-from __future__ import annotations
-
 import dataclasses
 from types import SimpleNamespace
 from typing import cast

@@ -1,8 +1,6 @@
 """A container's child counts and open children come from its sub-issue list
 alone; a lagging child-count summary refuses nothing."""
 
-from __future__ import annotations
-
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path

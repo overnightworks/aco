@@ -7,8 +7,6 @@ tests drive the real server, token-free, the way a browser loading the
 shell does (`specs/serve.spec.md` ABRD-12).
 """
 
-from __future__ import annotations
-
 import secrets
 from collections.abc import Callable
 from pathlib import Path

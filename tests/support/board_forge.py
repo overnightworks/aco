@@ -8,8 +8,6 @@ to a log beside it. `run_context` is the one replacement for
 it, so the board's aco source reaches this forge and never GitHub.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import threading

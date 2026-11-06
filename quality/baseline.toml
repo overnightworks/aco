@@ -15,32 +15,31 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1234
-"src/aco/checkout.py" = 2025
-"src/aco/cli.py" = 833
-"src/aco/cmd_claim.py" = 1134
-"src/aco/cmd_release.py" = 921
-"src/aco/github.py" = 1571
-"src/aco/protocol.py" = 1874
-"src/aco/state_board.py" = 927
-"src/aco/store.py" = 1799
-"src/aco/workboard.py" = 2902
-"tests/support/cli_fixtures.py" = 890
-"tests/support/github_fixtures.py" = 832
-"tests/test_board.py" = 3590
-"tests/test_checkout.py" = 2039
-"tests/test_cli.py" = 12102
-"tests/test_cmd_adopt.py" = 1646
-"tests/test_cmd_cut.py" = 1069
-"tests/test_cmd_land_after_merge_rerun.py" = 873
-"tests/test_cmd_land_preflight_claim.py" = 858
-"tests/test_cmd_release_cleanup.py" = 804
-"tests/test_cmd_rescope_checkout.py" = 1087
-"tests/test_cmd_reset.py" = 952
-"tests/test_github.py" = 2841
-"tests/test_protocol.py" = 801
-"tests/test_state_board.py" = 5937
-"tests/test_store.py" = 5109
+"src/aco/body.py" = 1232
+"src/aco/checkout.py" = 2023
+"src/aco/cli.py" = 831
+"src/aco/cmd_claim.py" = 1132
+"src/aco/cmd_release.py" = 919
+"src/aco/github.py" = 1569
+"src/aco/protocol.py" = 1872
+"src/aco/state_board.py" = 925
+"src/aco/store.py" = 1797
+"src/aco/workboard.py" = 2900
+"tests/support/cli_fixtures.py" = 888
+"tests/support/github_fixtures.py" = 830
+"tests/test_board.py" = 3588
+"tests/test_checkout.py" = 2037
+"tests/test_cli.py" = 12100
+"tests/test_cmd_adopt.py" = 1644
+"tests/test_cmd_cut.py" = 1067
+"tests/test_cmd_land_after_merge_rerun.py" = 871
+"tests/test_cmd_land_preflight_claim.py" = 856
+"tests/test_cmd_release_cleanup.py" = 802
+"tests/test_cmd_rescope_checkout.py" = 1085
+"tests/test_cmd_reset.py" = 950
+"tests/test_github.py" = 2839
+"tests/test_state_board.py" = 5935
+"tests/test_store.py" = 5107
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 82

@@ -13,8 +13,6 @@ carries the same guard headers, and none carries a cross-origin header, so a
 page from another origin can never read one.
 """
 
-from __future__ import annotations
-
 import hmac
 import socket
 import sys

@@ -25,8 +25,6 @@ guard holds for a test module outside `tests/` run with `-c pyproject.toml`
 too, not only where `tests/conftest.py` is found.
 """
 
-from __future__ import annotations
-
 import tempfile
 
 import pytest

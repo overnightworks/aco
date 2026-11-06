@@ -2,8 +2,6 @@
 (NEXT-37) and TAB, the read side lists a stored claim holding one unchanged, and
 `aco status` and `aco brief` print each as its escape."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

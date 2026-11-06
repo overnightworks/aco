@@ -2,8 +2,6 @@
 them, and the card hash pins the card the operator decided
 (BODY-69..89, RUL-02/10/12..14)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

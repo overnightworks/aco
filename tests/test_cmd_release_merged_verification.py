@@ -4,8 +4,6 @@ Every case releases from a real clone whose bare remote holds a real merge or sq
 commit carrying the trailer block, with the claim on the real state ref; the forge is
 the only fake."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from functools import partial

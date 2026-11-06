@@ -5,8 +5,6 @@ created user-only and not policed afterwards, but its content may come from a
 file this process did not write, so it is validated before use (ABRD-96).
 """
 
-from __future__ import annotations
-
 import os
 import re
 import secrets

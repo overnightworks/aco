@@ -1,8 +1,6 @@
 """The `claim` command (`specs/claim.spec.md`)."""
 # ruff: noqa: T201 - the claim command writes its result lines to stdout
 
-from __future__ import annotations
-
 import argparse
 import sys
 import uuid

@@ -1,8 +1,6 @@
 """The argument parser every `aco` command line is read with: it raises a
 refusal instead of exiting inside the parse, so one place decides its shape."""
 
-from __future__ import annotations
-
 import argparse
 import sys
 from collections.abc import Callable, Iterable

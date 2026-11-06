@@ -3,8 +3,6 @@ repository: GitHub answers a reference with its canonical name, and the adapter
 asks once what GitHub calls the run's repository only when an answer names
 another. The GitHub CLI is the only fake."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass

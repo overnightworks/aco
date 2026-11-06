@@ -1,8 +1,6 @@
 """The `check` command (`specs/check.spec.md`)."""
 # ruff: noqa: T201 - the check command writes its result lines to stdout
 
-from __future__ import annotations
-
 import argparse
 import sys
 from dataclasses import dataclass

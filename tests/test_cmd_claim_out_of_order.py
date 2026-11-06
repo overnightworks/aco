@@ -3,8 +3,6 @@ git worktrees and the real state ref: the out-of-order refusal and its
 downgrade, the items that do not rank, and the replay that skips the check.
 The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

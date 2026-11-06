@@ -2,8 +2,6 @@
 git worktrees and the real state ref: the standing claims it lists as touches
 and the value a shared resource allocates. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

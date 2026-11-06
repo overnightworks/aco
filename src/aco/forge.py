@@ -7,8 +7,6 @@ directly, `cmd_item` on `StateRefBoard`, and `cmd_release` on both, so a
 further forge needs its own contract for them first.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime

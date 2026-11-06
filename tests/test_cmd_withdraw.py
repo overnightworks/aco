@@ -1,8 +1,6 @@
 """`aco withdraw` (`specs/withdraw.spec.md`) through a real GitHub checkout,
 injecting only at the forge boundary."""
 
-from __future__ import annotations
-
 import json
 import re
 from collections.abc import Callable

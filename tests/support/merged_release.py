@@ -2,8 +2,6 @@
 commit on the bare remote, then the claim on the real state ref (none when `identity` is
 None: the state a rerun finds after a completed release)."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 

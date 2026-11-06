@@ -7,8 +7,6 @@ provider-neutral exceptions; only a caller that knows what command it ran and
 why can turn one into a user-facing message.
 """
 
-from __future__ import annotations
-
 import os
 import selectors
 import subprocess

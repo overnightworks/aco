@@ -3,8 +3,6 @@ owns (moved from `board.py`): the `expectation_lines`
 projection `rule --line` and `rulings` share. CLI wiring lives in
 `tests/test_cmd_rule.py` for `rule` and `tests/test_cmd_rulings.py` for `rulings`."""
 
-from __future__ import annotations
-
 import json
 import tomllib
 from collections.abc import Callable

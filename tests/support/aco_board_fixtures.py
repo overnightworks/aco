@@ -7,8 +7,6 @@ board's port over such a checkout, wrapped in a `RecordedPort` that logs
 every call at the port.
 """
 
-from __future__ import annotations
-
 import errno
 import http.client
 import json
