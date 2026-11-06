@@ -33,8 +33,8 @@ flowchart LR
   the same commit as the claim that requests it, so two lanes racing for it
   serialize on the one ref and the loser gets the next value.
 - Ownership of item facts on GitHub: kind is the forge's native issue type
-  (`Container`, `Task`, `Bug`; an unrecognized type maps to no kind, never
-  guessed from a label), and parent and blocker relations are the forge's
+  (`Container`, `Task`, `Bug` or `Feature`; an unrecognized type maps to no
+  kind, never guessed from a label), and parent and blocker relations are the forge's
   sub-issue and blocked-by relations. The body repeats neither. `cut` writes
   a `Parent:` line into a fresh child body only so that a repeated `cut` can
   finish its own half-made relation. An item's contract is one fenced TOML
