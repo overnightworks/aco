@@ -35,10 +35,11 @@ flowchart LR
   serialize on the one ref and the loser gets the next value.
 - Ownership of item facts on GitHub: kind is the forge's native issue type
   (`Container`, `Task`, `Bug` or `Feature`; an unrecognized type maps to no
-  kind, never guessed from a label), and parent and blocker relations are the forge's
-  sub-issue and blocked-by relations. The body repeats neither. `cut` writes
-  a `Parent:` line into a fresh child body only so that a repeated `cut` can
-  finish its own half-made relation. An item's contract is one fenced TOML
+  kind, never guessed from a label), and parent and blocker relations are the
+  forge's sub-issue and blocked-by relations. The body repeats neither, except
+  the `Parent:` recovery line `cut` writes; its owners are
+  `specs/cut.spec.md` (CUT-25) and `specs/body-block.spec.md`. An item's
+  contract is one fenced TOML
   block whose keys are protocol and whose values are the operator's prose
   (`specs/body-block.spec.md`).
 - Wide-scope thresholds are constants of the protocol, not configuration, so
