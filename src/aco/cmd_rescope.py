@@ -248,7 +248,7 @@ def _write_rescoped_body(
 
 def _rescope_item_and_claim(
     context: session.RunContext,
-    subject: store.ClaimTransitionSubject,
+    subject: store.TransitionSubject,
     intent: protocol.RescopeIntent,
     item: _RescopedItemBody,
     whole: str | None,

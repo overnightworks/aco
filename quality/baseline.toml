@@ -21,9 +21,9 @@
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 919
 "src/aco/github.py" = 1569
-"src/aco/protocol.py" = 1872
+"src/aco/protocol.py" = 1865
 "src/aco/state_board.py" = 925
-"src/aco/store.py" = 1797
+"src/aco/store.py" = 1742
 "src/aco/workboard.py" = 2900
 "tests/support/cli_fixtures.py" = 888
 "tests/support/github_fixtures.py" = 830
@@ -38,8 +38,8 @@
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
 "tests/test_github.py" = 2839
-"tests/test_state_board.py" = 5935
-"tests/test_store.py" = 5107
+"tests/test_state_board.py" = 5933
+"tests/test_store.py" = 5103
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 82
@@ -66,9 +66,6 @@
 
 [function_lines."src/aco/github.py"]
 "GitHubForge._landing" = 60
-
-[function_lines."src/aco/store.py"]
-"commit_transition" = 60
 
 [function_lines."src/aco/workboard.py"]
 "_board_item" = 97

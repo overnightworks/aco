@@ -621,7 +621,7 @@ class RunContext:
 
     def transition(
         self,
-        subject: store.TransitionSubject | store.ClaimTransitionSubject,
+        subject: store.TransitionSubject,
         intent: protocol.ClaimTransitionIntent,
     ) -> protocol.ClaimState:
         """Write one transition onto this run's observation of the state ref
