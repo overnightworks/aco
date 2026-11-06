@@ -29,9 +29,9 @@ flowchart LR
   `specs/ref-store-cas.spec.md`.
 - A resource is a number that must stay unique per resource name.
   `specs/claim-record.spec.md` owns the allocation outcomes.
-- On GitHub, kind is the forge's native issue type (`Container`, `Task`,
-  `Bug` or `Feature`; an unrecognized type maps to no kind, never guessed from
-  a label). An item's contract is one fenced TOML block, specified in
+- The GitHub issue types `Container`, `Task`, `Bug` and `Feature` map to the
+  four kinds; an unrecognized type maps to no kind, never guessed from a
+  label. An item's contract is one fenced TOML block, specified in
   `specs/body-block.spec.md`.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
   forge. Its error types are `ForgeNotFoundError`,
@@ -52,7 +52,7 @@ flowchart LR
 The trust model is cooperating clients: the state ref and `aco rule --via` are
 aids for cooperative agents (`specs/rule.spec.md` declares `--via` a
 tripwire). Against anyone else the forge's permissions enforce who may write,
-and its edit history records afterward what was written; it does not stop an
+and its edit history records afterward what was written; neither stops an
 agent acting under the operator's own identity. Claimants need push rights to
 the canonical remote. The board adds its own boundary, described in
 `specs/serve.spec.md`.
@@ -62,10 +62,12 @@ the canonical remote. The board adds its own boundary, described in
 - Claims live in the state ref, one tree of `claims/` and `resources/`. The
   ref is the one serialization point, and a claim needs no issue, so a lane
   without one can hold it.
-- Kind and the parent and blocker relations live on the forge's native
-  fields, so each fact has one owner: no reader derives a kind, parent or
-  blocker from the body. The `Parent:` line `aco cut` writes is a recovery
-  marker (`specs/cut.spec.md`, `specs/body-block.spec.md`).
+- On GitHub, kind and the parent and blocker relations live on the forge's
+  native fields (issue type, sub-issue, blocked-by), so each fact has one
+  owner and no reader derives one from the body. Under the state-ref item
+  store, the block's `[record]` table is that owner
+  (`specs/storage-pin.spec.md`). The `Parent:` line `aco cut` writes is a
+  recovery marker (`specs/cut.spec.md`, `specs/body-block.spec.md`).
 - Forge errors are typed, so no caller matches error text.
 - The state ref advances by a plain fast-forward push. A push already accepts
   fast-forwards and rejects the rest, which is the serialization needed; a
@@ -81,8 +83,8 @@ the canonical remote. The board adds its own boundary, described in
   owner without a migration.
 - Wide-scope thresholds are protocol constants, not configuration, so two
   fleets in one repository cannot disagree on what "too wide" means.
-- Configuration in `.aco/board.toml` holds only settings with a caller today,
-  because an option without a caller is upkeep with no user.
+- `.aco/board.toml` gains a setting only when that setting has a caller,
+  because an option without one is upkeep with no user.
 - The state-ref item store and the board are kept although nobody uses them.
   The store keeps items as files in the state ref for a repository without a
   forge (`specs/storage-pin.spec.md`). The board (`aco serve`,
