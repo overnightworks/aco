@@ -111,18 +111,15 @@ class TestSeveralLinesInOneWrite:
             pytest.param(
                 "option",
                 "AB",
-                via,
+                "chat",
                 {
                     "reason": "ruled",
                     "lines": [{"index": 2, "ruling": "A"}, {"index": 3, "ruling": "B"}],
                     "ruled_on": TODAY,
                     "open": 0,
                 },
-                id=f"option-{via}",
-            )
-            for via in ("chat",)
-        ]
-        + [
+                id="option-chat",
+            ),
             pytest.param(
                 "option",
                 "AA",
@@ -467,7 +464,7 @@ def test_via_board_is_refused_as_an_invalid_choice(
 
     assert refused.status == 2
     assert "invalid choice: 'board'" in refused.stderr
-    assert client.body_writes == []
+    assert (client.issue_reference_lookups, client.body_writes) == ([], [])
 
 
 def refusal_call(

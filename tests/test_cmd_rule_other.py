@@ -39,20 +39,18 @@ def serve_written(monkeypatch: pytest.MonkeyPatch, written: str) -> None:
 
 @pytest.mark.usefixtures("github_world")
 class TestRuleOther:
-    @pytest.mark.parametrize("via", ["chat"])
     @pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
     def test_an_open_option_line_is_ruled_with_the_answer(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
-        via: str,
         newline: str,
     ) -> None:
         """Spec: RULE-20, RULE-01, BODY-92, BODY-88, RUL-16 -- five keys, the answer verbatim."""
         freeze_cli_now(monkeypatch)
         today = FROZEN_CLI_NOW.date()
         client = serve_item(monkeypatch, item_body(card(), newline=newline))
-        ruled = run_cli(["rule", "7", *other_arguments(OTHER_ANSWER, via)], capsys)
+        ruled = run_cli(["rule", "7", *other_arguments(OTHER_ANSWER, "chat")], capsys)
         assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 other; 0 line(s) still open\n")
         written = client.item_bodies[7]
         entry = body.block_expectation_dicts(body.locate_block(written).data)[1]
@@ -62,8 +60,8 @@ class TestRuleOther:
             entry["card_hash"],
             entry["via"],
             entry["other"],
-        ) == ("other", today, GOLDEN_CARD_HASH, via, OTHER_ANSWER)
-        assert f'via = "{via}"{newline}other = ' in written
+        ) == ("other", today, GOLDEN_CARD_HASH, "chat", OTHER_ANSWER)
+        assert f'via = "chat"{newline}other = ' in written
         checked = run_cli(["check", "-"], capsys, stdin=written)
         assert (checked.status, checked.stdout) == (0, "body ok\n")
         serve_written(monkeypatch, written)
@@ -73,7 +71,7 @@ class TestRuleOther:
             "#7 0/2: Karte",
             "other",
             today.isoformat(),
-            via,
+            "chat",
             OTHER_ANSWER,
         )
         assert (line["stored_card_hash"], line["card_hash"]) == (GOLDEN_CARD_HASH, GOLDEN_CARD_HASH)
