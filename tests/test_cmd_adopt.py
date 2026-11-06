@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -25,7 +24,6 @@ from cli_fixtures import (
     real_git,
     run_cli,
     run_context_over,
-    sealed_git_environment,
     track_board_config,
     worktrees_and_branches,
 )
@@ -47,29 +45,12 @@ OVERLONG_ISSUE_NUMBER = "1" * 4301
 
 
 def _publish_branch_tip(clone: Path, message: str) -> str:
-    """A fresh commit on top of `clone`'s `HEAD`, forced onto the remote as the
-    pull request's head branch; no local branch or ref moves. The commit adds a file named
-    for `message`, so squashing the branch onto the default branch leaves a change to commit."""
-    index = clone.parent / f"{clone.name}-publish-index"
-    index_environment = sealed_git_environment() | {"GIT_INDEX_FILE": str(index)}
-
-    def index_git(*arguments: str) -> str:
-        return subprocess.run(
-            ["git", *arguments],
-            cwd=clone,
-            env=index_environment,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-
-    try:
-        index_git("read-tree", "HEAD")
-        blob_id = real_git(clone, "hash-object", "-w", "--no-filters", "/dev/null").stdout.strip()
-        index_git("update-index", "--add", "--cacheinfo", f"100644,{blob_id},{message}.txt")
-        tree = index_git("write-tree")
-    finally:
-        index.unlink(missing_ok=True)
+    """A fresh commit adding an empty file on top of `clone`'s `HEAD` (a squash landing needs a
+    change), forced onto the remote as the pull request's head branch; no local ref moves."""
+    empty_blob = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    real_git(clone, "update-index", "--add", "--cacheinfo", f"100644,{empty_blob},{message}.txt")
+    tree = real_git(clone, "write-tree").stdout.strip()
+    real_git(clone, "reset", "-q")
     tip = real_git(clone, "commit-tree", tree, "-p", "HEAD", "-m", message).stdout.strip()
     real_git(clone, "push", "-q", "--force", "origin", f"{tip}:refs/heads/{ADOPTED_BRANCH}")
     return tip
@@ -512,9 +493,7 @@ def test_adopt_refuses_a_head_branch_that_moved_around_its_fetch(
 
     result = adopt(capsys, kind="deps")
 
-    assert result.stderr == (
-        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; run adopt again\n"
-    )
+    assert result.stderr == _refusal("moved while adopt read it; run adopt again")
 
 
 def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkout(
@@ -1051,8 +1030,7 @@ def _a_claim_lands_between_the_observation_and_the_push(
     [
         pytest.param(
             _move_the_remote_tracking_ref_before_the_build,
-            f"ERROR: pull request #{ADOPTED_PULL_REQUEST} moved while adopt read it; "
-            "run adopt again\n",
+            _refusal("moved while adopt read it; run adopt again"),
             [],
             id="cell-23-built-head-differs",
         ),
@@ -1558,9 +1536,9 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
 
     landed = run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", reviewed_head], capsys)
 
-    refusal = (
-        f"ERROR: pull request #{ADOPTED_PULL_REQUEST} head is {current_head}, "
-        f"not the reviewed {reviewed_head}; review the new head before landing\n"
+    refusal = _refusal(
+        f"head is {current_head}, not the reviewed {reviewed_head}; "
+        "review the new head before landing"
     )
     released_line = _released_line(claim) + f"worktree: {worktree_outcome}\n"
     expected_run = (status, released_line, "") if merged else (status, "", refusal)
