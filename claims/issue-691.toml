@@ -1,8 +1,0 @@
-claim_id = "6f2e0b3c8d864890899c0ffd28fc1020"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "f9dae83e174fae510d478695a91f694dfa184426"
-branch = "claude/issue-691-claim-commits-on-the-state-ref-drop-the"
-scope = ["quality/baseline.toml", "specs/ref-store-cas.spec.md", "src/aco/cmd_claim.py", "src/aco/cmd_release.py", "src/aco/cmd_rescope.py", "src/aco/protocol.py", "src/aco/session.py", "src/aco/store.py", "tests"]
-opened_commit = "f011a0969eef9a1e27e31cba886fa9ad05de99fa"
-whole_reason = "One persisted trailer and the one type field that feeds it leave together; split, a commit format would change without its spec, or a type would keep a field nothing writes."
