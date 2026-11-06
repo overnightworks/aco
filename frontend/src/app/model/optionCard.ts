@@ -255,8 +255,7 @@ export function nextOpen<Id extends string | number>(open: Id | null, id: Id): I
 /** An option's RESULT alt text: its caption, else the picture's own
  * fallback `A · name: effect`. */
 export function resultAltText(option: CardOption): string {
-	const caption = 'caption' in option ? option.caption : undefined;
-	return caption ?? `${verdictLabel(option)}: ${option.effect}`;
+	return option.caption ?? `${verdictLabel(option)}: ${option.effect}`;
 }
 
 /** The Undo row's tail after the bold word. */

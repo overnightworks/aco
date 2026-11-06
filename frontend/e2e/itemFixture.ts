@@ -36,8 +36,8 @@ export interface OptionEntry {
 	returned_note?: string;
 	question: string;
 	problem: string;
-	picture: string;
-	caption: string;
+	picture?: string;
+	caption?: string;
 	decision_kind: string;
 	area: string;
 	topic: string;

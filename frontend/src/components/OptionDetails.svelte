@@ -22,18 +22,19 @@
 </script>
 
 <dl class="details">
-	<dt>{ROW_LABEL.result}</dt>
-	<dd>
-		{#if 'picture' in option}
+	{#if option.picture !== undefined}
+		<dt>{ROW_LABEL.result}</dt>
+		<dd>
 			<EnlargeablePicture
 				picture={option.picture}
 				alt={resultAltText(option)}
 				caption={option.caption}
 			/>
-		{:else}
-			<span class="same">{SAME_AS_TODAY_MARK}</span>
-		{/if}
-	</dd>
+		</dd>
+	{:else if option.same_as_today}
+		<dt>{ROW_LABEL.result}</dt>
+		<dd><span class="same">{SAME_AS_TODAY_MARK}</span></dd>
+	{/if}
 	<dt>{ROW_LABEL.notice}</dt>
 	<dd><p>{option.notice}</p></dd>
 	<dt>{ROW_LABEL.cost}</dt>

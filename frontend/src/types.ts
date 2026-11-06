@@ -39,9 +39,13 @@ interface CardOptionFields {
 }
 
 /** An option's RESULT picture, or the statement that it leaves the TODAY
- * picture as it is -- never both (`specs/serve.spec.md` ABRD-34). */
+ * picture as it is, or neither -- never both (`specs/serve.spec.md` ABRD-34). */
 export type CardOption = CardOptionFields &
-	({ picture: string; caption?: string } | { same_as_today: true });
+	(
+		| { picture: string; caption?: string; same_as_today?: never }
+		| { same_as_today: true; picture?: never; caption?: never }
+		| { picture?: never; caption?: never; same_as_today?: never }
+	);
 
 export type RulingVia = 'board' | 'chat' | 'default';
 
@@ -59,8 +63,9 @@ export interface OptionLine {
 	stored_card_hash: string | null;
 	question: string;
 	problem: string;
-	picture: string;
-	caption: string;
+	/** The TODAY picture and its caption; a caption comes only with a picture. */
+	picture?: string;
+	caption?: string;
 	decision_kind: DecisionKind;
 	area: string;
 	topic: string;

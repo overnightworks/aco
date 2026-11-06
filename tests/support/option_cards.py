@@ -4,6 +4,7 @@ modules: card bodies, rule arguments and the rewrite invariant."""
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 
 import pytest
@@ -88,6 +89,17 @@ def card(head: str | None = None, *options: str) -> str:
     return (card_head() if head is None else head) + "".join(
         options or (card_option_a(), card_option_b())
     )
+
+
+def pictureless(text: str) -> str:
+    """`text` without any `picture` or `caption` key."""
+    without_pictures = re.sub(r'^picture = """.*?"""\n', "", text, flags=re.MULTILINE | re.DOTALL)
+    return re.sub(r"^caption = .*\n", "", without_pictures, flags=re.MULTILINE)
+
+
+def pictureless_card() -> str:
+    """The open card with no picture at all; option B has no result either."""
+    return pictureless(card(None, card_option_a(), card_option_b(("same_as_today = true\n", ""))))
 
 
 def ruled_card(*edits: tuple[str, str]) -> str:

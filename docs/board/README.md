@@ -19,10 +19,10 @@ header's Refresh shows the time of the last read; Mitsprache holds Self-refresh,
 30 minutes until Mitsprache's Self-refresh sets it.
 
 The shipped board shows a card of one option line as the picture's card: meta line,
-question, PROBLEM, TODAY, OPTIONS A to D with name and effect, RECOMMENDATION and
+question, PROBLEM, TODAY (only when the card has a picture), OPTIONS A to D with name and effect, RECOMMENDATION and
 DECIDE with one pick per option. Every ruled line shows the picture's decided card:
 Decided, How with the way and the date or `not recorded`, and Contract behind Show. A line decided with the operator's own answer reads `Other: „…“` under Decided and binds that answer alone. Each
-option opens its RESULT, YOU NOTICE, COST, UNDO and CONTRACT. Every TODAY and
+option opens its RESULT (only when it has a picture or reads `= TODAY`), YOU NOTICE, COST, UNDO and CONTRACT. Every TODAY and
 RESULT picture opens enlarged in a dialog, and on a phone TODAY is a framed
 thumbnail with the enlarge mark. A pick on a `final` option first asks in a
 confirm dialog. A pick shows the picture's strip with Undo for its 8-second

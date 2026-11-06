@@ -13,9 +13,16 @@
 <CardRow label={ROW_LABEL.problem}>
 	<p>{line.problem}</p>
 </CardRow>
-<CardRow label={ROW_LABEL.today}>
-	<EnlargeablePicture picture={line.picture} alt={line.caption} caption={line.caption} thumbnail />
-</CardRow>
+{#if line.picture !== undefined}
+	<CardRow label={ROW_LABEL.today}>
+		<EnlargeablePicture
+			picture={line.picture}
+			alt={line.caption ?? ROW_LABEL.today}
+			caption={line.caption}
+			thumbnail
+		/>
+	</CardRow>
+{/if}
 <CardRow label={ROW_LABEL.options}>
 	<ol aria-label={ROW_LABEL.options}>
 		{#each line.options as option (option.letter)}
