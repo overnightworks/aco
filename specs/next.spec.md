@@ -161,7 +161,7 @@ other printable space are text.
 
 ## Never
 
-- `aco next` never writes anything: it is a pure projection over the same read `board` performs.
+- `aco next` never writes anything: it is a pure projection: it reads what `board` reads, plus the trunk's ahead-of-caller list and the state of each item that list names (NEXT-49..55).
 - `close:` never fires the cut proposal's own `Next:`/`Run:` lines: a closable container's own action, when it is also the top action, never carries a command -- NEXT-06/NEXT-07 already refuse to invent one.
 - `parallel:`/`scope unknown:` never occupy or place a `board.recovery` item: a landed-but-open item is `close:`'s domain alone, never a `parallel:` candidate or an occupant that could crowd out a real free item behind it.
 - The first action's own row is never repeated inside `parallel:`'s candidate list, whatever its own scope is.
@@ -477,13 +477,13 @@ exit 0
 
 ### E-NEXT-17 — code built ahead of a closed item
 
-Setup: bare-remote, fake `gh`, the trunk holds `.aco/ahead-of-caller.toml` with `[[code]]` `path = "src/token.py"`, `item = "#12"`, `reason = "token helper"`; `#12` is closed, `#11` a scopeless open item
+Setup: bare-remote, fake `gh`, run from the main checkout, the trunk holds `.aco/ahead-of-caller.toml` with `[[code]]` `path = "src/token.py"`, `item = "#12"`, `reason = "token helper"`; `#12` is closed, `#11` a scopeless open item
 
 ```console
 $ aco next
 #11 score -10: Top work
 Next: Claim #11.
-Run: aco claim 11 --scope <paths>
+Run: aco start 11 --slug=top-work --scope <paths>
 scope unknown
 parallel: unknown (first action names no scope)
 close: none
