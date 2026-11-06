@@ -70,8 +70,9 @@ A later ballast audit names both as kept and refreshes the numbers in #658
 
 ## Trust
 
-The trust model is cooperating clients: the state ref, the write gate and
-`aco rule --via` are aids for cooperative agents, and the forge's permissions
-and edit history are the boundary against anyone else (`specs/rule.spec.md`).
+The trust model is cooperating clients: the state ref and `aco rule --via` are
+aids for cooperative agents (`specs/rule.spec.md` declares `--via` a tripwire),
+and the forge's permissions and edit history are the boundary against anyone
+else.
 Claimants need push rights to the canonical remote. No other trust boundary is
 declared yet.
