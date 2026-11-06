@@ -92,13 +92,13 @@ def card(head: str | None = None, *options: str) -> str:
 
 
 def pictureless(text: str) -> str:
-    """`text` without any `picture` and `caption` key, as a head writes a card that leaves them out."""
+    """`text` without any `picture` or `caption` key."""
     without_pictures = re.sub(r'^picture = """.*?"""\n', "", text, flags=re.MULTILINE | re.DOTALL)
     return re.sub(r"^caption = .*\n", "", without_pictures, flags=re.MULTILINE)
 
 
 def pictureless_card() -> str:
-    """The open card with no picture at all; option B gives neither a picture nor `same_as_today`."""
+    """The open card with no picture at all; option B has no result either."""
     return pictureless(card(None, card_option_a(), card_option_b(("same_as_today = true\n", ""))))
 
 
