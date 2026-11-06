@@ -1,7 +1,5 @@
 """Reset against real state refs, bundles, leases, and worktree lineage."""
 
-from __future__ import annotations
-
 import re
 import shlex
 from collections.abc import Callable, Iterator

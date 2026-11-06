@@ -4,8 +4,6 @@ checkout no claim can ever cover is refused with (`specs/rescope.spec.md`).
 Also owns the real-repository arrangements these tests build -- linked
 worktrees, nested worktrees, and a canonical-remote repository."""
 
-from __future__ import annotations
-
 import json
 import os
 from collections.abc import Callable

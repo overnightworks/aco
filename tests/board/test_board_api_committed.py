@@ -2,8 +2,6 @@
 same item `GET /api/board` lists next, fingerprints included; a refusal carries
 no item."""
 
-from __future__ import annotations
-
 from datetime import date
 from typing import Any
 

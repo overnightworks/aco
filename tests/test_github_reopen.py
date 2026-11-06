@@ -1,8 +1,6 @@
 """The GitHub adapter's reopen read: one aliased GraphQL answer per block, refusing
 what it cannot read as a time or as "never reopened"."""
 
-from __future__ import annotations
-
 import json
 from datetime import UTC, datetime
 

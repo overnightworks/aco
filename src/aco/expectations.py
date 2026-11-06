@@ -4,8 +4,6 @@ them, and the byte-preserving edits that rule one. The entry grammar
 is `expectation_grammar`'s; the block codec is `body`'s.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date

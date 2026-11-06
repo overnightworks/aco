@@ -3,8 +3,6 @@ a clone of the scenario's bare remote carrying the trunk files a scenario
 names, the live claims other agents hold, and the linked worktree the command
 is made from."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass

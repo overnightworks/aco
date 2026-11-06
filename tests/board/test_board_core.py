@@ -9,8 +9,6 @@ The served board and `aco serve` itself also prove the shutdown drain
 end-to-end (test_board_server, test_board_cli).
 """
 
-from __future__ import annotations
-
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date

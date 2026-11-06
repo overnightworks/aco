@@ -6,8 +6,6 @@ Consumers import this module directly: pytest's rootless collection puts
 tests/ on sys.path, so import board_fixtures resolves here.
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from pathlib import Path

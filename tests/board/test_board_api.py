@@ -5,8 +5,6 @@ itself; only the forge is a fake whose items and request log the test
 reads, beside the calls at the board's port (specs/serve.spec.md).
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 from collections.abc import Callable

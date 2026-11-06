@@ -1,8 +1,6 @@
 """Spec: BODY-23, BODY-32 -- a `ruled_on` that is not a TOML local date is refused
 with the sentence the spec prints."""
 
-from __future__ import annotations
-
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 

@@ -1,8 +1,6 @@
 """Dependency listing and path decisions (LAND-71, LAND-73..76) and the adoption
 preflight's precedence (ADOPT-02..07, ADOPT-11, ADOPT-16)."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 

@@ -1,7 +1,5 @@
 """`aco check <pr>`: declarations, dependency paths and parents in the real GitHub world."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, replace

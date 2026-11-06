@@ -1,8 +1,6 @@
 """The `release` command (`specs/release.spec.md`)."""
 # ruff: noqa: T201 - the release command writes its result lines to stdout
 
-from __future__ import annotations
-
 import argparse
 import shlex
 import uuid

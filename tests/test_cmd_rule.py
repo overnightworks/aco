@@ -1,7 +1,5 @@
 """Rule through a real GitHub checkout, injecting only at the forge boundary."""
 
-from __future__ import annotations
-
 import json
 import tomllib
 from dataclasses import replace

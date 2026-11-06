@@ -3,8 +3,6 @@ worktrees: which base and branch an omitted or given flag binds, the sentence
 each checkout that cannot be claimed in is refused with, and the line naming
 the standing claims a new scope overlaps. The forge is the only fake."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

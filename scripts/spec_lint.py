@@ -46,8 +46,6 @@ Usage:
 """
 # ruff: noqa: T201 - the spec lint writes its findings to stdout
 
-from __future__ import annotations
-
 import argparse
 import json
 import re

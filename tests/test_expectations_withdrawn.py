@@ -2,8 +2,6 @@
 counts it open, `aco rule` refuses it, `aco next` and `aco board --json` never
 read it as unruled or as a ruling (RUL-22, RUL-23, RULE-37, NEXT-48)."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

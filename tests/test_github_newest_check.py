@@ -1,7 +1,5 @@
 """The GitHub adapter's check-run read keeps the newest run of each check name."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

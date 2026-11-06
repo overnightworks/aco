@@ -1,7 +1,5 @@
 """Land merge decisions through real claims, pushed branches and forge-side merges."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path

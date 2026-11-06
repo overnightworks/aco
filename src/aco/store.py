@@ -19,8 +19,6 @@ transition's already-committed parent tree still carries unchanged
 -- and a commit with `commit-tree`.
 """
 
-from __future__ import annotations
-
 import os
 import sys
 import tarfile

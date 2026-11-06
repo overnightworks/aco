@@ -3,8 +3,6 @@ and the real state ref: which reason lands on the claim, the bound a reason
 holds from the flag and from the item's body, and the refusals of a body whose
 `whole` or `size` is defective. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

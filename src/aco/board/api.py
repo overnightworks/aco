@@ -8,8 +8,6 @@ leaves withdrawn lines out. The transport decides when to answer; this
 module owns what the answer and the request look like.
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass

@@ -6,8 +6,6 @@ file description probes the stamp lock (flock conflicts across descriptions
 of one process).
 """
 
-from __future__ import annotations
-
 import fcntl
 import os
 import shutil

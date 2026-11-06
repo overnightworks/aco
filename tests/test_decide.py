@@ -1,7 +1,5 @@
 """The shared ruling writer (`specs/rule.spec.md`) on a fake forge, on both storage pins."""
 
-from __future__ import annotations
-
 from datetime import date
 from pathlib import Path
 

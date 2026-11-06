@@ -6,8 +6,6 @@ Every read-modify-write of the stamp happens under `locked`, an exclusive
 callers pass the stamp directory and an ancestry predicate.
 """
 
-from __future__ import annotations
-
 import fcntl
 import os
 import tempfile

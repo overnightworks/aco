@@ -1,8 +1,6 @@
 """`aco check <n>` for issues and absent numbers, `aco check <sha>`, and the refusals
 without an issue verdict, in the real GitHub world."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass

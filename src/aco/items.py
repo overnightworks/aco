@@ -17,8 +17,6 @@ This module sits below `workboard.py` and `body.py` in the Layers contract
 three.
 """
 
-from __future__ import annotations
-
 import secrets
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass

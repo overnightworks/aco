@@ -7,8 +7,6 @@ uses -- is exercised directly. Tests that drive these through
 `issue_claim.main([...])` stay in `tests/test_cli.py` as CLI-wiring behavior,
 except `claim`'s and `rescope`'s own proofs of the checkout they judge."""
 
-from __future__ import annotations
-
 import dataclasses
 import os
 import re

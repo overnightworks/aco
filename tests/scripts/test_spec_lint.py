@@ -9,8 +9,6 @@ same `analyze` over the repository's own `specs/` tree: every one of its 23 file
 already be clean under this gate.
 """
 
-from __future__ import annotations
-
 import json
 import runpy
 import sys

@@ -1,8 +1,6 @@
 """`aco next` and `aco board` leave an item out of RECOVERY once it was reopened after
 the last merge that declared it (LAND-81). The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path

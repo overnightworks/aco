@@ -9,8 +9,6 @@ draining a stalled connection on shutdown. Only the forge is a fake
 are real.
 """
 
-from __future__ import annotations
-
 import json
 import socket
 import threading

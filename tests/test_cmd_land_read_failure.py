@@ -1,7 +1,5 @@
 """A GitHub read that fails before the merge refuses naming what was read."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, replace
 from pathlib import Path
 

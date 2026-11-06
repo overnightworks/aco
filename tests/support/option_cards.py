@@ -1,8 +1,6 @@
 """Option-card arrangement shared by the option-line, rewrite and `rule` test
 modules: card bodies, rule arguments and the rewrite invariant."""
 
-from __future__ import annotations
-
 import json
 import re
 import tomllib

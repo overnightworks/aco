@@ -2,8 +2,6 @@
 (specs/serve.spec.md): what one read lists (ABRD-06, ABRD-07, ABRD-60), and
 what one decision reads and writes (ABRD-02, ABRD-41, ABRD-78)."""
 
-from __future__ import annotations
-
 import http.client
 from collections.abc import Callable
 from datetime import date

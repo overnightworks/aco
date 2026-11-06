@@ -9,8 +9,6 @@ between `STATIC_ROOT` and the file, whichever of those a request tries.
 module owns only which file a path names and how to read it.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote

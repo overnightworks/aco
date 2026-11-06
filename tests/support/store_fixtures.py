@@ -1,7 +1,5 @@
 """Git-state-ref tree builders and claim-intent values."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess

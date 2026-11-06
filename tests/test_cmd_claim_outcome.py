@@ -3,8 +3,6 @@ worktrees and the real state ref: a lane claim released again, the `--json`
 object of a claim made, and the `--json` refusal of a conflict and of a
 failed write. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

@@ -1,8 +1,6 @@
 """What `aco claim` reads of the repository and of the state ref, counted on a
 real linked worktree and the real state ref. The forge is the only fake."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

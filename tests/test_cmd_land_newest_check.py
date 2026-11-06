@@ -1,7 +1,5 @@
 """What `aco land` judges when one check name has several runs on the head."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path

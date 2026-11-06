@@ -1,8 +1,6 @@
 """Where `aco next` advises `claim` and where `start`, and the claim it advises for a nested
 container's one row, run as printed, on real checkouts. The forge is the only fake."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path

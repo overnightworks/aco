@@ -3,8 +3,6 @@ worktrees and the real state ref: both owners of the scope move together, a
 failed write names what went through, and a body that cannot carry the scope
 or whose `whole` is defective changes neither. The forge is the only fake."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

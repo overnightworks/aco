@@ -1,7 +1,5 @@
 """A ruled option line was not ruled before it was asked (BODY-108)."""
 
-from __future__ import annotations
-
 import pytest
 from option_cards import E, card_body, check_defects, malformed, ruled_card
 

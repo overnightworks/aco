@@ -1,8 +1,6 @@
 """Pull-request landing checks for classification, closing references, claims,
 and parent requirements, `aco adopt`'s preflight, plus the claim width gate."""
 
-from __future__ import annotations
-
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cache

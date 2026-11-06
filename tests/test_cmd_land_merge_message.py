@@ -1,7 +1,5 @@
 """Land message literals and Git trailer interpretation on a real claimed lane."""
 
-from __future__ import annotations
-
 import os
 from dataclasses import dataclass, field
 from enum import Enum

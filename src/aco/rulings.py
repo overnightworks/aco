@@ -1,8 +1,6 @@
 """The rows `aco rulings` lists (`specs/rulings.spec.md`) and their two
 renderings, free of output; `aco rulings` (`cmd_rulings`) emits them."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date

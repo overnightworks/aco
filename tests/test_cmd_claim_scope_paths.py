@@ -3,8 +3,6 @@ worktrees and the real state ref: the lane claim that names no scope or a
 path with a display control, the comma a path may hold, and the comma value
 that matches no versioned file. The forge is the only fake."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 

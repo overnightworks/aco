@@ -1,7 +1,5 @@
 """Claim protocol: claim records, scope rules, and the `refs/aco/state` codec."""
 
-from __future__ import annotations
-
 import re
 import tomllib
 import unicodedata

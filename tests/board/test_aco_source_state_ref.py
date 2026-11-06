@@ -4,8 +4,6 @@ ABRD-78, ABRD-80): every read and write builds its own context, so a decision
 reads the state ref afresh, and a write after a stale read refuses with
 CAS-20 and loses nothing."""
 
-from __future__ import annotations
-
 import tomllib
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor

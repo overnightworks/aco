@@ -9,8 +9,6 @@ entry, and owns the one write turn and drain shared across all of them --
 including the single-repo case, so that lock never exists twice.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import threading

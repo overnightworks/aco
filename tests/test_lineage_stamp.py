@@ -1,7 +1,5 @@
 """`lineage_stamp`: the stamp's verdicts and lock, with no git (CAS-09..12, CAS-75..77)."""
 
-from __future__ import annotations
-
 import fcntl
 import os
 from pathlib import Path

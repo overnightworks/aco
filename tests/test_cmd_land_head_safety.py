@@ -1,7 +1,5 @@
 """`aco land` refuses a pull request whose head branch it must not act on."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, replace
 from pathlib import Path
 

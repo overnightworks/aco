@@ -2,8 +2,6 @@
 checkout's own forge, board checkouts, and the real board server serving one
 of them."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast

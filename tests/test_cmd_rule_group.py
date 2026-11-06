@@ -1,8 +1,6 @@
 """`aco rule` with several `--line`: each named line is checked in the order written and
 all are written in one body write with one date, or none is (RULE-29..36, E-RULE-13/14)."""
 
-from __future__ import annotations
-
 import json
 from datetime import date, timedelta
 

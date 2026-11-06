@@ -2,8 +2,6 @@
 command run's static repository facts, read lazily, held once read, and
 answered per directory."""
 
-from __future__ import annotations
-
 import io
 import subprocess
 import sys

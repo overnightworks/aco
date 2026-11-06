@@ -1,7 +1,5 @@
 """`aco brief` on a real lane worktree and the real state ref. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from dataclasses import dataclass

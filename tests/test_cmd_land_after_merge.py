@@ -1,7 +1,5 @@
 """Land's trunk update, repository reminder, cleanup and incomplete follow-up."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from enum import Enum

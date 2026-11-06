@@ -4,8 +4,6 @@
 then interrupts the main thread the way Ctrl-C does.
 """
 
-from __future__ import annotations
-
 import _thread
 import io
 import socket

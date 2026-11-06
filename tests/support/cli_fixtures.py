@@ -1,8 +1,6 @@
 """CLI-boundary scaffolding: real and faked git process helpers, agent-identity
 environment setup, stdin sources, pipe helpers, and boundary-forbid helpers."""
 
-from __future__ import annotations
-
 import contextlib
 import os
 import socket

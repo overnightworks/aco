@@ -1,8 +1,6 @@
 """`aco next` names a childless container with an open blocker under `SKIPPED`
 instead of proposing it as `check_container` (NEXT-47)."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import replace
 

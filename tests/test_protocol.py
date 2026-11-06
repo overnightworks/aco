@@ -7,8 +7,6 @@ except `LandingIntent`, whose one job is exactly the atomic
 close-and-release this module owns describing, so its own `apply` proof
 lives here instead."""
 
-from __future__ import annotations
-
 import tomllib
 from collections.abc import Callable
 from dataclasses import replace

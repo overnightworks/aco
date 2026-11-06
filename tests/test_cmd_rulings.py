@@ -1,7 +1,5 @@
 """Rulings through the real GitHub repository world; only the forge is injected."""
 
-from __future__ import annotations
-
 import dataclasses
 import json
 

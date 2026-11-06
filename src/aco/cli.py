@@ -1,7 +1,5 @@
 """Coordinate coding-agent claims through this repository's own state ref."""
 
-from __future__ import annotations
-
 import argparse
 import re
 import sys

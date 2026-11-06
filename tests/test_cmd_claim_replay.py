@@ -3,8 +3,6 @@ state ref: the retry of an interrupted request that returns the live claim,
 what it reads from the claim and the item rather than the forge, and the
 retries that are refused. The forge is the only fake."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

@@ -1,8 +1,6 @@
 """Shared board reads, builds, claim history, validation, post-write hints,
 and live-body gates before item rewrites."""
 
-from __future__ import annotations
-
 import sys
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor

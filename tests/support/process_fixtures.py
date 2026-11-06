@@ -1,7 +1,5 @@
 """Test double for a started child process that never reports its exit."""
 
-from __future__ import annotations
-
 import subprocess
 from collections.abc import Iterable
 from typing import Any

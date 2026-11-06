@@ -1,7 +1,5 @@
 """`aco rulings` under `storage = "state-ref"` against a real bare remote."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

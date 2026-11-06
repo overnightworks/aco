@@ -6,8 +6,6 @@ in process. Truth stays with the source: the board keeps no copy of a line or
 a ruling, and reads aco's own types rather than copies of them.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum

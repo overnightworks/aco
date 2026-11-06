@@ -3,8 +3,6 @@
 fresh on every listing, keeping no copy of a decision, the repos a card is written to,
 and what a failed item read does to a card post."""
 
-from __future__ import annotations
-
 from datetime import date
 from typing import Any, cast
 

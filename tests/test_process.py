@@ -7,8 +7,6 @@ wrapper over that boundary (`github._bounded_command`) is covered in
 `tests/test_github.py`; `checkout`'s and `store`'s own `ClaimError`
 translations of a failed git launch are covered in their own test modules."""
 
-from __future__ import annotations
-
 import os
 import subprocess
 import sys

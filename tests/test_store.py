@@ -7,8 +7,6 @@ conventions reserve for exactly that, never a re-implementation of git
 semantics in Python.
 """
 
-from __future__ import annotations
-
 import ast
 import errno
 import os

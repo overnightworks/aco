@@ -5,8 +5,6 @@ real binary under `tmp_path`. The refused remotes point at a closed
 loopback port, so a push the guard failed to stop still ends on this machine.
 """
 
-from __future__ import annotations
-
 import subprocess
 import sys
 from collections.abc import Callable

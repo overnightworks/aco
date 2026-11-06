@@ -1,8 +1,6 @@
 """`aco status` reads the state ref and nothing else: no forge, no write; a claim's
 age is the committer date of the commit that preceded its own."""
 
-from __future__ import annotations
-
 import json
 import re
 from collections.abc import Callable

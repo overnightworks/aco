@@ -1,7 +1,5 @@
 """The `serve` command (`specs/serve.spec.md`)."""
 
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
