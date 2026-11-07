@@ -71,7 +71,7 @@ order `merge`, `squash`, `rebase`.
 | GitHub refuses the merge | LANDCMD-37 |
 | a step after the merge fails | LANDCMD-15, LANDCMD-16 |
 | this repository's own pull request | LANDCMD-17 |
-| a RELEASED ending | LANDCMD-54, LANDCMD-55 |
+| a RELEASED ending | LANDCMD-57, LANDCMD-54, LANDCMD-55 |
 | a pull request already merged (rerun) | LANDCMD-18 |
 | the head branch is no safe name, or a merged pull request comes from another repository | LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53 |
 | a rerun whose release already succeeded | LANDCMD-38 |
@@ -143,6 +143,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-17] In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing after LANDCMD-54's line.
 - [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25 and 33, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
 - [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
+- [ ] [LANDCMD-57] After every RELEASED ending, first landing or resumed rerun, `merged: <sha>` (the full 40-hex merge commit) follows the release's lines, before LANDCMD-54's and LANDCMD-17's.
 - [ ] [LANDCMD-54] After a RELEASED ending, a trunk red at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)`, naming its first failed check; nothing when it is not red (E-LANDCMD-54).
 - [ ] [LANDCMD-55] A trunk check read that fails after the merge prints `trunk: unreadable at <sha7>: <error>` instead and keeps exit `0`; the merge and release stand.
 
@@ -324,6 +325,7 @@ $ aco land 57
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
+merged: <sha>
 exit 0
 ```
 
@@ -338,6 +340,7 @@ $ aco land 57
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
+merged: <sha>
 exit 0
 ```
 
@@ -438,6 +441,7 @@ $ aco land 57
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
+merged: <sha>
 exit 0
 ```
 
@@ -452,6 +456,7 @@ RELEASED issue #42: <claim-id>
 freed: none
 next: none
 worktree: removed
+merged: <sha>
 trunk: red at 9b09880: quality / verdict (failure)
 exit 0
 ```

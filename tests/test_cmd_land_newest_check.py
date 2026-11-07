@@ -12,7 +12,9 @@ from github_fixtures import MERGE_COMMIT_SHA, FakeForge, landed_world
 from aco import forge, github
 from aco.github import GitHubForge
 
-RELEASED = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+RELEASED = (
+    "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\nmerged: {merged}\n"
+)
 OLD_RUN = 122559589457
 NEW_RUN = 122580424334
 
@@ -88,9 +90,15 @@ def test_land_judges_only_the_newest_run_of_a_check_name(
         checks = checks_read_from(case.runs)
         client.readiness_by_number[12] = replace(readiness, checks=checks)
 
-    landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+    landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     capsys.readouterr()
 
     result = run_cli(["land", "12"], capsys)
 
-    assert (result.status, result.stdout, result.stderr) == (case.status, case.stdout, case.stderr)
+    merge_commit = landed.landing.forge.landings[12].merge_commit
+    expected_stdout = case.stdout.format(merged=merge_commit)
+    assert (result.status, result.stdout, result.stderr) == (
+        case.status,
+        expected_stdout,
+        case.stderr,
+    )
