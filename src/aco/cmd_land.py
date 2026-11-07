@@ -98,6 +98,15 @@ def _land_failed_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | N
     )
 
 
+def _land_failed_trunk_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | None:
+    """The first failed check of the trunk: a skipped or neutral one is not a failure."""
+    return _land_failed_check(
+        tuple(
+            check for check in checks if check.conclusion not in forge.CHECK_CONCLUSIONS_NOT_FAILED
+        )
+    )
+
+
 def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str | None:
     """Why `aco land`'s preflight refuses on `checks` alone, or `None` when
     every one of them proves green: no checks at all, a check
@@ -591,7 +600,7 @@ def _land_trunk_state_line(
     when the trunk is not red."""
     first_parent = checkout.git_output(["rev-parse", f"{merge_sha}^1"], directory=toplevel)
     try:
-        failed = _land_failed_check(client.commit_checks(first_parent))
+        failed = _land_failed_trunk_check(client.commit_checks(first_parent, push_only=True))
     except protocol.ClaimError as error:
         return f"trunk: unreadable at {first_parent[:7]}: {protocol.terminal_text(str(error))}"
     if failed is None:

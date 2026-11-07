@@ -29,6 +29,16 @@ class TestLandTrunkState:
                 TrunkCase((PASSED, FAILED), "trunk: red at {sha7}: quality / verdict (failure)\n"),
                 id="a-failed-check-is-named",
             ),
+            pytest.param(
+                TrunkCase((forge.CheckRun("Image", "skipped"), PASSED)), id="skipped-is-not-red"
+            ),
+            pytest.param(
+                TrunkCase(
+                    (forge.CheckRun("lint", "neutral"), FAILED),
+                    "trunk: red at {sha7}: quality / verdict (failure)\n",
+                ),
+                id="neutral-is-not-red",
+            ),
             pytest.param(TrunkCase((PASSED,)), id="all-succeeded-prints-nothing"),
             pytest.param(TrunkCase((PASSED, RUNNING)), id="pending-prints-nothing"),
             pytest.param(TrunkCase(()), id="no-checks-print-nothing"),
