@@ -3,7 +3,11 @@
 a member of the repository wrote."""
 
 import pytest
-from github_pages import board_issue_page_client, raw_board_issue
+from github_pages import (
+    board_issue_page_client,
+    raw_board_issue,
+    rest_board_issue_page_client,
+)
 from option_cards import card, card_body
 
 from aco import body, inbox
@@ -44,3 +48,30 @@ def test_an_item_whose_listing_lacks_the_association_is_not_listed() -> None:
     rows = inbox.rows(client.list_open_board_issues(), storage=body.Storage.GITHUB)
 
     assert rows == ()
+
+
+@pytest.mark.parametrize(
+    ("rest_association", "listed"),
+    [
+        pytest.param("OWNER", True, id="owner"),
+        pytest.param("CONTRIBUTOR", False, id="contributor"),
+        pytest.param(None, False, id="null"),
+    ],
+)
+def test_a_rest_issue_is_listed_by_its_author_association(
+    rest_association: str | None, listed: bool
+) -> None:
+    rest_issue = {
+        "number": 5,
+        "title": "Title",
+        "labels": [],
+        "body": _CARD,
+        "created_at": "2026-08-20T00:00:00Z",
+        "updated_at": "2026-08-20T00:00:00Z",
+        "author_association": rest_association,
+    }
+    client = rest_board_issue_page_client(rest_issue)
+
+    rows = inbox.rows(client.list_open_board_issues(), storage=body.Storage.GITHUB)
+
+    assert [row.number for row in rows] == ([5] if listed else [])
