@@ -2,6 +2,7 @@
 (specs/serve.spec.md, ABRD-06): a card reaches the operator only from an item
 a member of the repository wrote."""
 
+import threading
 from datetime import date
 from pathlib import Path
 from typing import Any, cast
@@ -153,6 +154,25 @@ def test_the_read_lists_each_repository_in_discovery_order_and_names_the_failed_
     assert answer["unreadable"] == [
         {"directory": str(tmp_path / "locked"), "reason": "Permission denied"}
     ]
+
+
+def test_the_repositories_are_read_concurrently_and_listed_in_discovery_order(
+    tmp_path: Path,
+) -> None:
+    labels = ["a/first", "b/second", "c/third"]
+    discovery = repositories.Discovery(
+        tmp_path, tuple(_repository(label, tmp_path / label) for label in labels), ()
+    )
+    every_read_has_started = threading.Barrier(len(labels), timeout=10)
+
+    def read_rows(_repository: repositories.Repository) -> tuple[rulings.Row, ...]:
+        every_read_has_started.wait()
+        return ()
+
+    answer = inbox.inbox_json(inbox.read(discovery, read_rows))
+
+    repositories_read = cast("list[dict[str, Any]]", answer["repositories"])
+    assert [entry["repository"] for entry in repositories_read] == labels
 
 
 def test_the_read_of_a_root_holding_only_unreadable_directories_lists_no_repository(
