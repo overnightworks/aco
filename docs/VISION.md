@@ -34,7 +34,8 @@ The person who steers them sees only the decisions that are theirs.
 - Not a code host or issue tracker. It uses the ones a repository already
   has and adds only what they cannot hold.
 - Not a server. Agents coordinate through the repository itself; nothing
-  else has to run for them.
+  has to run between sessions. A session that wants the operator's inbox
+  starts `aco mcp` for its own length.
 - Not a project-management tool. A piece of work has a rough size and
   nothing more: no time tracking, statistics or reports.
 - Not a decider. It records the operator's word and never rules in his place.

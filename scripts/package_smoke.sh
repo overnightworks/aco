@@ -48,7 +48,7 @@ UV_PYTHON="$(uv python find)"
 export UV_PYTHON
 tool_path="$scratch/path"
 mkdir -p "$tool_path"
-for tool in uv git unzip tar gzip grep sed sort diff rm sleep head cat; do
+for tool in uv git unzip tar gzip grep sed sort diff rm sleep head cat printf timeout; do
     ln -s "$(command -v "$tool")" "$tool_path/$tool"
 done
 export PATH="$tool_path"
@@ -158,3 +158,17 @@ with urllib.request.urlopen(url, timeout=5) as response:
 kill "$serve_pid" 2>/dev/null || true
 serve_pid=""
 echo "aco serve answers / over HTTP"
+
+# The installed tool answers the MCP handshake and lists its tool over stdio;
+# end of input ends the process, so nothing here is killed.
+mcp_answers="$(printf '%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
+    '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+    | XDG_CONFIG_HOME="$scratch/config" XDG_STATE_HOME="$scratch/state" timeout 60 "$scratch/bin/aco" mcp)"
+if ! grep -q '"serverInfo"' <<<"$mcp_answers" || ! grep -q '"name": "read_inbox"' <<<"$mcp_answers"; then
+    echo "ERROR: aco mcp did not answer initialize and tools/list; it wrote:" >&2
+    printf '%s\n' "$mcp_answers" >&2
+    exit 1
+fi
+echo "aco mcp answers initialize and tools/list over stdio"

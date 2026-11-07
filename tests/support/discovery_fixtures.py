@@ -9,12 +9,19 @@ from board_forge import BoardForge, item_body
 from option_cards import open_option_entry
 
 
+def isolated_xdg_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variable: str, *relative: str
+) -> Path:
+    """`relative` under a home `variable` names, a directory of this test: the run
+    stays off the operator's own file, which is absent until a test writes it."""
+    home = tmp_path / variable.lower()
+    monkeypatch.setenv(variable, str(home))
+    return home.joinpath(*relative)
+
+
 def isolate_config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Keep the run off the operator's real config file; the returned file is
-    absent until a test writes it."""
-    config_home = tmp_path / "config-home"
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
-    return config_home / "aco" / "config.toml"
+    """aco's config file, which a test writes itself."""
+    return isolated_xdg_file(tmp_path, monkeypatch, "XDG_CONFIG_HOME", "aco", "config.toml")
 
 
 def write_config(config_file: Path, content: str) -> None:

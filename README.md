@@ -93,6 +93,16 @@ restarts in a user-only file (deleting it rotates the token)
 (`specs/serve.spec.md`). The browser app lives in `frontend/`; its build
 output is committed under `src/aco/board/static/`.
 
+## MCP
+
+`aco mcp` is a stdio MCP server an agent host starts for one session; its tool
+`read_inbox` returns the option lines that wait on the operator across the
+same repositories `aco serve` finds, rescanned on every call
+(`specs/mcp.spec.md`). For one session, `claude --strict-mcp-config
+--mcp-config '{"mcpServers":{"aco":{"command":"aco","args":["mcp"]}}}'` or
+`codex exec -c 'mcp_servers.aco.command="aco"' -c 'mcp_servers.aco.args=["mcp"]'`
+registers it.
+
 ## Machine output
 
 Most commands accept `--json` and print one object on stdout, refusals

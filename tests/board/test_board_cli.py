@@ -20,6 +20,7 @@ from aco_board_fixtures import BoardClient, HeldRuling, RecordedPort
 from discovery_fixtures import (
     configure_root,
     isolate_config_file,
+    isolated_xdg_file,
     repository_with_card,
     write_config,
 )
@@ -83,9 +84,7 @@ def _serve_until_done(
 @pytest.fixture(autouse=True)
 def board_token_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Keep every serve run off the operator's real token file."""
-    state_home = tmp_path / "state-home"
-    monkeypatch.setenv("XDG_STATE_HOME", str(state_home))
-    return state_home / "aco" / "board-token"
+    return isolated_xdg_file(tmp_path, monkeypatch, "XDG_STATE_HOME", "aco", "board-token")
 
 
 @pytest.fixture(autouse=True)
