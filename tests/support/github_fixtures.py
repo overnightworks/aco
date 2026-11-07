@@ -286,7 +286,7 @@ class FakeForge:
             return later[min(reads - 1, len(later) - 1)]
         return readiness
 
-    def commit_checks(self, sha: str) -> tuple[forge.CheckRun, ...]:
+    def commit_checks(self, sha: str, *, push_only: bool = False) -> tuple[forge.CheckRun, ...]:
         """This fake's mirror of `GitHubForge.commit_checks`: scripted per sha,
         no checks (or the scripted error) otherwise."""
         self._run()
