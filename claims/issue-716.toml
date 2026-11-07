@@ -3,6 +3,6 @@ agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
 role = "builder"
 base = "24b65d288eae5534e73f2a9a6f58eca2742e273c"
 branch = "claude/issue-716-members-cards-shared-inbox-read"
-scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "specs/serve.spec.md", "src/aco/board/aco_source.py", "src/aco/github.py", "src/aco/inbox.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/board/test_aco_source.py", "tests/board/test_aco_source_state_ref.py", "tests/support/aco_board_fixtures.py", "tests/support/board_fixtures.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/support/github_pages.py", "tests/test_github.py", "tests/test_inbox.py", "tests/test_state_board.py"]
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/serve.spec.md", "src/aco/board/aco_source.py", "src/aco/github.py", "src/aco/inbox.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/board/test_aco_source.py", "tests/board/test_aco_source_state_ref.py", "tests/support/aco_board_fixtures.py", "tests/support/board_fixtures.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/support/github_pages.py", "tests/test_github.py", "tests/test_inbox.py", "tests/test_state_board.py"]
 opened_commit = "2c8dad5408a1bcf8bac115535ba98bf41bda4deb"
 whole_reason = "One trust filter with its shared read: the adapter's association key, the item's member flag and its state-ref value, the inbox read the board calls, its spec and trust docs, and the fakes and fixtures that now need a member's association."
