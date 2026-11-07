@@ -436,18 +436,13 @@ class GitHubForge:
     def _json_lines(self, raw: str, description: str) -> tuple[object, ...]:
         """Parse compact NDJSON, pretty JSON, or a concatenated JSON sequence."""
         text = strip_ansi(raw).strip()
-        if not text:
-            return ()
         decoder = json.JSONDecoder()
         values: list[object] = []
         offset = 0
         length = len(text)
         try:
             while offset < length:
-                # No "only whitespace remains" exit here: `text` is already
-                # `.strip()`ped above, so its last character is never
-                # whitespace -- this inner skip can never reach `length`
-                # without first landing on a value to decode.
+                # `text` is stripped, so this skip always lands on a value to decode.
                 while offset < length and text[offset].isspace():
                     offset += 1
                 value, offset = decoder.raw_decode(text, offset)
@@ -847,7 +842,12 @@ class GitHubForge:
     def commit_checks(self, sha: str, *, push_only: bool = False) -> tuple[forge.CheckRun, ...]:
         """Every check against `sha`: its check runs plus its combined commit status (SonarCloud
         and the like); `push_only` drops Actions runs that something other than a push started."""
-        suites = github_actions.push_suites(self._run, self.repository, sha, push_only=push_only)
+        suites = github_actions.push_suites(
+            lambda arguments: self._json_lines(self._run(arguments), "workflow run"),
+            self.repository,
+            sha,
+            push_only=push_only,
+        )
         return self._check_runs(sha, suites) + self._combined_status_checks(sha)
 
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
