@@ -30,6 +30,18 @@ out_dir="$(cd "$out_dir" && pwd)"
 expected_package="$scratch/expected-package"
 git -C "$repository_root" ls-files -- src/aco | sed 's|^src/||' | sort >"$expected_package"
 
+# `aco serve` finds its repositories under the root in aco's config file, so the
+# smoke gives it one checkout tracking the board file; discovery runs git, so git
+# stays on the narrowed PATH below.
+smoke_root="$scratch/root"
+mkdir -p "$smoke_root/project" "$scratch/config/aco"
+git -C "$smoke_root/project" init --quiet
+git -C "$smoke_root/project" remote add origin https://github.com/smoke/project
+mkdir "$smoke_root/project/.aco"
+: >"$smoke_root/project/.aco/board.toml"
+git -C "$smoke_root/project" add .aco/board.toml
+printf 'root = "%s"\n' "$smoke_root" >"$scratch/config/aco/config.toml"
+
 # A PATH holding only the tools this script needs proves the install path never
 # reaches for Node, which a developer machine or CI runner usually has.
 # UV_PYTHON pins the interpreter found now, before the narrowed PATH hides it.
@@ -37,7 +49,7 @@ UV_PYTHON="$(uv python find)"
 export UV_PYTHON
 tool_path="$scratch/path"
 mkdir -p "$tool_path"
-for tool in uv unzip tar gzip grep sed sort diff rm sleep head cat; do
+for tool in uv git unzip tar gzip grep sed sort diff rm sleep head cat; do
     ln -s "$(command -v "$tool")" "$tool_path/$tool"
 done
 export PATH="$tool_path"
@@ -122,16 +134,7 @@ echo "importlib.resources finds aco/board/static/index.html"
 
 # Proves the installed tool actually answers the shell over HTTP -- the
 # importlib.resources check above only proves the file ships, not that
-# `aco serve` can reach it. `aco serve` finds its repositories under the root in
-# aco's config file, so the smoke gives it one checkout tracking the board file.
-smoke_root="$scratch/root"
-mkdir -p "$smoke_root/project" "$scratch/config/aco"
-git -C "$smoke_root/project" init --quiet
-git -C "$smoke_root/project" remote add origin https://github.com/smoke/project
-mkdir "$smoke_root/project/.aco"
-: >"$smoke_root/project/.aco/board.toml"
-git -C "$smoke_root/project" add .aco/board.toml
-printf 'root = "%s"\n' "$smoke_root" >"$scratch/config/aco/config.toml"
+# `aco serve` can reach it.
 serve_log="$scratch/serve.log"
 XDG_CONFIG_HOME="$scratch/config" XDG_STATE_HOME="$scratch/state" "$scratch/bin/aco" serve --port 0 >"$serve_log" 2>&1 &
 serve_pid=$!
