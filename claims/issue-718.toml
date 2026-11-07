@@ -1,8 +1,0 @@
-claim_id = "7f336d7778e548909efef768f73c36d5"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "1b4e8705b154e6e7403156ef7947643f24912c31"
-branch = "claude/issue-718-aco-mcp-read-inbox"
-scope = ["README.md", "docs/ARCHITECTURE.md", "docs/VISION.md", "pyproject.toml", "quality/baseline.toml", "scripts/package_smoke.sh", "specs/mcp.spec.md", "src/aco/cli.py", "src/aco/cmd_mcp.py", "src/aco/cmd_serve.py", "src/aco/inbox.py", "src/aco/mcp_server.py", "src/aco/process.py", "src/aco/rulings.py", "tests/board/test_board_cli.py", "tests/support/aco_board_fixtures.py", "tests/support/board_forge.py", "tests/support/discovery_fixtures.py", "tests/support/github_pages.py", "tests/test_cmd_mcp.py", "tests/test_inbox.py", "tests/test_mcp_server.py", "tests/test_process.py"]
-opened_commit = "0969bf1950930697831672987e103ae889b665b8"
-whole_reason = "The stdio server's only caller is an agent host and its first tool is its proof: the dispatcher, the loop, the waiting-line read, the registration, the stdin rule, the spec, the docs and the smoke land together, because each part alone is code only tests reach."
