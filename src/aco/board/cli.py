@@ -1,55 +1,49 @@
-"""Start the decision board for one or more repositories, one page and one
-URL for all of them. `aco serve` (`aco.cmd_serve`) parses the command line
-and calls `serve`."""
+"""Start the decision board for every repository under the configured root,
+one page and one URL for all of them. `aco serve` (`aco.cmd_serve`) parses the
+command line and calls `serve`."""
 # ruff: noqa: T201 - the board command line prints its URL and its refusals to the terminal
 
 import contextlib
 import os
 import sys
-from collections.abc import Sequence
 from pathlib import Path
 
+from .. import protocol, report, repositories
 from .aco_source import AcoSource
-from .board import Board, Boards
+from .board import Board, Boards, Found, RepositoriesUnavailableError, RepoUnavailable
 from .server import LOOPBACK_HOST, start_board
 from .static import StaticAssetsMissingError
 from .token_store import MalformedTokenFileError, board_token, token_path
 
 
-class _DuplicateRepositoryError(Exception):
-    """Two `--repo` paths resolve to the same label or the same directory."""
-
-
-def _labelled_repositories(paths: Sequence[Path]) -> dict[str, Path]:
-    """Each path resolved and labelled by its directory name, in given order.
-
-    Two paths that resolve to the same label -- the same directory under
-    different names included -- would let a ruling meant for one land in the
-    other, so the board refuses to start rather than guess.
-    """
-    labelled: dict[str, Path] = {}
-    for path in paths:
-        resolved = path.resolve()
-        label = resolved.name
-        existing = labelled.get(label)
-        if existing is not None:
-            raise _DuplicateRepositoryError(
-                f"two repositories named {label}: {existing}, {resolved}"
-            )
-        labelled[label] = resolved
-    return labelled
-
-
-def serve(port: int, paths: Sequence[Path]) -> int:
-    """Serve `paths` on `port` until interrupted; 0 picks a free port."""
+def _found() -> Found:
+    """One scan of the configured root: each repository's board under its
+    `owner/repo` label, each unreadable directory as an unavailable entry."""
     try:
-        labelled = _labelled_repositories(paths)
-    except _DuplicateRepositoryError as error:
-        print(f"ERROR: {error}", file=sys.stderr)
-        return 1
-    boards = Boards(
-        {label: Board(AcoSource(directory=directory)) for label, directory in labelled.items()}
+        root = repositories.configured_root(repositories.config_path(os.environ, Path.home()))
+        discovery = repositories.discover(root)
+    except protocol.ClaimError as refusal:
+        raise RepositoriesUnavailableError(str(refusal)) from refusal
+    return Found(
+        str(discovery.root),
+        {
+            repository.label: Board(AcoSource(directory=repository.directory))
+            for repository in discovery.repositories
+        },
+        tuple(
+            RepoUnavailable(str(entry.directory), entry.reason) for entry in discovery.unavailable
+        ),
     )
+
+
+def serve(port: int) -> int:
+    """Serve the repositories under the configured root on `port` until
+    interrupted; 0 picks a free port."""
+    try:
+        _found()
+    except RepositoriesUnavailableError as refusal:
+        return report.render_error(str(refusal))
+    boards = Boards(_found)
     try:
         token = board_token(token_path(os.environ, Path.home()))
     except MalformedTokenFileError as error:

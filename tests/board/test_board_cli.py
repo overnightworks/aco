@@ -6,6 +6,7 @@ then interrupts the main thread the way Ctrl-C does.
 
 import _thread
 import io
+import shutil
 import socket
 import sys
 import threading
@@ -87,6 +88,29 @@ def board_token_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return state_home / "aco" / "board-token"
 
 
+@pytest.fixture(autouse=True)
+def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep every serve run off the operator's real config file; the file
+    itself is absent until a test writes it."""
+    config_home = tmp_path / "config-home"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+    return config_home / "aco" / "config.toml"
+
+
+def _write_config(config_file: Path, content: str) -> None:
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(content, encoding="utf-8")
+
+
+@pytest.fixture
+def root(tmp_path: Path, config_file: Path) -> Path:
+    """The configured root, an existing empty directory."""
+    directory = tmp_path / "root"
+    directory.mkdir()
+    _write_config(config_file, f'root = "{directory}"\n')
+    return directory
+
+
 def _repository(directory: Path, item: int, title: str) -> BoardForge:
     """A board checkout at `directory` holding `item`, one open option card."""
     repository = board_checkout(directory)
@@ -94,11 +118,16 @@ def _repository(directory: Path, item: int, title: str) -> BoardForge:
     return repository
 
 
-def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrupted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def _repos_by_name(board: BoardClient) -> dict[str, dict[str, Any]]:
+    repo_list = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
+    return {repo["name"]: repo for repo in repo_list}
+
+
+def test_serve_shows_every_repository_under_the_root_on_a_tokened_loopback_url_until_interrupted(
+    root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    here = _repository(tmp_path / "here", 1, "Here")
-    _repository(tmp_path / "elsewhere", 2, "Elsewhere")
+    here = _repository(root / "here", 1, "Here")
+    elsewhere = _repository(root / "group" / "elsewhere", 2, "Elsewhere")
     seen: list[BoardClient] = []
 
     def look(board: BoardClient) -> None:
@@ -106,19 +135,23 @@ def test_serve_shows_its_own_repository_on_a_tokened_loopback_url_until_interrup
         shell = board.get_shell()
         assert shell.status == 200
         assert shell.headers["Content-Type"] == "text/html; charset=utf-8"
-        [repo] = cast("list[dict[str, Any]]", board.get_board_json().json()["repos"])
-        assert [item["number"] for item in repo["items"]] == [1]
+        answer = board.get_board_json().json()
+        assert answer["root"] == str(root)
+        repos = _repos_by_name(board)
+        assert set(repos) == {str(here.repository), str(elsewhere.repository)}
+        assert [item["number"] for item in repos[str(here.repository)]["items"]] == [1]
+        assert [item["number"] for item in repos[str(elsewhere.repository)]["items"]] == [2]
 
-    assert _serve_until_done(monkeypatch, here.directory, look) == 0
+    assert _serve_until_done(monkeypatch, root, look) == 0
     [board] = seen
     assert board.host == LOOPBACK_HOST
     assert board.token
 
 
 def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file_is_deleted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, board_token_file: Path
+    root: Path, monkeypatch: pytest.MonkeyPatch, board_token_file: Path
 ) -> None:
-    here = _repository(tmp_path / "here", 1, "Here")
+    _repository(root / "here", 1, "Here")
     tokens: list[str] = []
 
     def remember(board: BoardClient) -> None:
@@ -126,9 +159,9 @@ def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file
         tokens.append(board.token)
 
     for _ in range(2):
-        assert _serve_until_done(monkeypatch, here.directory, remember) == 0
+        assert _serve_until_done(monkeypatch, root, remember) == 0
     board_token_file.unlink()
-    assert _serve_until_done(monkeypatch, here.directory, remember) == 0
+    assert _serve_until_done(monkeypatch, root, remember) == 0
 
     first, second, third = tokens
     assert second == first
@@ -136,8 +169,9 @@ def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file
 
 
 def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
-    board_token_file: Path, capsys: pytest.CaptureFixture[str]
+    root: Path, board_token_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    _repository(root / "here", 1, "Here")
     board_token_file.parent.mkdir(parents=True)
     board_token_file.write_text("not a token")
 
@@ -151,102 +185,186 @@ def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
     )
 
 
-def test_serve_with_repeated_repo_lists_both_repositories_under_one_board(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_serve_decides_in_the_repository_a_card_names_and_touches_no_other(
+    root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository_a = _repository(tmp_path / "a", 1, "In a")
-    repository_b = _repository(tmp_path / "b", 2, "In b")
+    repository_a = _repository(root / "a", 1, "In a")
+    repository_b = _repository(root / "b", 2, "In b")
+    label_a = str(repository_a.repository)
 
     def decide_only_in_a(board: BoardClient) -> None:
-        payload = board.get_board_json().json()
-        repo_list = cast("list[dict[str, Any]]", payload["repos"])
-        repos = {repo["name"]: repo for repo in repo_list}
-        assert set(repos) == {"a", "b"}
-        assert [item["number"] for item in repos["a"]["items"]] == [1]
-        assert [item["number"] for item in repos["b"]["items"]] == [2]
-
-        listed_line = repos["a"]["items"][0]["lines"][0]
-        answer = board.decide_card_through_api(1, [listed_line], ["A"], repo="a")
+        repos = _repos_by_name(board)
+        listed_line = repos[label_a]["items"][0]["lines"][0]
+        answer = board.decide_card_through_api(1, [listed_line], ["A"], repo=label_a)
         assert answer.status_and_message() == {"status": "ruled", "message": None}
 
-    exit_code = _serve_until_done(
-        monkeypatch,
-        tmp_path,
-        decide_only_in_a,
-        "--repo",
-        str(repository_a.directory),
-        "--repo",
-        str(repository_b.directory),
-    )
-
-    assert exit_code == 0
+    assert _serve_until_done(monkeypatch, root, decide_only_in_a) == 0
     assert (repository_a.stored_entries(1)[0]["ruling"], repository_a.body_writes()) == ("A", [1])
     assert repository_b.item_requests() == ()
 
 
-def _two_directories_named_the_same(tmp_path: Path) -> list[str]:
-    first = _repository(tmp_path / "left" / "shared", 1, "A")
-    second = _repository(tmp_path / "right" / "shared", 2, "B")
-    return ["--repo", str(first.directory), "--repo", str(second.directory)]
+def test_serve_finds_a_repository_added_and_loses_one_removed_after_it_started(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    kept = _repository(root / "kept", 1, "Kept")
+    removed = _repository(root / "removed", 2, "Removed")
+    seen: list[set[str]] = []
+
+    def watch_the_root_change(board: BoardClient) -> None:
+        seen.append(set(_repos_by_name(board)))
+        shutil.rmtree(removed.directory)
+        added = _repository(root / "added", 3, "Added")
+        seen.append(set(_repos_by_name(board)))
+        assert added.directory.is_dir()
+
+    assert _serve_until_done(monkeypatch, root, watch_the_root_change) == 0
+    before, after = seen
+    assert before == {str(kept.repository), str(removed.repository)}
+    assert after == {str(kept.repository), "board-forge/added"}
 
 
-def _a_symlink_resolving_to_a_configured_directory(tmp_path: Path) -> list[str]:
-    """A second `--repo` spelling that resolves to the same directory as the
-    first: `ABRD-19`'s own-directory check must read
-    the resolved path, not the string a symlink was given as."""
-    real = _repository(tmp_path / "shared", 1, "A")
-    alias = tmp_path / "alias"
-    alias.symlink_to(real.directory, target_is_directory=True)
-    return ["--repo", str(real.directory), "--repo", str(alias)]
+def test_serve_answers_a_read_once_nothing_is_found_with_a_refusal_naming_the_root(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    only = _repository(root / "only", 1, "Only")
+    answers: list[tuple[int, dict[str, object]]] = []
+
+    def read_after_the_repository_is_gone(board: BoardClient) -> None:
+        shutil.rmtree(only.directory)
+        answer = board.get_board_json()
+        answers.append((answer.status, answer.json()))
+
+    assert _serve_until_done(monkeypatch, root, read_after_the_repository_is_gone) == 0
+    assert answers == [(502, {"error": f"no repository tracking .aco/board.toml under {root}"})]
 
 
-def _a_missing_directory(tmp_path: Path) -> list[str]:
-    return ["--repo", str(tmp_path / "no-such-directory")]
+def test_serve_shows_a_checkout_it_cannot_read_as_unavailable_with_its_path(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    good = _repository(root / "good", 1, "Good")
+    broken = root / "broken"
+    (broken / ".git").mkdir(parents=True)
+    seen: list[dict[str, Any]] = []
+
+    def look(board: BoardClient) -> None:
+        seen.append(_repos_by_name(board))
+
+    assert _serve_until_done(monkeypatch, root, look) == 0
+    [repos] = seen
+    assert list(repos) == [str(good.repository), str(broken)]
+    assert repos[str(broken)]["items"] == []
+    assert repos[str(broken)]["error"]
 
 
-def _exit_code(arguments: list[str]) -> int:
-    """`cli.main`'s own exit code, whether it returns one or raises the
-    `SystemExit` argparse's own usage-error path (a bad `--repo` directory)."""
-    try:
-        return cli.main(["serve", "--port", "0", *arguments])
-    except SystemExit as refused:
-        return cast(int, refused.code)
+def test_serve_answers_502_naming_each_unreadable_checkout_when_none_else_is_found(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken = root / "broken"
+    (broken / ".git").mkdir(parents=True)
+    answers: list[tuple[int, str, list[str]]] = []
+
+    def look(board: BoardClient) -> None:
+        answer = board.get_board_json()
+        body = answer.json()
+        names = [repo["name"] for repo in cast("list[dict[str, Any]]", body["repos"])]
+        answers.append((answer.status, str(body["root"]), names))
+
+    assert _serve_until_done(monkeypatch, root, look) == 0
+    assert answers == [(502, str(root), [str(broken)])]
+
+
+def test_serve_refuses_a_decision_for_a_repository_the_scan_does_not_find(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = _repository(root / "here", 1, "Here")
+    answers: list[tuple[int, str]] = []
+
+    def decide_in_another_repository(board: BoardClient) -> None:
+        listed_line = _repos_by_name(board)[str(repository.repository)]["items"][0]["lines"][0]
+        answer = board.decide_card_through_api(1, [listed_line], ["A"], repo="nobody/else")
+        answers.append((answer.status, str(answer.json()["error"])))
+
+    assert _serve_until_done(monkeypatch, root, decide_in_another_repository) == 0
+    assert answers == [(400, "bad request: decision")]
+    assert repository.item_requests() == ()
+
+
+def _a_missing_config_file(config_file: Path, _tmp_path: Path) -> str:
+    return f'{config_file} does not exist; create it with root = "<absolute path>"'
+
+
+def _a_malformed_config_file(config_file: Path, _tmp_path: Path) -> str:
+    _write_config(config_file, "root = ")
+    return f"{config_file} is not valid TOML: "
+
+
+def _a_config_file_without_a_root(config_file: Path, _tmp_path: Path) -> str:
+    _write_config(config_file, 'directory = "/somewhere"\n')
+    return f'{config_file} sets no root = "<absolute path>"'
+
+
+def _a_relative_root(config_file: Path, _tmp_path: Path) -> str:
+    _write_config(config_file, 'root = "repositories"\n')
+    return f"{config_file}: root repositories is not an absolute path"
+
+
+def _a_root_that_is_no_directory(config_file: Path, tmp_path: Path) -> str:
+    missing = tmp_path / "no-such-root"
+    _write_config(config_file, f'root = "{missing}"\n')
+    return f"{config_file}: root {missing} is not a directory"
+
+
+def _a_root_without_a_board_checkout(config_file: Path, tmp_path: Path) -> str:
+    empty = tmp_path / "empty-root"
+    empty.mkdir()
+    _write_config(config_file, f'root = "{empty}"\n')
+    return f"no repository tracking .aco/board.toml under {empty}"
 
 
 @pytest.mark.parametrize(
-    ("build_arguments", "expected_code", "expected_message"),
+    "arrange",
     [
-        (_two_directories_named_the_same, 1, "two repositories named shared"),
-        (_a_symlink_resolving_to_a_configured_directory, 1, "two repositories named shared"),
-        (_a_missing_directory, 2, "is not a directory"),
+        _a_missing_config_file,
+        _a_malformed_config_file,
+        _a_config_file_without_a_root,
+        _a_relative_root,
+        _a_root_that_is_no_directory,
+        _a_root_without_a_board_checkout,
     ],
-    ids=["duplicate-label", "symlink-resolves-to-a-configured-repo", "missing-directory"],
+    ids=["no-file", "malformed", "no-root", "relative-root", "no-directory", "none-found"],
 )
-def test_serve_refuses_a_bad_repo_argument_as_a_usage_error(
+def test_serve_refuses_to_start_without_a_usable_root_and_names_why(
     tmp_path: Path,
+    config_file: Path,
     capsys: pytest.CaptureFixture[str],
-    build_arguments: Callable[[Path], list[str]],
-    expected_code: int,
-    expected_message: str,
+    arrange: Callable[[Path, Path], str],
 ) -> None:
-    exit_code = _exit_code(build_arguments(tmp_path))
+    refusal = arrange(config_file, tmp_path)
 
-    assert exit_code == expected_code
-    assert expected_message in capsys.readouterr().err
+    exit_code = cli.main(["serve", "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert captured.err.startswith(f"ERROR: {refusal}")
+    assert captured.err.count("\n") == 1
 
 
 def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    repository = _repository(tmp_path / "here", 42, "Share page")
+    repository = _repository(root / "here", 42, "Share page")
     shutdown_waits = threading.Event()
     holds: list[HeldRuling] = []
+    ports: dict[DecisionPort, RecordedPort] = {}
 
     def board_holding_its_next_ruling(decisions: DecisionPort) -> Board:
-        """The port `serve` built, wrapped so that its next `rule_card` is held."""
-        port = RecordedPort(decisions)
-        holds.append(port.hold_next_rule_card(_URL_WAIT_SECONDS))
-        return Board(port)
+        """The port `serve` built, wrapped so that its next `rule_card` is held;
+        every scan builds its ports anew, so a repository keeps its one wrapper."""
+        if decisions not in ports:
+            ports[decisions] = RecordedPort(decisions)
+            holds.append(ports[decisions].hold_next_rule_card(_URL_WAIT_SECONDS))
+        return Board(ports[decisions])
 
     class ShutdownWatchedBoards(Boards):
         def close_writes(self) -> None:
@@ -274,7 +392,7 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
             releasers.append(threading.Thread(target=release_once_shutdown_waits, args=(held,)))
             releasers[0].start()
 
-        assert _serve_until_done(monkeypatch, repository.directory, click_then_interrupt) == 0
+        assert _serve_until_done(monkeypatch, root, click_then_interrupt) == 0
         # Checked before the click's own answer is awaited: `main` returning
         # must already mean the ruling is stored.
         assert repository.stored_entries(42)[0]["ruling"] == "A"
@@ -292,6 +410,9 @@ _NOT_A_PORT = "is not a port between 0 and 65535"
         pytest.param(["--host", "0.0.0.0"], "--host", id="no-way-to-listen-beyond-loopback"),  # noqa: S104 - the case proves the refusal of a non-loopback host
         pytest.param(["--json"], "unrecognized arguments: --json", id="no-json-mode"),
         pytest.param(["--po", "1"], "unrecognized arguments: --po 1", id="no-abbreviated-flag"),
+        pytest.param(
+            ["--repo", "elsewhere"], "unrecognized arguments: --repo elsewhere", id="no-repo-flag"
+        ),
         pytest.param(["--port", "65536"], _NOT_A_PORT, id="port-above-65535"),
         pytest.param(["--port", "-1"], _NOT_A_PORT, id="negative-port"),
         pytest.param(["--port", "eighty"], _NOT_A_PORT, id="port-not-a-number"),
@@ -317,11 +438,14 @@ def test_serve_refuses_the_global_repo_naming_a_forge_repository(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == (
-        "ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH\n"
+        "ERROR: aco serve finds its repositories itself; --repo does not apply to it\n"
     )
 
 
-def test_serve_refuses_a_port_already_in_use(capsys: pytest.CaptureFixture[str]) -> None:
+def test_serve_refuses_a_port_already_in_use(
+    root: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _repository(root / "here", 1, "Here")
     with socket.socket() as occupant:
         occupant.bind((LOOPBACK_HOST, 0))
         occupant.listen()
@@ -333,7 +457,7 @@ def test_serve_refuses_a_port_already_in_use(capsys: pytest.CaptureFixture[str])
 
 
 def test_serve_refuses_to_start_once_the_shell_is_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """ABRD-25: the check runs before any bind attempt (`start_board` calls
     `static.ensure_built` first), so a board that cannot start never holds the
@@ -342,6 +466,7 @@ def test_serve_refuses_to_start_once_the_shell_is_missing(
     surfacing the "cannot listen" / address-in-use message (see
     `test_serve_refuses_a_port_already_in_use`) rather than the asset-missing
     one asserted below."""
+    _repository(root / "here", 1, "Here")
     missing_root = tmp_path / "unbuilt"
     monkeypatch.setattr(static, "STATIC_ROOT", missing_root)
     with socket.socket() as occupant:

@@ -40,7 +40,13 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import board_forge
-from aco_board_fixtures import DEFAULT_LABEL, board_checkout, decision_port, rulings_lines
+from aco_board_fixtures import (
+    DEFAULT_LABEL,
+    board_checkout,
+    decision_port,
+    fixed_boards,
+    rulings_lines,
+)
 from board_forge import BoardForge, StoredItem
 
 from aco import body, expectation_grammar, session
@@ -166,7 +172,7 @@ def _wait_for_stop_signal() -> None:
 def main() -> None:
     session.run_context = board_forge.run_context
     repository = _forge_checkout(Path(tempfile.mkdtemp(prefix="aco-board-e2e-")))
-    boards = Boards({DEFAULT_LABEL: Board(decision_port(repository))})
+    boards = Boards(fixed_boards({DEFAULT_LABEL: Board(decision_port(repository))}))
     running = start_board(0, boards, secrets.token_urlsafe(32))
     control = ThreadingHTTPServer(("127.0.0.1", 0), control_handler(repository))
     threads = [_serve_in_background(running.httpd), _serve_in_background(control)]

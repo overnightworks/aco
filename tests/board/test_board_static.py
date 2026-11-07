@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from aco_board_fixtures import decision_port, serving
+from aco_board_fixtures import decision_port, fixed_boards, serving
 from board_forge import BoardForge
 
 from aco.board import static
@@ -182,7 +182,7 @@ def test_start_board_refuses_to_bind_once_the_shell_is_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(static, "STATIC_ROOT", tmp_path / "unbuilt")
-    boards = Boards({})
+    boards = Boards(fixed_boards({}))
     token = secrets.token_urlsafe(32)
 
     with pytest.raises(static.StaticAssetsMissingError):

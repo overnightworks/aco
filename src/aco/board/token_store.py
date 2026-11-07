@@ -12,6 +12,8 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
+from ..repositories import xdg_directory
+
 _TOKEN_BYTES = 32
 _TOKEN_SHAPE = re.compile(rb"[A-Za-z0-9_-]{43,}\n?")
 _DIRECTORY_MODE = 0o700
@@ -27,9 +29,11 @@ class MalformedTokenFileError(Exception):
 
 def token_path(environment: Mapping[str, str], home: Path) -> Path:
     """`$XDG_STATE_HOME/aco/board-token` when that is absolute, else under `home`."""
-    state_home = environment.get("XDG_STATE_HOME", "")
-    base = Path(state_home) if Path(state_home).is_absolute() else home / ".local" / "state"
-    return base / "aco" / "board-token"
+    return (
+        xdg_directory(environment, "XDG_STATE_HOME", home, ".local", "state")
+        / "aco"
+        / "board-token"
+    )
 
 
 def board_token(path: Path) -> str:

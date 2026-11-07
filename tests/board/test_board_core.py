@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import pytest
-from aco_board_fixtures import CallPhase, PortCall, decision_port
+from aco_board_fixtures import CallPhase, PortCall, decision_port, fixed_boards
 from board_forge import BoardForge, item_body
 from option_cards import open_option_entry
 
@@ -135,7 +135,7 @@ def test_card_posts_on_two_items_at_once_are_both_stored_one_at_a_time(
     port = decision_port(repository)
     rows = Board(port).snapshot().rows
     first, second = _posted(rows, _LABEL, 42), _posted(rows, _LABEL, 7)
-    boards = Boards({_LABEL: Board(port)})
+    boards = Boards(fixed_boards({_LABEL: Board(port)}))
     waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
     held = port.hold_next_rule_card(_WAIT_SECONDS)
 
@@ -162,7 +162,7 @@ def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
     event-driven drain refuses a still-waiting decision the moment stopping
     begins, without waiting for the decision already being written."""
     decisions, running = _card_held_in(repository, _LABEL)
-    boards = Boards({_LABEL: Board(decisions)})
+    boards = Boards(fixed_boards({_LABEL: Board(decisions)}))
     waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
     waiting = _card_waiting_for_its_turn(8)
 
@@ -202,7 +202,7 @@ def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
     repos never touch the same state."""
     decisions_a, card_in_a = _card_held_in(repository, "a")
     decisions_b, card_in_b = _card_held_in(repository, "b")
-    boards = Boards({"a": Board(decisions_a), "b": Board(decisions_b)})
+    boards = Boards(fixed_boards({"a": Board(decisions_a), "b": Board(decisions_b)}))
     waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
 
     with ThreadPoolExecutor(max_workers=2) as threads:
