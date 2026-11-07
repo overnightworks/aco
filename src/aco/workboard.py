@@ -15,10 +15,9 @@ from typing import NoReturn, TypeGuard, cast
 
 from . import items, protocol
 
-# The body-block codec: parsed, validated,
-# and rendered in `body.py`, one layer below this module. Every reader
-# imports the names it needs from `body` directly; `workboard.py` itself imports only what
-# its own board-builder code below actually calls.
+# The body-block codec: parsed, validated, and rendered in `body.py`, one layer
+# below this module. Every reader imports the names it needs from `body` directly;
+# `workboard.py` itself imports only what its own board-builder code below calls.
 from .body import (
     BLOCK_FENCE_INFO,
     BodyReadState,
@@ -101,21 +100,20 @@ RECOVERY_STEP = "close or re-project"
 # A slice's pull request must never close its still-open epic — that would
 # retire the epic before its remaining slices exist. This repository's
 # established substitute is a whole line opening with one of these markers
-# (for example "Part of #79.", "Refs #956 and #80",
-# "Refs #<n> ..."). Anchoring to the start of the line
-# is what keeps a casual mid-paragraph mention — "as noted in #79's plan" —
-# from ever counting; only a dedicated reference line does. This is still a
-# syntactic marker, not a validated relation: GitHub has no structured field
-# for a non-closing PR-to-issue link, and this repository's own children use
-# it inconsistently (see `_touched_without_closing`'s docstring for the
+# (for example "Part of #79.", "Refs #956 and #80", "Refs #<n> ..."). Anchoring
+# to the start of the line keeps a casual mid-paragraph mention — "as noted in
+# #79's plan" — from counting; only a dedicated reference line does. This is
+# still a syntactic marker, not a validated relation: GitHub has no structured
+# field for a non-closing PR-to-issue link, and this repository's own children
+# use it inconsistently (see `_touched_without_closing`'s docstring for the
 # named residual and the corroboration this module still requires).
 TOUCHES_WITHOUT_CLOSING_LINE_PATTERN = re.compile(
     r"(?im)^(?:Refs?|References?|Part of|Teil von)\b[:\s].*$"
 )
 CLAIM_OLD_AFTER = timedelta(hours=1)
-# The three slice-title forms: a parenthetical
-# after the real title (`(#962 Scheibe 4)`, `(#962 slice 4)`) or a leading
-# German phrase (`Scheibe 4 von #962`).
+# The three slice-title forms: a parenthetical after the real title
+# (`(#962 Scheibe 4)`, `(#962 slice 4)`) or a leading German phrase
+# (`Scheibe 4 von #962`).
 _SLICE_TITLE_PARENTHETICAL_PATTERN = re.compile(
     rf"\(#(?P<parent>{ISSUE_NUMBER})[ \t]+(?:Scheibe|slice)[ \t]+(?P<slice>{ISSUE_NUMBER})\)",
     re.IGNORECASE | re.ASCII,
@@ -138,9 +136,11 @@ class Issue:
     children_closed: int | None = None
     children_total: int | None = None
     blocked_by_count: int = 0
-    # Why the store could not read this item at all: the board
-    # names it with this defect instead of parsing `body`, and the item's
-    # other fields are only what could still be read.
+    # Whether a writer of the repository wrote it; a store that does not say counts as no member's.
+    author_is_member: bool = False
+    # Why the store could not read this item at all: the board names it with this
+    # defect instead of parsing `body`, and the item's other fields are only what
+    # could still be read.
     unreadable: ContractDefect | None = None
 
     @property

@@ -19,6 +19,8 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 
 | state \ trigger | load the page | decide a shown card |
 |---|---|---|
+| an item a non-member wrote, or whose author is unknown | ABRD-06 | — (not shown) |
+| an item under `storage = "state-ref"` | ABRD-06, ABRD-112 | as its lines |
 | an open line | ABRD-06 | ABRD-58, ABRD-59 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled option line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
@@ -75,7 +77,8 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 
 ## Reading the lines
 
-- [ ] [ABRD-06] Each page load reads one open-item listing per configured repo and shows each repo's open lines in RUL-03's order, option lines as one card per item (ABRD-82); no copy is kept.
+- [ ] [ABRD-06] A page load reads one open-item listing per repo and shows open lines of items a member (owner, member, collaborator) wrote in RUL-03's order, one card per item (ABRD-82); no copy is kept.
+- [ ] [ABRD-112] Under `storage = "state-ref"` every item counts as a member's: only a writer of the state ref can create one.
 - [ ] [ABRD-07] An item whose block aco's grammar refuses, or that the store cannot read, is not listed, as RUL-20; its repository stays readable.
 
 ## Browser decision flow

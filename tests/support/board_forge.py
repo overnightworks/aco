@@ -51,6 +51,7 @@ class ForgeRequest:
 class StoredItem:
     title: str
     body: str
+    author_is_member: bool = True
 
 
 @dataclass
@@ -92,9 +93,11 @@ class BoardForge:
 
     directory: Path
 
-    def put_item(self, number: int, raw_body: str, *, title: str = "Karte") -> None:
+    def put_item(
+        self, number: int, raw_body: str, *, title: str = "Karte", author_is_member: bool = True
+    ) -> None:
         state = self._state()
-        state.items[number] = StoredItem(title, raw_body)
+        state.items[number] = StoredItem(title, raw_body, author_is_member)
         self._replace_state(state)
 
     def replace_items(self, items: Mapping[int, StoredItem]) -> None:
@@ -180,7 +183,7 @@ class BoardForge:
         if state.listing_failure is not None:
             raise forge.ForgeError(state.listing_failure)
         return tuple(
-            board_issue(number, item.title, item.body)
+            board_issue(number, item.title, item.body, author_is_member=item.author_is_member)
             for number, item in state.items.items()
             if number not in state.closed
         )

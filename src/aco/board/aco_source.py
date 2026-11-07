@@ -1,19 +1,19 @@
 """`DecisionPort` over aco's own library, in process.
 
-A read lists every open item through `rulings.rows`, the rows `aco rulings`
-prints. A decision reads its one item through `decide.fresh_item`, runs the
-board's check on aco's own lines of that read, and writes the whole card
-through `decide.rule`, the writer `aco rule` uses. Every read and every write
-builds its own context bound to the board's directory, so nothing read carries
-over between calls or threads, and one write's read, check and write share
-that one context.
+A read lists the members' open items through `inbox.rows`, the rows `aco rulings`
+prints on the items a member wrote. A decision reads its one item through
+`decide.fresh_item`, runs the board's check on aco's own lines of that read, and
+writes the whole card through `decide.rule`, the writer `aco rule` uses. Every
+read and every write builds its own context bound to the board's directory, so
+nothing read carries over between calls or threads, and one write's read, check
+and write share that one context.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .. import decide, expectations, forge, protocol, rulings, session
+from .. import decide, expectations, forge, inbox, protocol, rulings, session
 from .ports import (
     CardAnswer,
     CardChanged,
@@ -36,7 +36,7 @@ class AcoSource:
         context = self._context()
         try:
             issues = context.forge.list_open_board_issues()
-            return rulings.rows(issues, storage=context.config.storage)
+            return inbox.rows(issues, storage=context.config.storage)
         except protocol.ClaimError as error:
             raise DecisionSourceUnavailableError(str(error)) from error
 

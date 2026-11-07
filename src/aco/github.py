@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
-from typing import TypeVar
+from typing import TypeIs, TypeVar
 
 from . import forge, github_actions, github_graphql, process, protocol, workboard
 from .body import ItemKind
@@ -26,8 +26,8 @@ MAX_RECENT_MERGED_PULL_REQUESTS = 1000
 # board's merged-pull-request date shards are independent, order-agnostic
 # fetches. Walking them one `gh` subprocess at a time made shard count the
 # dominant cost of a wide `board`/`next` read; fetched in parallel batches
-# instead. This bounds how many `gh` subprocesses run at once, comfortably
-# under GitHub's secondary rate limit for concurrent requests.
+# instead. This bounds how many `gh` subprocesses run at once, comfortably under
+# GitHub's secondary rate limit for concurrent requests.
 PARALLEL_FETCH_CONCURRENCY = 20
 GH_TIMEOUT_SECONDS = 60
 GH_QUIET_ENVIRONMENT = {
@@ -38,11 +38,10 @@ API_ISSUE_STATES: dict[str, workboard.BlockerState] = {
     "open": workboard.BlockerState.OPEN,
     "closed": workboard.BlockerState.CLOSED,
 }
-# The organization's native issue types:
-# casefolded so an org's own casing of the type name never matters. An
-# unrecognized type name maps to no kind at all -- never guessed from a
-# label -- so a repository whose org renames a type loses that item's
-# container/bug rules rather than silently misreading them.
+# The organization's native issue types: casefolded so an org's own casing of
+# the type name never matters. An unrecognized type name maps to no kind at
+# all -- never guessed from a label -- so a repository whose org renames a type
+# loses that item's container/bug rules rather than silently misreading them.
 _ISSUE_TYPE_KINDS: dict[str, ItemKind] = {
     "container": ItemKind.CONTAINER,
     "bug": ItemKind.BUG,
@@ -281,6 +280,13 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
     return decoded
 
 
+_MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")  # tuple: unhashable input is no member
+
+
+def _is_count(value: object, minimum: int = 0) -> TypeIs[int]:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
+
+
 class BodyWriteOutcome(StrEnum):
     """What a failed `update_item_body` tells of the body: `REFUSED` wrote
     nothing, `UNKNOWN` may have written it."""
@@ -497,11 +503,7 @@ class GitHubForge:
             return True
         if closed is None or total is None:
             return False
-        if isinstance(closed, bool) or not isinstance(closed, int) or closed < 0:
-            return False
-        if isinstance(total, bool) or not isinstance(total, int) or total < 0:
-            return False
-        return closed <= total
+        return _is_count(closed) and _is_count(total) and int(closed) <= int(total)
 
     def _board_issue(self, value: object) -> workboard.Issue:
         if not isinstance(value, dict):
@@ -517,9 +519,7 @@ class GitHubForge:
         children_total = value.get("childrenTotal")
         blocked_by_count = value.get("blockedByCount")
         if (
-            isinstance(number, bool)
-            or not isinstance(number, int)
-            or number < 1
+            not _is_count(number, minimum=1)
             or not isinstance(title, str)
             or not isinstance(labels, list)
             or not all(isinstance(label, str) for label in labels)
@@ -530,9 +530,7 @@ class GitHubForge:
             or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(updated_at) is None
             or (kind_raw is not None and not isinstance(kind_raw, str))
             or not self._valid_children_progress(children_closed, children_total)
-            or isinstance(blocked_by_count, bool)
-            or not isinstance(blocked_by_count, int)
-            or blocked_by_count < 0
+            or not _is_count(blocked_by_count)
         ):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed board issue")
         return workboard.Issue(
@@ -546,6 +544,7 @@ class GitHubForge:
             children_closed,
             children_total,
             blocked_by_count,
+            author_is_member=value.get("authorAssociation") in _MEMBER_ASSOCIATIONS,
         )
 
     def _board_pull_request(self, value: object) -> workboard.PullRequest:
@@ -1174,6 +1173,7 @@ class GitHubForge:
                     "createdAt:.created_at,updatedAt:.updated_at,"
                     'isPullRequest:has("pull_request"),'
                     "kind:(.type.name // null),"
+                    "authorAssociation:(.author_association // null),"
                     "childrenClosed:(.sub_issues_summary.completed // null),"
                     "childrenTotal:(.sub_issues_summary.total // null),"
                     "blockedByCount:(.issue_dependencies_summary.total_blocked_by // 0)}"

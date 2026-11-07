@@ -40,6 +40,8 @@ flowchart LR
     Board -->|"same library code, in process"| Session
     Board --> Protocol
     Board --> Port
+    Board --> Inbox["inbox<br/>(members' items only)"]
+    Inbox --> Dec
     Board --> Dec["decide, rulings,<br/>expectations,<br/>expectation_grammar"]
 ```
 
@@ -112,7 +114,13 @@ tripwire). Against anyone else the forge's permissions enforce who may write,
 and its edit history records afterward what was written; neither stops an
 agent acting under the operator's own identity. Claimants need push rights to
 the canonical remote. The board adds its own boundary, described in
-`specs/serve.spec.md`.
+`specs/serve.spec.md`. A card reaches it only from an item a member of the
+repository wrote (GitHub's `OWNER`, `MEMBER` or `COLLABORATOR` author
+association; an item whose association is unknown counts as a stranger's; a
+state-ref item counts as a member's, since only a writer of the state ref can
+create one): in a public repository a stranger can open an issue carrying a
+card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
+stay unfiltered.
 
 ### Proof strategy
 
