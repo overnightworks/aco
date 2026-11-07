@@ -3,6 +3,6 @@ agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
 role = "builder"
 base = "095addfa699f1b9467565035d583aea2c6e9b610"
 branch = "claude/issue-714-discovery-replaces-serve-repo"
-scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "scripts/package_smoke.sh", "specs/serve.spec.md", "src/aco/board/board.py", "src/aco/board/cli.py", "src/aco/board/server.py", "src/aco/cmd_serve.py", "src/aco/repositories.py", "tests/board/test_board_api.py", "tests/board/test_board_card_decisions.py", "tests/board/test_board_cli.py", "tests/board/test_board_core.py", "tests/board/test_board_static.py", "tests/support/aco_board_fixtures.py", "tests/support/e2e_server.py", "tests/test_repositories.py"]
+scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "scripts/package_smoke.sh", "specs/serve.spec.md", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/cli.py", "src/aco/board/server.py", "src/aco/board/token_store.py", "src/aco/cmd_serve.py", "src/aco/repositories.py", "tests/board/test_board_api.py", "tests/board/test_board_card_decisions.py", "tests/board/test_board_cli.py", "tests/board/test_board_core.py", "tests/board/test_board_static.py", "tests/support/aco_board_fixtures.py", "tests/support/e2e_server.py", "tests/test_repositories.py"]
 opened_commit = "a83c7e2ee6cd8f35d3a69f5bed7d5a24cee2c3e9"
 whole_reason = "Discovery has no caller but aco serve, so it lands with the --repo removal it replaces, its spec, docs, smoke script and every Boards builder; landed alone it would be code only tests reach."
