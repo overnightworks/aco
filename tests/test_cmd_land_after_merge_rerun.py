@@ -620,10 +620,7 @@ class TestLandAfterMergeRerun:
                 ),
                 id="issue-the-keep-worktree-flag-keeps-the-lane",
             ),
-            pytest.param(
-                FOREIGN_LANE,
-                id="foreign-lane-removes-the-lane",
-            ),
+            pytest.param(FOREIGN_LANE, id="foreign-lane-removes-the-lane"),
             pytest.param(
                 replace(
                     FOREIGN_LANE,
@@ -774,9 +771,7 @@ class TestLandAfterMergeRerun:
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
-                RerunCase(
-                    arguments=("land", "12", "--head", "0000000"),
-                ),
+                RerunCase(arguments=("land", "12", "--head", "0000000")),
                 id="squash-rerun-on-recorded-head",
             ),
         ],
