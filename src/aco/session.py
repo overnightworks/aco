@@ -487,10 +487,21 @@ class RunContext:
         return checkout.remote_url(self.configured_canonical_remote, directory=self.directory)
 
     @cached_property
+    def remote_repository_id(self) -> forge.RepositoryId:
+        """The repository the canonical remote's URL names, read without
+        asking the forge: under `state-ref` its own host and path, under
+        `github` the repository its GitHub URL names, refused by name when
+        the host is not GitHub."""
+        if self.config.storage is body.Storage.STATE_REF:
+            return forge.RepositoryId(self.remote_location.host, (), self.remote_location.path)
+        refuse_unsupported_forge_host(self.remote_location)
+        return github.repository_id(self.remote_location.path)
+
+    @cached_property
     def repository_id(self) -> forge.RepositoryId:
         """The repository this run's forge talks to, refused by name before
         any forge is built: under `state-ref` the
-        canonical remote's own host and path, with `--repo` meaningless;
+        canonical remote's own repository, with `--repo` meaningless;
         under `github` `--repo` or the discovered repository, which must
         match the canonical remote."""
         if self.config.storage is body.Storage.STATE_REF:
@@ -498,7 +509,7 @@ class RunContext:
                 raise RepoMeaninglessUnderStateRefError(
                     "--repo is meaningless under storage = state-ref"
                 )
-            return forge.RepositoryId(self.remote_location.host, (), self.remote_location.path)
+            return self.remote_repository_id
         refuse_unsupported_forge_host(self.remote_location)
         target = (
             self.repo

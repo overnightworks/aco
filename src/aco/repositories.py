@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import body, checkout, github, protocol, session, workboard
+from . import checkout, protocol, session, workboard
 
 _GIT_DIRECTORY = ".git"
 _CONFIG_FILE = Path("aco") / "config.toml"
@@ -147,8 +147,4 @@ def _tracking_repository(directory: Path) -> Repository | None:
     context = session.run_context(None).for_directory(directory)
     # The remote URL alone names the repository: `repository_id` would ask `gh`
     # about a URL shape the GitHub pattern misses, a network call per scan.
-    location = context.remote_location
-    if context.config.storage is not body.Storage.STATE_REF:
-        session.refuse_unsupported_forge_host(location)
-        return Repository(github.repository_id(location.path).path, directory)
-    return Repository(location.path, directory)
+    return Repository(context.remote_repository_id.path, directory)

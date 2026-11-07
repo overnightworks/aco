@@ -8,6 +8,7 @@ import pytest
 from aco_board_fixtures import board_checkout
 from board_fixtures import write_repository_config
 from cli_fixtures import real_git
+from store_fixtures import path_without_gh
 
 from aco import repositories
 
@@ -177,11 +178,7 @@ def test_a_state_ref_checkout_is_found_under_its_remote_path_on_any_host(tmp_pat
 def test_a_remote_url_the_github_pattern_misses_is_read_without_asking_gh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    refusing_gh = tmp_path / "bin" / "gh"
-    refusing_gh.parent.mkdir()
-    refusing_gh.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-    refusing_gh.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{refusing_gh.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("PATH", path_without_gh(tmp_path))
     _tracked_checkout(
         tmp_path / "root" / "project", remote="ssh://git@github.com:22/owner/repo.git"
     )

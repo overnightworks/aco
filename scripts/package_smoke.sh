@@ -25,8 +25,7 @@ out_dir="$(cd "$out_dir" && pwd)"
 # The committed package tree is the manifest every archive must match exactly; a
 # file that exists only in the working tree (a module deleted since an earlier
 # build, a stray build output, a sourcemap) would otherwise ship unproven, and a
-# committed file an ignore rule hides would go missing. Read before the narrowed
-# PATH hides git.
+# committed file an ignore rule hides would go missing.
 expected_package="$scratch/expected-package"
 git -C "$repository_root" ls-files -- src/aco | sed 's|^src/||' | sort >"$expected_package"
 
