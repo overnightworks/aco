@@ -1,13 +1,14 @@
 """What `aco land` reports about a trunk whose commit also carries manual workflow runs."""
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY
 from cli_fixtures import real_git, run_cli
-from github_fixtures import FakeForge, landed_world
+from github_fixtures import CommitChecksResult, FakeForge, landed_world
 
 from aco import forge, github
 from aco.github import GitHubForge
@@ -36,8 +37,9 @@ class TrunkRead:
     trunk_line: str = ""
 
 
-def checks_read_from(read: TrunkRead, sha: str) -> tuple[forge.CheckRun, ...] | forge.ForgeError:
-    """What the adapter's trunk read answers when GitHub gives `read`'s rows."""
+def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], CommitChecksResult]:
+    """The adapter's trunk read of `sha`, answered with the `push_only` the caller passes,
+    when GitHub gives `read`'s rows."""
 
     def transport(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[-3] if "--paginate" in arguments else arguments[1]
@@ -52,10 +54,14 @@ def checks_read_from(read: TrunkRead, sha: str) -> tuple[forge.CheckRun, ...] | 
         return json.dumps({"state": "pending", "total": 0})
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=transport)
-    try:
-        return client.commit_checks(sha, push_only=True)
-    except forge.ForgeError as error:
-        return error
+
+    def reading(push_only: bool) -> CommitChecksResult:
+        try:
+            return client.commit_checks(sha, push_only=push_only)
+        except forge.ForgeError as error:
+            return error
+
+    return reading
 
 
 @pytest.mark.parametrize(
@@ -80,6 +86,33 @@ def checks_read_from(read: TrunkRead, sha: str) -> tuple[forge.CheckRun, ...] | 
                 [workflow_run("push", PUSH_SUITE), workflow_run("workflow_dispatch", MANUAL_SUITE)],
             ),
             id="a-manual-skipped-job-does-not-hide-the-push-job",
+        ),
+        pytest.param(
+            TrunkRead(
+                [
+                    actions_check(1, "Image", "failure", PUSH_SUITE),
+                    actions_check(2, "Image", "success", MANUAL_SUITE),
+                ],
+                [workflow_run("push", PUSH_SUITE), workflow_run("workflow_dispatch", MANUAL_SUITE)],
+                "trunk: red at {sha7}: Image (failure)\n",
+            ),
+            id="a-newer-manual-job-does-not-hide-a-failed-push-job",
+        ),
+        pytest.param(
+            TrunkRead(
+                [actions_check(1, "CI", "success", PUSH_SUITE)],
+                '{"suite": 501, "event": null}',
+                "trunk: unreadable at {sha7}: GitHub returned a malformed workflow run\n",
+            ),
+            id="a-workflow-run-without-an-event-is-unreadable",
+        ),
+        pytest.param(
+            TrunkRead(
+                [actions_check(1, "CI", "failure", "x")],
+                [workflow_run("push", PUSH_SUITE)],
+                "trunk: unreadable at {sha7}: GitHub returned a malformed check run\n",
+            ),
+            id="a-malformed-check-suite-is-unreadable",
         ),
         pytest.param(
             TrunkRead(

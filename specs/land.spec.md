@@ -144,7 +144,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25 and 33, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
 - [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-57, LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
 - [ ] [LANDCMD-57] After every RELEASED ending, first landing or resumed rerun, `merged: <sha>` (the full 40-hex merge commit) follows the release's lines, before LANDCMD-54's and LANDCMD-17's.
-- [ ] [LANDCMD-54] After a RELEASED ending, a trunk red at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)` naming its first failed check, never a skipped or neutral one (E-LANDCMD-54).
+- [ ] [LANDCMD-54] After a RELEASED ending, a red trunk at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)` for its first failed check, never a skipped or neutral one; else nothing.
 - [ ] [LANDCMD-55] A trunk check read, or its workflow-run read, that fails after the merge prints `trunk: unreadable at <sha7>: <error>` instead and keeps exit `0`; the merge and release stand.
 - [ ] [LANDCMD-58] LANDCMD-54 counts an Actions check run only when its workflow run was triggered by `push`, every other check and status always, and picks the newest per name after (E-LANDCMD-58a, E-LANDCMD-58b).
 
