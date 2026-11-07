@@ -125,7 +125,8 @@ def _chat_ruling() -> list[str]:
 def test_items_with_a_record_are_listed_in_the_rulings_order(
     checkout: _StateRefCheckout, state_ref_board: BoardClient, listed_items: Lister
 ) -> None:
-    """ABRD-06, RUL-03: the item asked on the newer day comes first, whatever its number."""
+    """ABRD-06, ABRD-112, RUL-03: a state-ref item counts as a member's;
+    the item asked on the newer day comes first, whatever its number."""
     newer = {**open_option_entry(), "asked_on": date(2026, 10, 29)}
     checkout.seed(
         {f"{_FIRST_ID}.md": _item_file(newer), f"{_SECOND_ID}.md": _item_file(open_option_entry())}
