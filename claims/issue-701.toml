@@ -1,8 +1,0 @@
-claim_id = "66da46c730f04efabebea9d94988c4dd"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "327cb41621556dd5dbca29b6285c0b3b44003545"
-branch = "claude/issue-701-land-names-merge-commit"
-scope = ["specs/land.spec.md", "src/aco/cmd_land.py", "tests"]
-opened_commit = "74658d5dc4cc7ede73912dffa1f92663800655ab"
-whole_reason = "One printed line, its spec criterion and the stdout pins that show it prove the change only together; the pins sit in several test modules."
