@@ -81,7 +81,7 @@ layers = [
     "ahead_of_caller",
     "checkout | store",
     "github | state_board",
-    "github_graphql",
+    "github_graphql | github_actions",
     "forge | rulings",
     "workboard",
     "items | expectations",
