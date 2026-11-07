@@ -25,10 +25,21 @@ out_dir="$(cd "$out_dir" && pwd)"
 # The committed package tree is the manifest every archive must match exactly; a
 # file that exists only in the working tree (a module deleted since an earlier
 # build, a stray build output, a sourcemap) would otherwise ship unproven, and a
-# committed file an ignore rule hides would go missing. Read before the narrowed
-# PATH hides git.
+# committed file an ignore rule hides would go missing.
 expected_package="$scratch/expected-package"
 git -C "$repository_root" ls-files -- src/aco | sed 's|^src/||' | sort >"$expected_package"
+
+# `aco serve` finds its repositories under the root in aco's config file, so the
+# smoke gives it one checkout tracking the board file; discovery runs git, so git
+# stays on the narrowed PATH below.
+smoke_root="$scratch/root"
+mkdir -p "$smoke_root/project" "$scratch/config/aco"
+git -C "$smoke_root/project" init --quiet
+git -C "$smoke_root/project" remote add origin https://github.com/smoke/project
+mkdir "$smoke_root/project/.aco"
+: >"$smoke_root/project/.aco/board.toml"
+git -C "$smoke_root/project" add .aco/board.toml
+printf 'root = "%s"\n' "$smoke_root" >"$scratch/config/aco/config.toml"
 
 # A PATH holding only the tools this script needs proves the install path never
 # reaches for Node, which a developer machine or CI runner usually has.
@@ -37,7 +48,7 @@ UV_PYTHON="$(uv python find)"
 export UV_PYTHON
 tool_path="$scratch/path"
 mkdir -p "$tool_path"
-for tool in uv unzip tar gzip grep sed sort diff rm sleep head cat; do
+for tool in uv git unzip tar gzip grep sed sort diff rm sleep head cat; do
     ln -s "$(command -v "$tool")" "$tool_path/$tool"
 done
 export PATH="$tool_path"
@@ -124,7 +135,7 @@ echo "importlib.resources finds aco/board/static/index.html"
 # importlib.resources check above only proves the file ships, not that
 # `aco serve` can reach it.
 serve_log="$scratch/serve.log"
-XDG_STATE_HOME="$scratch/state" "$scratch/bin/aco" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
+XDG_CONFIG_HOME="$scratch/config" XDG_STATE_HOME="$scratch/state" "$scratch/bin/aco" serve --port 0 >"$serve_log" 2>&1 &
 serve_pid=$!
 for ((attempt = 0; attempt < 50; attempt++)); do
     [[ -s "$serve_log" ]] && break

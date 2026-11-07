@@ -82,8 +82,10 @@ request or unreadable (`specs/ahead-of-caller.spec.md`).
 ## Board
 
 `aco board --json` projects the open work board read-only for agents and
-scripts. `aco serve [--port N] [--repo PATH]...` serves the open
-expectation lines of one or more repositories as decision cards on 127.0.0.1
+scripts. `aco serve [--port N]` serves the open
+expectation lines of every checkout under the `root` in `~/.config/aco/config.toml`
+(`root = "<absolute path>"`; `$XDG_CONFIG_HOME` when absolute) that tracks
+`.aco/board.toml`, one per forge repository and rescanned on every read, as decision cards on 127.0.0.1
 (an item's open option lines are one card, decided by a letter per line, Accept all,
 Other… or Unclear, stored all or none); the
 access token travels only in the printed URL's `#` fragment and survives

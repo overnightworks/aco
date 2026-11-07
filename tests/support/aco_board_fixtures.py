@@ -15,7 +15,7 @@ import select
 import socket
 import struct
 import threading
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from email.message import Message
@@ -30,7 +30,7 @@ from cli_fixtures import real_git
 
 from aco import expectations, rulings, workboard
 from aco.board.aco_source import AcoSource
-from aco.board.board import Board, Boards
+from aco.board.board import Board, Boards, Found
 from aco.board.ports import CardChanged, CardCheck, DecisionPort, DecisionResult
 from aco.board.server import TOKEN_HEADER, start_board
 
@@ -40,12 +40,20 @@ DEFAULT_LABEL = "repo"
 
 def board_checkout(directory: Path) -> BoardForge:
     """A git checkout at `directory` tracking an empty board configuration
-    (the `github` pin), and the forge holding its items."""
+    (the `github` pin), cloned from the forge repository its forge names, and
+    the forge holding its items."""
     directory.mkdir(parents=True)
+    repository = BoardForge(directory)
     real_git(directory, "init", "--quiet")
+    real_git(directory, "remote", "add", "origin", f"https://github.com/{repository.repository}")
     write_repository_config(directory)
     real_git(directory, "add", workboard.CONFIG_PATH.as_posix())
-    return BoardForge(directory)
+    return repository
+
+
+def fixed_boards(boards: Mapping[str, Board]) -> Callable[[], Found]:
+    """A discovery that finds the same `boards` on every scan."""
+    return lambda: Found("/", boards)
 
 
 class PortOperation(StrEnum):
@@ -150,7 +158,9 @@ def serving_many(
     decisions_by_label: Mapping[str, DecisionPort], **board_options: float
 ) -> Iterator[BoardClient]:
     """The real board server for every labelled repository, stopped on exit."""
-    boards = Boards({label: Board(decisions) for label, decisions in decisions_by_label.items()})
+    boards = Boards(
+        fixed_boards({label: Board(decisions) for label, decisions in decisions_by_label.items()})
+    )
     running = start_board(0, boards, secrets.token_urlsafe(32), **board_options)
     server_thread = threading.Thread(
         target=running.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True

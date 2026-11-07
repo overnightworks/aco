@@ -15,6 +15,7 @@ from aco_board_fixtures import (
     BoardClient,
     Lister,
     RecordedPort,
+    fixed_boards,
     serving_two,
 )
 from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
@@ -525,7 +526,7 @@ def test_a_card_post_after_stopping_began_is_refused_and_reaches_no_source(
 ) -> None:
     """ABRD-17, ABRD-18."""
     listed = show()
-    boards = Boards({"repo": Board(port)})
+    boards = Boards(fixed_boards({"repo": Board(port)}))
     boards.close_writes()
     posted = PostedCard(_ITEM, (PostedLine(2, listed[2]["fingerprint"], "A"),), None)
 

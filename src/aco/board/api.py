@@ -9,12 +9,11 @@ module owns what the answer and the request look like.
 """
 
 import json
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
 from .. import expectation_grammar, expectations, rulings
-from .board import RepoReading, RepoUnavailable, wire_fingerprint
+from .board import BoardReading, RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
     CardAnswer,
@@ -49,9 +48,10 @@ _KEYS_OF_ONE_LINE = ("line", "fingerprint", "option", "outcome")
 """Keys a card post never carries beside `lines`, even as `null`."""
 
 
-def board_json(readings: Sequence[RepoReading]) -> str:
-    """Every configured repo, in configured order, with its items or its error."""
-    return json.dumps({"repos": [_repo_json(reading) for reading in readings]})
+def board_json(reading: BoardReading) -> str:
+    """The root the repos were looked for under, and every repo found with its
+    items or its error."""
+    return json.dumps({"root": reading.root, "repos": [_repo_json(repo) for repo in reading.repos]})
 
 
 def _repo_json(reading: RepoReading) -> dict[str, object]:

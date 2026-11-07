@@ -281,13 +281,14 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
 
     assert response.status == 502
     assert response.json() == {
+        "root": "/",
         "repos": [
             {
                 "name": DEFAULT_LABEL,
                 "error": "no forge adapter for host",
                 "items": [],
             }
-        ]
+        ],
     }
     assert response.headers["Content-Type"] == "application/json"
     assert_guarded(response)
@@ -330,10 +331,11 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
 
     assert response.status == 502
     assert response.json() == {
+        "root": "/",
         "repos": [
             {"name": "a", "error": "a is down", "items": []},
             {"name": "b", "error": "b is down", "items": []},
-        ]
+        ],
     }
 
 

@@ -248,7 +248,7 @@ for (const viewport of [
 		test('[ABRD-37] [ABRD-54] [ABRD-57] [ABRD-106] the decided card says what was decided, how and when', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token } = readBoardRuntime();
+			const { appUrl, token, repository } = readBoardRuntime();
 			await arrangeEveryWay();
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(openTab(page)).toHaveText(/^Open 0$/);
@@ -260,7 +260,7 @@ for (const viewport of [
 			] of EVERY_WAY.entries()) {
 				await openDecidedLine(page, title);
 				const card = decidedCard(page);
-				await expect(card.locator('.meta')).toContainText(`repo › ${area}`);
+				await expect(card.locator('.meta')).toContainText(`${repository} › ${area}`);
 				if (asked === undefined) {
 					await expect(card.locator('.meta')).not.toContainText('Asked');
 				} else {
@@ -278,7 +278,7 @@ for (const viewport of [
 				await expect(binding).toBeVisible();
 				await expect(binding.locator('p')).toHaveText(sentences);
 				await expect(binding.locator('.source')).toHaveText(
-					`repo · Item 50 · Line ${position + 1}`
+					`${repository} · Item 50 · Line ${position + 1}`
 				);
 				await expect(card.getByText('Problem', { exact: true })).toHaveCount(0);
 				await expect(card.getByText('Today', { exact: true })).toHaveCount(0);

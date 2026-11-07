@@ -8,9 +8,6 @@ import { readBoardRuntime } from './runtime';
 // global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
 
-// The E2E board's one repository label (`aco_board_fixtures.DEFAULT_LABEL`).
-const REPOSITORY = 'repo';
-
 const SONG_QUESTION = 'Soll dein Song beim Sprung zum Ursprungs-Take offen bleiben?';
 const SONG_CONTRACT =
 	'Ja ändert die bisherige Vorgabe in Regel 10 für normalen Klick und Enter: Der vorbereitete Plan nutzt den vorhandenen App-Verlauf, öffnet den Ursprungs-Take und scrollt dorthin; URL sowie Zurück/Vorwärts bleiben erhalten.';
@@ -134,7 +131,7 @@ for (const viewport of [
 		test('[ABRD-106] an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token } = readBoardRuntime();
+			const { appUrl, token, repository } = readBoardRuntime();
 			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
@@ -142,7 +139,7 @@ for (const viewport of [
 			const card = page.locator('.option-card');
 			await expect(card.locator('.meta')).toHaveText(
 				new RegExp(
-					`^\\s*${REPOSITORY} › Song-Seite\\s*·\\s*Product\\s*·\\s*reversible\\s*·\\s*Asked \\d{2}\\.\\d{2}\\.\\d{4}\\s*$`
+					`^\\s*${repository} › Song-Seite\\s*·\\s*Product\\s*·\\s*reversible\\s*·\\s*Asked \\d{2}\\.\\d{2}\\.\\d{4}\\s*$`
 				)
 			);
 			await expect(card.getByRole('heading', { name: SONG_QUESTION, exact: true })).toBeVisible();
@@ -218,7 +215,7 @@ for (const viewport of [
 		test('each option opens its rows, one at a time, and folds the contract behind Show', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token } = readBoardRuntime();
+			const { appUrl, token, repository } = readBoardRuntime();
 			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await openFromList(page, SONG_QUESTION, phone);
@@ -253,7 +250,7 @@ for (const viewport of [
 				'reversible — eine neue Entscheidung kann es wieder ändern.'
 			);
 
-			const source = card.getByText(`${REPOSITORY} · Item 1843 · Line 1`);
+			const source = card.getByText(`${repository} · Item 1843 · Line 1`);
 			await expect(card.getByText(SONG_CONTRACT)).toBeHidden();
 			await expect(source).toBeHidden();
 			await card.getByText('Show', { exact: true }).click();
@@ -388,7 +385,7 @@ for (const viewport of [
 		test('[ABRD-37] a ruled option line leaves the open list and Decided lists it under its project', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token } = readBoardRuntime();
+			const { appUrl, token, repository } = readBoardRuntime();
 			await arrangeCards();
 			await page.goto(`${appUrl}#t=${token}`);
 			await expect(page.locator('.tracks').getByTitle('Song offen lassen?')).toHaveCount(0);
@@ -398,7 +395,7 @@ for (const viewport of [
 			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
 			const row = decidedList(page).getByRole('button');
 			await expect(decidedList(page).getByRole('heading', { level: 2 })).toHaveText(
-				new RegExp(`^${REPOSITORY}\\s+1$`)
+				new RegExp(`^${repository}\\s+1$`)
 			);
 			await expect(row).toHaveCount(1);
 			await expect(row).toContainText('Sprung zum Ursprungs-Take');

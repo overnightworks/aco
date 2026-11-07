@@ -12,7 +12,7 @@ including the single-repo case, so that lock never exists twice.
 import hashlib
 import json
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
@@ -65,6 +65,17 @@ class RepoUnavailable:
 
 
 RepoReading = RepoSnapshot | RepoUnavailable
+
+
+@dataclass(frozen=True)
+class BoardReading:
+    root: str
+    """Where the repositories were looked for."""
+    repos: tuple[RepoReading, ...]
+
+
+class RepositoriesUnavailableError(Exception):
+    """A scan found no usable repo set, or none holding the one a decision names."""
 
 
 def all_repos_unavailable(readings: Sequence[RepoReading]) -> bool:
@@ -122,45 +133,63 @@ def checked_card(
     return CardDecision(posted.item, tuple(checked), posted.answer)
 
 
-class Boards:
-    """One or more repos' `Board`s under their labels, sharing one write turn.
+@dataclass(frozen=True)
+class Found:
+    """What one scan found: its root, each repo's board under its label, and
+    the directories that could not be read, as unavailable entries."""
 
-    A ruling rewrites a whole item body, so two writes at once -- even in
-    different repos, since nothing here needs that to be safe -- could each
-    leave the outcome of a stopped write unknown; this is the single owner of
-    that rule, always, even when only one repo is configured.
+    root: str
+    boards: Mapping[str, Board]
+    unavailable: tuple[RepoUnavailable, ...] = ()
+
+
+class Boards:
+    """The `Board`s of the repos a scan finds, sharing one write turn.
+
+    Every read and every write scans afresh through `discover`, so a repo
+    added or removed since the last call shows at once. A ruling rewrites a
+    whole item body, so two writes at once -- even in different repos, since
+    nothing here needs that to be safe -- could each leave the outcome of a
+    stopped write unknown; this is the single owner of that rule, always, even
+    when only one repo is found.
     """
 
-    def __init__(self, boards: Mapping[str, Board]) -> None:
-        self._boards = dict(boards)
+    def __init__(self, discover: Callable[[], Found]) -> None:
+        self._discover = discover
         self._turn = threading.Condition()
         self._writing = False
         self._closed = False
 
-    @property
-    def labels(self) -> tuple[str, ...]:
-        """Every configured repo's label, in configured order."""
-        return tuple(self._boards)
-
-    def snapshot(self) -> tuple[RepoReading, ...]:
-        """Every configured repo read in parallel, in configured order.
+    def snapshot(self) -> BoardReading:
+        """Every found repo read in parallel in label order, then each
+        unavailable directory; `discover` raises `RepositoriesUnavailableError`
+        when nothing is found.
 
         A repo whose read raises becomes its own `RepoUnavailable` entry; the
         others' readings are unaffected.
         """
-        with ThreadPoolExecutor(max_workers=len(self._boards)) as executor:
+        found = self._discover()
+        unavailable = found.unavailable
+        if not found.boards:
+            return BoardReading(found.root, unavailable)
+        with ThreadPoolExecutor(max_workers=len(found.boards)) as executor:
             futures = {
-                label: executor.submit(board.snapshot) for label, board in self._boards.items()
+                label: executor.submit(board.snapshot) for label, board in found.boards.items()
             }
-            return tuple(_reading(label, futures[label]) for label in self._boards)
+            read = tuple(_reading(label, futures[label]) for label in found.boards)
+        return BoardReading(found.root, (*read, *unavailable))
 
     def decide_card(self, repo: str, posted: PostedCard) -> DecisionResult:
         """Write a whole card through `repo`'s board in the one write turn;
-        `repo` must already be one of `labels`."""
+        `repo` must be one of the repos this turn's scan finds, else
+        `RepositoriesUnavailableError`."""
         if not self._take_turn():
             return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
         try:
-            return self._boards[repo].decide_card(posted, repo)
+            boards = self._discover().boards
+            if repo not in boards:
+                raise RepositoriesUnavailableError(f"{repo} is not among the repositories found")
+            return boards[repo].decide_card(posted, repo)
         finally:
             self._end_turn()
 

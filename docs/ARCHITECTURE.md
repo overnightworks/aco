@@ -36,6 +36,7 @@ flowchart LR
     Port --> GitHub["GitHub adapter<br/>github.py"]
     Port --> StateBoard["state-ref item store<br/>state_board.py"]
     Board["board (aco serve)<br/>board/, frontend/"]
+    Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
     Board --> Protocol
     Board --> Port
@@ -98,8 +99,8 @@ aco is a CLI installed per machine (the README owns installation); every
 machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
 operator starts with `aco serve`; it is not a service and keeps no
-coordination state of its own, only its access token file
-(`specs/serve.spec.md`). Nothing else is deployed.
+coordination state of its own, only its access token file; the root it scans
+comes from aco's config file (`specs/serve.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
 
@@ -149,8 +150,8 @@ but not grow.
 - `.aco/board.toml` gains a setting only when that setting has a caller,
   because an option without one is upkeep with no user.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
-  decision surface: only his questions, from several repositories
-  (`specs/serve.spec.md` ABRD-14); frozen and unused today, kept on purpose.
+  decision surface: only his questions, from every repository under one root
+  (`repositories.py`, `specs/serve.spec.md` ABRD-14), in use and growing.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
   the item commands still carries both storage paths. It is known and
@@ -189,7 +190,7 @@ but not grow.
 
 ## Risks and Technical Debt
 
-- Two storage paths and the frozen board are carried by `session`, `store` and
+- Two storage paths are carried by `session`, `store` and
   the item commands (see Constraints and reasons).
 - The forge seam is not exclusive: landing, item and release depend on
   concrete adapters, so a second forge is more than one adapter.

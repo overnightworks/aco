@@ -26,7 +26,7 @@ from typing import cast
 from urllib.parse import urlsplit
 
 from . import api, static
-from .board import Boards, all_repos_unavailable
+from .board import Boards, RepositoriesUnavailableError, all_repos_unavailable
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"  # noqa: S105 - names the query field that carries the token and holds no secret
@@ -316,24 +316,23 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         self._refuse_as_json(HTTPStatus.METHOD_NOT_ALLOWED, _METHOD_NOT_ALLOWED, allow=allow)
 
     def _get_board(self) -> None:
-        readings = self._server().boards.snapshot()
-        status = HTTPStatus.BAD_GATEWAY if all_repos_unavailable(readings) else HTTPStatus.OK
-        self._respond(status, api.board_json(readings).encode("utf-8"), api.JSON_CONTENT_TYPE)
+        try:
+            reading = self._server().boards.snapshot()
+        except RepositoriesUnavailableError as refusal:
+            self._refuse_as_json(HTTPStatus.BAD_GATEWAY, str(refusal))
+            return
+        status = HTTPStatus.BAD_GATEWAY if all_repos_unavailable(reading.repos) else HTTPStatus.OK
+        self._respond(status, api.board_json(reading).encode("utf-8"), api.JSON_CONTENT_TYPE)
 
     def _post_rule(self) -> None:
         raw = self._read_body(self._refuse_as_json)
         if raw is None:
             return
         request = api.parse_rule_request(raw)
-        if request is None or not self._repo_known(request.repo):
+        if request is None:
             self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
             return
         self._decide(request)
-
-    def _repo_known(self, repo: str) -> bool:
-        """Whether `repo` names one of this server's configured repos -- checked
-        before any `aco` call, so a request for an unknown repo never reaches it."""
-        return repo in self._server().boards.labels
 
     def _read_body(self, refuse: _Refusal) -> bytes | None:
         """The whole declared body, or None once `refuse` has answered why not."""
@@ -356,7 +355,12 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         return body
 
     def _decide(self, request: api.CardRequest) -> None:
-        result = self._server().boards.decide_card(request.repo, request.card)
+        try:
+            result = self._server().boards.decide_card(request.repo, request.card)
+        except RepositoriesUnavailableError:
+            # A repo outside the scan's findings never reaches aco.
+            self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
+            return
         self._respond(
             HTTPStatus.OK,
             api.decision_result_json(result, request.repo).encode("utf-8"),

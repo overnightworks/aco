@@ -185,7 +185,7 @@ async function fits(page: Page, width: number): Promise<void> {
 }
 
 function cardPost(item: number, lines: object[], answer: object = {}): object {
-	return { repo: 'repo', item, lines, ...answer };
+	return { repo: readBoardRuntime().repository, item, lines, ...answer };
 }
 
 for (const viewport of [
@@ -216,11 +216,14 @@ for (const viewport of [
 		test('[ABRD-83] [ABRD-106] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
 			page
 		}, testInfo) => {
+			const { repository } = readBoardRuntime();
 			await arrangeCards();
 			await open(page, phone);
 
 			await expect(card(page).locator('.meta')).toHaveText(
-				/^\s*repo › Song-Seite\s*·\s*Product\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
+				new RegExp(
+					`^\\s*${repository} › Song-Seite\\s*·\\s*Product\\s*·\\s*reversible\\s*·\\s*Asked \\d{2}\\.\\d{2}\\.\\d{4}\\s*$`
+				)
 			);
 			await expect(card(page).getByRole('heading', { name: CARD_NAME, exact: true })).toBeVisible();
 			await expect(card(page).getByText('Problem', { exact: true })).toHaveCount(0);
@@ -535,6 +538,7 @@ for (const viewport of [
 		test('[ABRD-61] [ABRD-106] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
 			page
 		}, testInfo) => {
+			const { repository } = readBoardRuntime();
 			await arrange([
 				sprung(
 					point(2),
@@ -553,7 +557,9 @@ for (const viewport of [
 			await expect(rows.nth(1).getByRole('img', { name: 'With head' })).toBeVisible();
 			await showCard(page, phone, name);
 			await expect(card(page).locator('.meta')).toHaveText(
-				/^\s*repo › Song-Seite \/ Bibliothek\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
+				new RegExp(
+					`^\\s*${repository} › Song-Seite / Bibliothek\\s*·\\s*Product\\s*·\\s*with head\\s*·\\s*reversible\\s*·\\s*Asked \\d{2}\\.\\d{2}\\.\\d{4}\\s*$`
+				)
 			);
 			await expect(card(page).getByRole('heading', { name, exact: true })).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Unclear' })).toHaveCount(0);

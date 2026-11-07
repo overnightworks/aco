@@ -8,7 +8,8 @@ live `aco serve` does. It speaks the same protocol, too
 (`aco.board.server.start_board`), so a spec drives the real wire form
 (`specs/serve.spec.md` ABRD-08/09/21) end to end. The board's port runs
 aco's own library in this process; the only thing fake is the forge, a
-`board_forge.BoardForge` in a temporary checkout.
+`board_forge.BoardForge` in a checkout under the root of a temporary config
+file, which the board finds by the production discovery.
 
 A second server beside the board, the control endpoint, arranges that
 forge: `PUT /board` stores the items a spec names, rendered by aco and
@@ -16,7 +17,7 @@ refused when aco's grammar refuses them, and `GET /items/<n>/lines` reads an
 item's stored lines back in aco's own line JSON.
 
 One line of JSON on stdout once both servers listen:
-`{"host", "port", "token", "control_url"}`. Stops on SIGTERM or SIGINT,
+`{"host", "port", "token", "control_url", "repository"}`. Stops on SIGTERM or SIGINT,
 which the launcher sends on teardown.
 """
 # ruff: noqa: T201 - the server announces its address to the test that starts it
@@ -40,11 +41,16 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import board_forge
-from aco_board_fixtures import DEFAULT_LABEL, board_checkout, decision_port, rulings_lines
+from aco_board_fixtures import (
+    DEFAULT_LABEL,
+    board_checkout,
+    rulings_lines,
+)
 from board_forge import BoardForge, StoredItem
 
 from aco import body, expectation_grammar, session
-from aco.board.board import Board, Boards
+from aco.board.board import Boards
+from aco.board.cli import discovered_boards
 from aco.board.server import start_board
 
 _DATE_KEYS = (
@@ -144,12 +150,18 @@ def _serve_in_background(httpd: HTTPServer) -> threading.Thread:
 
 
 def _forge_checkout(workspace: Path) -> BoardForge:
-    """A board checkout in `workspace`, with git reading an empty global
-    configuration."""
+    """A board checkout under the root the config file in `workspace` names,
+    with git reading an empty global configuration; the board finds it by the
+    production discovery."""
     global_git_config = workspace / "gitconfig"
     global_git_config.touch()
     os.environ["GIT_CONFIG_GLOBAL"] = str(global_git_config)
-    return board_checkout(workspace / DEFAULT_LABEL)
+    root = workspace / "root"
+    config_file = workspace / "config" / "aco" / "config.toml"
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text(f'root = "{root}"\n', encoding="utf-8")
+    os.environ["XDG_CONFIG_HOME"] = str(workspace / "config")
+    return board_checkout(root / DEFAULT_LABEL)
 
 
 def _wait_for_stop_signal() -> None:
@@ -166,7 +178,7 @@ def _wait_for_stop_signal() -> None:
 def main() -> None:
     session.run_context = board_forge.run_context
     repository = _forge_checkout(Path(tempfile.mkdtemp(prefix="aco-board-e2e-")))
-    boards = Boards({DEFAULT_LABEL: Board(decision_port(repository))})
+    boards = Boards(discovered_boards)
     running = start_board(0, boards, secrets.token_urlsafe(32))
     control = ThreadingHTTPServer(("127.0.0.1", 0), control_handler(repository))
     threads = [_serve_in_background(running.httpd), _serve_in_background(control)]
@@ -178,6 +190,7 @@ def main() -> None:
         "port": served.port,
         "token": parse_qs(served.fragment)["t"][0],
         "control_url": f"http://{control_host!s}:{control_port}",
+        "repository": str(repository.repository),
     }
     print(json.dumps(ready), flush=True)
     _wait_for_stop_signal()
