@@ -1,21 +1,19 @@
 # `aco serve`
 
-`aco serve --repo PATH...` shows one or
-more repositories' open expectation lines in a browser SPA and writes each
-decision in process, through aco's own library: it lists the rows `aco rulings`
-lists and writes through the writer `aco rule` uses; without `--repo`, the
-current directory is the one repository
-served. This file owns the board's decision rules: which answers it writes,
+`aco serve` shows the open expectation lines of every repository under the
+configured root in a browser SPA and writes each decision in process, through
+aco's own library: it lists the rows `aco rulings` lists and writes through the
+writer `aco rule` uses; it takes no `--repo`.
+This file owns the board's decision rules: which answers it writes,
 when it refuses a decision, how writes are ordered and stopped, and the note
-it may carry -- across every configured repository, since one write turn and
+it may carry -- across every repository found, since one write turn and
 one drain span all of them. It cites the read shape `specs/rulings.spec.md`
 owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-14, RULE-20, RULE-29)
 rather than restating them. It also owns the JSON API under `/api/` -- its
 shapes, token, and headers -- and the shell's own delivery contract (who may
 fetch it, and how it is contained to its own files); the SPA's own behaviour
 once loaded is `frontend/`'s. `<n>` is an item number, `<k>` an expectation
-line's 1-based index, `<repo>` a configured repository's label -- the
-resolved directory's name.
+line's 1-based index, `<repo>` a found repository's label, its forge name `owner/repo`.
 
 ## Behavior table
 
@@ -44,13 +42,16 @@ resolved directory's name.
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
-| one configured repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
-| every configured repo's read fails or times out | ABRD-20, ABRD-102 | ABRD-20 |
+| one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
+| every found repo's read fails or times out | ABRD-20, ABRD-102 | ABRD-20 |
 | an `/api/` request without the right token | ABRD-10 | ABRD-10 |
-| a decision naming a repo outside the configured ones | — | ABRD-16 |
+| a decision naming a repo the scan does not find | — | ABRD-16 |
 | a card's fingerprint submitted against a different configured repo | — | ABRD-21 |
 | `aco serve --json` | ABRD-26 | — |
 | the global `aco --repo OWNER/REPO` before `serve` | ABRD-27 | — |
+| no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — |
+| no repository found, at start or on a later read | ABRD-109 | — |
+| a directory under the root that cannot be read | ABRD-110 | — |
 
 ## Writing a decision
 
@@ -149,17 +150,21 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 ## Multiple repositories
 
-- [ ] [ABRD-14] `aco serve --repo PATH` (repeatable) configures the repos served, labelled `<repo>` by each resolved directory's name; without `--repo`, the current directory is the one repository.
+- [ ] [ABRD-14] `aco serve` serves each checkout under the config file's `root` tracking `.aco/board.toml`, labelled `owner/repo`, one per forge repository (first sorted path); it takes no `--repo`.
 - [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence and no items, others unaffected (E-ABRD-06); the page shows it per ABRD-101.
-- [ ] [ABRD-16] A decision naming a `repo` outside the configured labels is refused `bad request: decision` before any forge request (see E-ABRD-07).
+- [ ] [ABRD-16] A decision naming a `repo` that the scan made for that decision does not find is refused `bad request: decision` before any forge request (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running write in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
-- [ ] [ABRD-19] A `--repo` path that is not a directory is a usage error; two resolved paths with the same label refuse the start with `ERROR: two repositories named <repo>: <p1>, <p2>`.
+- [ ] [ABRD-19] Every read and every decision scans the root afresh, so a checkout added or removed since the last shows or goes at once; `GET /api/board` names the `root` it scanned (E-ABRD-03).
+- [ ] [ABRD-108] A missing or malformed config file, one without `root`, a relative `root` or a `root` that is no directory refuses the start, naming the file, exit `2` (see E-ABRD-17).
+- [ ] [ABRD-109] Finding no repository refuses the start naming the root, exit `2`; a later read answers 502 `{"error": "<sentence>"}` naming the root, never an empty board (see E-ABRD-18).
+- [ ] [ABRD-110] A directory under the root that cannot be read is listed as a repo named by its path, its sentence in `error`, no items; it is never skipped (see E-ABRD-19).
+- [ ] [ABRD-111] The walk stops at each checkout and follows no symlink; a linked worktree, a submodule and a checkout that does not track `.aco/board.toml` are not served.
 - [ ] [ABRD-21] A card's fingerprint binds the `repo` it was read under; posted against another configured repo, identical content included, it is refused like a changed line (see E-ABRD-07).
 
 ## The JSON API
 
-- [ ] [ABRD-08] `GET /api/board` answers `{"repos": [{"name", "error", "items"}]}` in order; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence, no items (E-ABRD-06).
+- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items"}]}`, repos in order; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"`, the written item as ABRD-08 lists it, once stored; else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
@@ -167,7 +172,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
 - [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
-- [ ] [ABRD-20] Once every configured repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-102.
+- [ ] [ABRD-20] Once every found repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-102.
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` is a ruled yes/no line, with no `default` and no fingerprint (E-ABRD-03). No line offers an outcome.
@@ -187,7 +192,7 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - [ ] [ABRD-24] Shell/assets CSP adds `script-src 'self'`, `style-src 'self'`, `img-src data:` to ABRD-12, no nonce/inline/external styles; built CSS is `text/css; charset=utf-8` (E-ABRD-08).
 - [ ] [ABRD-25] `aco serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
 - [ ] [ABRD-26] `aco serve --json` is refused by the argument parser as plain text, never in the envelope: `aco: error: unrecognized arguments: --json`, exit `2` (see E-ABRD-09).
-- [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH`, exit `2` (see E-ABRD-10).
+- [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve finds its repositories itself; --repo does not apply to it`, exit `2` (see E-ABRD-10).
 
 ## Never
 
@@ -198,15 +203,15 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - The board never runs two writes at once across any configured repo, and never starts one after stopping began (ABRD-03, ABRD-04, ABRD-17, ABRD-18).
 - The board never writes an item through a second path: every ruling goes through the writer `aco rule` uses.
 - No answer carries an `Access-Control-*` header, so a page from another origin can neither read an answer nor send the token header (ABRD-10).
-- The board never resolves a repo label from a request into a path: a label is only ever a lookup key among the repos `--repo` configured at start (ABRD-16).
-- A card's fingerprint never satisfies another configured repo's check, even with identical line content: it binds the repo label it was read under (ABRD-21).
+- The board never resolves a repo label from a request into a path: a label is only ever a lookup key among the repos a fresh scan found (ABRD-16).
+- A card's fingerprint never satisfies another found repo's check, even with identical line content: it binds the repo label it was read under (ABRD-21).
 
 ## Examples
 
 `Setup: test-forge` is a checkout whose items live in a file-backed forge
 that logs every request; `aco serve` runs aco's library over it in that
-directory (E-ABRD-02 through E-ABRD-05: `--repo` not given, so the one repo
-is labelled by that directory's name) and each example sends one request.
+directory (E-ABRD-02 through E-ABRD-05: the root holds that one checkout, so the one repo
+is labelled by its forge name) and each example sends one request.
 
 - E-ABRD-01 (removed).
 
@@ -227,7 +232,7 @@ Setup: test-forge, item `#42` titled `Share page` with ruled lines `Guests?` (`y
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing
-answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
+answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"},
   {"index": 2, "text": "Hosts?", "ruling": "no", "ruled_on": "2026-10-01"}]}]}]}
 ```
@@ -255,35 +260,35 @@ answer 403: {"error": "forbidden: missing or wrong token"}
 
 ### E-ABRD-06 -- two repos, one down
 
-Setup: `aco serve --repo a --repo b`; repo `a`'s test-forge lists item `#42` with one line `Guests?` ruled `yes` on 2026-10-01; repo `b`'s test-forge fails its listing with `no forge adapter for host`
+Setup: the root holds checkouts of `owner/a` and `owner/b`; repo `owner/a`'s test-forge lists item `#42` with one line `Guests?` ruled `yes` on 2026-10-01; repo `owner/b`'s test-forge fails its listing with `no forge adapter for host`
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
-forge requests: the open-item listing in a, the open-item listing in b
-answer 200: {"repos": [
-  {"name": "a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
+forge requests: the open-item listing in owner/a, the open-item listing in owner/b
+answer 200: {"root": "<root>", "repos": [
+  {"name": "owner/a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
     {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}]},
-  {"name": "b", "error": "no forge adapter for host", "items": []}]}
+  {"name": "owner/b", "error": "no forge adapter for host", "items": []}]}
 ```
 
-Had `b`'s test-forge listed only an item whose block aco's grammar refuses instead, `b`'s entry would read `{"name": "b", "error": null, "items": []}` (ABRD-07).
+Had `owner/b`'s test-forge listed only an item whose block aco's grammar refuses instead, its entry would read `{"name": "owner/b", "error": null, "items": []}` (ABRD-07).
 
-Had `a`'s test-forge failed too, the answer would be 502 with the same two-entry `repos[]` envelope (ABRD-20).
+Had `owner/a`'s test-forge failed too, the answer would be 502 with the same two-entry `repos[]` envelope (ABRD-20).
 
 ### E-ABRD-07 -- a decision routes only into its named repo
 
-Setup: `aco serve --repo a --repo b`; repo `a` and repo `b`'s test-forges each list an identical item `#12` with E-RUL-07's open option line
+Setup: the root holds checkouts of `owner/a` and `owner/b`; their test-forges each list an identical item `#12` with E-RUL-07's open option line
 
 ```text
 request: POST /api/rule, header X-Board-Token: <board token>
-body: {"repo": "a", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed in a>", "option": "A"}]}
-forge requests: read #12, then one write of #12's body in a; none in b
+body: {"repo": "owner/a", "item": 12, "lines": [{"line": 1, "fingerprint": "<as listed in a>", "option": "A"}]}
+forge requests: read #12, then one write of #12's body in owner/a; none in owner/b
 answer 200: {"status": "ruled", "message": null, "item": <#12 as GET /api/board lists it after the write>}
 ```
 
-Posting the same body with `"repo": "c"` -- not a configured repo -- answers 400 `{"error": "bad request: decision"}`, no forge request in `a` or `b`.
+Posting the same body with `"repo": "owner/c"` -- no checkout of it under the root -- answers 400 `{"error": "bad request: decision"}`, no forge request in `owner/a` or `owner/b`.
 
-Posting it with `"repo": "b"` instead -- `a`'s own fingerprint, against `b`'s identical card -- answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; `b` reads #12 once and nothing is written in `a` or `b` (ABRD-21).
+Posting it with `"repo": "owner/b"` instead -- `owner/a`'s own fingerprint, against `owner/b`'s identical card -- answers 200 `{"status": "failed", "message": "Diese Zeile hat sich geändert, bitte neu laden"}`; `owner/b` reads #12 once and nothing is written in either (ABRD-21).
 
 ### E-ABRD-08 -- the shell and its assets need no token
 
@@ -320,13 +325,13 @@ $ aco serve --json
 exit 2
 ```
 
-### E-ABRD-10 -- the global `--repo` names a forge repository, not a checkout
+### E-ABRD-10 -- the global `--repo` does not apply to `serve`
 
 Setup: none
 
 ```console
 $ aco --repo overnightworks/aco serve
-2> ERROR: aco serve reads checkout directories; pass them as aco serve --repo PATH
+2> ERROR: aco serve finds its repositories itself; --repo does not apply to it
 exit 2
 ```
 
@@ -337,7 +342,7 @@ Setup: test-forge, item `#12` titled `Song jump` with E-RUL-07's open option lin
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing
-answer 200: {"repos": [{"name": "<repo>", "error": null, "items": [{"number": 12, "title": "Song jump", "lines": [
+answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [{"number": 12, "title": "Song jump", "lines": [
   {"index": 1, "form": "options", "text": "The song stays open on the jump.", "asked_on": "2026-10-28",
    "ruling": null, "ruled_on": null,
    "card_hash": "sha256:b3f1720e7b5b083f5ae59eaf99559b438d1e729dc9034e3ea534cf5806f23b8a",
@@ -418,4 +423,39 @@ Setup: the token file, `<state home>/aco/board-token`, holds `not a token`
 $ aco serve
 2> ERROR: <state home>/aco/board-token holds no board token; delete it to start with a new one
 exit 1
+```
+
+### E-ABRD-17 -- a config file that names no usable root
+
+Setup: `<config home>/aco/config.toml` holds `root = "repositories"`
+
+```console
+$ aco serve
+2> ERROR: <config home>/aco/config.toml: root repositories is not an absolute path
+exit 2
+```
+
+The other refusals read `<file> does not exist; create it with root = "<absolute path>"`, `<file> is not valid TOML: <reason>`, `<file> sets no root = "<absolute path>"` and `<file>: root <root> is not a directory`; each exits `2` with nothing bound.
+
+### E-ABRD-18 -- no repository under the root
+
+Setup: the config file's root is `<root>`, an existing directory holding no checkout that tracks `.aco/board.toml`
+
+```console
+$ aco serve
+2> ERROR: no repository tracking .aco/board.toml under <root>
+exit 2
+```
+
+Had the last checkout been removed while the board ran, `GET /api/board` would answer 502 `{"error": "no repository tracking .aco/board.toml under <root>"}` (ABRD-109).
+
+### E-ABRD-19 -- a checkout that cannot be read
+
+Setup: the root holds a checkout of `owner/a` listing item `#42`, and `<root>/broken/.git`, a directory git does not read as a repository
+
+```text
+request: GET /api/board, header X-Board-Token: <board token>
+answer 200: {"root": "<root>", "repos": [
+  {"name": "owner/a", "error": null, "items": [{"number": 42, ...}]},
+  {"name": "<root>/broken", "error": "<git's refusal>", "items": []}]}
 ```

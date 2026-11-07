@@ -122,9 +122,18 @@ echo "importlib.resources finds aco/board/static/index.html"
 
 # Proves the installed tool actually answers the shell over HTTP -- the
 # importlib.resources check above only proves the file ships, not that
-# `aco serve` can reach it.
+# `aco serve` can reach it. `aco serve` finds its repositories under the root in
+# aco's config file, so the smoke gives it one checkout tracking the board file.
+smoke_root="$scratch/root"
+mkdir -p "$smoke_root/project" "$scratch/config/aco"
+git -C "$smoke_root/project" init --quiet
+git -C "$smoke_root/project" remote add origin https://github.com/smoke/project
+mkdir "$smoke_root/project/.aco"
+: >"$smoke_root/project/.aco/board.toml"
+git -C "$smoke_root/project" add .aco/board.toml
+printf 'root = "%s"\n' "$smoke_root" >"$scratch/config/aco/config.toml"
 serve_log="$scratch/serve.log"
-XDG_STATE_HOME="$scratch/state" "$scratch/bin/aco" serve --port 0 --repo "$scratch" >"$serve_log" 2>&1 &
+XDG_CONFIG_HOME="$scratch/config" XDG_STATE_HOME="$scratch/state" "$scratch/bin/aco" serve --port 0 >"$serve_log" 2>&1 &
 serve_pid=$!
 for ((attempt = 0; attempt < 50; attempt++)); do
     [[ -s "$serve_log" ]] && break
