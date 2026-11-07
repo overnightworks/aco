@@ -2,11 +2,13 @@
 # ruff: noqa: T201 - the rule command writes its result lines to stdout
 
 import argparse
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from enum import StrEnum
 from functools import partial
+from pathlib import Path
 from typing import cast
 
 from . import (
@@ -351,8 +353,10 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     report."""
     named = _line_outcomes(parsed)
     number = int(parsed.item)
-    fresh = decide.fresh_item(context, number, command="rule")
-    committed = decide.rule(context, fresh, named, context.today())
+    with decide.turn(
+        context, number, command="rule", environment=os.environ, home=Path.home()
+    ) as fresh:
+        committed = decide.rule(context, fresh, named, context.today())
     # A successful write names only option lines: every other form refused before it.
     ruled = cast(
         tuple[expectations.OptionLine, ...],

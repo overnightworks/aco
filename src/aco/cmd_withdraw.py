@@ -3,10 +3,12 @@ expectation line before anyone has ruled it."""
 # ruff: noqa: T201 - the withdraw command writes its result line to stdout
 
 import argparse
+import os
 from collections.abc import Sequence
 from datetime import date
 from enum import StrEnum
 from functools import partial
+from pathlib import Path
 
 from . import body, decide, expectations, protocol, report, usage, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
@@ -108,9 +110,11 @@ def _emit_withdrawn(
 def _withdraw_lines(parsed: argparse.Namespace, context: RunContext) -> int:
     """`withdraw`'s own work, every refusal raised by name for `run` to report."""
     indexes = _named_once(parsed.lines)
-    fresh = decide.fresh_item(context, int(parsed.item), command="withdraw")
     today = context.today()
-    committed = decide.withdraw(context, fresh, indexes, today)
+    with decide.turn(
+        context, int(parsed.item), command="withdraw", environment=os.environ, home=Path.home()
+    ) as fresh:
+        committed = decide.withdraw(context, fresh, indexes, today)
     _emit_withdrawn(committed, indexes, today, fresh.storage, as_json=parsed.json)
     return 0
 

@@ -92,6 +92,7 @@ layers = [
     "card_rules",
     "usage",
     "lineage_stamp",
+    "file_lock",
     "protocol | process",
 ]
 # `items` may import `body`, never the reverse.

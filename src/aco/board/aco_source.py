@@ -9,6 +9,7 @@ nothing read carries over between calls or threads, and one write's read, check
 and write share that one context.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -61,7 +62,15 @@ def _checked_and_written(
     context: session.RunContext, item: int, check: CardCheck
 ) -> DecisionResult | CardChanged:
     """One read of `item`, `check` on that read, then one write of the card."""
-    fresh = decide.fresh_item(context, item, command="rule")
+    with decide.turn(
+        context, item, command="rule", environment=os.environ, home=Path.home()
+    ) as fresh:
+        return _checked_and_written_in_turn(context, fresh, check)
+
+
+def _checked_and_written_in_turn(
+    context: session.RunContext, fresh: decide.FreshItem, check: CardCheck
+) -> DecisionResult | CardChanged:
     if fresh.state is not forge.ItemState.OPEN:
         return CardChanged()
     decision = check(expectations.expectation_lines(fresh.body, storage=fresh.storage))

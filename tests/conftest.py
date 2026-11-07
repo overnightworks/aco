@@ -50,3 +50,10 @@ def github_world(github_clone: Path, bare_remote: Path) -> Path:
 
     assert_github_world(github_clone, bare_remote)
     return github_clone
+
+
+@pytest.fixture(autouse=True)
+def _isolate_state_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """aco's state directory (item locks, the board token) is the test's own,
+    never the operator's."""
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))

@@ -6,7 +6,6 @@ Every read-modify-write of the stamp happens under `locked`, an exclusive
 callers pass the stamp directory and an ancestry predicate.
 """
 
-import fcntl
 import os
 import tempfile
 from collections.abc import Callable, Iterator
@@ -15,6 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from . import file_lock
 from .protocol import ObjectId
 
 _STAMP_FILENAME = "last-oid"
@@ -42,15 +42,9 @@ def lock_path(stamp_directory: Path) -> Path:
 
 @contextmanager
 def locked(stamp_directory: Path) -> Iterator[None]:
-    """Hold this worktree's exclusive stamp lock. Not re-entrant. The lock
-    file is never deleted: unlinking a held flock file breaks the lock."""
-    stamp_directory.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(lock_path(stamp_directory), os.O_CREAT | os.O_RDWR, 0o644)
-    try:
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
+    """Hold this worktree's exclusive stamp lock. Not re-entrant."""
+    with file_lock.held(lock_path(stamp_directory)):
         yield
-    finally:
-        os.close(descriptor)
 
 
 def read(stamp_directory: Path) -> ObjectId | None:
