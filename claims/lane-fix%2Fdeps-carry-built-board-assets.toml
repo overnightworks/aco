@@ -1,7 +1,0 @@
-claim_id = "d2d6d21acbba4c998dc4f9baa162c1cf"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "f4d3d61b8a11065cdc84276b6eda210936575505"
-branch = "fix/deps-carry-built-board-assets"
-scope = [".aco/board.toml"]
-opened_commit = "044dfb862f6546000f01416b6489b0e3ebcdffba"
