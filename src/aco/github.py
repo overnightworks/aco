@@ -725,7 +725,7 @@ class GitHubForge:
 
     def _check_run(self, value: object) -> tuple[int, forge.CheckRun, object]:
         if not isinstance(value, dict):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed check run")
+            raise forge.ForgeMalformedResponseError(github_actions.MALFORMED_CHECK_RUN)
         run_id, name, conclusion = (value.get(key) for key in ("id", "name", "conclusion"))
         suite = value.get("suite")
         if (
@@ -734,7 +734,7 @@ class GitHubForge:
             or not name
             or (conclusion is not None and (not isinstance(conclusion, str) or not conclusion))
         ):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed check run")
+            raise forge.ForgeMalformedResponseError(github_actions.MALFORMED_CHECK_RUN)
         return run_id, forge.CheckRun(name, conclusion), suite
 
     def _check_run_page(self, sha: str, page: int) -> tuple[object, ...]:

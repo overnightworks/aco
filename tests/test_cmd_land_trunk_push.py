@@ -108,7 +108,7 @@ def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], Checks]:
         ),
         pytest.param(
             TrunkRead(
-                [actions_check(1, "CI", "failure", "x")],
+                [{"id": 1, "name": "CI", "conclusion": "failure", "suite": "x"}],
                 [workflow_run("push", PUSH_SUITE)],
                 "trunk: unreadable at {sha7}: GitHub returned a malformed check run\n",
             ),
