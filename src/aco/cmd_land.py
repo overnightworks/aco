@@ -602,7 +602,8 @@ def _land_trunk_state_line(
 
 
 def _land_print_released_notes(client: github.GitHubForge, merge_sha: str, toplevel: Path) -> None:
-    """What follows a RELEASED ending: LANDCMD-54's line, then LANDCMD-17's."""
+    """What follows a RELEASED ending: LANDCMD-57's line, then LANDCMD-54's, then LANDCMD-17's."""
+    print(f"merged: {merge_sha}")
     trunk_line = _land_trunk_state_line(client, merge_sha, toplevel)
     if trunk_line is not None:
         print(trunk_line)

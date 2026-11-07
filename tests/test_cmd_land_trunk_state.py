@@ -55,11 +55,12 @@ class TestLandTrunkState:
         def arrange(client: FakeForge, _head: str) -> None:
             client.commit_checks_by_sha[first_parent] = case.checks
 
-        landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+        landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
         capsys.readouterr()
         result = run_cli(["land", "12"], capsys)
+        merged = f"merged: {landed.landing.forge.landings[12].merge_commit}\n"
         observed = (result.status, result.stdout, result.stderr)
-        expected = (0, RELEASED + case.trunk_line.format(sha7=first_parent[:7]), "")
+        expected = (0, RELEASED + merged + case.trunk_line.format(sha7=first_parent[:7]), "")
         assert observed == expected
 
     def test_a_rerun_reports_the_trunk_too(
@@ -81,12 +82,13 @@ class TestLandTrunkState:
         first = run_cli(["land", "12"], capsys)
         landed.landing.forge.close_error = None
         rerun = run_cli(["land", "12"], capsys)
+        merged = f"merged: {landed.landing.forge.landings[12].merge_commit}\n"
         observed = (first.status, first.stdout, rerun.status, rerun.stdout, rerun.stderr)
         expected = (
             2,
             "",
             0,
-            RELEASED + f"trunk: red at {first_parent[:7]}: quality / verdict (failure)\n",
+            RELEASED + merged + f"trunk: red at {first_parent[:7]}: quality / verdict (failure)\n",
             "",
         )
         assert observed == expected

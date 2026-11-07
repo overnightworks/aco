@@ -308,7 +308,7 @@ def assert_separate_rerun_outcome(
     }
     expected = {
         "land.exit": case.land_status,
-        "land.stdout": case.land_stdout,
+        "land.stdout": case.land_stdout.format(merge=merge),
         "land.stderr": case.land_stderr.format(merge=merge),
         "merge.calls": case.merge_calls,
         "closed.items": case.closed_items,
@@ -354,7 +354,9 @@ class RerunCase:
     quality_error: str | None = None
     arguments: tuple[str, ...] = ("land", "12")
     status: int = 0
-    stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+    stdout: str = (
+        "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\nmerged: {merge}\n"
+    )
     stderr: str = ""
     merge_calls: int = 1
     closed_items: frozenset[int] = frozenset({72})
@@ -545,7 +547,7 @@ class TestLandAfterMergeRerun:
                     "worktree: kept -- no linked worktree on codex/issue-72-claims "
                     "in this checkout; "
                     "run aco release 72 --merged 12 --branch codex/issue-72-claims "
-                    "in the checkout that holds it\n",
+                    "in the checkout that holds it\nmerged: {merge}\n",
                     lane_exists=True,
                     branch_exists=True,
                 ),
@@ -579,7 +581,9 @@ class TestLandAfterMergeRerun:
         }
         expected = {
             "land.exit": case.land_status,
-            "land.stdout": case.land_stdout,
+            "land.stdout": case.land_stdout.format(
+                merge=world.landing.forge.landings[12].merge_commit
+            ),
             "land.stderr": case.land_stderr,
             "merge.calls": case.merge_calls,
             "claims": case.claims,
@@ -616,10 +620,7 @@ class TestLandAfterMergeRerun:
                 ),
                 id="issue-the-keep-worktree-flag-keeps-the-lane",
             ),
-            pytest.param(
-                FOREIGN_LANE,
-                id="foreign-lane-removes-the-lane",
-            ),
+            pytest.param(FOREIGN_LANE, id="foreign-lane-removes-the-lane"),
             pytest.param(
                 replace(
                     FOREIGN_LANE,
@@ -752,7 +753,7 @@ class TestLandAfterMergeRerun:
                     "delete-branch (delete branch failed (simulated)); re-run aco land 12\n",
                     quality_error="GitHub returned HTTP 500",
                     stdout="RELEASED lane dependabot/x: landing\nfreed: none\nnext: none\n"
-                    "worktree: removed\n",
+                    "worktree: removed\nmerged: {merge}\n",
                     closed_items=frozenset(),
                 ),
                 id="no-item-resumes-delete",
@@ -770,9 +771,7 @@ class TestLandAfterMergeRerun:
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
-                RerunCase(
-                    arguments=("land", "12", "--head", "0000000"),
-                ),
+                RerunCase(arguments=("land", "12", "--head", "0000000")),
                 id="squash-rerun-on-recorded-head",
             ),
         ],
@@ -809,7 +808,7 @@ class TestLandAfterMergeRerun:
         }
         expected = {
             "exit": case.status,
-            "stdout": case.stdout,
+            "stdout": case.stdout.format(merge=world.merge),
             "stderr": case.stderr,
             "merge.calls": case.merge_calls,
             "closed.items": case.closed_items,
