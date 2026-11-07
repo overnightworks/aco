@@ -376,7 +376,8 @@ class TestLandMerge:
         indirect=True,
     )
     def test_lands(self, world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29, LANDCMD-32.
+        """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29,
+        LANDCMD-32, LANDCMD-43.
         The reviewed head lands, releases the real claim and retains the classification trailer.
         """
         observed, expected = merge_observations(world, land(world, capsys))
