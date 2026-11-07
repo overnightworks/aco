@@ -14,7 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TypeVar
 
-from . import forge, github_graphql, process, protocol, workboard
+from . import forge, github_actions, github_graphql, process, protocol, workboard
 from .body import ItemKind
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
@@ -436,18 +436,13 @@ class GitHubForge:
     def _json_lines(self, raw: str, description: str) -> tuple[object, ...]:
         """Parse compact NDJSON, pretty JSON, or a concatenated JSON sequence."""
         text = strip_ansi(raw).strip()
-        if not text:
-            return ()
         decoder = json.JSONDecoder()
         values: list[object] = []
         offset = 0
         length = len(text)
         try:
             while offset < length:
-                # No "only whitespace remains" exit here: `text` is already
-                # `.strip()`ped above, so its last character is never
-                # whitespace -- this inner skip can never reach `length`
-                # without first landing on a value to decode.
+                # `text` is stripped, so this skip always lands on a value to decode.
                 while offset < length and text[offset].isspace():
                     offset += 1
                 value, offset = decoder.raw_decode(text, offset)
@@ -723,18 +718,19 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError("GitHub returned duplicate changed files")
         return forge.PullRequestChanges(before, after, files)
 
-    def _check_run(self, value: object) -> tuple[int, forge.CheckRun]:
+    def _check_run(self, value: object) -> tuple[int, forge.CheckRun, object]:
         if not isinstance(value, dict):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed check run")
+            raise forge.ForgeMalformedResponseError(github_actions.MALFORMED_CHECK_RUN)
         run_id, name, conclusion = (value.get(key) for key in ("id", "name", "conclusion"))
+        suite = value.get("suite")
         if (
             not isinstance(run_id, int)
             or not isinstance(name, str)
             or not name
             or (conclusion is not None and (not isinstance(conclusion, str) or not conclusion))
         ):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed check run")
-        return run_id, forge.CheckRun(name, conclusion)
+            raise forge.ForgeMalformedResponseError(github_actions.MALFORMED_CHECK_RUN)
+        return run_id, forge.CheckRun(name, conclusion), suite
 
     def _check_run_page(self, sha: str, page: int) -> tuple[object, ...]:
         raw = self._run(
@@ -743,19 +739,21 @@ class GitHubForge:
                 f"repos/{self.repository}/commits/{sha}/check-runs"
                 f"?per_page={ISSUES_PER_PAGE}&page={page}",
                 "--jq",
-                '.check_runs[] | {id,name,conclusion:(if .status == "completed" '
+                '.check_runs[] | {id,name,suite:(if .app.slug == "github-actions" '
+                'then .check_suite.id else null end),conclusion:(if .status == "completed" '
                 "then .conclusion else null end)}",
             ]
         )
         return self._json_lines(raw, "check run")
 
-    def _check_runs(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """Each check name's newest run (highest id) against `sha`, over every page."""
+    def _check_runs(
+        self, sha: str, suites: github_actions.Suites = None
+    ) -> tuple[forge.CheckRun, ...]:
+        """Each check name's newest run against `sha` among the `suites` admit, over every page."""
         values = self._fetch_pages(
             lambda page: self._check_run_page(sha, page), per_page=ISSUES_PER_PAGE
         )
-        oldest_first = sorted(map(self._check_run, values), key=lambda pair: pair[0])
-        return tuple({run.name: run for _, run in oldest_first}.values())
+        return github_actions.newest_per_name(map(self._check_run, values), suites)
 
     def _combined_status_summary(self, sha: str) -> tuple[str, int]:
         """`sha`'s combined-status verdict and true total:
@@ -824,20 +822,16 @@ class GitHubForge:
         return tuple(names)
 
     def _combined_status_checks(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """`sha`'s combined commit status, read as one verdict:
-        the external checks
-        GitHub's own check-runs listing never carries -- a SonarCloud
-        quality gate, say -- posted through the separate legacy status API.
-        The endpoint's own aggregate `state` decides pending/failure/
-        error/success, GitHub's own semantics this tool never recomputes
-        from individual contexts; `total_count` zero passes regardless of
-        that `state` (GitHub's own default state for no statuses at all is
-        `pending`, which would otherwise misread a pull request with no
-        external checks as blocked). A `success` verdict with statuses
-        present is itself a named, successful check, not nothing: a pull
-        request whose only checks are combined statuses must still expose
-        them, or `landing_readiness` reads it as exposing no CI checks at
-        all and refuses a green pull request."""
+        """`sha`'s combined commit status, read as one verdict: the external checks GitHub's own
+        check-runs listing never carries -- a SonarCloud quality gate, say -- posted through the
+        separate legacy status API. The endpoint's own aggregate `state` decides pending/failure/
+        error/success, GitHub's own semantics this tool never recomputes from individual
+        contexts; `total_count` zero passes regardless of that `state` (GitHub's own default
+        state for no statuses at all is `pending`, which would otherwise misread a pull request
+        with no external checks as blocked). A `success` verdict with statuses present is itself
+        a named, successful check, not nothing: a pull request whose only checks are combined
+        statuses must still expose them, or `landing_readiness` reads it as exposing no CI checks
+        at all and refuses a green pull request."""
         state, total = self._combined_status_summary(sha)
         if total == 0:
             return ()
@@ -845,10 +839,16 @@ class GitHubForge:
         conclusion = None if state == "pending" else state
         return tuple(forge.CheckRun(name, conclusion) for name in names)
 
-    def commit_checks(self, sha: str) -> tuple[forge.CheckRun, ...]:
-        """Every check against any commit `sha`: its check runs plus its
-        combined commit status (external contexts such as SonarCloud)."""
-        return self._check_runs(sha) + self._combined_status_checks(sha)
+    def commit_checks(self, sha: str, *, push_only: bool = False) -> tuple[forge.CheckRun, ...]:
+        """Every check against `sha`: its check runs plus its combined commit status (SonarCloud
+        and the like); `push_only` drops Actions runs that something other than a push started."""
+        suites = github_actions.push_suites(
+            lambda arguments: self._json_lines(self._run(arguments), "workflow run"),
+            self.repository,
+            sha,
+            push_only=push_only,
+        )
+        return self._check_runs(sha, suites) + self._combined_status_checks(sha)
 
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
         """Whether pull request `number` is safe to merge with its own pinned

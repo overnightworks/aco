@@ -715,11 +715,10 @@ def _readiness_client(
 
 
 def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_checks() -> None:
-    """`landing_readiness` reads the pull request itself (open
-    state, head sha, mergeable state), the check-runs endpoint against that
-    same head sha, and the combined commit status -- never `gh pr checks`,
-    which reads the pull request's current head rather than the one this
-    call pins."""
+    """`landing_readiness` reads the pull request itself (open state, head sha, mergeable
+    state), the check-runs endpoint against that same head sha, and the combined commit
+    status -- never `gh pr checks`, which reads the pull request's current head rather than
+    the one this call pins."""
     client, calls = _readiness_client(
         check_run_pages={1: [{"id": 1, "name": "build", "conclusion": "success"}]},
         statuses=[],
@@ -738,7 +737,8 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
             "api",
             f"{_READINESS_CHECK_RUNS_PATH}?per_page=100&page=1",
             "--jq",
-            '.check_runs[] | {id,name,conclusion:(if .status == "completed" '
+            '.check_runs[] | {id,name,suite:(if .app.slug == "github-actions" '
+            'then .check_suite.id else null end),conclusion:(if .status == "completed" '
             "then .conclusion else null end)}",
         ],
         [

@@ -81,6 +81,7 @@ class MergeCase:
     arguments: tuple[str, ...] = ()
     trunk_config: str = ""
     head_config: str = ""
+    quality_config: str | None = None
     methods: frozenset[workboard.MergeMethod] | None = None
     rules: tuple[frozenset[workboard.MergeMethod], ...] = ()
     error: forge.ForgeError | None = None
@@ -121,6 +122,7 @@ def world(
     lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, head: str) -> None:
+        client.quality_config = case.quality_config
         if case.decoy_rules:
             client.branch_rules = {"main": case.decoy_rules}
         if case.invalid_configuration:
@@ -129,11 +131,8 @@ def world(
         if case.unknown_reads_before_clean:
             clean = client.readiness_by_number[12]
             unknown = replace(clean, mergeable_state="unknown")
-            client.readiness_by_number[12] = unknown
-            client.later_readiness_by_number[12] = (
-                *(unknown,) * (case.unknown_reads_before_clean - 1),
-                clean,
-            )
+            settling = (*(unknown,) * (case.unknown_reads_before_clean - 1), clean)
+            client.readiness_by_number[12], client.later_readiness_by_number[12] = unknown, settling
         if case.lane_worktree is LaneWorktree.PRESENT:
             add_lane_worktree(github_clone, lane, case.branch)
         observed = (
@@ -297,6 +296,13 @@ class TestLandMerge:
             ),
             pytest.param(MergeCase(Landed(), reviewed=ReviewedHead.FULL), id="full-sha-matches"),
             pytest.param(
+                MergeCase(
+                    Landed(),
+                    quality_config='[[root.allow]]\nrule = "python-print"\npath = "src/a.py"\n',
+                ),
+                id="root-entries-only-config-lands-on-green-checks-without-a-verdict",
+            ),
+            pytest.param(
                 MergeCase(Landed(), reviewed=ReviewedHead.FULL, unknown_reads_before_clean=2),
                 id="unknown-settles-to-clean-and-the-reviewed-head-lands",
             ),
@@ -370,7 +376,8 @@ class TestLandMerge:
         indirect=True,
     )
     def test_lands(self, world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29, LANDCMD-32.
+        """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29,
+        LANDCMD-32, LANDCMD-43.
         The reviewed head lands, releases the real claim and retains the classification trailer.
         """
         observed, expected = merge_observations(world, land(world, capsys))

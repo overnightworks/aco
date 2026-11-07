@@ -295,6 +295,8 @@ class TestSettledReadiness:
 
 
 class TestLandQualityGate:
+    gate_config = '[gate]\nmandatory_jobs = ["checks"]\n'
+
     @pytest.mark.parametrize(
         "world",
         [
@@ -303,7 +305,7 @@ class TestLandQualityGate:
                     landing_readiness(),
                     "pull request #12 has no quality / verdict check; main adopts the quality "
                     "gate (quality/config.toml)",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -314,7 +316,7 @@ class TestLandQualityGate:
                     landing_readiness(checks=()),
                     "pull request #12 has no quality / verdict check; main adopts the quality "
                     "gate (quality/config.toml)",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -327,7 +329,7 @@ class TestLandQualityGate:
                     ),
                     "pull request #12 has no quality / verdict check; main adopts the quality "
                     "gate (quality/config.toml)",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -338,7 +340,7 @@ class TestLandQualityGate:
                     landing_readiness(mergeable_state="blocked", checks=()),
                     "pull request #12 has no quality / verdict check; main adopts the quality "
                     "gate (quality/config.toml)",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -351,7 +353,7 @@ class TestLandQualityGate:
                         checks=(forge.CheckRun("quality / verdict", "success"),),
                     ),
                     "pull request #12 is not mergeable (blocked)",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -369,10 +371,63 @@ class TestLandQualityGate:
             ),
             pytest.param(
                 LandingCase(
+                    landing_readiness(mergeable_state="blocked", checks=()),
+                    "pull request #12 is not mergeable (blocked)",
+                    quality_config='[[root.allow]]\nrule = "python-print"\npath = "src/a.py"\n',
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="root-entries-only-is-unadopted",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(mergeable_state="blocked", checks=()),
+                    "pull request #12 is not mergeable (blocked)",
+                    quality_config="",
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="empty-config-is-unadopted",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "pull request #12 has no quality / verdict check; main adopts the quality "
+                    "gate (quality/config.toml)",
+                    quality_config="gate = 1\n",
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="gate-key-of-scalar-value-adopts",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "pull request #12 has no quality / verdict check; main adopts the quality "
+                    "gate (quality/config.toml)",
+                    quality_config="[gate.loosened]\n",
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="gate-key-of-nested-table-adopts",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "pull request #12 was not merged: reading its landing preconditions failed "
+                    "(quality/config.toml is not valid TOML: Invalid value (at end of document)); "
+                    "re-run aco land 12",
+                    quality_config="gate =",
+                    quality_reads=("main",),
+                ),
+                id="invalid-toml-config",
+            ),
+            pytest.param(
+                LandingCase(
                     landing_readiness(checks=(forge.CheckRun("build", None),)),
                     "pull request #12 has checks still running: build; wait for every check to "
                     "succeed",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -383,7 +438,7 @@ class TestLandQualityGate:
                     landing_readiness(checks=(forge.CheckRun("quality / verdict", "failure"),)),
                     "pull request #12 has non-successful checks: quality / verdict (failure); "
                     "land only after every check succeeds",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -393,7 +448,7 @@ class TestLandQualityGate:
                 LandingCase(
                     landing_readiness(checks=(forge.CheckRun("quality / verdict", "success"),)),
                     "pull request #12 carries no `Work-Item:` or `No-Item:` line",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=("main",),
                     body="Advances #72",
                 ),
@@ -403,7 +458,7 @@ class TestLandQualityGate:
                 LandingCase(
                     landing_readiness(),
                     "pull request #12 has no quality / verdict check; " + "b" * 143 + "…",
-                    quality_config="",
+                    quality_config=gate_config,
                     default_branch="b" * 255,
                     length=RefusalLength.EXACTLY_LIMIT,
                     quality_reads=("b" * 255,),
@@ -415,7 +470,7 @@ class TestLandQualityGate:
                     landing_readiness(mergeable_state="blocked", checks=()),
                     "pull request #12 has no quality / verdict check; main adopts the quality "
                     "gate (quality/config.toml)",
-                    quality_config="",
+                    quality_config=gate_config,
                     head_config=None,
                     quality_reads=("main",),
                 ),
@@ -426,7 +481,7 @@ class TestLandQualityGate:
                     landing_readiness(mergeable_state="blocked", checks=()),
                     "pull request #12 is not mergeable (blocked)",
                     quality_config=None,
-                    head_config="",
+                    head_config=gate_config,
                     quality_reads=("main",),
                 ),
                 id="adoption-pull-request-adding-the-config",
@@ -435,7 +490,7 @@ class TestLandQualityGate:
                 LandingCase(
                     replace(landing_readiness(checks=()), open=False),
                     "pull request #12 is not open; it cannot be landed",
-                    quality_config="",
+                    quality_config=gate_config,
                     quality_reads=(),
                 ),
                 id="closed-reads-nothing",

@@ -30,9 +30,9 @@
 "tests/test_board.py" = 3588
 "tests/test_checkout.py" = 2037
 "tests/test_cli.py" = 12097
-"tests/test_cmd_adopt.py" = 1644
+"tests/test_cmd_adopt.py" = 1642
 "tests/test_cmd_cut.py" = 1067
-"tests/test_cmd_land_after_merge_rerun.py" = 871
+"tests/test_cmd_land_after_merge_rerun.py" = 870
 "tests/test_cmd_land_preflight_claim.py" = 856
 "tests/test_cmd_release_cleanup.py" = 802
 "tests/test_cmd_rescope_checkout.py" = 1085
@@ -96,7 +96,7 @@
 "separate_world" = 76
 
 [function_lines."tests/test_cmd_land_merge.py"]
-"world" = 105
+"world" = 103
 
 [function_lines."tests/test_cmd_land_merge_message.py"]
 "world" = 110
