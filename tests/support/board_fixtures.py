@@ -175,6 +175,7 @@ def board_issue(
     labels: tuple[str, ...] = (),
     blocked_by_count: int = 0,
     kind: ItemKind | None = None,
+    author_is_member: bool = True,
 ) -> workboard.Issue:
     return workboard.Issue(
         number,
@@ -185,6 +186,7 @@ def board_issue(
         "2026-08-20T00:00:00Z",
         kind=kind,
         blocked_by_count=blocked_by_count,
+        author_is_member=author_is_member,
     )
 
 

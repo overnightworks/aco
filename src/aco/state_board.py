@@ -283,17 +283,16 @@ def _delivered_content_fields(
     body: str, stored: items.ItemRecord
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     """`update_item_body`'s own owner split for `title`, `labels`,
-    `blocked_by` (`aco item edit`'s ruled record merge): taken
-    from `body`'s own `[record]` table when the delivered body carries one
-    valid -- read off the table's raw TOML presence, never
-    `items.parse_item_record`'s own `.get(key, [])` default, which would
-    turn an omitted `labels`/`blocked_by` into an emptied one rather than
-    `stored`'s own value. A body with no `[record]` at all -- every
-    `rule`/`ask`/`cut` write already composes one -- changes nothing here. Every other
-    record field (`parent`, `state`, `origin`, `kind`, the three
-    timestamps) stays `stored`'s own regardless of what a delivered record
-    names for it -- `update_item_body` itself, never this helper, owns
-    that half of the split."""
+    `blocked_by` (`aco item edit`'s ruled record merge): taken from `body`'s
+    own `[record]` table when the delivered body carries one valid -- read off
+    the table's raw TOML presence, never `items.parse_item_record`'s own
+    `.get(key, [])` default, which would turn an omitted `labels`/`blocked_by`
+    into an emptied one rather than `stored`'s own value. A body with no
+    `[record]` at all -- every `rule`/`ask`/`cut` write already composes one --
+    changes nothing here. Every other record field (`parent`, `state`,
+    `origin`, `kind`, the three timestamps) stays `stored`'s own regardless of
+    what a delivered record names for it -- `update_item_body` itself, never
+    this helper, owns that half of the split."""
     parsed = parse_body(body, storage=Storage.STATE_REF)
     delivered = parsed.record
     if parsed.read_state is not BodyReadState.VALID or delivered is None:
@@ -432,8 +431,7 @@ class StateRefBoard:
         return self._items[item_id]
 
     def _carries(self, item_id: str) -> bool:
-        """Whether `items/` holds `item_id` at all, malformed or not: the one
-        existence test behind PIN-16/PIN-17's "does not exist"."""
+        """Whether `items/` holds `item_id`, malformed or not: PIN-16/PIN-17's existence test."""
         return item_id in self._items or item_id in self._malformed
 
     def _issue(self, item_id: str) -> workboard.Issue:
@@ -456,6 +454,7 @@ class StateRefBoard:
             children_closed,
             children_total,
             len(record.blocked_by),
+            author_is_member=True,
         )
 
     def item_reference(self, number: int) -> forge.ItemReference:
@@ -569,6 +568,7 @@ class StateRefBoard:
             malformed.text,
             read_at,
             read_at,
+            author_is_member=True,
             unreadable=malformed.defect,
         )
 

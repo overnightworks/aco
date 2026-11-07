@@ -27,6 +27,7 @@ def raw_board_issue(**overrides: object) -> dict[str, object]:
         "childrenClosed": None,
         "childrenTotal": None,
         "blockedByCount": 0,
+        "authorAssociation": "MEMBER",
     }
     base.update(overrides)
     return base

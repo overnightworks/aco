@@ -166,3 +166,13 @@ def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_tu
     answered = board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
     assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"
+
+
+def test_a_card_on_a_strangers_item_is_not_listed(
+    repository: BoardForge, board: BoardClient, listed_items: Lister
+) -> None:
+    """ABRD-06: only an item a member of the repository wrote is listed."""
+    repository.put_item(_ITEM, item_body(open_option_entry()), author_is_member=False)
+    repository.put_item(_OTHER_ITEM, item_body(open_option_entry()))
+
+    assert [item["number"] for item in listed_items(board)] == [_OTHER_ITEM]
