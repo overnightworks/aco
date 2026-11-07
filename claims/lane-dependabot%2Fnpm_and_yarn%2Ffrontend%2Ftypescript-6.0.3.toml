@@ -1,7 +1,0 @@
-claim_id = "935d046649f54b3da68cf95a09e60e4b"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "66750358df326930f9b6a0f630908c7151e4c7d7"
-branch = "dependabot/npm_and_yarn/frontend/typescript-6.0.3"
-scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
-opened_commit = "7855b236223e6f228e7607bd2bed3953a6e650ee"
