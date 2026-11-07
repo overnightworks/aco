@@ -162,6 +162,18 @@ def test_a_checkout_that_cannot_be_read_is_unavailable_with_its_path(
     assert unavailable.reason
 
 
+def test_a_state_ref_checkout_is_found_under_its_remote_path_on_any_host(tmp_path: Path) -> None:
+    _tracked_checkout(
+        tmp_path / "project",
+        remote="https://gitlab.com/owner/repo",
+        board_toml='storage = "state-ref"\n',
+    )
+
+    discovery = repositories.discover(tmp_path)
+
+    assert _labels(discovery) == ["owner/repo"]
+
+
 def test_a_remote_url_the_github_pattern_misses_is_read_without_asking_gh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
