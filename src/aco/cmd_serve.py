@@ -2,7 +2,7 @@
 
 import argparse
 
-from . import protocol, report
+from . import protocol, report, usage
 from .session import RunContext
 
 _HIGHEST_PORT = 65535
@@ -19,9 +19,10 @@ def _port(text: str) -> int:
     return port
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    """`serve`'s own flag."""
-    parser.add_argument(
+def add_parser(commands: usage.Subcommands, name: str) -> None:
+    """`serve`'s parser and its own flag."""
+    serve = commands.add_parser(name, help="serve the decision board")
+    serve.add_argument(
         "--port",
         type=_port,
         default=0,

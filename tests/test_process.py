@@ -312,3 +312,21 @@ def test_lossy_git_failure_detail_reads_stderr_then_stdout_then_the_fixed_senten
     stdout: bytes, stderr: bytes, expected: str
 ) -> None:
     assert process.git_failure_detail_lossy(process.CapturedResult(1, stdout, stderr)) == expected
+
+
+_PRINT_WHETHER_STDIN_IS_THE_NULL_DEVICE = (
+    "import os, sys; sys.stdout.write(str(os.path.samestat(os.fstat(0), os.stat(os.devnull))))"
+)
+
+
+@pytest.mark.parametrize(
+    "run_without_input",
+    [process.run_captured, process.run_bounded_captured],
+    ids=["captured", "bounded"],
+)
+def test_a_child_started_without_input_reads_no_stdin(
+    run_without_input: Callable[[list[str]], process.CapturedResult],
+) -> None:
+    result = run_without_input([sys.executable, "-c", _PRINT_WHETHER_STDIN_IS_THE_NULL_DEVICE])
+
+    assert result.stdout == b"True"
