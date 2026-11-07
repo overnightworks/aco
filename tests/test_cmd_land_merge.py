@@ -131,11 +131,8 @@ def world(
         if case.unknown_reads_before_clean:
             clean = client.readiness_by_number[12]
             unknown = replace(clean, mergeable_state="unknown")
-            client.readiness_by_number[12] = unknown
-            client.later_readiness_by_number[12] = (
-                *(unknown,) * (case.unknown_reads_before_clean - 1),
-                clean,
-            )
+            settling = (*(unknown,) * (case.unknown_reads_before_clean - 1), clean)
+            client.readiness_by_number[12], client.later_readiness_by_number[12] = unknown, settling
         if case.lane_worktree is LaneWorktree.PRESENT:
             add_lane_worktree(github_clone, lane, case.branch)
         observed = (

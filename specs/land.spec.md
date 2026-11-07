@@ -94,7 +94,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` pins whatever head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) never compares `--head`, since its merge already happened.
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
-- [ ] [LANDCMD-43] If `<branch>` has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
+- [ ] [LANDCMD-43] If `<branch>`'s config has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
 - [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n>`, exit `2`.

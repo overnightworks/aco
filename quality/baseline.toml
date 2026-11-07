@@ -96,7 +96,7 @@
 "separate_world" = 76
 
 [function_lines."tests/test_cmd_land_merge.py"]
-"world" = 105
+"world" = 103
 
 [function_lines."tests/test_cmd_land_merge_message.py"]
 "world" = 110
