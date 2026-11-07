@@ -36,7 +36,7 @@ LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
 # A well-formed 40-hex sha (`protocol.COMMIT_PATTERN`) for every scenario that
 # just needs one.
 MERGE_COMMIT_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
-CommitChecksResult = tuple[forge.CheckRun, ...] | forge.ForgeError
+Checks = tuple[forge.CheckRun, ...] | forge.ForgeError
 
 
 def landing_pull_request(
@@ -161,9 +161,7 @@ class FakeForge:
         default_factory=dict
     )
     readiness_reads: dict[int, int] = field(default_factory=dict)
-    commit_checks_by_sha: dict[str, CommitChecksResult | Callable[[bool], CommitChecksResult]] = (
-        field(default_factory=dict)
-    )
+    commit_checks_by_sha: dict[str, Checks | Callable[[bool], Checks]] = field(default_factory=dict)
     merge_calls: list[tuple[int, str, MergeMethod, str, str]] = field(default_factory=list)
     merge_requests: list[tuple[str, MergeMethod]] = field(default_factory=list)
     merge_error: forge.ForgeError | None = None

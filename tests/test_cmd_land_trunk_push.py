@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY
 from cli_fixtures import real_git, run_cli
-from github_fixtures import CommitChecksResult, FakeForge, landed_world
+from github_fixtures import Checks, FakeForge, landed_world
 
 from aco import forge, github
 from aco.github import GitHubForge
@@ -37,7 +37,7 @@ class TrunkRead:
     trunk_line: str = ""
 
 
-def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], CommitChecksResult]:
+def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], Checks]:
     """The adapter's trunk read of `sha`, answered with the `push_only` the caller passes,
     when GitHub gives `read`'s rows."""
 
@@ -55,7 +55,7 @@ def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], CommitChecks
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=transport)
 
-    def reading(push_only: bool) -> CommitChecksResult:
+    def reading(push_only: bool) -> Checks:
         try:
             return client.commit_checks(sha, push_only=push_only)
         except forge.ForgeError as error:
