@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import checkout, protocol, session, workboard
+from . import body, checkout, github, protocol, session, workboard
 
 _GIT_DIRECTORY = ".git"
 _CONFIG_FILE = Path("aco") / "config.toml"
@@ -73,6 +73,8 @@ def configured_root(path: Path) -> Path:
         raise RootConfigError(
             f'{path} does not exist; create it with {_ROOT_KEY} = "<absolute path>"'
         ) from None
+    except (OSError, UnicodeDecodeError) as error:
+        raise RootConfigError(f"{path} cannot be read as UTF-8 text: {error}") from error
     try:
         root = tomllib.loads(text).get(_ROOT_KEY)
     except tomllib.TOMLDecodeError as error:
@@ -143,4 +145,10 @@ def _tracking_repository(directory: Path) -> Repository | None:
     # Looked up on the module at every call, so a replaced `run_context` (the
     # board's test forge) reaches every scan.
     context = session.run_context(None).for_directory(directory)
-    return Repository(context.repository_id.path, directory)
+    # The remote URL alone names the repository: `repository_id` would ask `gh`
+    # about a URL shape the GitHub pattern misses, a network call per scan.
+    location = context.remote_location
+    if context.config.storage is not body.Storage.STATE_REF:
+        session.refuse_unsupported_forge_host(location)
+        return Repository(github.repository_id(location.path).path, directory)
+    return Repository(location.path, directory)

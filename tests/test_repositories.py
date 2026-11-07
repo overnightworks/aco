@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from aco_board_fixtures import board_checkout
+from board_fixtures import write_repository_config
 from cli_fixtures import real_git
 
 from aco import repositories
@@ -25,6 +26,31 @@ def _checkout_without_board_configuration(directory: Path) -> None:
     directory.mkdir(parents=True)
     real_git(directory, "init", "--quiet")
     real_git(directory, "remote", "add", "origin", "https://github.com/owner/plain")
+
+
+def _tracked_checkout(directory: Path, *, remote: str | None, board_toml: str = "") -> None:
+    directory.mkdir(parents=True)
+    real_git(directory, "init", "--quiet")
+    if remote is not None:
+        real_git(directory, "remote", "add", "origin", remote)
+    write_repository_config(directory, board_toml)
+    real_git(directory, "add", ".aco/board.toml")
+
+
+def _git_directory_only(directory: Path) -> None:
+    (directory / ".git").mkdir(parents=True)
+
+
+def _without_remote(directory: Path) -> None:
+    _tracked_checkout(directory, remote=None)
+
+
+def _with_non_github_remote(directory: Path) -> None:
+    _tracked_checkout(directory, remote="https://gitlab.com/owner/repo")
+
+
+def _with_malformed_board_configuration(directory: Path) -> None:
+    _tracked_checkout(directory, remote="https://github.com/owner/repo", board_toml="= nope")
 
 
 def _untracked_board_configuration(directory: Path) -> None:
@@ -102,20 +128,31 @@ def test_among_clones_of_one_repository_the_first_sorted_path_wins(tmp_path: Pat
     assert second.repository == first.repository
 
 
-def test_repositories_are_listed_in_label_order(tmp_path: Path) -> None:
-    board_checkout(tmp_path / "zebra")
-    board_checkout(tmp_path / "apple")
+def test_repositories_are_listed_in_label_order_not_path_order(tmp_path: Path) -> None:
+    board_checkout(tmp_path / "a" / "zebra")
+    board_checkout(tmp_path / "b" / "apple")
 
     discovery = repositories.discover(tmp_path)
 
-    assert _labels(discovery) == sorted(_labels(discovery))
-    assert len(discovery.repositories) == 2
+    assert _labels(discovery) == ["board-forge/apple", "board-forge/zebra"]
 
 
-def test_a_checkout_git_cannot_read_is_unavailable_with_its_path(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "arrange",
+    [
+        _git_directory_only,
+        _without_remote,
+        _with_non_github_remote,
+        _with_malformed_board_configuration,
+    ],
+    ids=["git-directory-only", "no-remote", "non-github-remote", "malformed-board-file"],
+)
+def test_a_checkout_that_cannot_be_read_is_unavailable_with_its_path(
+    tmp_path: Path, arrange: Callable[[Path], None]
+) -> None:
     kept = board_checkout(tmp_path / "kept")
     broken = tmp_path / "broken"
-    (broken / ".git").mkdir(parents=True)
+    arrange(broken)
 
     discovery = repositories.discover(tmp_path)
 
@@ -123,6 +160,23 @@ def test_a_checkout_git_cannot_read_is_unavailable_with_its_path(tmp_path: Path)
     [unavailable] = discovery.unavailable
     assert unavailable.directory == broken
     assert unavailable.reason
+
+
+def test_a_remote_url_the_github_pattern_misses_is_read_without_asking_gh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusing_gh = tmp_path / "bin" / "gh"
+    refusing_gh.parent.mkdir()
+    refusing_gh.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    refusing_gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{refusing_gh.parent}{os.pathsep}{os.environ['PATH']}")
+    _tracked_checkout(
+        tmp_path / "root" / "project", remote="ssh://git@github.com:22/owner/repo.git"
+    )
+
+    discovery = repositories.discover(tmp_path / "root")
+
+    assert _labels(discovery) == ["owner/repo"]
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root reads every directory")
@@ -177,3 +231,26 @@ def test_a_config_file_names_its_root(tmp_path: Path) -> None:
     config.write_text(f'root = "{tmp_path}"\n', encoding="utf-8")
 
     assert repositories.configured_root(config) == tmp_path
+
+
+def _unreadable_config(config: Path) -> None:
+    config.write_bytes(b'root = "\xff\xfe"\n')
+
+
+def _config_that_is_a_directory(config: Path) -> None:
+    config.mkdir()
+
+
+@pytest.mark.parametrize(
+    "arrange",
+    [_unreadable_config, _config_that_is_a_directory],
+    ids=["not-utf-8", "directory"],
+)
+def test_a_config_file_that_cannot_be_read_is_refused_by_name(
+    tmp_path: Path, arrange: Callable[[Path], None]
+) -> None:
+    config = tmp_path / "config.toml"
+    arrange(config)
+
+    with pytest.raises(repositories.RootConfigError, match=str(config)):
+        repositories.configured_root(config)
