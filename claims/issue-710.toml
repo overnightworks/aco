@@ -1,8 +1,0 @@
-claim_id = "f922d8e0fce741e387536d2925c03b6f"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "a05df32b0cc81f7153a56274639255cb3eb99046"
-branch = "claude/issue-710-quality-gate-adoption-marker"
-scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "tests/support/github_fixtures.py", "tests/test_cmd_land_merge.py", "tests/test_cmd_land_preflight.py"]
-opened_commit = "9356954e4d0b55814a2bcc43db19e4c4d103bf51"
-whole_reason = "One refusal's adoption read changes with its spec lines, its tests and their fake-forge fixture; the baseline rides along only if a listed function shrinks."
