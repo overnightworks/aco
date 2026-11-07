@@ -503,13 +503,7 @@ class GitHubForge:
             return True
         if closed is None or total is None:
             return False
-        return (
-            _is_count(closed)
-            and _is_count(total)
-            and isinstance(closed, int)
-            and isinstance(total, int)
-            and closed <= total
-        )
+        return _is_count(closed) and _is_count(total) and int(closed) <= int(total)
 
     def _board_issue(self, value: object) -> workboard.Issue:
         if not isinstance(value, dict):
