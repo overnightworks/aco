@@ -146,16 +146,33 @@ def _land_lacks_quality_verdict(checks: tuple[forge.CheckRun, ...]) -> bool:
     )
 
 
+def _land_quality_gate_adopted(config_text: str | None) -> bool:
+    """Whether the quality configuration's text declares the gate: it parses
+    as TOML and holds a top-level `gate` key, whatever that key holds. No
+    file, or a file of other settings only, adopts nothing; text that is not
+    TOML is a malformed forge answer, never a missing gate."""
+    if config_text is None:
+        return False
+    try:
+        return "gate" in tomllib.loads(config_text)
+    except tomllib.TOMLDecodeError as error:
+        raise forge.ForgeMalformedResponseError(
+            f"{_LAND_QUALITY_CONFIG_PATH} is not valid TOML: {error}"
+        ) from error
+
+
 def _refuse_land_missing_quality_verdict(
     client: github.GitHubForge,
     readiness: forge.LandingReadiness,
     resolve_default_branch: Callable[[], str],
 ) -> None:
     """LANDCMD-43: where the default branch -- never the pull request head --
-    holds the quality gate's configuration, presence alone adopts the gate
-    and the verdict must be among the checks."""
+    declares the quality gate in its configuration, the verdict must be among
+    the checks."""
     default_branch = resolve_default_branch()
-    adopted = client.file_at_commit(_LAND_QUALITY_CONFIG_PATH, default_branch) is not None
+    adopted = _land_quality_gate_adopted(
+        client.file_at_commit(_LAND_QUALITY_CONFIG_PATH, default_branch)
+    )
     if adopted and _land_lacks_quality_verdict(readiness.checks):
         raise protocol.ClaimUnavailableError(
             report.bounded_refusal(
