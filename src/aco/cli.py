@@ -21,6 +21,7 @@ from . import (
     cmd_cut,
     cmd_item,
     cmd_land,
+    cmd_mcp,
     cmd_next,
     cmd_release,
     cmd_rescope,
@@ -148,10 +149,6 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
     board = commands.add_parser(name, help="project the open work board, read-only")
     report.add_json_flag(board, "JSON only")
-
-
-def _add_serve_parser(commands: usage.Subcommands, name: str) -> None:
-    cmd_serve.add_arguments(commands.add_parser(name, help="serve the decision board"))
 
 
 def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
@@ -651,7 +648,8 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "reset": _RepositoryCommand(_add_reset_parser, cmd_reset.run),
     "status": _RepositoryCommand(_add_status_parser, cmd_status.run),
     "board": _RepositoryCommand(_add_board_parser, cmd_board.run),
-    "serve": _RepositoryCommand(_add_serve_parser, cmd_serve.run),
+    "serve": _RepositoryCommand(cmd_serve.add_parser, cmd_serve.run),
+    "mcp": _RepositoryCommand(cmd_mcp.add_parser, cmd_mcp.run),
     "rulings": _RepositoryCommand(_add_rulings_parser, cmd_rulings.run),
     "next": _RepositoryCommand(_add_next_parser, cmd_next.run),
     "start": _RepositoryCommand(_add_start_parser, cmd_start.run),

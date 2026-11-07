@@ -123,7 +123,7 @@ def _start_bounded_process(
     try:
         return subprocess.Popen(  # noqa: S603 - every caller passes an argv list and never a shell string
             command,
-            stdin=subprocess.PIPE if input_data is not None else None,
+            stdin=subprocess.PIPE if input_data is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE if separate_stderr else subprocess.STDOUT,
             env=env,
@@ -336,7 +336,13 @@ def run_captured(
     """
     try:
         completed = subprocess.run(  # noqa: S603 - every caller passes an argv list and never a shell string
-            command, check=False, capture_output=True, timeout=timeout, env=env, cwd=cwd
+            command,
+            check=False,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=timeout,
+            env=env,
+            cwd=cwd,
         )
     except FileNotFoundError as error:
         raise ExecutableMissingError(command[0]) from error

@@ -312,3 +312,31 @@ def test_lossy_git_failure_detail_reads_stderr_then_stdout_then_the_fixed_senten
     stdout: bytes, stderr: bytes, expected: str
 ) -> None:
     assert process.git_failure_detail_lossy(process.CapturedResult(1, stdout, stderr)) == expected
+
+
+_PRINT_WHETHER_STDIN_IS_THE_NULL_DEVICE = (
+    "import os, sys; sys.stdout.write(str(os.path.samestat(os.fstat(0), os.stat(os.devnull))))"
+)
+
+
+@pytest.mark.parametrize("function", ["run_captured", "run_bounded_captured"])
+def test_a_child_started_without_input_reads_no_stdin(function: str) -> None:
+    # The test runner's own descriptor 0 is the null device already, so the
+    # code under test runs in a process whose stdin is a pipe it could inherit.
+    outer = (
+        "import sys; from aco import process; "
+        f"sys.stdout.buffer.write(process.{function}"
+        f"([sys.executable, '-c', {_PRINT_WHETHER_STDIN_IS_THE_NULL_DEVICE!r}]).stdout)"
+    )
+    source_root = Path(process.__file__).parent.parent
+
+    result = subprocess.run(  # noqa: S603 - the interpreter running these tests
+        [sys.executable, "-c", outer],
+        input=b"from the parent",
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": str(source_root)},
+        check=True,
+        timeout=60,
+    )
+
+    assert result.stdout == b"True"

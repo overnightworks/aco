@@ -8,7 +8,8 @@ only what no spec owns.
 
 aco coordinates agents working in one repository. Claims live in git, work
 items live on the forge, and the commands join the two. It runs no lease or
-coordination server; the state ref is the serialization point.
+coordination server; the state ref is the serialization point. An agent
+host can start `aco mcp` for one session to read the operator's inbox.
 
 ```mermaid
 flowchart LR
@@ -36,6 +37,9 @@ flowchart LR
     Port --> GitHub["GitHub adapter<br/>github.py"]
     Port --> StateBoard["state-ref item store<br/>state_board.py"]
     Board["board (aco serve)<br/>board/, frontend/"]
+    Mcp["aco mcp<br/>cmd_mcp.py, mcp_server.py"]
+    Mcp --> Repos
+    Mcp --> Inbox
     Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
     Board --> Protocol
@@ -102,7 +106,10 @@ machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
 operator starts with `aco serve`; it is not a service and keeps no
 coordination state of its own, only its access token file; the root it scans
-comes from aco's config file (`specs/serve.spec.md`). Nothing else is deployed.
+comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
+kind of process: an agent host starts it over stdio for one session and it ends
+when the host closes stdin; it keeps no state and reads the same root
+(`specs/mcp.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
 
@@ -120,7 +127,8 @@ association; an item whose association is unknown counts as a stranger's; a
 state-ref item counts as a member's, since only a writer of the state ref can
 create one): in a public repository a stranger can open an issue carrying a
 card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
-stay unfiltered.
+stay unfiltered. `aco mcp` lists only the lines of those items that wait on the
+operator (`specs/mcp.spec.md`).
 
 ### Proof strategy
 
