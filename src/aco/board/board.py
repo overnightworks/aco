@@ -169,7 +169,7 @@ class Boards:
         others' readings are unaffected.
         """
         found = self._discover()
-        unavailable = tuple(found.unavailable)
+        unavailable = found.unavailable
         if not found.boards:
             return BoardReading(found.root, unavailable)
         with ThreadPoolExecutor(max_workers=len(found.boards)) as executor:

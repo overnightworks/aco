@@ -48,14 +48,10 @@ class _PrintedLines(io.StringIO):
 
 
 def _serve_until_done(
-    monkeypatch: pytest.MonkeyPatch,
-    directory: Path,
-    scenario: Callable[[BoardClient], None],
-    *extra_arguments: str,
+    monkeypatch: pytest.MonkeyPatch, scenario: Callable[[BoardClient], None]
 ) -> int:
-    """Run `aco serve` in `directory`, drive `scenario`, then press Ctrl-C."""
+    """Run `aco serve`, drive `scenario`, then press Ctrl-C."""
     printed = _PrintedLines()
-    monkeypatch.chdir(directory)
     monkeypatch.setattr(sys, "stdout", printed)
     failures: list[BaseException] = []
 
@@ -73,7 +69,7 @@ def _serve_until_done(
 
     driver = threading.Thread(target=drive)
     driver.start()
-    exit_code = cli.main(["serve", "--port", "0", *extra_arguments])
+    exit_code = cli.main(["serve", "--port", "0"])
     driver.join()
     if failures:
         raise failures[0]
@@ -142,7 +138,7 @@ def test_serve_shows_every_repository_under_the_root_on_a_tokened_loopback_url_u
         assert [item["number"] for item in repos[str(here.repository)]["items"]] == [1]
         assert [item["number"] for item in repos[str(elsewhere.repository)]["items"]] == [2]
 
-    assert _serve_until_done(monkeypatch, root, look) == 0
+    assert _serve_until_done(monkeypatch, look) == 0
     [board] = seen
     assert board.host == LOOPBACK_HOST
     assert board.token
@@ -159,9 +155,9 @@ def test_serve_prints_the_same_token_after_a_restart_and_a_new_one_once_the_file
         tokens.append(board.token)
 
     for _ in range(2):
-        assert _serve_until_done(monkeypatch, root, remember) == 0
+        assert _serve_until_done(monkeypatch, remember) == 0
     board_token_file.unlink()
-    assert _serve_until_done(monkeypatch, root, remember) == 0
+    assert _serve_until_done(monkeypatch, remember) == 0
 
     first, second, third = tokens
     assert second == first
@@ -198,7 +194,7 @@ def test_serve_decides_in_the_repository_a_card_names_and_touches_no_other(
         answer = board.decide_card_through_api(1, [listed_line], ["A"], repo=label_a)
         assert answer.status_and_message() == {"status": "ruled", "message": None}
 
-    assert _serve_until_done(monkeypatch, root, decide_only_in_a) == 0
+    assert _serve_until_done(monkeypatch, decide_only_in_a) == 0
     assert (repository_a.stored_entries(1)[0]["ruling"], repository_a.body_writes()) == ("A", [1])
     assert repository_b.item_requests() == ()
 
@@ -209,18 +205,18 @@ def test_serve_finds_a_repository_added_and_loses_one_removed_after_it_started(
     kept = _repository(root / "kept", 1, "Kept")
     removed = _repository(root / "removed", 2, "Removed")
     seen: list[set[str]] = []
+    added_labels: list[str] = []
 
     def watch_the_root_change(board: BoardClient) -> None:
         seen.append(set(_repos_by_name(board)))
         shutil.rmtree(removed.directory)
-        added = _repository(root / "added", 3, "Added")
+        added_labels.append(str(_repository(root / "added", 3, "Added").repository))
         seen.append(set(_repos_by_name(board)))
-        assert added.directory.is_dir()
 
-    assert _serve_until_done(monkeypatch, root, watch_the_root_change) == 0
+    assert _serve_until_done(monkeypatch, watch_the_root_change) == 0
     before, after = seen
     assert before == {str(kept.repository), str(removed.repository)}
-    assert after == {str(kept.repository), "board-forge/added"}
+    assert after == {str(kept.repository), *added_labels}
 
 
 def test_serve_answers_a_read_once_nothing_is_found_with_a_refusal_naming_the_root(
@@ -234,7 +230,7 @@ def test_serve_answers_a_read_once_nothing_is_found_with_a_refusal_naming_the_ro
         answer = board.get_board_json()
         answers.append((answer.status, answer.json()))
 
-    assert _serve_until_done(monkeypatch, root, read_after_the_repository_is_gone) == 0
+    assert _serve_until_done(monkeypatch, read_after_the_repository_is_gone) == 0
     assert answers == [(502, {"error": f"no repository tracking .aco/board.toml under {root}"})]
 
 
@@ -249,7 +245,7 @@ def test_serve_shows_a_checkout_it_cannot_read_as_unavailable_with_its_path(
     def look(board: BoardClient) -> None:
         seen.append(_repos_by_name(board))
 
-    assert _serve_until_done(monkeypatch, root, look) == 0
+    assert _serve_until_done(monkeypatch, look) == 0
     [repos] = seen
     assert list(repos) == [str(good.repository), str(broken)]
     assert repos[str(broken)]["items"] == []
@@ -269,7 +265,7 @@ def test_serve_answers_502_naming_each_unreadable_checkout_when_none_else_is_fou
         names = [repo["name"] for repo in cast("list[dict[str, Any]]", body["repos"])]
         answers.append((answer.status, str(body["root"]), names))
 
-    assert _serve_until_done(monkeypatch, root, look) == 0
+    assert _serve_until_done(monkeypatch, look) == 0
     assert answers == [(502, str(root), [str(broken)])]
 
 
@@ -284,7 +280,7 @@ def test_serve_refuses_a_decision_for_a_repository_the_scan_does_not_find(
         answer = board.decide_card_through_api(1, [listed_line], ["A"], repo="nobody/else")
         answers.append((answer.status, str(answer.json()["error"])))
 
-    assert _serve_until_done(monkeypatch, root, decide_in_another_repository) == 0
+    assert _serve_until_done(monkeypatch, decide_in_another_repository) == 0
     assert answers == [(400, "bad request: decision")]
     assert repository.item_requests() == ()
 
@@ -392,7 +388,7 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
             releasers.append(threading.Thread(target=release_once_shutdown_waits, args=(held,)))
             releasers[0].start()
 
-        assert _serve_until_done(monkeypatch, root, click_then_interrupt) == 0
+        assert _serve_until_done(monkeypatch, click_then_interrupt) == 0
         # Checked before the click's own answer is awaited: `main` returning
         # must already mean the ruling is stored.
         assert repository.stored_entries(42)[0]["ruling"] == "A"
