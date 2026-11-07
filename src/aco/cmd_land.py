@@ -98,6 +98,15 @@ def _land_failed_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | N
     )
 
 
+def _land_failed_trunk_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | None:
+    """The first failed check of the trunk: a skipped or neutral one is not a failure."""
+    return _land_failed_check(
+        tuple(
+            check for check in checks if check.conclusion not in forge.CHECK_CONCLUSIONS_NOT_FAILED
+        )
+    )
+
+
 def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str | None:
     """Why `aco land`'s preflight refuses on `checks` alone, or `None` when
     every one of them proves green: no checks at all, a check
@@ -137,16 +146,33 @@ def _land_lacks_quality_verdict(checks: tuple[forge.CheckRun, ...]) -> bool:
     )
 
 
+def _land_quality_gate_adopted(config_text: str | None) -> bool:
+    """Whether the quality configuration's text declares the gate: it parses
+    as TOML and holds a top-level `gate` key, whatever that key holds. No
+    file, or a file of other settings only, adopts nothing; text that is not
+    TOML is a malformed forge answer, never a missing gate."""
+    if config_text is None:
+        return False
+    try:
+        return "gate" in tomllib.loads(config_text)
+    except tomllib.TOMLDecodeError as error:
+        raise forge.ForgeMalformedResponseError(
+            f"{_LAND_QUALITY_CONFIG_PATH} is not valid TOML: {error}"
+        ) from error
+
+
 def _refuse_land_missing_quality_verdict(
     client: github.GitHubForge,
     readiness: forge.LandingReadiness,
     resolve_default_branch: Callable[[], str],
 ) -> None:
     """LANDCMD-43: where the default branch -- never the pull request head --
-    holds the quality gate's configuration, presence alone adopts the gate
-    and the verdict must be among the checks."""
+    declares the quality gate in its configuration, the verdict must be among
+    the checks."""
     default_branch = resolve_default_branch()
-    adopted = client.file_at_commit(_LAND_QUALITY_CONFIG_PATH, default_branch) is not None
+    adopted = _land_quality_gate_adopted(
+        client.file_at_commit(_LAND_QUALITY_CONFIG_PATH, default_branch)
+    )
     if adopted and _land_lacks_quality_verdict(readiness.checks):
         raise protocol.ClaimUnavailableError(
             report.bounded_refusal(
@@ -591,7 +617,7 @@ def _land_trunk_state_line(
     when the trunk is not red."""
     first_parent = checkout.git_output(["rev-parse", f"{merge_sha}^1"], directory=toplevel)
     try:
-        failed = _land_failed_check(client.commit_checks(first_parent))
+        failed = _land_failed_trunk_check(client.commit_checks(first_parent, push_only=True))
     except protocol.ClaimError as error:
         return f"trunk: unreadable at {first_parent[:7]}: {protocol.terminal_text(str(error))}"
     if failed is None:
@@ -602,7 +628,8 @@ def _land_trunk_state_line(
 
 
 def _land_print_released_notes(client: github.GitHubForge, merge_sha: str, toplevel: Path) -> None:
-    """What follows a RELEASED ending: LANDCMD-54's line, then LANDCMD-17's."""
+    """What follows a RELEASED ending: LANDCMD-57's line, then LANDCMD-54's, then LANDCMD-17's."""
+    print(f"merged: {merge_sha}")
     trunk_line = _land_trunk_state_line(client, merge_sha, toplevel)
     if trunk_line is not None:
         print(trunk_line)

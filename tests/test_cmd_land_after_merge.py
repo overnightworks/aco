@@ -80,7 +80,10 @@ class TrunkCase:
     canonical: CanonicalRemote
     main: MainBranchState
     arguments: tuple[str, ...] = ("land", "12")
-    stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+    stdout: str = (
+        "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+        "merged: {merged}\n"
+    )
     status: int = 0
     stderr: str = ""
     fetch_calls: tuple[str, ...] = ("fetch",)
@@ -106,7 +109,10 @@ class PackageFile(Enum):
 @dataclass(frozen=True)
 class PackageCase:
     package: PackageFile
-    stdout: str = "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+    stdout: str = (
+        "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+        "merged: {merged}\n"
+    )
     rerun_stdout: str = (
         "LANDED pull request #12 already; nothing left to release\n"
         "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
@@ -132,7 +138,7 @@ class KeepCase:
     status: int = 0
     stdout: str = (
         "RELEASED issue #72: landing\nfreed: none\nnext: none\n"
-        "worktree: kept -- --keep-worktree was given\n"
+        "worktree: kept -- --keep-worktree was given\nmerged: {merged}\n"
     )
     stderr: str = ""
     lane_exists: bool = True
@@ -381,7 +387,7 @@ class TestLandAfterMerge:
         }
         expected = {
             "exit": case.status,
-            "stdout": case.stdout,
+            "stdout": case.stdout.format(merged=landing.forge.landings[12].merge_commit),
             "stderr": case.stderr,
             "lane.exists": case.lane_exists,
             "lane.head": landing.head,
@@ -398,6 +404,7 @@ class TestLandAfterMerge:
                 PackageCase(
                     PackageFile.OWN,
                     "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
+                    "merged: {merged}\n"
                     "reinstall: uv tool install --force --from . overnightworks-aco\n",
                 ),
                 id="this-package",
@@ -441,7 +448,9 @@ class TestLandAfterMerge:
         }
         expected = {
             "exit": case.status,
-            "stdout": case.stdout,
+            "stdout": case.stdout.format(
+                merged=package_world.landing.forge.landings[12].merge_commit
+            ),
             "stderr": case.stderr,
             "rerun.exit": case.rerun_status,
             "rerun.stdout": case.rerun_stdout,
@@ -494,7 +503,7 @@ class TestLandAfterMerge:
         expected = {
             "exit": case.status,
             "stderr": case.stderr,
-            "stdout": case.stdout,
+            "stdout": case.stdout.format(merged=landing.forge.landings[12].merge_commit),
             "fetch.calls": [(call, landing.clone.resolve()) for call in case.fetch_calls],
             "origin.calls": [(call, landing.clone.resolve()) for call in case.origin_calls],
             "trunk": landing.forge.landings[12].merge_commit,

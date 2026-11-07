@@ -749,10 +749,10 @@ def verify_cleanup(
     }
     assert observed_prepared == expected_prepared
     record = InterventionRecord()
-    intervention = CleanupIntervention(world, monkeypatch, lane, record)
-    case.intervention.install(intervention)
+    case.intervention.install(CleanupIntervention(world, monkeypatch, lane, record))
     capsys.readouterr()
     result = run_cli(list(case.command), capsys)
+    merged_line = f"merged: {world.landing.forge.landings[12].merge_commit}\n"
     values = {
         "head": head,
         "raced": record.raced,
@@ -791,7 +791,7 @@ def verify_cleanup(
     }
     expected = {
         "exit": case.status,
-        "stdout": case.stdout.format(**values),
+        "stdout": case.stdout.format(**values) + (merged_line if case.command[0] == "land" else ""),
         "stderr": case.stderr.format(**values),
         "lane.worktree.exists": case.worktree_exists,
         "lane.branch": case.branch.format(**values),

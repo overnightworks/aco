@@ -26,12 +26,7 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge, landing_readiness, serve_forge
-from store_fixtures import (
-    RaceOnceTransport,
-    claim_intent,
-    fail_every_state_ref_push,
-    state_ref_tip,
-)
+from store_fixtures import RaceOnceTransport, claim_intent, fail_every_state_ref_push, state_ref_tip
 
 from aco import checkout, cmd_claim, forge, github, protocol, store
 from aco.github import GitHubForge
@@ -1538,7 +1533,10 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
         f"head is {current_head}, not the reviewed {reviewed_head}; "
         "review the new head before landing"
     )
-    released_line = _released_line(claim) + f"worktree: {worktree_outcome}\n"
+    merge_commit = world.forge.landings[ADOPTED_PULL_REQUEST].merge_commit
+    released_line = (
+        _released_line(claim) + f"worktree: {worktree_outcome}\nmerged: {merge_commit}\n"
+    )
     expected_run = (status, released_line, "") if merged else (status, "", refusal)
     observed_run = (landed.status, landed.stdout, landed.stderr)
     merged_heads = [call[1] for call in world.forge.merge_calls]
