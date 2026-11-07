@@ -3,6 +3,6 @@ agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
 role = "builder"
 base = "b1f82175e44b0bb94261dbbd4b7045467a7d91a0"
 branch = "claude/issue-629-land-trunk-push-runs-only"
-scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/forge.py", "src/aco/github.py", "tests"]
+scope = ["pyproject.toml", "quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_actions.py", "tests"]
 opened_commit = "7f2c9104b9d5bd669554effe05dd82816a6fd37c"
 whole_reason = "One filter needs its forge read, its predicate, its spec lines and the trunk-state tests together; a read without its filter would be code reached only by tests."
