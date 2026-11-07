@@ -749,8 +749,7 @@ def verify_cleanup(
     }
     assert observed_prepared == expected_prepared
     record = InterventionRecord()
-    intervention = CleanupIntervention(world, monkeypatch, lane, record)
-    case.intervention.install(intervention)
+    case.intervention.install(CleanupIntervention(world, monkeypatch, lane, record))
     capsys.readouterr()
     result = run_cli(list(case.command), capsys)
     merged_line = f"merged: {world.landing.forge.landings[12].merge_commit}\n"
