@@ -81,6 +81,7 @@ class MergeCase:
     arguments: tuple[str, ...] = ()
     trunk_config: str = ""
     head_config: str = ""
+    quality_config: str | None = None
     methods: frozenset[workboard.MergeMethod] | None = None
     rules: tuple[frozenset[workboard.MergeMethod], ...] = ()
     error: forge.ForgeError | None = None
@@ -121,6 +122,7 @@ def world(
     lane = github_clone.parent / "lane"
 
     def arrange(client: FakeForge, head: str) -> None:
+        client.quality_config = case.quality_config
         if case.decoy_rules:
             client.branch_rules = {"main": case.decoy_rules}
         if case.invalid_configuration:
@@ -296,6 +298,13 @@ class TestLandMerge:
                 id="only-non-governing-settings-changed",
             ),
             pytest.param(MergeCase(Landed(), reviewed=ReviewedHead.FULL), id="full-sha-matches"),
+            pytest.param(
+                MergeCase(
+                    Landed(),
+                    quality_config='[[root.allow]]\nrule = "python-print"\npath = "src/a.py"\n',
+                ),
+                id="root-entries-only-config-lands-on-green-checks-without-a-verdict",
+            ),
             pytest.param(
                 MergeCase(Landed(), reviewed=ReviewedHead.FULL, unknown_reads_before_clean=2),
                 id="unknown-settles-to-clean-and-the-reviewed-head-lands",

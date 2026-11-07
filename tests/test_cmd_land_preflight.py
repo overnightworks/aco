@@ -381,6 +381,38 @@ class TestLandQualityGate:
             ),
             pytest.param(
                 LandingCase(
+                    landing_readiness(mergeable_state="blocked", checks=()),
+                    "pull request #12 is not mergeable (blocked)",
+                    quality_config="",
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="empty-config-is-unadopted",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "pull request #12 has no quality / verdict check; main adopts the quality "
+                    "gate (quality/config.toml)",
+                    quality_config="gate = 1\n",
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="gate-key-of-scalar-value-adopts",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "pull request #12 has no quality / verdict check; main adopts the quality "
+                    "gate (quality/config.toml)",
+                    quality_config="[gate.loosened]\n",
+                    quality_reads=("main",),
+                    body="Advances #72",
+                ),
+                id="gate-key-of-nested-table-adopts",
+            ),
+            pytest.param(
+                LandingCase(
                     landing_readiness(),
                     "pull request #12 was not merged: reading its landing preconditions failed "
                     "(quality/config.toml is not valid TOML: Invalid value (at end of document)); "
@@ -449,7 +481,7 @@ class TestLandQualityGate:
                     landing_readiness(mergeable_state="blocked", checks=()),
                     "pull request #12 is not mergeable (blocked)",
                     quality_config=None,
-                    head_config="",
+                    head_config=gate_config,
                     quality_reads=("main",),
                 ),
                 id="adoption-pull-request-adding-the-config",
