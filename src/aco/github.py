@@ -280,8 +280,7 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
     return decoded
 
 
-# A tuple, not a frozenset: `in` on a tuple fails closed for an unhashable provider value.
-_MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")
+_MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")  # tuple: unhashable input is no member
 
 
 def _is_count(value: object, minimum: int = 0) -> TypeIs[int]:
