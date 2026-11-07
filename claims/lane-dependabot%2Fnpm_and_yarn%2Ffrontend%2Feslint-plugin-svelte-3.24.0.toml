@@ -1,0 +1,7 @@
+claim_id = "158eff3202e74ef389bc1a8ffc25bc78"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "c65ef7f433526abd0ed895a673bcc37740eb2d71"
+branch = "dependabot/npm_and_yarn/frontend/eslint-plugin-svelte-3.24.0"
+scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
+opened_commit = "b5c50539ae7943e6025bbdf59d87ce7bf21c50fa"
