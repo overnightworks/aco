@@ -1,7 +1,0 @@
-claim_id = "b2a58f0b1c7d4d83b1672276ac97550e"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "911814f6a340d763996a12e298b9faa8cc91f19b"
-branch = "dependabot/npm_and_yarn/frontend/svelte-5.57.3"
-scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
-opened_commit = "0603b4c05ccd6488f3de9a0951e5bf27892223f2"
