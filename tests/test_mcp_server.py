@@ -152,6 +152,8 @@ def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
     ("text", "code"),
     [
         pytest.param("{not json", -32700, id="unparsable"),
+        pytest.param("[" * 100_000, -32700, id="nested-past-the-recursion-limit"),
+        pytest.param("1" * 5_000, -32700, id="integer-past-the-digit-limit"),
         pytest.param("[]", -32600, id="array"),
         pytest.param('[{"jsonrpc": "2.0", "id": 1, "method": "ping"}]', -32600, id="batch"),
         pytest.param('"ping"', -32600, id="string"),

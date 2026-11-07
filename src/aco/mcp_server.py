@@ -44,14 +44,20 @@ def reply(text: str, read_inbox: ReadInbox) -> str | None:
     """The line answering the message `text`, or None for a notification."""
     try:
         message = json.loads(text)
-    except json.JSONDecodeError:
-        return _error(None, _PARSE_ERROR, "invalid JSON")
+    except ValueError, RecursionError:
+        # Past the parser's limits (digit count, nesting) it raises these, not JSONDecodeError.
+        return unparsable_reply()
     invalid = _invalid_request(message)
     if invalid is not None:
         return _error(None, _INVALID_REQUEST, invalid)
     if "id" not in message:
         return None
     return _answer(message["id"], message["method"], message.get("params"), read_inbox)
+
+
+def unparsable_reply() -> str:
+    """The line answering a message that cannot be parsed as JSON."""
+    return _error(None, _PARSE_ERROR, "invalid JSON")
 
 
 def _invalid_request(message: object) -> str | None:
