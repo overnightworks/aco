@@ -1,8 +1,0 @@
-claim_id = "d73e23e31ed14c78ae6885f628eca39b"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "d00098f060f1a317bd1d5a44a6edcced3fd65992"
-branch = "claude/issue-705-one-gh-line-parser"
-scope = ["pyproject.toml", "src/aco/github.py", "src/aco/github_actions.py", "tests"]
-opened_commit = "6618a511f0874301453d255f488f77f77f98158e"
-whole_reason = "Moving one parser changes its two callers and their adapter tests together; the import contract line rides along because it guards the same new module."
