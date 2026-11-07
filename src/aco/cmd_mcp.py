@@ -54,5 +54,7 @@ def run(parsed: argparse.Namespace, _context: RunContext) -> int:
     except BrokenPipeError:
         # The host closed the pipe; the interpreter's own flush at exit must not
         # fail on it either.
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        os.close(devnull)
     return 0
