@@ -149,7 +149,7 @@ def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], Checks]:
             TrunkRead(
                 [actions_check(1, "CI", "success", PUSH_SUITE)],
                 "not json",
-                "trunk: unreadable at {sha7}: GitHub returned a malformed workflow run\n",
+                "trunk: unreadable at {sha7}: GitHub returned invalid workflow run JSON\n",
             ),
             id="an-undecodable-workflow-run-is-unreadable",
         ),
@@ -160,6 +160,14 @@ def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], Checks]:
                 "trunk: unreadable at {sha7}: GitHub returned a malformed workflow run\n",
             ),
             id="a-malformed-workflow-run-is-unreadable",
+        ),
+        pytest.param(
+            TrunkRead(
+                [actions_check(1, "CI", "success", PUSH_SUITE)],
+                "[1]",
+                "trunk: unreadable at {sha7}: GitHub returned a malformed workflow run\n",
+            ),
+            id="a-workflow-run-that-is-no-object-is-unreadable",
         ),
     ],
 )
