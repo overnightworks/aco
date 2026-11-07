@@ -106,9 +106,10 @@ machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
 operator starts with `aco serve`; it is not a service and keeps no
 coordination state of its own, only its access token file; the root it scans
-comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same kind of process: an agent host starts it
-over stdio for one session and it ends when the host closes stdin; it keeps
-no state and reads the same root (`specs/mcp.spec.md`). Nothing else is deployed.
+comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
+kind of process: an agent host starts it over stdio for one session and it ends
+when the host closes stdin; it keeps no state and reads the same root
+(`specs/mcp.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
 
