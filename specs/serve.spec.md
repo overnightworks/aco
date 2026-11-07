@@ -164,7 +164,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 ## The JSON API
 
-- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items"}]}`, repos in order; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06).
+- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items"}]}`; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"`, the written item as ABRD-08 lists it, once stored; else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.

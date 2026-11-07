@@ -8,12 +8,14 @@ import os
 import sys
 from pathlib import Path
 
-from .. import protocol, report, repositories
+from .. import protocol, repositories
 from .aco_source import AcoSource
 from .board import Board, Boards, Found, RepositoriesUnavailableError, RepoUnavailable
 from .server import LOOPBACK_HOST, start_board
 from .static import StaticAssetsMissingError
 from .token_store import MalformedTokenFileError, board_token, token_path
+
+_REFUSED_EXIT_CODE = 2
 
 
 def _found() -> Found:
@@ -42,7 +44,8 @@ def serve(port: int) -> int:
     try:
         _found()
     except RepositoriesUnavailableError as refusal:
-        return report.render_error(str(refusal))
+        print(f"ERROR: {refusal}", file=sys.stderr)
+        return _REFUSED_EXIT_CODE
     boards = Boards(_found)
     try:
         token = board_token(token_path(os.environ, Path.home()))
