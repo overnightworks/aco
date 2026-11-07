@@ -26,15 +26,23 @@ def read_inbox() -> dict[str, object]:
     """One fresh scan of the configured root and the read of every repository
     found; refused, naming the file or the root, when there is none to read."""
     root = repositories.configured_root(repositories.config_path(os.environ, Path.home()))
-    return inbox.inbox_json(inbox.read(repositories.discover(root), _repository_rows))
+    discovery = repositories.discover(root)
+    if not discovery.repositories:
+        reasons = "; ".join(f"{entry.directory}: {entry.reason}" for entry in discovery.unavailable)
+        raise protocol.ClaimError(f"no repository could be read under {root} ({reasons})")
+    return inbox.inbox_json(inbox.read(discovery, _repository_rows))
 
 
-def serve(requests: Iterable[str], replies: TextIO) -> None:
-    """Answer each line of `requests` on `replies` until the lines end."""
+def serve(requests: Iterable[bytes], replies: TextIO) -> None:
+    """Answer each line of `requests` on `replies` until the lines end; a line
+    that is no UTF-8 is answered as unparsable."""
     for request in requests:
         if not request.strip():
             continue
-        answer = mcp_server.reply(request, read_inbox)
+        try:
+            answer = mcp_server.reply(request.decode("utf-8"), read_inbox)
+        except UnicodeDecodeError:
+            answer = mcp_server.unparsable_reply()
         if answer is not None:
             replies.write(answer + "\n")
             replies.flush()
@@ -50,7 +58,7 @@ def run(parsed: argparse.Namespace, _context: RunContext) -> int:
     if parsed.repo is not None:
         return report.render_error(protocol.ClaimError(_GLOBAL_REPO_MESSAGE))
     try:
-        serve(sys.stdin, sys.stdout)
+        serve(sys.stdin.buffer, sys.stdout)
     except BrokenPipeError:
         # The host closed the pipe; the interpreter's own flush at exit must not
         # fail on it either.

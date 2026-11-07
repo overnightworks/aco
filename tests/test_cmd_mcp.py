@@ -151,15 +151,18 @@ class _Script:
     """Standard input that hands out its lines one by one and runs each
     callable between two of them, so the world changes while the server waits."""
 
-    def __init__(self, *steps: str | Callable[[], None]) -> None:
+    def __init__(self, *steps: str | bytes | Callable[[], None]) -> None:
         self._steps = steps
 
-    def __iter__(self) -> Iterator[str]:
+    @property
+    def buffer(self) -> Iterator[bytes]:
         for step in self._steps:
             if callable(step):
                 step()
+            elif isinstance(step, bytes):
+                yield step + b"\n"
             else:
-                yield step + "\n"
+                yield step.encode() + b"\n"
 
 
 def _call_line(request_id: int) -> str:
@@ -178,7 +181,7 @@ def _arrive(root: Path) -> None:
 
 
 def _serve_in_process(
-    monkeypatch: pytest.MonkeyPatch, *steps: str | Callable[[], None]
+    monkeypatch: pytest.MonkeyPatch, *steps: str | bytes | Callable[[], None]
 ) -> tuple[int, list[dict[str, Any]]]:
     """`aco mcp` through its entry point over the board's test forge: the exit
     code and every answer line."""
@@ -215,6 +218,32 @@ def test_every_call_scans_afresh_and_a_refusal_is_a_tool_error_the_next_call_rec
     assert [entry["repository"] for entry in found["structuredContent"]["repositories"]] == [
         "board-forge/arrived"
     ]
+
+
+def test_a_root_holding_only_unreadable_directories_is_a_tool_error_naming_the_root_and_the_reasons(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (root / "broken" / ".git").mkdir(parents=True)
+
+    _, [answer] = _serve_in_process(monkeypatch, _call_line(1))
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert str(root) in result["content"][0]["text"]
+    assert str(root / "broken") in result["content"][0]["text"]
+
+
+@pytest.mark.parametrize(
+    "bad_line", [b"\xff\xfe", b"[" * 100_000, b"1" * 5_000], ids=["not-utf-8", "nested", "digits"]
+)
+def test_a_line_the_parser_cannot_handle_is_answered_and_the_next_request_still_is(
+    bad_line: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exit_code, [bad, ping] = _serve_in_process(
+        monkeypatch, bad_line, json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"})
+    )
+
+    assert (exit_code, bad["id"], bad["error"]["code"], ping["id"]) == (0, None, -32700, 1)
 
 
 def test_a_repository_whose_read_fails_is_listed_as_unavailable_beside_the_others(
