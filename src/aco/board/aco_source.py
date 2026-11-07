@@ -3,11 +3,10 @@
 A read lists the members' open items through `inbox.rows`, the rows `aco rulings`
 prints on the items a member wrote. A decision reads its one item through
 `decide.fresh_item`, runs the board's check on aco's own lines of that read, and
-writes the whole card
-through `decide.rule`, the writer `aco rule` uses. Every read and every write
-builds its own context bound to the board's directory, so nothing read carries
-over between calls or threads, and one write's read, check and write share
-that one context.
+writes the whole card through `decide.rule`, the writer `aco rule` uses. Every
+read and every write builds its own context bound to the board's directory, so
+nothing read carries over between calls or threads, and one write's read, check
+and write share that one context.
 """
 
 from dataclasses import dataclass

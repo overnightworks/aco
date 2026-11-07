@@ -280,6 +280,7 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
     return decoded
 
 
+# A tuple, not a frozenset: `in` on a tuple fails closed for an unhashable provider value.
 _MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")
 
 
@@ -544,7 +545,7 @@ class GitHubForge:
             children_closed,
             children_total,
             blocked_by_count,
-            value.get("authorAssociation") in _MEMBER_ASSOCIATIONS,
+            author_is_member=value.get("authorAssociation") in _MEMBER_ASSOCIATIONS,
         )
 
     def _board_pull_request(self, value: object) -> workboard.PullRequest:
