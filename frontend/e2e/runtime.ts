@@ -14,6 +14,8 @@ export interface BoardRuntime {
 	token: string;
 	/** The control endpoint's origin, where `itemFixture.ts` arranges the forge. */
 	controlUrl: string;
+	/** The one repository the board serves, as the page labels it. */
+	repository: string;
 }
 
 export const RUNTIME_FILE = path.join(import.meta.dirname, '.runtime.json');

@@ -18,7 +18,7 @@ from .token_store import MalformedTokenFileError, board_token, token_path
 _REFUSED_EXIT_CODE = 2
 
 
-def _found() -> Found:
+def discovered_boards() -> Found:
     """One scan of the configured root: each repository's board under its
     `owner/repo` label, each unreadable directory as an unavailable entry."""
     try:
@@ -42,11 +42,11 @@ def serve(port: int) -> int:
     """Serve the repositories under the configured root on `port` until
     interrupted; 0 picks a free port."""
     try:
-        _found()
+        discovered_boards()
     except RepositoriesUnavailableError as refusal:
         print(f"ERROR: {refusal}", file=sys.stderr)
         return _REFUSED_EXIT_CODE
-    boards = Boards(_found)
+    boards = Boards(discovered_boards)
     try:
         token = board_token(token_path(os.environ, Path.home()))
     except MalformedTokenFileError as error:

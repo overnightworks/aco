@@ -21,6 +21,7 @@ interface BoardReady {
 	port: number;
 	token: string;
 	control_url: string;
+	repository: string;
 }
 
 function startBoardServer(): Promise<{
@@ -54,7 +55,12 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 
 	writeFileSync(
 		RUNTIME_FILE,
-		JSON.stringify({ appUrl, token: ready.token, controlUrl: ready.control_url })
+		JSON.stringify({
+			appUrl,
+			token: ready.token,
+			controlUrl: ready.control_url,
+			repository: ready.repository
+		})
 	);
 
 	return async () => {

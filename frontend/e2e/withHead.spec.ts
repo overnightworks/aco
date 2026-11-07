@@ -39,7 +39,7 @@ for (const viewport of [
 		test('[ABRD-61] [ABRD-106] a returned line lists muted with the With head shape after the open ones, and its card says with head and offers Decide', async ({
 			page
 		}, testInfo) => {
-			const { appUrl, token } = readBoardRuntime();
+			const { appUrl, token, repository } = readBoardRuntime();
 			await arrange([
 				item(
 					8,
@@ -79,7 +79,9 @@ for (const viewport of [
 			await rows.nth(1).click();
 			const card = page.locator('.option-card');
 			await expect(card.locator('.meta')).toHaveText(
-				/^\s*repo › Bereich\s*·\s*Product\s*·\s*with head\s*·\s*reversible\s*·\s*Asked \d{2}\.\d{2}\.\d{4}\s*$/
+				new RegExp(
+					`^\\s*${repository} › Bereich\\s*·\\s*Product\\s*·\\s*with head\\s*·\\s*reversible\\s*·\\s*Asked \\d{2}\\.\\d{2}\\.\\d{4}\\s*$`
+				)
 			);
 			await expect(card.getByRole('group', { name: 'Decide' }).getByRole('button')).toHaveCount(2);
 			await page.screenshot({ path: testInfo.outputPath('with-head-card.png') });
