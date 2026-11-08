@@ -50,9 +50,9 @@ _METHOD_NOT_FOUND: Final = -32601
 _INVALID_PARAMS: Final = -32602
 
 _INSTRUCTIONS: Final = (
-    "Read the decisions waiting on the operator across every repository on this machine "
-    f"with {READ_INBOX}, put a decision card of your own on an item with {ASK}, and record "
-    f"the answer the operator gave in this chat with {RECORD_ANSWER}."
+    "Read the decisions and the steps waiting on the operator across every repository on "
+    f"this machine with {READ_INBOX}, put a decision card of your own on an item with {ASK}, "
+    f"and record the answer the operator gave in this chat with {RECORD_ANSWER}."
 )
 _ENVELOPE_KEYS: Final = ("repository", "item")
 _OPTION: Final = "option"
@@ -144,9 +144,10 @@ _TOOLS: Final = (
         "name": READ_INBOX,
         "title": "Read the operator's inbox",
         "description": (
-            "The option lines that wait on the operator, across every repository found under "
-            "the configured root: each item with its waiting lines, the repositories that "
-            "could not be read, and the checkouts that could not be scanned."
+            "The option lines and the steps that wait on the operator, across every repository "
+            "found under the configured root: each item with its waiting lines, each item "
+            "labelled needs-operator with its step, the repositories that could not be read, "
+            "and the checkouts that could not be scanned."
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "annotations": {"readOnlyHint": True},

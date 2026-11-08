@@ -3,12 +3,13 @@
 a member of the repository wrote."""
 
 import threading
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from board_fixtures import board_issue
+from board_fixtures import board_issue, complete_contract
 from board_forge import item_body
 from github_pages import (
     board_issue_page_client,
@@ -17,7 +18,7 @@ from github_pages import (
 )
 from option_cards import card, card_body, open_option_entry
 
-from aco import body, forge, inbox, repositories, rulings
+from aco import body, forge, inbox, repositories, rulings, workboard
 
 _CARD = card_body(card())
 
@@ -132,14 +133,14 @@ def test_the_read_lists_each_repository_in_discovery_order_and_names_the_failed_
     unscanned = repositories.UnavailableCheckout(tmp_path / "locked", "Permission denied")
     discovery = repositories.Discovery(tmp_path, (good, broken, unreadable), (unscanned,))
 
-    def read_rows(repository: repositories.Repository) -> tuple[rulings.Row, ...]:
+    def read_issues(repository: repositories.Repository) -> inbox.Reading:
         if repository is broken:
             raise forge.ForgeError("listing failed")
         if repository is unreadable:
             raise PermissionError("no access")
-        return _read_rows(open_option_entry(), _RULED)
+        return inbox.Reading(_read_rows(open_option_entry(), _RULED), ())
 
-    answer = inbox.inbox_json(inbox.read(discovery, read_rows))
+    answer = inbox.inbox_json(inbox.read(discovery, read_issues))
 
     repositories_read = cast("list[dict[str, Any]]", answer["repositories"])
     assert answer["root"] == str(tmp_path)
@@ -149,8 +150,9 @@ def test_the_read_lists_each_repository_in_discovery_order_and_names_the_failed_
         "c/unreadable",
     ]
     assert [line["index"] for line in repositories_read[0]["items"][0]["lines"]] == [1]
-    assert repositories_read[1]["unavailable"] == "listing failed"
-    assert repositories_read[2]["unavailable"] == "no access"
+    assert repositories_read[0]["steps"] == []
+    assert repositories_read[1] == {"repository": "b/broken", "unavailable": "listing failed"}
+    assert repositories_read[2] == {"repository": "c/unreadable", "unavailable": "no access"}
     assert answer["unreadable"] == [
         {"directory": str(tmp_path / "locked"), "reason": "Permission denied"}
     ]
@@ -165,11 +167,11 @@ def test_the_repositories_are_read_concurrently_and_listed_in_discovery_order(
     )
     every_read_has_started = threading.Barrier(len(labels), timeout=10)
 
-    def read_rows(_repository: repositories.Repository) -> tuple[rulings.Row, ...]:
+    def read_issues(_repository: repositories.Repository) -> inbox.Reading:
         every_read_has_started.wait()
-        return ()
+        return inbox.Reading((), ())
 
-    answer = inbox.inbox_json(inbox.read(discovery, read_rows))
+    answer = inbox.inbox_json(inbox.read(discovery, read_issues))
 
     repositories_read = cast("list[dict[str, Any]]", answer["repositories"])
     assert [entry["repository"] for entry in repositories_read] == labels
@@ -181,6 +183,109 @@ def test_the_read_of_a_root_holding_only_unreadable_directories_lists_no_reposit
     unscanned = repositories.UnavailableCheckout(tmp_path / "locked", "Permission denied")
     discovery = repositories.Discovery(tmp_path, (), (unscanned,))
 
-    answer = inbox.inbox_json(inbox.read(discovery, lambda _repository: ()))
+    answer = inbox.inbox_json(inbox.read(discovery, lambda _repository: inbox.Reading((), ())))
 
     assert answer["repositories"] == []
+
+
+def _step_issue(
+    number: int,
+    *,
+    labels: tuple[str, ...] = (workboard.NEEDS_OPERATOR_LABEL,),
+    body_text: str | None = None,
+    next_step: str = "Do the thing.",
+    author_is_member: bool = True,
+) -> workboard.Issue:
+    text = complete_contract(next_step) if body_text is None else body_text
+    return board_issue(
+        number, f"Item {number}", text, labels=labels, author_is_member=author_is_member
+    )
+
+
+def test_a_labelled_member_item_is_a_step_with_its_number_title_and_next() -> None:
+    issues = (_step_issue(9, next_step="Rotate the key."),)
+
+    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert found == (inbox.Step(9, "Item 9", "Rotate the key."),)
+
+
+def test_the_label_matches_in_any_case() -> None:
+    issues = (_step_issue(9, labels=("Needs-Operator",)),)
+
+    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert [step.number for step in found] == [9]
+
+
+@pytest.mark.parametrize(
+    "body_text",
+    [
+        pytest.param("Prose only, no block.", id="no-block"),
+        pytest.param("```aco\nversion = \n```\n", id="malformed-block"),
+    ],
+)
+def test_a_labelled_item_without_a_readable_block_is_a_step_with_no_text(body_text: str) -> None:
+    issues = (_step_issue(9, body_text=body_text), _step_issue(8, next_step="Fine."))
+
+    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert [(step.number, step.next_step) for step in found] == [(9, None), (8, "Fine.")]
+
+
+def test_only_a_labelled_item_a_member_wrote_and_the_store_could_read_is_a_step() -> None:
+    unreadable = replace(_step_issue(6), unreadable=body.ContractDefect("body", "unreadable"))
+    issues = (
+        _step_issue(3, author_is_member=False),
+        unreadable,
+        _step_issue(4, labels=()),
+        _step_issue(5, labels=("bug",)),
+        _step_issue(7),
+    )
+
+    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert [step.number for step in found] == [7]
+
+
+def test_steps_come_by_descending_number() -> None:
+    issues = (_step_issue(2), _step_issue(11), _step_issue(5))
+
+    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert [step.number for step in found] == [11, 5, 2]
+
+
+def test_a_labelled_item_with_a_waiting_line_is_in_both_lists() -> None:
+    carded = _step_issue(5, body_text=item_body(open_option_entry()))
+
+    reading = inbox.read_issues((carded,), storage=body.Storage.GITHUB)
+
+    assert [row.number for row in reading.rows] == [5]
+    assert [step.number for step in reading.steps] == [5]
+
+
+def test_the_answer_lists_steps_always_and_gives_an_unavailable_entry_none() -> None:
+    discovery = repositories.Discovery(
+        Path("/root"),
+        (_repository("a/steps", Path("/a")), _repository("b/none", Path("/b"))),
+        (),
+    )
+    step = inbox.Step(9, "Item 9", "Rotate the key.")
+
+    def read_issues(repository: repositories.Repository) -> inbox.Reading:
+        return inbox.Reading((), (step,) if repository.label == "a/steps" else ())
+
+    answer = inbox.inbox_json(inbox.read(discovery, read_issues))
+
+    repositories_read = cast("list[dict[str, Any]]", answer["repositories"])
+    assert repositories_read[0]["steps"] == [
+        {"number": 9, "title": "Item 9", "step": "Rotate the key."}
+    ]
+    assert repositories_read[1]["steps"] == []
+
+
+def test_a_step_with_no_text_prints_as_null() -> None:
+    step = inbox.Step(9, "Item 9", None)
+
+    assert inbox.step_json(step) == {"number": 9, "title": "Item 9", "step": None}
