@@ -30,6 +30,8 @@ _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _ITEM_READ_FAILURE = "item_read_failure"
 _WRITE_FAILURE = "write_failure"
+_WRITE_ANSWER = "write_answer"
+_REPLACINGS = "replacings"
 _CLOSED = "closed"
 RULING_DAY = date(2026, 10, 3)
 """The day aco rules on over this forge, so a page shows a date it can name."""
@@ -54,6 +56,9 @@ class StoredItem:
     author_is_member: bool = True
 
 
+type _CheckAnswer = forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError
+
+
 @dataclass
 class _ForgeState:
     """Everything the forge file holds, keyed by item number."""
@@ -62,6 +67,8 @@ class _ForgeState:
     listing_failure: str | None = None
     item_read_failure: str | None = None
     write_failure: str | None = None
+    write_answer: _CheckAnswer | None = None
+    replacings: list[str] = field(default_factory=list[str])
     closed: set[int] = field(default_factory=set[int])
 
     @classmethod
@@ -72,6 +79,8 @@ class _ForgeState:
             stored[_LISTING_FAILURE],
             stored[_ITEM_READ_FAILURE],
             stored[_WRITE_FAILURE],
+            _answer_from_json(stored[_WRITE_ANSWER]),
+            stored[_REPLACINGS],
             set(stored[_CLOSED]),
         )
 
@@ -82,9 +91,37 @@ class _ForgeState:
                 _LISTING_FAILURE: self.listing_failure,
                 _ITEM_READ_FAILURE: self.item_read_failure,
                 _WRITE_FAILURE: self.write_failure,
+                _WRITE_ANSWER: _answer_to_json(self.write_answer),
+                _REPLACINGS: self.replacings,
                 _CLOSED: sorted(self.closed),
             }
         )
+
+
+def _answer_to_json(answer: _CheckAnswer | None) -> dict[str, object] | None:
+    if answer is None:
+        return None
+    if isinstance(answer, forge.ForgeBodyOverwrittenError):
+        return {
+            "number": answer.number,
+            "edited_at": answer.edited_at,
+            "editor": answer.editor,
+            "kept": answer.kept,
+        }
+    return {"number": answer.number, "cause": answer.cause}
+
+
+def _answer_from_json(stored: dict[str, object] | None) -> _CheckAnswer | None:
+    if stored is None:
+        return None
+    if "kept" in stored:
+        return forge.ForgeBodyOverwrittenError(
+            int(str(stored["number"])),
+            str(stored["edited_at"]),
+            str(stored["editor"]),
+            kept=bool(stored["kept"]),
+        )
+    return forge.ForgeBodyNotVerifiedError(int(str(stored["number"])), str(stored["cause"]))
 
 
 @dataclass(frozen=True)
@@ -136,6 +173,17 @@ class BoardForge:
         state = self._state()
         state.write_failure = message
         self._replace_state(state)
+
+    def answer_next_write(self, answer: _CheckAnswer) -> None:
+        """The next body write is logged and stored, then raises `answer`, the
+        forge's check of a write that landed; the write after it answers nothing."""
+        state = self._state()
+        state.write_answer = answer
+        self._replace_state(state)
+
+    def body_replacings(self) -> list[str]:
+        """The `replacing` text of every body write, in order."""
+        return self._state().replacings
 
     def stored_body(self, number: int) -> str:
         return self._state().items[number].body
@@ -210,7 +258,12 @@ class BoardForge:
             self._replace_state(state)
             raise RuntimeError(failure)
         state.items[number].body = body
+        state.replacings.append(replacing)
+        answer = state.write_answer
+        state.write_answer = None
         self._replace_state(state)
+        if answer is not None:
+            raise answer
 
     def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
         _unsupported("list_board_dependencies")
