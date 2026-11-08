@@ -13,12 +13,12 @@ from typing import Any
 import board_forge
 import pytest
 from board_fixtures import complete_contract, write_repository_config
+from cli_fixtures import run_cli
 from discovery_fixtures import (
     configure_root,
     isolate_config_file,
     repository_with_card,
 )
-from option_cards import check_defects
 
 from aco import body, cli, forge, protocol, session, workboard
 
@@ -85,10 +85,11 @@ def _inbox_line(request_id: int) -> str:
 def _serve(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
     """The results of every line `aco mcp` answers."""
     replies = io.StringIO()
-    monkeypatch.setattr(session, "run_context", board_forge.run_context)
-    monkeypatch.setattr(sys, "stdin", _Script(*lines))
-    monkeypatch.setattr(sys, "stdout", replies)
-    exit_code = cli.main(["mcp"])
+    with monkeypatch.context() as served:
+        served.setattr(session, "run_context", board_forge.run_context)
+        served.setattr(sys, "stdin", _Script(*lines))
+        served.setattr(sys, "stdout", replies)
+        exit_code = cli.main(["mcp"])
     assert exit_code == 0
     return [json.loads(line)["result"] for line in replies.getvalue().splitlines()]
 
@@ -133,7 +134,7 @@ def _fail_once(
     real = getattr(board_forge.BoardForge, operation)
     failed: list[bool] = []
 
-    def wrapper(self: board_forge.BoardForge, *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: board_forge.BoardForge, *args: object, **kwargs: object) -> object:
         if failed:
             return real(self, *args, **kwargs)
         failed.append(True)
@@ -149,7 +150,7 @@ def _witness_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, operation: st
     real: Callable[..., None] = getattr(board_forge.BoardForge, operation)
     held: list[bool] = []
 
-    def witnessed(self: board_forge.BoardForge, *args: Any, **kwargs: Any) -> None:
+    def witnessed(self: board_forge.BoardForge, *args: object, **kwargs: object) -> None:
         held.append(_lock_is_held(tmp_path))
         real(self, *args, **kwargs)
 
@@ -199,7 +200,8 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
     opened, inbox = _serve(monkeypatch, _step_line(1, item=None, title=TITLE), _inbox_line(2))
 
     created = here.stored_item(2)
-    status, defects = check_defects(capsys, created.body)
+    monkeypatch.chdir(here.directory)
+    checked = run_cli(["check", "-", "--json"], capsys, stdin=created.body)
     data = body.locate_block(created.body).data
     assert opened["structuredContent"] == {
         "repository": "board-forge/here",
@@ -208,7 +210,7 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
         "created": True,
     }
     assert (created.title, created.kind, created.labels) == (TITLE, "task", [_LABEL])
-    assert (status, defects) == (0, [])
+    assert (checked.status, json.loads(checked.stdout)["ok"]) == (0, True)
     assert data["next"] == STEP
     assert board_forge.RULING_DAY.isoformat() in str(data["now"])
     assert _writes(here) == [("create_issue", 2), ("add_label", 2)]
@@ -230,9 +232,7 @@ def test_the_same_title_call_again_opens_no_second_item_and_calls_the_label_agai
 def _standing(
     number: int, step: str = STEP, *, member: bool = True
 ) -> dict[int, board_forge.StoredItem]:
-    return {
-        number: board_forge.StoredItem(TITLE, complete_contract(step), author_is_member=member)
-    }
+    return {number: board_forge.StoredItem(TITLE, complete_contract(step), author_is_member=member)}
 
 
 @pytest.mark.parametrize(
@@ -240,7 +240,9 @@ def _standing(
     [
         pytest.param(_standing(2), TITLE, 2, False, id="same-title-and-step-without-the-label"),
         pytest.param(_standing(2), f"  {TITLE}\n", 2, False, id="padded-title"),
-        pytest.param({**_standing(2), **_standing(4), **_standing(3)}, TITLE, 4, False, id="highest"),
+        pytest.param(
+            {**_standing(2), **_standing(4), **_standing(3)}, TITLE, 4, False, id="highest"
+        ),
         pytest.param(_standing(2, "Another step."), TITLE, 3, True, id="same-title-another-step"),
         pytest.param(_standing(2, member=False), TITLE, 3, True, id="a-non-members-item"),
         pytest.param(
@@ -360,9 +362,7 @@ def test_a_failed_label_after_the_body_says_the_step_stands_and_a_repeat_sets_th
 @pytest.mark.parametrize(
     ("operation", "error", "after_real_call", "names_the_item"),
     [
-        pytest.param(
-            "add_label", forge.ForgeError("HTTP 403: forbidden"), False, True, id="label"
-        ),
+        pytest.param("add_label", forge.ForgeError("HTTP 403: forbidden"), False, True, id="label"),
         pytest.param(
             "create_issue",
             forge.ForgeIssueTypeNotSetError(created=2, type_name="Task"),

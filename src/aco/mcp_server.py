@@ -1,9 +1,9 @@
 """The MCP server's replies (`specs/mcp.spec.md`): one decoded JSON-RPC message
-in, the line to answer with out. Free of I/O: the inbox read, the card write and
-the answer write are passed in.
+in, the line to answer with out. Free of I/O: the inbox read, the card write, the
+answer write and the step write are passed in.
 
 Speaks the `initialize` era of the protocol: `initialize`, `ping`, `tools/list`
-and `tools/call`, with the tools `read_inbox`, `ask` and `record_answer`.
+and `tools/call`, with the tools `read_inbox`, `ask`, `record_answer` and `step`.
 """
 
 import json
@@ -19,6 +19,7 @@ SUPPORTED_PROTOCOL_VERSIONS: Final = ("2025-11-25", "2025-06-18")
 READ_INBOX: Final = "read_inbox"
 ASK: Final = "ask"
 RECORD_ANSWER: Final = "record_answer"
+STEP: Final = "step"
 
 type ReadInbox = Callable[[], Mapping[str, object]]
 """The inbox as JSON; raises `protocol.ClaimError` when it cannot be read."""
@@ -34,6 +35,12 @@ type RecordAnswer = Callable[
 item of a repository, named as `read_inbox` lists it, given the card's hash, and
 answers as JSON; raises `protocol.ClaimError` when it refuses."""
 
+type Step = Callable[[str, str, int | str], Mapping[str, object]]
+"""Marks a step only the operator can take, given as text, in a repository named
+as `read_inbox` lists it: on the item whose number is the third argument, or, when
+that is a title, on the open item holding it or on a new one; answers as JSON;
+raises `protocol.ClaimError` when it refuses."""
+
 
 @dataclass(frozen=True)
 class Tools:
@@ -42,6 +49,7 @@ class Tools:
     read_inbox: ReadInbox
     ask: Ask
     record_answer: RecordAnswer
+    step: Step
 
 
 _PARSE_ERROR: Final = -32700
@@ -52,9 +60,14 @@ _INVALID_PARAMS: Final = -32602
 _INSTRUCTIONS: Final = (
     "Read the decisions and the steps waiting on the operator across every repository on "
     f"this machine with {READ_INBOX}, put a decision card of your own on an item with {ASK}, "
-    f"and record the answer the operator gave in this chat with {RECORD_ANSWER}."
+    f"record the answer the operator gave in this chat with {RECORD_ANSWER}, and mark a step "
+    f"only the operator can take with {STEP}."
 )
 _ENVELOPE_KEYS: Final = ("repository", "item")
+_REPOSITORY: Final = "repository"
+_ITEM: Final = "item"
+_TITLE: Final = "title"
+_STEP_KEYS: Final = (_REPOSITORY, STEP, _ITEM, _TITLE)
 _OPTION: Final = "option"
 _OTHER: Final = "other"
 _RECORD_KEYS: Final = (*_ENVELOPE_KEYS, "line", "card_hash", _OPTION, _OTHER)
@@ -139,6 +152,20 @@ def _record_answer_schema() -> dict[str, object]:
     }
 
 
+def _step_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": {
+            _REPOSITORY: _string("the repository as read_inbox lists it, owner/repo"),
+            STEP: _string("what the operator must do"),
+            _ITEM: {"type": "integer", "description": "the number of an open item; or give title"},
+            _TITLE: _string("the title of a new item; give this or item"),
+        },
+        "required": [_REPOSITORY, STEP],
+        "additionalProperties": False,
+    }
+
+
 _TOOLS: Final = (
     {
         "name": READ_INBOX,
@@ -183,6 +210,22 @@ _TOOLS: Final = (
             "unless it says it was overwritten in the meantime."
         ),
         "inputSchema": _record_answer_schema(),
+        "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True},
+    },
+    {
+        "name": STEP,
+        "title": "Mark a step only the operator can take",
+        "description": (
+            "Marks a step that only the operator can take, such as a secret to set or an "
+            "approval to give: it becomes the item's next, replacing the one that stood, "
+            "and the item gets the label needs-operator, so the step shows in read_inbox "
+            "under steps. Give an open item's number as item, or a title to open a new item "
+            "for the step; a title that an open item of the operator's already holds with "
+            "this step marks that item instead. The head removes the label once the operator "
+            "says the step is done; there is no tool for that. A refusal that says the step "
+            "was written or the item was opened is finished by repeating the same call."
+        ),
+        "inputSchema": _step_schema(),
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True},
     },
 )
@@ -262,6 +305,7 @@ def _handlers(tools: Tools) -> dict[str, _Handler]:
         RECORD_ANSWER: _Handler(
             _record_answer_defects, lambda arguments: _record_answer(tools.record_answer, arguments)
         ),
+        STEP: _Handler(_step_defects, lambda arguments: _step(tools.step, arguments)),
     }
 
 
@@ -299,6 +343,17 @@ def _record_answer(
         cast(int, arguments["line"]),
         cast(str, arguments["card_hash"]),
         answer,
+    )
+
+
+def _step(step: Step, arguments: Mapping[str, object]) -> Mapping[str, object]:
+    """The call of the step writer with arguments whose defects were already refused;
+    the item number, or the title stripped, is its target."""
+    target = arguments[_ITEM] if _ITEM in arguments else cast(str, arguments[_TITLE]).strip()
+    return step(
+        cast(str, arguments[_REPOSITORY]),
+        cast(str, arguments[STEP]).strip(),
+        cast(int | str, target),
     )
 
 
@@ -347,6 +402,32 @@ def _record_answer_defects(arguments: Mapping[str, object]) -> list[str]:
     if isinstance(other, str) and not other.strip():
         defects.append(f"{_OTHER} must not be blank")
     return defects
+
+
+def _step_defects(arguments: Mapping[str, object]) -> list[str]:
+    """Every defect of `step`'s arguments: an unknown key, a `repository`, `step`
+    or `title` that is no string, an `item` that is no integer, not exactly one of
+    `item` and `title`, a blank `step` or `title`. Whether the item or the
+    repository exists is the writer's to judge."""
+    defects = [f"unknown argument: {key}" for key in arguments if key not in _STEP_KEYS]
+    given = [key for key in (_ITEM, _TITLE) if key in arguments]
+    named = (_REPOSITORY, STEP, *(key for key in given if key == _TITLE))
+    defects.extend(
+        f"{key} must be a string" for key in named if not isinstance(arguments.get(key), str)
+    )
+    if _ITEM in given and not _is_integer(arguments[_ITEM]):
+        defects.append(f"{_ITEM} must be an integer")
+    if len(given) != 1:
+        defects.append(f"give exactly one of {_ITEM} and {_TITLE}")
+    defects.extend(
+        f"{key} must not be blank" for key in (STEP, *given) if _is_blank(arguments, key)
+    )
+    return defects
+
+
+def _is_blank(arguments: Mapping[str, object], key: str) -> bool:
+    value = arguments.get(key)
+    return isinstance(value, str) and not value.strip()
 
 
 def _answered(request_id: int | str, produce: Callable[[], Mapping[str, object]]) -> str:

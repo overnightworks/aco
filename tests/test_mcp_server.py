@@ -34,10 +34,8 @@ def _echoing_record(
     }
 
 
-def _echoing_step(
-    label: str, step: str, item: int | None, title: str | None
-) -> Mapping[str, object]:
-    return {"repository": label, "step": step, "item": item, "title": title}
+def _echoing_step(label: str, step: str, target: int | str) -> Mapping[str, object]:
+    return {"repository": label, "step": step, "target": target}
 
 
 def _answer(
@@ -522,7 +520,7 @@ def test_a_step_call_on_an_item_hands_the_stripped_step_to_the_writer_and_answer
 
     result = _answer(_call(arguments, name="step"))["result"]
 
-    expected = {"repository": "owner/repo", "step": "Rotate the key.", "item": 7, "title": None}
+    expected = {"repository": "owner/repo", "step": "Rotate the key.", "target": 7}
     assert result["isError"] is False
     assert result["structuredContent"] == expected
     assert json.loads(result["content"][0]["text"]) == expected
@@ -533,13 +531,10 @@ def test_a_step_call_with_a_title_hands_the_stripped_title_to_the_writer() -> No
 
     result = _answer(_call(arguments, name="step"))["result"]
 
-    assert result["structuredContent"]["title"] == "Key rotation"
-    assert result["structuredContent"]["item"] is None
+    assert result["structuredContent"]["target"] == "Key rotation"
 
 
-def _refusing_step(
-    label: str, step: str, item: int | None, title: str | None
-) -> Mapping[str, object]:
+def _refusing_step(label: str, step: str, target: int | str) -> Mapping[str, object]:
     raise protocol.ClaimError("item 7 is closed")
 
 
@@ -551,9 +546,7 @@ def test_a_refused_step_is_a_tool_error_carrying_its_reason() -> None:
     assert "structuredContent" not in result
 
 
-def _step_reaches_nothing(
-    label: str, step: str, item: int | None, title: str | None
-) -> Mapping[str, object]:
+def _step_reaches_nothing(label: str, step: str, target: int | str) -> Mapping[str, object]:
     pytest.fail("a step call with a defective envelope reached the writer")
 
 
@@ -574,14 +567,14 @@ def _step_reaches_nothing(
         pytest.param(
             _without(_step_arguments(), "item"), "give exactly one of item and title", id="neither"
         ),
-        pytest.param(
-            _step_arguments(title="Key"), "give exactly one of item and title", id="both"
-        ),
+        pytest.param(_step_arguments(title="Key"), "give exactly one of item and title", id="both"),
         pytest.param(
             _without(_step_arguments(title=3), "item"), "title must be a string", id="title-integer"
         ),
         pytest.param(
-            _without(_step_arguments(title=" "), "item"), "title must not be blank", id="title-blank"
+            _without(_step_arguments(title=" "), "item"),
+            "title must not be blank",
+            id="title-blank",
         ),
     ],
 )
@@ -663,7 +656,7 @@ def test_any_other_method_is_not_found(method: str) -> None:
     ],
 )
 def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
-    tools = mcp_server.Tools(lambda: _INBOX, _echoing, _echoing_record)
+    tools = mcp_server.Tools(lambda: _INBOX, _echoing, _echoing_record, _echoing_step)
 
     assert mcp_server.reply(json.dumps(message), tools) is None
 

@@ -1,6 +1,7 @@
 """Decoding of one GitHub issue object: the board listing's issue and the
 single-item read, which share the one rule for who counts as a member."""
 
+import json
 from typing import TypeIs
 
 from . import forge, protocol, workboard
@@ -116,3 +117,16 @@ def item_reference(value: object) -> forge.ItemReference:
         is_landing,
         author_is_member=is_member(value.get("author_association")),
     )
+
+
+def require_label(raw: str, label: str) -> None:
+    """Raises `forge.ForgeMalformedResponseError` unless `raw`, GitHub's answer to a
+    label write, is the issue's label list and holds `label`."""
+    try:
+        listed = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise forge.ForgeMalformedResponseError("GitHub returned invalid label JSON") from error
+    entries = listed if isinstance(listed, list) else []
+    names = [entry.get("name") for entry in entries if isinstance(entry, dict)]
+    if not workboard.has_label(tuple(name for name in names if isinstance(name, str)), label):
+        raise forge.ForgeMalformedResponseError(f"GitHub did not set the label {label}")

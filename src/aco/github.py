@@ -327,21 +327,10 @@ class GitHubForge:
         )
 
     def _run(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
-        """The one chokepoint every board or claim read/write funnels through:
-        every one of this class's operations calls `self._run`,
-        never `self._gh` or an injected `run` directly, so `requests` counts
-        every round trip exactly once regardless of which operation asked for
-        it. Locked because `board` fans reads out across worker threads
-        (`board_read.build_board`'s pools, and this adapter's own paginated/sharded
-        fetches) that call `_run` concurrently -- an unlocked `+=` could lose
-        an increment and under-count.
-
-        Forwards `input_data` only when a caller actually passed one: tests
-        across this suite inject `run=` callables shaped like `_gh`, most of
-        them taking no `input_data` keyword at all, and this preserves that call shape
-        exactly rather than widening every fixture's signature for a
-        counting concern they have nothing to do with.
-        """
+        """The one chokepoint every operation funnels through, so `requests` counts
+        every round trip exactly once. Locked because `board` fans reads out across
+        worker threads. Forwards `input_data` only when a caller passed one: tests
+        inject `run=` callables that take no such keyword."""
         with self._requests_lock:
             self.requests += 1
         if input_data is None:
@@ -1319,6 +1308,22 @@ class GitHubForge:
             )
         return number
 
+    def add_label(self, number: int, label: str) -> None:
+        """GitHub creates a label the repository lacks; the answer is the issue's
+        label list, which must hold `label`, so a silent drop never passes."""
+        raw = self._run(
+            [
+                "api",
+                "--method",
+                "POST",
+                f"repos/{self.repository}/issues/{number}/labels",
+                "--input",
+                "-",
+            ],
+            input_data=json.dumps({"labels": [label]}).encode("utf-8"),
+        )
+        github_issue_payload.require_label(raw, label)
+
     def _issue_identifier(self, number: int) -> int:
         """`number`'s internal id, which the sub-issue POST needs and the
         issue-number-only port surface never otherwise carries."""
@@ -1428,19 +1433,12 @@ class GitHubForge:
         return False
 
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
-        """Closes `number` itself instead of refusing:
-        `release --merged <pr>` accepts a still-open item and closes it here, not
-        only one already closed on the forge -- not part of the
-        generic `ForgeWriter` port, since `storage = "state-ref"` closes its
-        own item through `state_board.StateRefBoard.prepare_landing`'s
-        atomic `protocol.LandingIntent` instead, never through a forge
-        write at all. The comment lands first: a transient failure between
-        the two calls then leaves an open issue explaining the pull request
-        that is about to close it, never a closed issue with no record of
-        why -- and repeat-safe: a rerun that finds its own
-        comment already posted skips straight to the close, never doubling
-        it.
-        """
+        """Closes `number` itself: `release --merged <pr>` accepts a still-open item.
+        Not part of the `ForgeWriter` port, since `storage = "state-ref"` closes its
+        item through `state_board.StateRefBoard.prepare_landing`'s
+        `protocol.LandingIntent`. The comment lands first, so a failure between the
+        two calls never leaves a closed issue with no record of why, and a rerun
+        that finds its own comment skips straight to the close."""
         comment = landing_comment(pull_request)
         if not self._has_landing_comment(number, comment):
             self._run(

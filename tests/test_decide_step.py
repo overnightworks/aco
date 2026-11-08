@@ -100,7 +100,7 @@ def test_a_repeat_writes_no_body_and_still_calls_the_label(clone: Path) -> None:
     context, client = _world(clone, _stepped_item())
     _mark(context)
     client.issue_references[NUMBER] = forge.ItemReference(
-        forge.ItemState.OPEN, "Titel", client.item_bodies[NUMBER]
+        forge.ItemState.OPEN, "Titel", client.item_bodies[NUMBER], author_is_member=True
     )
 
     _mark(context)
@@ -128,7 +128,7 @@ def test_a_failed_label_says_the_step_stands_and_a_repeat_sets_the_label(clone: 
         _mark(context)
     client.add_label_error = None
     client.issue_references[NUMBER] = forge.ItemReference(
-        forge.ItemState.OPEN, "Titel", client.item_bodies[NUMBER]
+        forge.ItemState.OPEN, "Titel", client.item_bodies[NUMBER], author_is_member=True
     )
     _mark(context)
 

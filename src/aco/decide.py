@@ -1,10 +1,10 @@
-"""The one read-modify-write of expectation lines (`specs/rule.spec.md`,
+"""The one read-modify-write of an item's block (`specs/rule.spec.md`,
 `specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
-decision board and the MCP `ask` and `record_answer` read an item through the target gate and write
-its folded body once, here, so every ruling, withdrawal and card takes the same
-path. `item_lock` serializes the writers of one item on this machine; `turn` is
-that lock plus the fresh read, and a writer that judges from another read
-(`aco cut`) holds `item_lock` alone."""
+decision board and the MCP `ask`, `record_answer` and `step` read an item through the
+target gate and write its folded body once, here, so every ruling, withdrawal, card and
+step takes the same path. `item_lock` serializes the writers of one item on this
+machine; `turn` is that lock plus the fresh read, and a writer that judges from
+another read (`aco cut`) holds `item_lock` alone."""
 
 import hashlib
 import sys
@@ -215,6 +215,19 @@ def _refuse_a_shape_verdict(check: body.BodyShapeCheck, verdict: body.BodyShapeV
         raise protocol.ClaimError("; ".join(check.defects))
 
 
+def _refuse_an_item_the_inbox_omits(fresh: FreshItem, noun: str) -> None:
+    """Refuses a closed item and one a non-member wrote: the inbox and the board
+    list neither, so a `noun` written on it would show nowhere."""
+    if fresh.state is not forge.ItemState.OPEN:
+        raise protocol.ClaimError(
+            f"item {fresh.number} is closed; a {noun} on it would show nowhere"
+        )
+    if not fresh.author_is_member:
+        raise protocol.ClaimError(
+            f"item {fresh.number} was not written by a member; its {noun}s are not listed"
+        )
+
+
 def ask(context: RunContext, fresh: FreshItem, card: Mapping[str, object]) -> Asked:
     """Puts the option line `card` on the fresh item, dated by the run's clock
     and written once. It refuses a closed item and one a non-member wrote (the
@@ -223,12 +236,7 @@ def ask(context: RunContext, fresh: FreshItem, card: Mapping[str, object]) -> As
     line, the first by index, and writes nothing; only then an incomplete
     body refuses. Raises `protocol.ClaimError` by name for every refusal,
     before the write."""
-    if fresh.state is not forge.ItemState.OPEN:
-        raise protocol.ClaimError(f"item {fresh.number} is closed; a card on it would show nowhere")
-    if not fresh.author_is_member:
-        raise protocol.ClaimError(
-            f"item {fresh.number} was not written by a member; its cards are not listed"
-        )
+    _refuse_an_item_the_inbox_omits(fresh, "card")
     new_body = expectations.ask_line(fresh.body, card, context.today())
     shape = body.body_shape_check(new_body, storage=fresh.storage)
     _refuse_a_shape_verdict(shape, body.BodyShapeVerdict.MALFORMED)
@@ -240,3 +248,55 @@ def ask(context: RunContext, fresh: FreshItem, card: Mapping[str, object]) -> As
     _refuse_a_shape_verdict(shape, body.BodyShapeVerdict.INCOMPLETE)
     _committed(context, fresh, new_body)
     return Asked(asked, written=True)
+
+
+def _label_as_a_step(client: forge.ForgeWriter, number: int, *, standing: str) -> None:
+    """Sets the label of an operator-only step on item `number`. A refusal says what
+    `standing` already holds and that repeating the same call sets the label."""
+    try:
+        client.add_label(number, workboard.NEEDS_OPERATOR_LABEL)
+    except protocol.ClaimError as error:
+        raise protocol.ClaimError(
+            f"{standing}, but the label {workboard.NEEDS_OPERATOR_LABEL} was not set: {error}; "
+            "repeat the same call to set it once that cause is gone"
+        ) from error
+
+
+def mark_step(context: RunContext, fresh: FreshItem, step: str) -> None:
+    """Writes `step` as the `next` of the fresh item, every other field and byte
+    kept, then sets the label of an operator-only step. A body equal to the
+    fresh one writes nothing and the label is set all the same, so a repeat
+    finishes a call whose label failed. Raises `protocol.ClaimError` by name for
+    a closed item and one a non-member wrote, before the write."""
+    _refuse_an_item_the_inbox_omits(fresh, "step")
+    folded = {**fresh.located.data, "next": step}
+    new_body = body.replace_block(fresh.body, fresh.located, folded)
+    write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
+    _label_as_a_step(context.forge_writer, fresh.number, standing=f"#{fresh.number} holds the step")
+
+
+def open_step_item(context: RunContext, title: str, step: str) -> int:
+    """Opens a task named `title` whose body names `step` as its `next`, sets the
+    label of an operator-only step on it and answers its number. A failure after
+    the item exists names it and says repeating the same call finishes it."""
+    client = context.forge_writer
+    fields = {
+        "now": f"Opened by the step tool on {context.today().isoformat()}.",
+        "next": step,
+        "done_when": (
+            "The operator has taken the step and the head has removed the label "
+            f"{workboard.NEEDS_OPERATOR_LABEL}."
+        ),
+    }
+    opened = body.prose_above_fresh_block(
+        "This item waits on a step only the operator can take.", fields
+    )
+    try:
+        number = client.create_issue(title=title, body=opened, kind=body.ItemKind.TASK)
+    except forge.ForgeIssueTypeNotSetError as error:
+        raise protocol.ClaimError(
+            f"{error}; repeat the same call to set the label {workboard.NEEDS_OPERATOR_LABEL}, "
+            "then set the issue type on the forge by hand"
+        ) from error
+    _label_as_a_step(client, number, standing=f"#{number} was opened with the step")
+    return number
