@@ -363,3 +363,19 @@ def test_the_global_repo_is_refused_before_anything_is_served(
         captured.err
         == "ERROR: aco mcp finds its repositories itself; --repo does not apply to it\n"
     )
+
+
+def test_an_unwritable_lock_directory_is_a_tool_error_that_writes_nothing(
+    root: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    here = repository_with_card(root / "here", 1, "Here")
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
+
+    _, [answer] = _serve_in_process(monkeypatch, _ask_line(1))
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert "cannot lock the item" in result["content"][0]["text"]
+    assert here.body_writes() == []
