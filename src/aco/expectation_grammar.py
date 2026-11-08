@@ -92,17 +92,24 @@ class RulingVia(StrEnum):
 # decided state; all are required except `picture` and `caption`, and
 # `caption` needs a picture beside it. `question` and `picture` are shared
 # with the yes/no line, the others belong to the option line alone.
+DECISION_KIND = "decision_kind"
+RECOMMENDED = "recommended"
+UNDO = "undo"
+OPTIONS = "options"
 OPTION_LINE_KEYS = (
     "question",
     "problem",
     _PICTURE,
     _CAPTION,
-    "decision_kind",
+    DECISION_KIND,
     "area",
     "topic",
-    "recommended",
+    RECOMMENDED,
     "reason",
 )
+# The keys of a card as the MCP `ask` takes it: the line's own keys, then its options.
+CARD_LINE_KEYS = ("text", *OPTION_LINE_KEYS)
+CARD_KEYS = (*CARD_LINE_KEYS, OPTIONS)
 OPTION_LINE_OPTIONAL_KEYS = frozenset({_PICTURE, _CAPTION})
 _OPTION_LINE_ONLY_KEYS = frozenset(OPTION_LINE_KEYS) - {"question", _PICTURE}
 _OPTION_LINE_REFUSED_KEYS = ("example",)
@@ -117,7 +124,7 @@ OPTION_KEYS = (
     _CAPTION,
     "notice",
     "cost",
-    "undo",
+    UNDO,
     "undo_how",
     "contract",
 )
@@ -477,8 +484,8 @@ def _option_line_key_defects(
 ) -> list[FieldDefect]:
     checks: dict[str, Callable[[object], str | None]] = {
         "question": _expectation_question_defect,
-        "decision_kind": _member_defect(tuple(DecisionKind)),
-        "recommended": _letter_defect(letters),
+        DECISION_KIND: _member_defect(tuple(DecisionKind)),
+        RECOMMENDED: _letter_defect(letters),
     }
     defects: list[FieldDefect] = []
     for key in OPTION_LINE_KEYS:
@@ -523,7 +530,7 @@ def _option_defects(path: str, option: dict[str, object]) -> list[FieldDefect]:
         if key not in option:
             defects.append(FieldDefect(key_path, f"{key_path} is required"))
             continue
-        check = _undo_defect if key == "undo" else _non_empty_string_defect
+        check = _undo_defect if key == UNDO else _non_empty_string_defect
         defects.extend(_field_defect(key_path, check(option[key])))
     defects.extend(_option_result_defects(path, option))
     if _CAPTION in option:

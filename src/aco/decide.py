@@ -1,9 +1,10 @@
 """The one read-modify-write of expectation lines (`specs/rule.spec.md`,
-`specs/withdraw.spec.md`): `aco rule`, `aco withdraw` and the decision board
-read an item through the target gate and write its folded body once, here,
-so every ruling and every withdrawal takes the same path. `item_lock` serializes
-the writers of one item on this machine; `turn` is that lock plus the fresh read,
-and a writer that judges from another read (`aco cut`) holds `item_lock` alone."""
+`specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
+decision board and the MCP `ask` read an item through the target gate and write
+its folded body once, here, so every ruling, withdrawal and card takes the same
+path. `item_lock` serializes the writers of one item on this machine; `turn` is
+that lock plus the fresh read, and a writer that judges from another read
+(`aco cut`) holds `item_lock` alone."""
 
 import hashlib
 import sys
@@ -56,7 +57,6 @@ class Asked:
     """The answer to an ask: the option line the card stands as, and whether
     this call wrote it (False when the same card already stood)."""
 
-    number: int
     line: expectations.OptionLine
     written: bool
 
@@ -236,7 +236,7 @@ def ask(context: RunContext, fresh: FreshItem, card: Mapping[str, object]) -> As
     asked = cast(expectations.OptionLine, asked)
     for line in standing:
         if isinstance(line, expectations.OptionLine) and line.card_hash == asked.card_hash:
-            return Asked(fresh.number, line, written=False)
+            return Asked(line, written=False)
     _refuse_a_shape_verdict(shape, body.BodyShapeVerdict.INCOMPLETE)
     _committed(context, fresh, new_body)
-    return Asked(fresh.number, asked, written=True)
+    return Asked(asked, written=True)

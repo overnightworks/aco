@@ -35,7 +35,6 @@ _INSTRUCTIONS: Final = (
     f"with {READ_INBOX}, and put a decision card of your own on an item with {ASK}."
 )
 _ENVELOPE_KEYS: Final = ("repository", "item")
-_CARD_KEYS: Final = ("text", *expectation_grammar.OPTION_LINE_KEYS, "options")
 
 
 def _string(description: str | None = None) -> dict[str, object]:
@@ -49,23 +48,22 @@ def _string(description: str | None = None) -> dict[str, object]:
 def _option_property(key: str) -> dict[str, object]:
     if key == expectation_grammar.SAME_AS_TODAY:
         return {"const": True}
-    if key == "undo":
+    if key == expectation_grammar.UNDO:
         return {"type": "string", "enum": [undo.value for undo in expectation_grammar.Undo]}
     return _string()
 
 
 def _line_property(key: str) -> dict[str, object]:
-    if key == "decision_kind":
+    if key == expectation_grammar.DECISION_KIND:
         kinds = [kind.value for kind in expectation_grammar.DecisionKind]
         return {"type": "string", "enum": kinds}
-    if key == "recommended":
+    if key == expectation_grammar.RECOMMENDED:
         return {"type": "string", "enum": list(expectation_grammar.OPTION_LETTERS)}
     return _string()
 
 
 def _ask_schema() -> dict[str, object]:
     grammar = expectation_grammar
-    line_keys = ("text", *grammar.OPTION_LINE_KEYS)
     options = {
         "type": "array",
         "minItems": grammar.OPTION_COUNT_MINIMUM,
@@ -82,13 +80,17 @@ def _ask_schema() -> dict[str, object]:
         "properties": {
             "repository": _string("the repository as read_inbox lists it, owner/repo"),
             "item": {"type": "integer", "description": "the number of an open item"},
-            **{key: _line_property(key) for key in line_keys},
-            "options": options,
+            **{key: _line_property(key) for key in grammar.CARD_LINE_KEYS},
+            grammar.OPTIONS: options,
         },
         "required": [
             *_ENVELOPE_KEYS,
-            *(key for key in line_keys if key not in grammar.OPTION_LINE_OPTIONAL_KEYS),
-            "options",
+            *(
+                key
+                for key in grammar.CARD_LINE_KEYS
+                if key not in grammar.OPTION_LINE_OPTIONAL_KEYS
+            ),
+            grammar.OPTIONS,
         ],
         "additionalProperties": False,
     }
@@ -209,7 +211,7 @@ def _ask_defects(arguments: Mapping[str, object]) -> list[str]:
     """Every defect of the envelope of `ask`'s arguments: an unknown key, a
     `repository` that is no string, an `item` that is no integer. The card's
     values are the grammar's to judge."""
-    allowed = (*_ENVELOPE_KEYS, *_CARD_KEYS)
+    allowed = (*_ENVELOPE_KEYS, *expectation_grammar.CARD_KEYS)
     defects = [f"unknown argument: {key}" for key in arguments if key not in allowed]
     item = arguments.get("item")
     if not isinstance(arguments.get("repository"), str):

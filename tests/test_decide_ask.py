@@ -66,7 +66,7 @@ def test_a_card_is_written_once_over_the_body_it_read_and_answered_with_its_stor
 
     written = client.item_bodies[NUMBER]
     *_, stored = expectations.expectation_lines(written, storage=storage)
-    assert (asked.written, asked.number, client.body_writes) == (True, NUMBER, [(NUMBER, written)])
+    assert (asked.written, client.body_writes) == (True, [(NUMBER, written)])
     assert client.body_replacings == [before]
     assert asked.line == stored
     assert (asked.line.index, asked.line.asked_on, asked.line.ruling) == (2, TODAY, None)

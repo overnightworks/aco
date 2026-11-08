@@ -24,6 +24,7 @@ from .body import (
 from .expectation_grammar import (
     ASKED_ON,
     OPTION_LETTERS,
+    OPTIONS,
     OTHER,
     RETURNED_NOTE,
     RETURNED_ON,
@@ -447,9 +448,9 @@ def ask_line(body: str, card: Mapping[str, object], asked_on: date) -> str:
     the wrong type refuses with its sentence, naming every defect."""
     located = locate_block(body)
     entries = block_expectation_dicts(located.data)
-    keys = {key: value for key, value in card.items() if key not in ("text", "options")}
+    keys = {key: value for key, value in card.items() if key not in ("text", OPTIONS)}
     asked = {"text": card.get("text"), ASKED_ON: asked_on, **keys}
-    new_entries = [*entries, {**asked, "option": card.get("options", [])}]
+    new_entries = [*entries, {**asked, "option": card.get(OPTIONS, [])}]
     defects = block_expectation_defects(cast(list[object], new_entries))
     if defects:
         raise ExpectationCardDefectError(
