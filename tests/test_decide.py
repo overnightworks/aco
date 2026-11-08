@@ -210,13 +210,15 @@ def item_locks(tmp_path: Path) -> list[str]:
 class LockWitnessForge(FakeForge):
     """Records, at every read of an item, whether the item's lock file is held by
     another open file description: a read made under the per-item turn finds it
-    held, so no second writer can read the item before the first one has written.
+    held, so no second writer can read the item before the first one has written;
+    the same holds at every write.
     A read answers the body last written, as a real forge does."""
 
     def __init__(self, reference: forge.ItemReference, lock_directory: Path) -> None:
         super().__init__(issue_references={90: reference})
         self.lock_directory = lock_directory
         self.lock_held_at_reads: list[bool] = []
+        self.lock_held_at_writes: list[bool] = []
 
     def item_reference(self, number: int) -> forge.ItemReference:
         reference = super().item_reference(number)
@@ -224,6 +226,10 @@ class LockWitnessForge(FakeForge):
             reference = replace(reference, body=self.item_bodies[number])
         self.lock_held_at_reads.append(self._lock_is_held())
         return reference
+
+    def update_item_body(self, number: int, body: str) -> None:
+        self.lock_held_at_writes.append(self._lock_is_held())
+        super().update_item_body(number, body)
 
     def _lock_is_held(self) -> bool:
         if not self.lock_directory.is_dir():
@@ -277,6 +283,7 @@ class TestTurn:
         )
         assert option_rulings(lines) == ["A", "A"]
         assert client.lock_held_at_reads == [True, True]
+        assert client.lock_held_at_writes == [True, True]
 
     def test_the_lock_is_one_digest_named_file_per_item_in_one_flat_directory(
         self, github_clone: Path, tmp_path: Path
