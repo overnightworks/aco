@@ -49,7 +49,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-08] `tools/list` lists `read_inbox` (no properties, `readOnlyHint` true) and `ask` (`repository`, `item`, a card's keys; `readOnlyHint` false, `destructiveHint` false, `idempotentHint` true).
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
 - [ ] [MCP-10] `tools/call` of an unknown tool, of `read_inbox` with arguments, or of `ask` with arguments that are no object, is answered error `-32602`.
-- [ ] [MCP-20] Standard output carries only these answers, one per line; the process writes its logs to standard error, and every child process it starts reads the null device or only the data aco pipes to it, never the host's stream.
+- [ ] [MCP-20] Standard output carries only these answers, one per line; logs go to standard error; every child process reads the null device or only data aco pipes to it, never the host's stream.
 
 ## Reading the inbox
 
