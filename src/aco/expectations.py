@@ -13,8 +13,8 @@ from typing import ClassVar, TypeGuard, cast
 from . import protocol
 from .body import (
     BodyReadState,
-    Storage,
     ContractDefect,
+    Storage,
     block_expectation_dicts,
     body_defect_text,
     locate_block,

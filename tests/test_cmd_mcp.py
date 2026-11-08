@@ -22,7 +22,7 @@ from discovery_fixtures import (
     repository_with_card,
     write_config,
 )
-from option_cards import open_option_entry
+from option_cards import ask_card, open_option_entry
 
 from aco import cli, session
 
@@ -135,7 +135,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         exit_code, rest, stderr = _finish(child)
 
     assert initialized["result"]["protocolVersion"] == "2025-06-18"
-    assert [tool["name"] for tool in listed["result"]["tools"]] == ["read_inbox"]
+    assert [tool["name"] for tool in listed["result"]["tools"]] == ["read_inbox", "ask"]
     assert inbox["isError"] is False
     structured = inbox["structuredContent"]
     assert structured["root"] == str(root)
@@ -165,15 +165,21 @@ class _Script:
                 yield step.encode() + b"\n"
 
 
-def _call_line(request_id: int) -> str:
+def _call_line(
+    request_id: int, name: str = "read_inbox", arguments: dict[str, object] | None = None
+) -> str:
+    params: dict[str, object] = {"name": name}
+    if arguments is not None:
+        params["arguments"] = arguments
     return json.dumps(
-        {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "method": "tools/call",
-            "params": {"name": "read_inbox"},
-        }
+        {"jsonrpc": "2.0", "id": request_id, "method": "tools/call", "params": params}
     )
+
+
+def _ask_line(request_id: int, repository: str = "board-forge/here", item: int = 1) -> str:
+    card = ask_card(question="Soll der Take danach markiert bleiben?")
+    arguments = {"repository": repository, "item": item, **card}
+    return _call_line(request_id, "ask", arguments)
 
 
 def _arrive(root: Path) -> None:
@@ -258,6 +264,50 @@ def test_a_repository_whose_read_fails_is_listed_as_unavailable_beside_the_other
         (entry["repository"], entry.get("unavailable"))
         for entry in answer["result"]["structuredContent"]["repositories"]
     ] == [("board-forge/broken", "the forge is down"), ("board-forge/good", None)]
+
+
+def test_an_asked_card_shows_in_the_inbox_read_and_is_stored_once(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    here = repository_with_card(root / "here", 1, "Here")
+
+    _, [asked, repeated, inbox] = _serve_in_process(
+        monkeypatch, _ask_line(1), _ask_line(2), _call_line(3)
+    )
+
+    written, again = asked["result"], repeated["result"]
+    line = written["structuredContent"]["line"]
+    assert (written["isError"], written["structuredContent"]["written"]) == (False, True)
+    assert written["structuredContent"]["repository"] == "board-forge/here"
+    assert (line["index"], line["asked_on"]) == (2, board_forge.RULING_DAY.isoformat())
+    assert (again["structuredContent"]["written"], again["structuredContent"]["line"]) == (
+        False,
+        line,
+    )
+    [item] = inbox["result"]["structuredContent"]["repositories"][0]["items"]
+    assert [shown["index"] for shown in item["lines"]] == [1, 2]
+    assert item["lines"][1] == line
+    assert here.body_writes() == [1]
+
+
+@pytest.mark.parametrize(
+    ("ask_line", "sentence"),
+    [
+        pytest.param(_ask_line(1, repository="board-forge/nowhere"), "no repository", id="unknown"),
+        pytest.param(_ask_line(1, item=9), "9", id="missing-item"),
+    ],
+)
+def test_a_card_for_an_undiscovered_repository_or_item_is_a_tool_error_that_writes_nothing(
+    ask_line: str, sentence: str, root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    here = repository_with_card(root / "here", 1, "Here")
+
+    _, [answer] = _serve_in_process(monkeypatch, ask_line)
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert sentence in result["content"][0]["text"]
+    assert here.body_writes() == []
 
 
 class _ClosedPipe(io.StringIO):

@@ -249,3 +249,11 @@ def shown_hash(raw: str, index: int) -> str:
     line = expectation_lines(raw)[index - 1]
     assert isinstance(line, OptionLine)
     return line.card_hash
+
+
+def ask_card(**changes: object) -> dict[str, object]:
+    """The open card as an `ask` caller passes it: its keys and `options`, none of
+    the state keys a head or the operator writes, `changes` applied."""
+    entry = open_option_entry()
+    shown = {key: value for key, value in entry.items() if key not in ("asked_on", "option")}
+    return {**shown, "options": entry["option"], **changes}
