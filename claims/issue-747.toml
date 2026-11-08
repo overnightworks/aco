@@ -1,0 +1,8 @@
+claim_id = "c961ec793f3742178ef0ae751454e411"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "dd8d42a27e73c509365937daa92736bc83f20c18"
+branch = "claude/issue-747-the-inbox-lists-steps"
+scope = ["README.md", "docs/ARCHITECTURE.md", "specs/mcp.spec.md", "src/aco/cmd_mcp.py", "src/aco/inbox.py", "src/aco/mcp_server.py", "tests/test_cmd_mcp.py", "tests/test_inbox.py"]
+opened_commit = "0107decf7fd4fe25a2ba764941c158aa1b8bfdac"
+whole_reason = "The inbox's read, its one caller, the tool's text and the spec and docs that state its answer are one vertical slice of one read-only answer."
