@@ -1579,7 +1579,7 @@ def toml_multiline_string(value: str) -> str:
 def _toml_string_escape(char: str) -> str:
     if char in _TOML_STRING_ESCAPES:
         return _TOML_STRING_ESCAPES[char]
-    if has_control_character(char) or char in "\x85  ":
+    if has_control_character(char) or char.splitlines() != [char]:
         return f"\\u{ord(char):04X}"
     return char
 

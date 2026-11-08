@@ -8,7 +8,7 @@ import pytest
 
 from aco import protocol
 
-SEPARATORS = ["\x85", " ", " "]
+SEPARATORS = ["\N{NEXT LINE}", "\N{LINE SEPARATOR}", "\N{PARAGRAPH SEPARATOR}"]
 SEPARATOR_IDS = ["next-line", "line-separator", "paragraph-separator"]
 
 

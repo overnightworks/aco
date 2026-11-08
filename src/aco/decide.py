@@ -1,6 +1,6 @@
 """The one read-modify-write of expectation lines (`specs/rule.spec.md`,
 `specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
-decision board and the MCP `ask` read an item through the target gate and write
+decision board and the MCP `ask` and `record_answer` read an item through the target gate and write
 its folded body once, here, so every ruling, withdrawal and card takes the same
 path. `item_lock` serializes the writers of one item on this machine; `turn` is
 that lock plus the fresh read, and a writer that judges from another read
