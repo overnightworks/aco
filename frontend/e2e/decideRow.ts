@@ -53,7 +53,9 @@ export async function routeRepositories(
 		await route.fulfill({
 			json: {
 				repos: names.map((name) =>
-					name in failed ? { name, error: failed[name], items: [] } : { ...board.repos[0], name }
+					name in failed
+						? { name, error: failed[name], items: [], steps: [] }
+						: { ...board.repos[0], name }
 				)
 			}
 		});
