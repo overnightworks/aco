@@ -5,8 +5,11 @@ of the repository wrote and no other. In a public repository a stranger can
 open an item that carries a card, and a card reaches the operator's decision
 surface only from a writer of the repository.
 
+The steps only the operator can take come from the same items: those a member
+wrote that carry the `needs-operator` label, each with its block's `next`.
+
 The read across repositories: of those rows, the option lines still waiting on
-the operator, for every repository discovery found.
+the operator, and the steps, for every repository discovery found.
 """
 
 from collections.abc import Callable, Iterable
@@ -37,15 +40,55 @@ def waiting_rows(rows_read: Iterable[rulings.Row]) -> tuple[rulings.Row, ...]:
     return tuple(waiting)
 
 
-type RowReader = Callable[[repositories.Repository], tuple[rulings.Row, ...]]
-"""One repository's rows, as `rows` returns them; raises `protocol.ClaimError`
-or `OSError` when that repository cannot be read."""
+@dataclass(frozen=True)
+class Step:
+    number: int
+    title: str
+    step: str | None
+    """The block's `next`; `None` when the body has no readable block."""
+
+
+def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[Step, ...]:
+    """The members' readable items among `issues` that carry the
+    `needs-operator` label, by descending number."""
+    found = [
+        Step(
+            issue.number,
+            issue.title,
+            body.parse_body(issue.body, storage=storage).contract.next,
+        )
+        for issue in issues
+        if issue.author_is_member
+        and issue.unreadable is None
+        and workboard.has_label(issue.labels, workboard.NEEDS_OPERATOR_LABEL)
+    ]
+    return tuple(sorted(found, key=lambda step: -step.number))
+
+
+@dataclass(frozen=True)
+class Reading:
+    """What one listing of a repository's open items holds for the operator."""
+
+    rows: tuple[rulings.Row, ...]
+    steps: tuple[Step, ...]
+
+
+def read_issues(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> Reading:
+    """The rows and the steps among `issues`, which are listed once."""
+    listed = tuple(issues)
+    return Reading(rows(listed, storage=storage), steps(listed, storage=storage))
+
+
+type IssueReader = Callable[[repositories.Repository], Reading]
+"""One repository's `Reading`; raises `protocol.ClaimError` or `OSError` when
+that repository cannot be read."""
 
 
 @dataclass(frozen=True)
 class Waiting:
     repository: str
     rows: tuple[rulings.Row, ...]
+    steps: tuple[Step, ...]
 
 
 @dataclass(frozen=True)
@@ -62,14 +105,15 @@ class Inbox:
     unreadable: tuple[repositories.UnavailableCheckout, ...]
 
 
-def read(discovery: repositories.Discovery, read_rows: RowReader) -> Inbox:
+def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbox:
     """What waits on the operator in every repository of `discovery`, the
     repositories read concurrently; one that cannot be read is listed as
     unavailable and the others are still read."""
 
     def read_one(repository: repositories.Repository) -> Waiting | Unavailable:
         try:
-            return Waiting(repository.label, waiting_rows(read_rows(repository)))
+            reading = read_issues_of(repository)
+            return Waiting(repository.label, waiting_rows(reading.rows), reading.steps)
         except (protocol.ClaimError, OSError) as error:
             return Unavailable(repository.label, str(error))
 
@@ -78,8 +122,13 @@ def read(discovery: repositories.Discovery, read_rows: RowReader) -> Inbox:
     return Inbox(discovery.root, entries, discovery.unavailable)
 
 
+def step_json(step: Step) -> dict[str, object]:
+    return {"number": step.number, "title": step.title, "step": step.step}
+
+
 def inbox_json(inbox: Inbox) -> dict[str, object]:
-    """The inbox as JSON: items and lines in the shapes `aco rulings --json` prints."""
+    """The inbox as JSON: items and lines in the shapes `aco rulings --json`
+    prints, and the steps."""
     return {
         "root": str(inbox.root),
         "repositories": [
@@ -88,6 +137,7 @@ def inbox_json(inbox: Inbox) -> dict[str, object]:
             else {
                 "repository": entry.repository,
                 "items": [rulings.row_json(row) for row in entry.rows],
+                "steps": [step_json(step) for step in entry.steps],
             }
             for entry in inbox.entries
         ],

@@ -26,12 +26,12 @@ from .session import RunContext
 _GLOBAL_REPO_MESSAGE = "aco mcp finds its repositories itself; --repo does not apply to it"
 
 
-def _repository_rows(repository: repositories.Repository) -> tuple[rulings.Row, ...]:
+def _repository_reading(repository: repositories.Repository) -> inbox.Reading:
     # Looked up on the module at every call, so a replaced `run_context` (the
     # board's test forge) reaches every read.
     context = session.run_context(None).for_directory(repository.directory)
     issues = context.forge.list_open_board_issues()
-    return inbox.rows(issues, storage=context.config.storage)
+    return inbox.read_issues(issues, storage=context.config.storage)
 
 
 def _discovered() -> repositories.Discovery:
@@ -47,7 +47,7 @@ def _discovered() -> repositories.Discovery:
 
 def read_inbox() -> dict[str, object]:
     """The read of every repository the scan found."""
-    return inbox.inbox_json(inbox.read(_discovered(), _repository_rows))
+    return inbox.inbox_json(inbox.read(_discovered(), _repository_reading))
 
 
 def _context_of(label: str) -> RunContext:

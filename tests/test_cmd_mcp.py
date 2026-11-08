@@ -10,14 +10,14 @@ import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import IO, Any, cast
 
 import board_forge
 import pytest
-from board_fixtures import board_issue
+from board_fixtures import board_issue, complete_contract
 from cli_fixtures import run_cli
 from discovery_fixtures import (
     configure_root,
@@ -28,7 +28,7 @@ from discovery_fixtures import (
 from github_fixtures import FakeForge, serve_forge
 from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
 
-from aco import body_fence, cli, expectations, forge, session
+from aco import body_fence, cli, expectations, forge, session, workboard
 from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
@@ -273,6 +273,62 @@ def test_a_repository_whose_read_fails_is_listed_as_unavailable_beside_the_other
         (entry["repository"], entry.get("unavailable"))
         for entry in answer["result"]["structuredContent"]["repositories"]
     ] == [("board-forge/broken", "the forge is down"), ("board-forge/good", None)]
+
+
+@dataclass(frozen=True)
+class _LabelledForge(board_forge.BoardForge):
+    """The board's test forge, whose listing carries `needs-operator` on the
+    items numbered in `labelled`."""
+
+    labelled: frozenset[int] = frozenset()
+
+    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
+        return tuple(
+            replace(issue, labels=("needs-operator",)) if issue.number in self.labelled else issue
+            for issue in super().list_open_board_issues()
+        )
+
+
+def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    here = repository_with_card(root / "here", 1, "Here")
+    here.put_item(2, complete_contract("Rotate the key."), title="Key")
+    here.put_item(3, complete_contract("Not a step."), title="Plain")
+    elsewhere = repository_with_card(root / "elsewhere", 4, "Elsewhere")
+
+    def build_forge(context: session.RunContext) -> board_forge.BoardForge:
+        return _LabelledForge(context.toplevel, frozenset({1, 2}))
+
+    monkeypatch.setattr(
+        session,
+        "run_context",
+        lambda repo: session.RunContext(repo, build_forge=build_forge, today=lambda: board_forge.RULING_DAY),
+    )
+    monkeypatch.setattr(sys, "stdin", _Script(_call_line(1)))
+    replies = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", replies)
+
+    exit_code = cli.main(["mcp"])
+
+    [answer] = [json.loads(line) for line in replies.getvalue().splitlines()]
+    entries = {
+        entry["repository"]: entry for entry in answer["result"]["structuredContent"]["repositories"]
+    }
+    assert exit_code == 0
+    assert entries["board-forge/here"]["steps"] == [
+        {"number": 2, "title": "Key", "step": "Rotate the key."},
+        {"number": 1, "title": "Here", "step": "X"},
+    ]
+    assert [item["number"] for item in entries["board-forge/here"]["items"]] == [1]
+    assert entries["board-forge/elsewhere"]["steps"] == []
+    for checkout in (here, elsewhere):
+        listings = [
+            request
+            for request in checkout.request_log()
+            if request.operation == board_forge.ForgeOperation.LIST_OPEN_ISSUES
+        ]
+        assert len(listings) == 1
 
 
 def test_an_asked_card_shows_in_the_inbox_read_and_is_stored_once(
