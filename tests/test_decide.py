@@ -1,5 +1,6 @@
 """The shared ruling writer (`specs/rule.spec.md`) on a fake forge, on both storage pins."""
 
+import fcntl
 import re
 import threading
 from dataclasses import replace
@@ -206,32 +207,39 @@ def item_locks(tmp_path: Path) -> list[str]:
     return sorted(path.name for path in directory.iterdir())
 
 
-class RendezvousForge(FakeForge):
-    """The first reader of an item waits for a second read before it goes on:
-    without a per-item turn the second reader reads the old body. Both writers
-    have entered their turn before the first read answers, so the wait starts
-    with the contention established; its timeout only bounds the time a
-    serialized second writer is given to read, never which interleaving is
-    tested. A read answers the body last written, as a real forge does."""
+class LockWitnessForge(FakeForge):
+    """Records, at every read of an item, whether the item's lock file is held by
+    another open file description: a read made under the per-item turn finds it
+    held, so no second writer can read the item before the first one has written.
+    A read answers the body last written, as a real forge does."""
 
-    def __init__(self, reference: forge.ItemReference) -> None:
+    def __init__(self, reference: forge.ItemReference, lock_directory: Path) -> None:
         super().__init__(issue_references={90: reference})
-        self.reads = 0
-        self.guard = threading.Lock()
-        self.second_read = threading.Event()
+        self.lock_directory = lock_directory
+        self.lock_held_at_reads: list[bool] = []
 
     def item_reference(self, number: int) -> forge.ItemReference:
         reference = super().item_reference(number)
         if number in self.item_bodies:
             reference = replace(reference, body=self.item_bodies[number])
-        with self.guard:
-            self.reads += 1
-            first = self.reads == 1
-        if first:
-            self.second_read.wait(timeout=2)
-        else:
-            self.second_read.set()
+        self.lock_held_at_reads.append(self._lock_is_held())
         return reference
+
+    def _lock_is_held(self) -> bool:
+        if not self.lock_directory.is_dir():
+            return False
+        locks = list(self.lock_directory.iterdir())
+        return len(locks) == 1 and _held_by_another(locks[0])
+
+
+def _held_by_another(lock: Path) -> bool:
+    with lock.open("rb") as probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(probe, fcntl.LOCK_UN)
+        return False
 
 
 class TestTurn:
@@ -241,14 +249,12 @@ class TestTurn:
         """Spec: RULE-40, WITHDRAW-15, ABRD-113 -- writers of one item are serialized."""
         track_board_config(github_clone, 'storage = "github"\n')
         reference = forge.ItemReference(forge.ItemState.OPEN, TITLE, item_with(card(), card()))
-        client = RendezvousForge(reference)
-        start = threading.Barrier(2, timeout=5)
+        client = LockWitnessForge(reference, tmp_path / "state" / "aco" / "item-locks")
         failures: list[BaseException] = []
 
         def write(line: int) -> None:
             context = run_context_over(client)
             try:
-                start.wait()
                 with decide.turn(
                     context,
                     90,
@@ -270,6 +276,7 @@ class TestTurn:
             expectations.expectation_lines(client.item_bodies[90], storage=body.Storage.GITHUB)
         )
         assert option_rulings(lines) == ["A", "A"]
+        assert client.lock_held_at_reads == [True, True]
 
     def test_the_lock_is_one_digest_named_file_per_item_in_one_flat_directory(
         self, github_clone: Path, tmp_path: Path
@@ -293,7 +300,7 @@ class TestTurn:
         self, github_clone: Path, tmp_path: Path
     ) -> None:
         """Spec: RULE-41, WITHDRAW-16 -- no lock, so nothing is read or written."""
-        context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        _, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
         forges_built: list[RunContext] = []
         context = RunContext(None, build_forge=lambda built: forges_built.append(built) or client)
         blocker = tmp_path / "blocker"
