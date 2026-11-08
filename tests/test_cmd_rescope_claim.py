@@ -310,7 +310,8 @@ def test_a_rescope_reads_the_checkout_its_path_names_never_the_working_directory
     """Spec: RESC-18, CAS-53. The checkout comes from the nearest existing
     ancestor of the path, here `src` under a lane worktree while the process
     stands in the repository's own checkout; its toplevel is read there once and
-    is the one the board configuration and the state ref are read from."""
+    is the one the board configuration and the state ref are read from. An item
+    claim reads the state ref a second time once the item lock is held."""
     standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     serve_body(monkeypatch, complete_contract("Build it."))
     monkeypatch.chdir(github_clone)
@@ -319,4 +320,4 @@ def test_a_rescope_reads_the_checkout_its_path_names_never_the_working_directory
 
     result = run_cli(rescope_arguments("--add", f"{root}/src/not/yet/there.py"), capsys)
 
-    assert (result.status, *reads.drain()) == (0, {root / "src": 1}, {root: 1}, {root: 1})
+    assert (result.status, *reads.drain()) == (0, {root / "src": 1}, {root: 1}, {root: 2})

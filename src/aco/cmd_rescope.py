@@ -384,9 +384,9 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
     selection = _selected_rescope(parsed, run_context)
     selected = selection.selected
     if isinstance(selected.identity, protocol.IssueIdentity):
-        locked = selection.context.observed_afresh()
-        with _item_turn(locked, selected.identity.issue) as item:
-            new_state = _rescope_transition(_judged_selection(selection.requested, locked), item)
+        afresh = selection.context.observed_afresh()
+        with _item_turn(afresh, selected.identity.issue) as item:
+            new_state = _rescope_transition(_judged_selection(selection.requested, afresh), item)
     else:
         new_state = _rescope_transition(selection, None)
     rescoped = new_state.claims[protocol.claim_key(selected.identity, selected.branch)]
