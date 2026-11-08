@@ -1,0 +1,8 @@
+claim_id = "2759291a8edc490b8a32f6f39def65bb"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "a7f6880288a60a3206c02ed7e8cfcb76ccf925dc"
+branch = "claude/issue-746-picture-fence-line"
+scope = ["quality/baseline.toml", "specs/mcp.spec.md", "src/aco/protocol.py", "tests/test_decide.py", "tests/test_decide_ask.py", "tests/test_protocol_toml_string.py"]
+opened_commit = "96ce459b381d7aa0730d87396955b8daa330ec94"
+whole_reason = "The writer, the one spec line its refusal stood on and the tests that pin both are one change to one writer."
