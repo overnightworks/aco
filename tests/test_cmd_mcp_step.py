@@ -237,6 +237,7 @@ def test_the_lookup_marks_the_item_a_member_wrote_with_that_title_and_step_or_op
 ) -> None:
     for number, item in standing.items():
         here.put_item(number, item.body, title=item.title, author_is_member=item.author_is_member)
+    unmarked = {number: here.stored_item(number) for number in standing if number != expected_item}
 
     [result] = _serve(monkeypatch, _step_line(1, item=None, title=title_given))
 
@@ -244,6 +245,7 @@ def test_the_lookup_marks_the_item_a_member_wrote_with_that_title_and_step_or_op
     assert result["structuredContent"]["created"] is created
     assert here.stored_item(expected_item).labels == [_LABEL]
     assert [operation for operation, _ in _writes(here)].count("create_issue") == int(created)
+    assert {number: here.stored_item(number) for number in unmarked} == unmarked
 
 
 def test_a_title_with_another_step_leaves_the_first_item_as_it_was(
