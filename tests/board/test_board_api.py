@@ -26,8 +26,10 @@ from aco_board_fixtures import (
     serving,
     serving_two,
 )
-from board_forge import BoardForge, item_body
+from board_forge import BoardForge, ForgeOperation, item_body
 from option_cards import open_option_entry
+
+from aco import workboard
 
 _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
 _OPEN_CARD = item_body(open_option_entry())
@@ -287,6 +289,7 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
                 "name": DEFAULT_LABEL,
                 "error": "no forge adapter for host",
                 "items": [],
+                "steps": [],
             }
         ],
     }
@@ -316,6 +319,7 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
         "name": "b",
         "error": "no forge adapter for host",
         "items": [],
+        "steps": [],
     }
 
 
@@ -333,8 +337,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
     assert response.json() == {
         "root": "/",
         "repos": [
-            {"name": "a", "error": "a is down", "items": []},
-            {"name": "b", "error": "b is down", "items": []},
+            {"name": "a", "error": "a is down", "items": [], "steps": []},
+            {"name": "b", "error": "b is down", "items": [], "steps": []},
         ],
     }
 
@@ -438,3 +442,48 @@ def test_a_cross_origin_preflight_is_granted_nothing(
     assert response.status >= 400
     assert cross_origin_headers(response) == []
     _assert_no_call(port, repository)
+
+
+def _listings_in(repository: BoardForge) -> int:
+    return sum(
+        request.operation is ForgeOperation.LIST_OPEN_ISSUES for request in repository.request_log()
+    )
+
+
+def test_the_board_lists_each_repos_steps_from_its_one_listing_and_none_for_a_failed_repo(
+    two_repositories: tuple[BoardForge, BoardForge],
+) -> None:
+    """ABRD-06, ABRD-08, ABRD-116: a step is `{number, title, step}` by descending
+    number, `step` is null without a readable block, and a repo that failed
+    lists none."""
+    repository_a, repository_b = two_repositories
+    needs_operator = [workboard.NEEDS_OPERATOR_LABEL]
+    repository_a.put_item(
+        3, item_body(next_step="Rotate the key."), title="Key", labels=needs_operator
+    )
+    repository_a.put_item(9, "No block here.", title="Plain", labels=needs_operator)
+    repository_a.put_item(5, item_body(), title="Not a step")
+    repository_b.fail_listing("no forge adapter for host")
+
+    with serving_two(two_repositories) as board:
+        response = board.get_board_json()
+
+    repos = cast(list[dict[str, Any]], response.json()["repos"])
+    assert [repo["steps"] for repo in repos] == [
+        [
+            {"number": 9, "title": "Plain", "step": None},
+            {"number": 3, "title": "Key", "step": "Rotate the key."},
+        ],
+        [],
+    ]
+    assert _listings_in(repository_a) == 1
+
+
+def test_a_repo_with_no_step_lists_an_empty_steps_beside_its_items(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    repository.put_item(42, _OPEN_CARD, title="Share page")
+
+    [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
+
+    assert (repo["steps"], [item["number"] for item in repo["items"]]) == ([], [42])

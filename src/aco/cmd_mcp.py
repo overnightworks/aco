@@ -31,8 +31,7 @@ def _repository_reading(repository: repositories.Repository) -> inbox.Reading:
     # Looked up on the module at every call, so a replaced `run_context` (the
     # board's test forge) reaches every read.
     context = session.run_context(None).for_directory(repository.directory)
-    issues = context.forge.list_open_board_issues()
-    return inbox.read_issues(issues, storage=context.config.storage)
+    return inbox.read_context(context)
 
 
 def _discovered() -> repositories.Discovery:

@@ -28,7 +28,7 @@ from board_fixtures import write_repository_config
 from board_forge import BoardForge
 from cli_fixtures import real_git
 
-from aco import expectations, rulings, workboard
+from aco import expectations, inbox, rulings, workboard
 from aco.board.aco_source import AcoSource
 from aco.board.board import Board, Boards, Found
 from aco.board.ports import CardChanged, CardCheck, DecisionPort, DecisionResult
@@ -57,7 +57,7 @@ def fixed_boards(boards: Mapping[str, Board]) -> Callable[[], Found]:
 
 
 class PortOperation(StrEnum):
-    ROWS = "rows"
+    READING = "reading"
     RULE_CARD = "rule_card"
 
 
@@ -111,12 +111,12 @@ class RecordedPort:
             self._held = held
         return held
 
-    def rows(self) -> tuple[rulings.Row, ...]:
-        self._record(PortCall(PortOperation.ROWS, CallPhase.ENTERED))
+    def reading(self) -> inbox.Reading:
+        self._record(PortCall(PortOperation.READING, CallPhase.ENTERED))
         try:
-            return self._port.rows()
+            return self._port.reading()
         finally:
-            self._record(PortCall(PortOperation.ROWS, CallPhase.COMPLETED))
+            self._record(PortCall(PortOperation.READING, CallPhase.COMPLETED))
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         held = self._record(PortCall(PortOperation.RULE_CARD, CallPhase.ENTERED, item))

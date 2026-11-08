@@ -1,6 +1,6 @@
 """The decision board's own rules, free of any transport.
 
-`Board` reads aco's rows afresh from its `DecisionPort` and
+`Board` reads aco's rows and steps afresh from its `DecisionPort` and
 writes one whole option card at a time through it, checking the card on
 that write's own read of its item, with no concurrency state of its own.
 `Boards` composes one or more `Board`s under their repo labels: it reads
@@ -17,7 +17,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 
-from .. import expectations, rulings
+from .. import expectations, inbox, rulings
 from .ports import (
     CardChanged,
     CardDecision,
@@ -45,16 +45,12 @@ def wire_fingerprint(repo: str, item: int, line: expectations.OptionLine) -> str
 
 
 @dataclass(frozen=True)
-class BoardSnapshot:
-    rows: tuple[rulings.Row, ...]
-    """Every open item with expectation lines, in RUL-03's order."""
-
-
-@dataclass(frozen=True)
 class RepoSnapshot:
     name: str
     rows: tuple[rulings.Row, ...]
     """This repo's open items with expectation lines, in RUL-03's order."""
+    steps: tuple[inbox.Step, ...]
+    """This repo's steps only the operator can take, by descending number."""
 
 
 @dataclass(frozen=True)
@@ -87,9 +83,9 @@ class Board:
     def __init__(self, decisions: DecisionPort) -> None:
         self._decisions = decisions
 
-    def snapshot(self) -> BoardSnapshot:
+    def snapshot(self) -> inbox.Reading:
         """A fresh read of the source; raises `DecisionSourceUnavailableError`."""
-        return BoardSnapshot(self._decisions.rows())
+        return self._decisions.reading()
 
     def decide_card(self, posted: PostedCard, repo: str) -> DecisionResult:
         """Write `posted` with one call unless it no longer reads as the card shown.
@@ -221,8 +217,9 @@ class Boards:
             self._turn.notify_all()
 
 
-def _reading(label: str, future: Future[BoardSnapshot]) -> RepoReading:
+def _reading(label: str, future: Future[inbox.Reading]) -> RepoReading:
     try:
-        return RepoSnapshot(label, future.result().rows)
+        reading = future.result()
+        return RepoSnapshot(label, reading.rows, reading.steps)
     except DecisionSourceUnavailableError as error:
         return RepoUnavailable(label, str(error))

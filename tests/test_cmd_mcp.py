@@ -528,7 +528,7 @@ def test_a_chat_answer_binds_like_a_board_ruling(
     serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(1, "Here", ruled),)))
     rulings = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
     shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
-    [decision_row] = AcoSource(here.directory).rows()
+    [decision_row] = AcoSource(here.directory).reading().rows
     next_after = run_cli(["next"], capsys).expect_success()
 
     listed = inbox_before["result"]["structuredContent"]["repositories"][0]["items"]

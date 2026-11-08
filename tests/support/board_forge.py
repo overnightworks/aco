@@ -136,10 +136,16 @@ class BoardForge:
     directory: Path
 
     def put_item(
-        self, number: int, raw_body: str, *, title: str = "Karte", author_is_member: bool = True
+        self,
+        number: int,
+        raw_body: str,
+        *,
+        title: str = "Karte",
+        author_is_member: bool = True,
+        labels: Iterable[str] = (),
     ) -> None:
         state = self._state()
-        state.items[number] = StoredItem(title, raw_body, author_is_member)
+        state.items[number] = StoredItem(title, raw_body, author_is_member, list(labels))
         self._replace_state(state)
 
     def replace_items(self, items: Mapping[int, StoredItem]) -> None:
@@ -388,12 +394,14 @@ def run_context(repo: forge.RepositoryId | None) -> session.RunContext:
     return session.RunContext(repo, build_forge=_forge_of, today=lambda: RULING_DAY)
 
 
-def item_body(*entries: Mapping[str, object]) -> str:
+def item_body(*entries: Mapping[str, object], next_step: str | None = None) -> str:
     """An item body whose block carries `entries` as its `[[expectation]]`
-    lines, rendered by aco itself. A ruled option line without a
-    `card_hash` gets the hash of its own card."""
+    lines, rendered by aco itself, and `next_step` as its `next` when given. A
+    ruled option line without a `card_hash` gets the hash of its own card."""
+    minimal = tomllib.loads(MINIMAL_BLOCK_TOML)
     data = {
-        **tomllib.loads(MINIMAL_BLOCK_TOML),
+        **minimal,
+        "next": minimal["next"] if next_step is None else next_step,
         "expectation": [_with_card_hash(entry) for entry in entries],
     }
     return block_body(body.render_block(data).removesuffix("\n"))

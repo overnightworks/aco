@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from aco_board_fixtures import board_checkout
 from board_fixtures import board_issue, complete_contract
-from board_forge import item_body
+from board_forge import ForgeOperation, item_body, run_context
 from github_pages import (
     board_issue_page_client,
     raw_board_issue,
@@ -289,3 +290,25 @@ def test_a_step_with_no_text_prints_as_null() -> None:
     step = inbox.Step(9, "Item 9", None)
 
     assert inbox.step_json(step) == {"number": 9, "title": "Item 9", "step": None}
+
+
+def test_one_read_of_a_checkout_lists_its_open_items_once_for_its_rows_and_its_steps(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    del isolated_global_git_config
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(5, item_body(open_option_entry()), labels=[workboard.NEEDS_OPERATOR_LABEL])
+    context = run_context(None).for_directory(repository.directory)
+
+    reading = inbox.read_context(context)
+
+    assert ([row.number for row in reading.rows], [step.number for step in reading.steps]) == (
+        [5],
+        [5],
+    )
+    listings = [
+        request
+        for request in repository.request_log()
+        if request.operation is ForgeOperation.LIST_OPEN_ISSUES
+    ]
+    assert len(listings) == 1

@@ -1,7 +1,8 @@
 """`DecisionPort` over aco's own library, in process.
 
-A read lists the members' open items through `inbox.rows`, the rows `aco rulings`
-prints on the items a member wrote. A decision reads its one item inside
+A read lists the members' open items once through `inbox.read_context`: the rows
+`aco rulings` prints on the items a member wrote, and the steps only the operator
+can take. A decision reads its one item inside
 `decide.turn` (the item's lock, then the fresh read), runs the board's check on
 aco's own lines of that read, and writes the whole card through `decide.rule`, the
 writer `aco rule` uses. Every read and every write builds its own context bound
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .. import decide, expectations, forge, inbox, protocol, rulings, session
+from .. import decide, expectations, forge, inbox, protocol, session
 from .ports import (
     CardAnswer,
     CardChanged,
@@ -33,11 +34,10 @@ from .ports import (
 class AcoSource:
     directory: Path
 
-    def rows(self) -> tuple[rulings.Row, ...]:
+    def reading(self) -> inbox.Reading:
         context = self._context()
         try:
-            issues = context.forge.list_open_board_issues()
-            return inbox.rows(issues, storage=context.config.storage)
+            return inbox.read_context(context)
         except protocol.ClaimError as error:
             raise DecisionSourceUnavailableError(str(error)) from error
 

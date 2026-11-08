@@ -18,7 +18,7 @@ from aco_board_fixtures import CallPhase, PortCall, decision_port, fixed_boards
 from board_forge import BoardForge, item_body
 from option_cards import open_option_entry
 
-from aco import expectations, rulings
+from aco import expectations, inbox, rulings
 from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
@@ -60,8 +60,8 @@ class _HeldDecisions:
         self.ruled_cards: list[CardDecision] = []
         self.read: tuple[rulings.Row, ...] = ()
 
-    def rows(self) -> tuple[rulings.Row, ...]:
-        return self.read
+    def reading(self) -> inbox.Reading:
+        return inbox.Reading(self.read, ())
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         """Checks the posted card on its item's lines, as the real source does on its read."""
