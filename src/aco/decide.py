@@ -109,7 +109,9 @@ def turn(
         try:
             held.enter_context(file_lock.held(lock_path))
         except OSError as error:
-            raise ItemLockUnavailableError(f"cannot lock the item at {lock_path}: {error}") from error
+            raise ItemLockUnavailableError(
+                f"cannot lock the item at {lock_path}: {error}"
+            ) from error
         yield fresh_item(context, number, command=command)
 
 

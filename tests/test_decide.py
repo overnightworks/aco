@@ -1,5 +1,8 @@
 """The shared ruling writer (`specs/rule.spec.md`) on a fake forge, on both storage pins."""
 
+import re
+import threading
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -192,3 +195,108 @@ def test_the_gate_reads_the_item_once(clone: Path) -> None:
     context, client = world(body.Storage.GITHUB, item_with(card()), clone)
     decide.fresh_item(context, 90, command="rule")
     assert client.issue_reference_lookups == [90]
+
+
+def lock_environment(tmp_path: Path) -> dict[str, str]:
+    return {"XDG_STATE_HOME": str(tmp_path / "state")}
+
+
+def item_locks(tmp_path: Path) -> list[str]:
+    directory = tmp_path / "state" / "aco" / "item-locks"
+    return sorted(path.name for path in directory.iterdir())
+
+
+class RendezvousForge(FakeForge):
+    """The first reader of an item waits, bounded, for a second read before it
+    goes on: without a per-item turn the second reader reads the old body. A read
+    answers the body last written, as a real forge does."""
+
+    def __init__(self, reference: forge.ItemReference) -> None:
+        super().__init__(issue_references={90: reference})
+        self.reads = 0
+        self.guard = threading.Lock()
+        self.second_read = threading.Event()
+
+    def item_reference(self, number: int) -> forge.ItemReference:
+        reference = super().item_reference(number)
+        if number in self.item_bodies:
+            reference = replace(reference, body=self.item_bodies[number])
+        with self.guard:
+            self.reads += 1
+            first = self.reads == 1
+        if first:
+            self.second_read.wait(timeout=0.3)
+        else:
+            self.second_read.set()
+        return reference
+
+
+class TestTurn:
+    def test_two_writers_of_distinct_lines_of_one_item_both_land(
+        self, github_clone: Path, tmp_path: Path
+    ) -> None:
+        track_board_config(github_clone, 'storage = "github"\n')
+        reference = forge.ItemReference(forge.ItemState.OPEN, TITLE, item_with(card(), card()))
+        client = RendezvousForge(reference)
+        start = threading.Barrier(2, timeout=5)
+        failures: list[BaseException] = []
+
+        def write(line: int) -> None:
+            context = run_context_over(client)
+            try:
+                start.wait()
+                with decide.turn(
+                    context,
+                    90,
+                    command="rule",
+                    environment=lock_environment(tmp_path),
+                    home=tmp_path,
+                ) as fresh:
+                    decide.rule(context, fresh, [choose(line)], TODAY)
+            except BaseException as failure:
+                failures.append(failure)
+
+        writers = [threading.Thread(target=write, args=(line,)) for line in (1, 2)]
+        for writer in writers:
+            writer.start()
+        for writer in writers:
+            writer.join(timeout=10)
+        assert failures == []
+        lines = tuple(
+            expectations.expectation_lines(client.item_bodies[90], storage=body.Storage.GITHUB)
+        )
+        assert option_rulings(lines) == ["A", "A"]
+
+    def test_the_lock_is_one_digest_named_file_per_item_in_one_flat_directory(
+        self, github_clone: Path, tmp_path: Path
+    ) -> None:
+        context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        client.issue_references[91] = client.issue_references[90]
+        for number in (90, 91, 90):
+            with decide.turn(
+                context,
+                number,
+                command="rule",
+                environment=lock_environment(tmp_path),
+                home=tmp_path,
+            ):
+                pass
+        names = item_locks(tmp_path)
+        assert len(names) == 2
+        assert all(re.fullmatch(r"[0-9a-f]{64}", name) for name in names)
+
+    def test_an_unwritable_lock_directory_refuses_naming_the_path_and_reads_nothing(
+        self, github_clone: Path, tmp_path: Path
+    ) -> None:
+        context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        blocker = tmp_path / "blocker"
+        blocker.write_text("a file, not a directory", encoding="utf-8")
+        environment = {"XDG_STATE_HOME": str(blocker)}
+        turn = decide.turn(context, 90, command="rule", environment=environment, home=tmp_path)
+        with pytest.raises(decide.ItemLockUnavailableError) as refused:
+            turn.__enter__()
+        assert (str(blocker / "aco" / "item-locks") in str(refused.value), client.body_writes) == (
+            True,
+            [],
+        )
+        assert client.issue_reference_lookups == []
