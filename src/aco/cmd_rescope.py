@@ -291,9 +291,9 @@ def _rescope_item_and_claim(
 
 @dataclass(frozen=True)
 class _RescopeSelection:
-    """The claim a rescope names, resolved and judged before anything is read or
-    written: the checkout it runs in, the request, the live claim, the versioned
-    paths and the scope the claim ends with."""
+    """The claim a rescope names, resolved and judged before any write: the
+    checkout it runs in, the request, the live claim, the versioned paths and
+    the scope the claim ends with."""
 
     context: session.RunContext
     requested: protocol.RescopeRequest
