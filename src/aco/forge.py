@@ -398,6 +398,11 @@ class ForgeWriter(ForgeReader, Protocol):
 
     def create_child(self, *, parent: int, title: str, body: str, kind: ItemKind) -> int: ...
 
+    def add_label(self, number: int, label: str) -> None:
+        """Sets `label` on item `number`, creating it when the repository lacks
+        it; raises when the forge's answer does not show it set."""
+        ...
+
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         """Writes `body` as item `number`'s body; `replacing` is the text the write
         replaces, as the caller read it."""

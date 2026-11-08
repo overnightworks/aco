@@ -1,7 +1,6 @@
 """`aco mcp` (`specs/mcp.spec.md`) as a real child process over pipes, its forge
 the board's test forge."""
 
-import fcntl
 import io
 import json
 import os
@@ -26,6 +25,7 @@ from discovery_fixtures import (
     write_config,
 )
 from github_fixtures import FakeForge, serve_forge
+from mcp_lines import Script, call_line
 from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
 
 from aco import body_fence, cli, expectations, forge, session, workboard
@@ -144,6 +144,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         "read_inbox",
         "ask",
         "record_answer",
+        "step",
     ]
     assert inbox["isError"] is False
     structured = inbox["structuredContent"]
@@ -156,39 +157,10 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
     assert (exit_code, rest, stderr) == (0, "", "")
 
 
-class _Script:
-    """Standard input that hands out its lines one by one and runs each
-    callable between two of them, so the world changes while the server waits."""
-
-    def __init__(self, *steps: str | bytes | Callable[[], None]) -> None:
-        self._steps = steps
-
-    @property
-    def buffer(self) -> Iterator[bytes]:
-        for step in self._steps:
-            if callable(step):
-                step()
-            elif isinstance(step, bytes):
-                yield step + b"\n"
-            else:
-                yield step.encode() + b"\n"
-
-
-def _call_line(
-    request_id: int, name: str = "read_inbox", arguments: dict[str, object] | None = None
-) -> str:
-    params: dict[str, object] = {"name": name}
-    if arguments is not None:
-        params["arguments"] = arguments
-    return json.dumps(
-        {"jsonrpc": "2.0", "id": request_id, "method": "tools/call", "params": params}
-    )
-
-
 def _ask_line(request_id: int, repository: str = "board-forge/here", item: int = 1) -> str:
     card = ask_card(question="Soll der Take danach markiert bleiben?")
     arguments = {"repository": repository, "item": item, **card}
-    return _call_line(request_id, "ask", arguments)
+    return call_line(request_id, "ask", arguments)
 
 
 def _arrive(root: Path) -> None:
@@ -202,7 +174,7 @@ def _serve_in_process(
     code and every answer line."""
     replies = io.StringIO()
     monkeypatch.setattr(session, "run_context", board_forge.run_context)
-    monkeypatch.setattr(sys, "stdin", _Script(*steps))
+    monkeypatch.setattr(sys, "stdin", Script(*steps))
     monkeypatch.setattr(sys, "stdout", replies)
     exit_code = cli.main(["mcp"])
     return exit_code, [json.loads(line) for line in replies.getvalue().splitlines()]
@@ -218,11 +190,11 @@ def test_every_call_scans_afresh_and_a_refusal_is_a_tool_error_the_next_call_rec
         monkeypatch,
         "",
         json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}),
-        _call_line(1),
+        call_line(1),
         lambda: write_config(config_file, config_text),
-        _call_line(2),
+        call_line(2),
         lambda: _arrive(root),
-        _call_line(3),
+        call_line(3),
     )
 
     missing, empty, found = (answer["result"] for answer in answers)
@@ -240,7 +212,7 @@ def test_a_root_holding_only_unreadable_directories_is_a_tool_error_naming_the_r
 ) -> None:
     (root / "broken" / ".git").mkdir(parents=True)
 
-    _, [answer] = _serve_in_process(monkeypatch, _call_line(1))
+    _, [answer] = _serve_in_process(monkeypatch, call_line(1))
 
     result = answer["result"]
     assert result["isError"] is True
@@ -267,7 +239,7 @@ def test_a_repository_whose_read_fails_is_listed_as_unavailable_beside_the_other
     repository_with_card(root / "good", 1, "Good")
     repository_with_card(root / "broken", 2, "Broken").fail_listing("the forge is down")
 
-    _, [answer] = _serve_in_process(monkeypatch, _call_line(1))
+    _, [answer] = _serve_in_process(monkeypatch, call_line(1))
 
     assert [
         (entry["repository"], entry.get("unavailable"))
@@ -307,7 +279,7 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
             repo, build_forge=build_forge, today=lambda: board_forge.RULING_DAY
         ),
     )
-    monkeypatch.setattr(sys, "stdin", _Script(_call_line(1)))
+    monkeypatch.setattr(sys, "stdin", Script(call_line(1)))
     replies = io.StringIO()
     monkeypatch.setattr(sys, "stdout", replies)
 
@@ -340,7 +312,7 @@ def test_an_asked_card_shows_in_the_inbox_read_and_is_stored_once(
     here = repository_with_card(root / "here", 1, "Here")
 
     _, [asked, repeated, inbox] = _serve_in_process(
-        monkeypatch, _ask_line(1), _ask_line(2), _call_line(3)
+        monkeypatch, _ask_line(1), _ask_line(2), call_line(3)
     )
 
     written, again = asked["result"], repeated["result"]
@@ -399,7 +371,7 @@ def test_a_broken_pipe_ends_the_server_with_exit_0(
     read_end, write_end = os.pipe()
     os.close(read_end)
     monkeypatch.setattr(session, "run_context", board_forge.run_context)
-    monkeypatch.setattr(sys, "stdin", _Script(_call_line(1)))
+    monkeypatch.setattr(sys, "stdin", Script(call_line(1)))
     monkeypatch.setattr(sys, "stdout", _ClosedPipe(write_end))
     try:
         exit_code = cli.main(["mcp"])
@@ -464,23 +436,11 @@ def _record_line(request_id: int = 1, /, **changes: object) -> str:
         **changes,
     }
     given = {key: value for key, value in arguments.items() if value is not None}
-    return _call_line(request_id, "record_answer", given)
+    return call_line(request_id, "record_answer", given)
 
 
 def _stored_item(**changes: object) -> dict[str, object]:
     return {**open_option_entry(), **changes}
-
-
-def _lock_is_held(tmp_path: Path) -> bool:
-    directory = tmp_path / "state" / "aco" / "item-locks"
-    for lock in directory.iterdir() if directory.is_dir() else ():
-        with lock.open("rb") as probe:
-            try:
-                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                return True
-            fcntl.flock(probe, fcntl.LOCK_UN)
-    return False
 
 
 def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_line(
@@ -491,7 +451,7 @@ def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_lin
     write = board_forge.BoardForge.update_item_body
 
     def witnessed(self: board_forge.BoardForge, number: int, body: str, *, replacing: str) -> None:
-        lock_held_at_writes.append(_lock_is_held(tmp_path))
+        lock_held_at_writes.append(board_forge.item_lock_is_held(tmp_path))
         write(self, number, body, replacing=replacing)
 
     monkeypatch.setattr(board_forge.BoardForge, "update_item_body", witnessed)
@@ -539,7 +499,7 @@ def test_an_answer_in_the_operators_words_is_stored_verbatim_and_reads_back_equa
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, words: str
 ) -> None:
     _, [answer, inbox] = _serve_in_process(
-        monkeypatch, _record_line(option=None, other=words), _call_line(2)
+        monkeypatch, _record_line(option=None, other=words), call_line(2)
     )
 
     [entry] = here.stored_entries(1)
@@ -560,7 +520,7 @@ def test_a_chat_answer_binds_like_a_board_ruling(
     unruled = here.stored_body(1)
     with monkeypatch.context() as served:
         _, [inbox_before, _, inbox_after] = _serve_in_process(
-            served, _call_line(1), _record_line(2), _call_line(3)
+            served, call_line(1), _record_line(2), call_line(3)
         )
     ruled = here.stored_body(1)
     serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(1, "Here", unruled),)))

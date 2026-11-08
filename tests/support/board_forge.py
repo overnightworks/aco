@@ -8,6 +8,7 @@ to a log beside it. `run_context` is the one replacement for
 it, so the board's aco source reaches this forge and never GitHub.
 """
 
+import fcntl
 import json
 import os
 import threading
@@ -41,6 +42,8 @@ class ForgeOperation(StrEnum):
     LIST_OPEN_ISSUES = "list_open_board_issues"
     READ_ITEM = "item_reference"
     WRITE_BODY = "update_item_body"
+    CREATE_ISSUE = "create_issue"
+    ADD_LABEL = "add_label"
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,8 @@ class StoredItem:
     title: str
     body: str
     author_is_member: bool = True
+    labels: list[str] = field(default_factory=list[str])
+    kind: str | None = None
 
 
 type _CheckAnswer = forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError
@@ -188,6 +193,9 @@ class BoardForge:
     def stored_body(self, number: int) -> str:
         return self._state().items[number].body
 
+    def stored_item(self, number: int) -> StoredItem:
+        return self._state().items[number]
+
     def stored_entries(self, number: int) -> list[dict[str, object]]:
         """Item `number`'s `[[expectation]]` entries as its stored body holds them."""
         return body.block_expectation_dicts(body.locate_block(self.stored_body(number)).data)
@@ -231,7 +239,14 @@ class BoardForge:
         if state.listing_failure is not None:
             raise forge.ForgeError(state.listing_failure)
         return tuple(
-            board_issue(number, item.title, item.body, author_is_member=item.author_is_member)
+            board_issue(
+                number,
+                item.title,
+                item.body,
+                labels=tuple(item.labels),
+                kind=None if item.kind is None else ItemKind(item.kind),
+                author_is_member=item.author_is_member,
+            )
             for number, item in state.items.items()
             if number not in state.closed
         )
@@ -304,7 +319,20 @@ class BoardForge:
         _unsupported("link_child")
 
     def create_issue(self, *, title: str, body: str, kind: ItemKind) -> int:
-        _unsupported("create_issue")
+        """An open item a member wrote, numbered after the highest the forge holds."""
+        state = self._state()
+        number = max(state.items, default=0) + 1
+        state.items[number] = StoredItem(title, body, kind=kind.value)
+        self._replace_state(state)
+        self._log(ForgeRequest(ForgeOperation.CREATE_ISSUE, number))
+        return number
+
+    def add_label(self, number: int, label: str) -> None:
+        self._log(ForgeRequest(ForgeOperation.ADD_LABEL, number))
+        state = self._state()
+        if label not in state.items[number].labels:
+            state.items[number].labels.append(label)
+        self._replace_state(state)
 
     def create_child(self, *, parent: int, title: str, body: str, kind: ItemKind) -> int:
         _unsupported("create_child")
@@ -326,6 +354,19 @@ class BoardForge:
         written = stored.with_name(f"{stored.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         written.write_text(state.to_json(), encoding="utf-8")
         written.replace(stored)
+
+
+def item_lock_is_held(state_home: Path) -> bool:
+    """Whether another holder has an item lock under the state home a test set."""
+    directory = state_home / "state" / "aco" / "item-locks"
+    for lock in directory.iterdir() if directory.is_dir() else ():
+        with lock.open("rb") as probe:
+            try:
+                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(probe, fcntl.LOCK_UN)
+    return False
 
 
 def _unsupported(operation: str) -> NoReturn:
