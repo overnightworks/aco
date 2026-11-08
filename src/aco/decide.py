@@ -1,9 +1,10 @@
 """The one read-modify-write of expectation lines (`specs/rule.spec.md`,
-`specs/withdraw.spec.md`): `aco rule`, `aco withdraw` and the decision board
-read an item through the target gate and write its folded body once, here,
-so every ruling and every withdrawal takes the same path. `item_lock` serializes
-the writers of one item on this machine; `turn` is that lock plus the fresh read,
-and a writer that judges from another read (`aco cut`) holds `item_lock` alone."""
+`specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
+decision board and the MCP `ask` read an item through the target gate and write
+its folded body once, here, so every ruling, withdrawal and card takes the same
+path. `item_lock` serializes the writers of one item on this machine; `turn` is
+that lock plus the fresh read, and a writer that judges from another read
+(`aco cut`) holds `item_lock` alone."""
 
 import hashlib
 import sys
@@ -12,6 +13,7 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import cast
 
 from . import board_read, body, expectations, file_lock, forge, protocol, repositories, workboard
 from .session import RunContext
@@ -38,7 +40,8 @@ class FreshItem:
     """One item as the target gate read it from the forge. `state` is open or
     closed as that read saw it; `aco rule` and `aco withdraw` write either, and
     the decision board refuses a card whose item was closed since its page
-    read it."""
+    read it. `author_is_member` says whether a member wrote it, as the inbox
+    and the board decide whom they list."""
 
     number: int
     title: str
@@ -46,6 +49,16 @@ class FreshItem:
     storage: body.Storage
     state: forge.ItemState
     located: body.LocatedBlock
+    author_is_member: bool
+
+
+@dataclass(frozen=True)
+class Asked:
+    """The answer to an ask: the option line the card stands as, and whether
+    this call wrote it (False when the same card already stood)."""
+
+    line: expectations.OptionLine
+    written: bool
 
 
 @dataclass(frozen=True)
@@ -75,7 +88,15 @@ def fresh_item(context: RunContext, number: int, *, command: str) -> FreshItem:
         raise
     except protocol.ClaimError as error:
         raise InvalidTargetError(str(error)) from error
-    return FreshItem(number, reference.title or "", current_body, storage, reference.state, located)
+    return FreshItem(
+        number,
+        reference.title or "",
+        current_body,
+        storage,
+        reference.state,
+        located,
+        reference.author_is_member,
+    )
 
 
 class ItemLockUnavailableError(protocol.ClaimUnavailableError):
@@ -187,3 +208,35 @@ def withdraw(
     for index in indexes:
         new_body = expectations.withdraw_line(new_body, index, today)
     return _committed(context, fresh, new_body)
+
+
+def _refuse_a_shape_verdict(check: body.BodyShapeCheck, verdict: body.BodyShapeVerdict) -> None:
+    if check.verdict is verdict:
+        raise protocol.ClaimError("; ".join(check.defects))
+
+
+def ask(context: RunContext, fresh: FreshItem, card: Mapping[str, object]) -> Asked:
+    """Puts the option line `card` on the fresh item, dated by the run's clock
+    and written once. It refuses a closed item and one a non-member wrote (the
+    inbox and the board list neither), a card the grammar refuses, and a body
+    that would not read back; the same card already on the item answers that
+    line, the first by index, and writes nothing; only then an incomplete
+    body refuses. Raises `protocol.ClaimError` by name for every refusal,
+    before the write."""
+    if fresh.state is not forge.ItemState.OPEN:
+        raise protocol.ClaimError(f"item {fresh.number} is closed; a card on it would show nowhere")
+    if not fresh.author_is_member:
+        raise protocol.ClaimError(
+            f"item {fresh.number} was not written by a member; its cards are not listed"
+        )
+    new_body = expectations.ask_line(fresh.body, card, context.today())
+    shape = body.body_shape_check(new_body, storage=fresh.storage)
+    _refuse_a_shape_verdict(shape, body.BodyShapeVerdict.MALFORMED)
+    *standing, asked = expectations.expectation_lines(new_body, storage=fresh.storage)
+    asked = cast(expectations.OptionLine, asked)
+    for line in standing:
+        if isinstance(line, expectations.OptionLine) and line.card_hash == asked.card_hash:
+            return Asked(line, written=False)
+    _refuse_a_shape_verdict(shape, body.BodyShapeVerdict.INCOMPLETE)
+    _committed(context, fresh, new_body)
+    return Asked(asked, written=True)

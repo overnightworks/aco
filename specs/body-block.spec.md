@@ -125,7 +125,7 @@ otherwise one carrying `option` is an option line; any other is a ruled yes/no
 line, read-only history judged by BODY-26..BODY-42. Its keys, in the order a rewrite
 writes them:
 
-- `text`, then `asked_on` (a TOML local date: today's UTC date when the head asked the line, as `ruled_on` is dated, required until it is ruled, never covered by the card hash; the head writes it with the card, aco never writes or changes it, and a line sent back and asked again carries the day it is asked again), then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open), and `other` exactly when `ruling` is `other`, then `returned_on` and an optional `returned_note` while the line is open and with its head;
+- `text`, then `asked_on` (a TOML local date: today's UTC date when the head asked the line, as `ruled_on` is dated, required until it is ruled, never covered by the card hash; the head writes it with the card, or the `ask` tool writes today's UTC date, and aco never changes it, and a line sent back and asked again carries the day it is asked again), then the decided state `ruling`, `ruled_on`, `card_hash`, `via` (all four, or none while open), and `other` exactly when `ruling` is `other`, then `returned_on` and an optional `returned_note` while the line is open and with its head;
 - `question`, `problem`, `decision_kind`, `area`, `topic`, `recommended`, `reason`, each required, and `picture` (TODAY) with its `caption`, each optional;
 - 2 to 4 `[[expectation.option]]` tables, each `name`, `effect`, then at most one of `picture` with an optional `caption` and `same_as_today = true`, then `notice`, `cost`, `undo`, `undo_how`, `contract`.
 

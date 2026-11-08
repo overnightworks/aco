@@ -2,18 +2,27 @@
 message in, the answer line out, the inbox read a function the test passes."""
 
 import json
+from collections.abc import Mapping
 from typing import Any, cast
 
 import pytest
 
-from aco import __version__, mcp_server, protocol
+from aco import __version__, expectation_grammar, mcp_server, protocol
 
 _INBOX: dict[str, object] = {"root": "/work", "repositories": [], "unreadable": []}
 
 
-def _answer(message: object, read_inbox: mcp_server.ReadInbox = lambda: _INBOX) -> dict[str, Any]:
+def _echoing(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
+    return {"repository": label, "item": number, "written": True, "card": dict(card)}
+
+
+def _answer(
+    message: object,
+    read_inbox: mcp_server.ReadInbox = lambda: _INBOX,
+    ask: mcp_server.Ask = _echoing,
+) -> dict[str, Any]:
     line = mcp_server.reply(
-        message if isinstance(message, str) else json.dumps(message), read_inbox
+        message if isinstance(message, str) else json.dumps(message), read_inbox, ask
     )
     assert line is not None
     assert "\n" not in line
@@ -55,7 +64,8 @@ def test_initialize_answers_the_clients_version_when_supported_else_the_newest(
     assert result["protocolVersion"] == answered
     assert result["capabilities"] == {"tools": {}}
     assert result["serverInfo"] == {"name": "aco", "version": __version__}
-    assert isinstance(result["instructions"], str)
+    assert mcp_server.READ_INBOX in result["instructions"]
+    assert mcp_server.ASK in result["instructions"]
 
 
 def test_initialize_without_params_still_answers() -> None:
@@ -68,13 +78,80 @@ def test_ping_answers_an_empty_result() -> None:
     assert _answer(_request("ping", request_id="p")) == {"jsonrpc": "2.0", "id": "p", "result": {}}
 
 
-def test_tools_list_offers_the_read_only_inbox_tool_without_arguments() -> None:
-    [tool] = _answer(_request("tools/list"))["result"]["tools"]
+def _tools() -> dict[str, dict[str, Any]]:
+    tools = _answer(_request("tools/list"))["result"]["tools"]
+    return {tool["name"]: tool for tool in tools}
 
-    assert tool["name"] == "read_inbox"
+
+def test_tools_list_offers_the_read_only_inbox_tool_without_arguments() -> None:
+    tool = _tools()["read_inbox"]
+
     assert tool["annotations"] == {"readOnlyHint": True}
     assert tool["inputSchema"]["type"] == "object"
     assert tool["inputSchema"]["properties"] == {}
+
+
+def test_tools_list_offers_ask_as_a_repeatable_write_that_destroys_nothing() -> None:
+    tool = _tools()["ask"]
+
+    assert list(_tools()) == ["read_inbox", "ask"]
+    assert tool["annotations"] == {
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+    }
+    assert tool["title"]
+    assert tool["description"]
+
+
+def test_the_ask_schema_takes_its_keys_and_values_from_the_card_grammar() -> None:
+    grammar = expectation_grammar
+    schema = _tools()["ask"]["inputSchema"]
+    option = schema["properties"]["options"]["items"]
+
+    assert set(schema["properties"]) == {
+        "repository",
+        "item",
+        "text",
+        *grammar.OPTION_LINE_KEYS,
+        "options",
+    }
+    assert set(schema["required"]) == {
+        "repository",
+        "item",
+        "text",
+        *(set(grammar.OPTION_LINE_KEYS) - grammar.OPTION_LINE_OPTIONAL_KEYS),
+        "options",
+    }
+    assert set(option["properties"]) == set(grammar.OPTION_KEYS)
+    assert option["required"] == list(grammar.OPTION_REQUIRED_KEYS)
+    assert option["properties"][grammar.SAME_AS_TODAY] == {"const": True}
+    assert option["properties"]["undo"]["enum"] == [undo.value for undo in grammar.Undo]
+    assert schema["properties"]["decision_kind"]["enum"] == [
+        kind.value for kind in grammar.DecisionKind
+    ]
+    assert schema["properties"]["recommended"]["enum"] == list(grammar.OPTION_LETTERS)
+    assert (schema["additionalProperties"], option["additionalProperties"]) == (False, False)
+
+
+@pytest.mark.parametrize(
+    "state_key",
+    [
+        "asked_on",
+        "ruling",
+        "ruled_on",
+        "via",
+        "other",
+        "returned_on",
+        "returned_note",
+        "withdrawn_on",
+        "card_hash",
+    ],
+)
+def test_the_ask_schema_offers_no_state_key(state_key: str) -> None:
+    properties = _tools()["ask"]["inputSchema"]["properties"]
+
+    assert state_key not in properties
 
 
 @pytest.mark.parametrize("arguments", [None, {}], ids=["absent", "empty"])
@@ -112,6 +189,90 @@ def test_a_failed_read_is_a_tool_error_carrying_its_reason(
     assert "structuredContent" not in result
 
 
+def _card_arguments(**changes: object) -> dict[str, object]:
+    return {"repository": "owner/repo", "item": 7, "text": "Frage", "options": [], **changes}
+
+
+def test_an_ask_call_hands_the_card_without_its_envelope_to_the_writer_and_answers_its_json() -> (
+    None
+):
+    result = _answer(_call(_card_arguments(), name="ask"))["result"]
+
+    expected = {
+        "repository": "owner/repo",
+        "item": 7,
+        "written": True,
+        "card": {"text": "Frage", "options": []},
+    }
+    assert result["isError"] is False
+    assert result["structuredContent"] == expected
+    assert json.loads(result["content"][0]["text"]) == expected
+
+
+def _refusing_ask(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
+    raise protocol.ClaimError("item 7 is closed")
+
+
+def _failing_ask(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
+    raise RuntimeError("boom")
+
+
+@pytest.mark.parametrize(
+    ("ask", "reason"),
+    [
+        pytest.param(_refusing_ask, "item 7 is closed", id="refusal"),
+        pytest.param(_failing_ask, "RuntimeError: boom", id="unexpected-exception"),
+    ],
+)
+def test_a_refused_ask_is_a_tool_error_carrying_its_reason(
+    ask: mcp_server.Ask, reason: str
+) -> None:
+    result = _answer(_call(_card_arguments(), name="ask"), ask=ask)["result"]
+
+    assert result["isError"] is True
+    assert result["content"] == [{"type": "text", "text": reason}]
+    assert "structuredContent" not in result
+
+
+def _writes_nothing(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
+    pytest.fail("an ask with a defective envelope reached the writer")
+
+
+@pytest.mark.parametrize(
+    ("arguments", "sentence"),
+    [
+        pytest.param(_card_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
+        pytest.param(
+            _card_arguments(asked_on="2026-11-08"), "unknown argument: asked_on", id="state"
+        ),
+        pytest.param(_card_arguments(item=True), "item must be an integer", id="item-boolean"),
+        pytest.param(_card_arguments(item="7"), "item must be an integer", id="item-string"),
+        pytest.param(_card_arguments(item=7.5), "item must be an integer", id="item-float"),
+        pytest.param(_card_arguments(repository=3), "repository must be a string", id="repository"),
+        pytest.param({"text": "Frage"}, "repository must be a string", id="no-repository"),
+    ],
+)
+def test_an_argument_defect_is_a_tool_error_naming_it_and_nothing_is_written(
+    arguments: dict[str, object], sentence: str
+) -> None:
+    result = _answer(_call(arguments, name="ask"), ask=_writes_nothing)["result"]
+
+    assert result["isError"] is True
+    assert sentence in result["content"][0]["text"]
+
+
+def test_every_envelope_defect_is_named_in_one_error() -> None:
+    arguments = _card_arguments(repository=3, item="x", extra=1)
+
+    result = _answer(_call(arguments, name="ask"), ask=_writes_nothing)["result"]
+
+    text = result["content"][0]["text"]
+    assert [
+        sentence in text
+        for sentence in ("unknown argument: extra", "repository must be", "item must be")
+    ] == [True, True, True]
+
+
 @pytest.mark.parametrize(
     "message",
     [
@@ -119,6 +280,8 @@ def test_a_failed_read_is_a_tool_error_carrying_its_reason(
         pytest.param(_request("tools/call"), id="no-name"),
         pytest.param(_call({"limit": 1}), id="arguments-given"),
         pytest.param(_call([]), id="arguments-not-an-object"),
+        pytest.param(_call([], name="ask"), id="ask-arguments-a-list"),
+        pytest.param(_call("card", name="ask"), id="ask-arguments-a-string"),
     ],
 )
 def test_a_call_of_an_unknown_tool_or_with_bad_arguments_is_an_invalid_params_error(
@@ -145,7 +308,7 @@ def test_any_other_method_is_not_found(method: str) -> None:
     ],
 )
 def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
-    assert mcp_server.reply(json.dumps(message), lambda: _INBOX) is None
+    assert mcp_server.reply(json.dumps(message), lambda: _INBOX, _echoing) is None
 
 
 @pytest.mark.parametrize(
