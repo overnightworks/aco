@@ -1397,13 +1397,7 @@ class GitHubForge:
             ) from error
         return child
 
-    def update_item_body(
-        self,
-        number: int,
-        body: str,
-        *,
-        replacing: str,  # NOSONAR(S1172) the port requires it; the forge's check reads it later
-    ) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:  # NOSONAR
         path = f"repos/{self.repository}/issues/{number}"
         self._run(
             ["api", "--method", "PATCH", path, "--input", "-"],

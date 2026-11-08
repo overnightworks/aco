@@ -1630,10 +1630,9 @@ class TestStateRefBoardWrites:
     def test_a_second_write_from_the_same_read_state_refuses_and_overwrites_nothing(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """Proof 3: two writers both read the item at the same oid; the
-        first write lands, the second -- still holding that now-stale oid --
-        refuses with the CAS-20 sentence, and the remote keeps the first
-        writer's content."""
+        """Proof 3: two writers both read the item at the same oid; the first write
+        lands, the second -- still holding that now-stale oid -- refuses with the
+        CAS-20 sentence, and the remote keeps the first writer's content."""
         push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         first = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
