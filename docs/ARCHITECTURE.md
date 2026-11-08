@@ -10,7 +10,8 @@ aco coordinates agents working in one repository. Claims live in git, work
 items live on the forge, and the commands join the two. It runs no lease or
 coordination server; the state ref is the serialization point. An agent
 host can start `aco mcp` for one session to read the operator's inbox, to
-put a decision card on an item and to record the operator's chat answer on one.
+put a decision card on an item, to record the operator's chat answer on one and to
+mark a step only the operator can take.
 
 ```mermaid
 flowchart LR
@@ -41,7 +42,7 @@ flowchart LR
     Mcp["aco mcp<br/>cmd_mcp.py, mcp_server.py"]
     Mcp --> Repos
     Mcp --> Inbox
-    Mcp -->|"ask, record_answer: one line per call"| Dec
+    Mcp -->|"ask, record_answer, step: one write per call"| Dec
     Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
     Board --> Protocol
@@ -138,8 +139,10 @@ operator and, from the same listing, the items of the same members labelled
 call, into an open item a member wrote, in any repository discovery finds, in
 that item's turn. Its `record_answer` tool rules one line per call in that
 turn, as `aco rule` does, so it refuses neither a closed item nor a
-non-member's: the card's hash binds the answer to what the agent read
-(`specs/mcp.spec.md`).
+non-member's: the card's hash binds the answer to what the agent read. Its
+`step` tool writes one item's `next` in that turn, refusing a closed item and a
+non-member's, or opens one item, and sets the label `needs-operator` through the
+forge port's `add_label`; it never removes the label (`specs/mcp.spec.md`).
 
 ### The per-item turn
 
@@ -150,7 +153,7 @@ item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
 decision, `aco item edit --size/--whole`, `aco rescope` (through its claim
-transition) and the `ask` and `record_answer` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
+transition) and the `ask`, `record_answer` and `step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
 `decide.write_item_body`, the one writer, which skips a body equal to the text it
