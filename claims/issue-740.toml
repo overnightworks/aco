@@ -1,0 +1,8 @@
+claim_id = "166d9473ac9e4cd08cfa4b7986126fad"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "54df6d517fc93acbc3c214569247c3e789bccc62"
+branch = "claude/issue-740-ask-tool-writes-a-card"
+scope = ["README.md", "docs/ARCHITECTURE.md", "specs/body-block.spec.md", "specs/mcp.spec.md", "specs/rulings.spec.md", "src/aco/cmd_mcp.py", "src/aco/decide.py", "src/aco/expectation_grammar.py", "src/aco/expectations.py", "src/aco/mcp_server.py", "tests/support/option_cards.py", "tests/test_body_option_line_rewrites.py", "tests/test_cmd_mcp.py", "tests/test_decide_ask.py", "tests/test_expectations_ask.py", "tests/test_mcp_server.py"]
+opened_commit = "337b865db30f3cd56a5d1f4ca8bae03a6b285bf9"
+whole_reason = "The writer's only caller is the tool and the tool does nothing without the writer, so one vertical slice proves the capability end to end; about 200 production lines over five files, split it would leave the writer built ahead of its caller."
