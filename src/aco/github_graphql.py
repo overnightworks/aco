@@ -191,6 +191,17 @@ class BodyRevision:
     deleted: bool
 
 
+def _is_instant(text: str) -> bool:
+    """Whether `text` is an RFC 3339 instant with real calendar and clock values."""
+    if protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(text) is None:
+        return False
+    try:
+        datetime.strptime(text, protocol.RFC3339_TIMESTAMP_FORMAT)
+    except ValueError:
+        return False
+    return True
+
+
 def _parsed_revision(node: object) -> BodyRevision:
     if not isinstance(node, dict):
         raise malformed_response(_EDIT_HISTORY_SUBJECT)
@@ -200,7 +211,7 @@ def _parsed_revision(node: object) -> BodyRevision:
     if (
         not isinstance(text, str | None)
         or not isinstance(edited_at, str)
-        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(edited_at) is None
+        or not _is_instant(edited_at)
         or not isinstance(login, str | None)
     ):
         raise malformed_response(_EDIT_HISTORY_SUBJECT)

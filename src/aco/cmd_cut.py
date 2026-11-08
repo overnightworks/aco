@@ -73,7 +73,7 @@ class _SliceRowRemoval:
 
 
 _CUT_BODY_CHECKED = (
-    "created {child}; {foreign}; if row {row} is still in {container}'s {fence} block, "
+    "created {child}; {check}; if row {row} is still in {container}'s {fence} block, "
     "re-run aco cut {number} --row {row} -- it adopts the child"
 )
 
@@ -96,9 +96,8 @@ class _CheckedWriteError(protocol.ClaimError):
         self.kept = answer.kept if isinstance(answer, forge.ForgeBodyOverwrittenError) else None
         self.reason = _CutReason.NOT_VERIFIED if self.kept is None else _CutReason.OVERWRITTEN
         super().__init__(
-            report.refusal_around_foreign_text(
-                _CUT_BODY_CHECKED,
-                str(answer),
+            _CUT_BODY_CHECKED.format(
+                check=answer,
                 child=workboard.item_label(child, storage),
                 container=workboard.item_label(removal.container, storage),
                 number=removal.container,

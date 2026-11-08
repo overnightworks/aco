@@ -15,7 +15,7 @@ from typing import Protocol
 
 from . import workboard
 from .body import ItemKind, Storage
-from .protocol import ClaimError
+from .protocol import ClaimError, terminal_text
 
 
 class ForgeError(ClaimError):
@@ -129,7 +129,17 @@ class ForgePartialChildCreationError(ForgePartialCreationError):
         )
 
 
-UNKNOWN_EDITOR = "an unknown editor"
+_UNKNOWN_EDITOR = "an unknown editor"
+_FOREIGN_TEXT_LIMIT = 80
+
+
+def _shown(foreign_text: str) -> str:
+    """`foreign_text` -- a login, a time, a failure's words -- as one bounded
+    printable piece of a sentence: escaped as `terminal_text` shows it, then cut."""
+    printable = terminal_text(foreign_text)
+    if len(printable) <= _FOREIGN_TEXT_LIMIT:
+        return printable
+    return printable[: _FOREIGN_TEXT_LIMIT - 1] + "…"
 
 
 class ForgeBodyWrittenError(ForgeError):
@@ -146,18 +156,16 @@ class ForgeBodyOverwrittenError(ForgeBodyWrittenError):
     def __init__(self, number: int, edited_at: str, editor: str | None, *, kept: bool) -> None:
         self.number = number
         self.edited_at = edited_at
-        self.editor = editor if editor is not None else UNKNOWN_EDITOR
+        self.editor = editor if editor is not None else _UNKNOWN_EDITOR
         self.kept = kept
+        foreign = f"{_shown(self.editor)} at {_shown(edited_at)}"
         if kept:
             message = (
-                f"#{number} body written over a change by {self.editor} at {edited_at} "
+                f"#{number} body written over a change by {foreign} "
                 "aco had not read; that change is only in the edit history"
             )
         else:
-            message = (
-                f"#{number} body written, but overwritten in the meantime "
-                f"by {self.editor} at {edited_at}"
-            )
+            message = f"#{number} body written, but overwritten in the meantime by {foreign}"
         super().__init__(message)
 
 
@@ -168,7 +176,7 @@ class ForgeBodyNotVerifiedError(ForgeBodyWrittenError):
     def __init__(self, number: int, cause: str) -> None:
         self.number = number
         self.cause = cause
-        super().__init__(f"#{number} body written, not verified ({cause})")
+        super().__init__(f"#{number} body written, not verified ({_shown(cause)})")
 
 
 @dataclass(frozen=True)
