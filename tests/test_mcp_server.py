@@ -64,7 +64,8 @@ def test_initialize_answers_the_clients_version_when_supported_else_the_newest(
     assert result["protocolVersion"] == answered
     assert result["capabilities"] == {"tools": {}}
     assert result["serverInfo"] == {"name": "aco", "version": __version__}
-    assert isinstance(result["instructions"], str)
+    assert mcp_server.READ_INBOX in result["instructions"]
+    assert mcp_server.ASK in result["instructions"]
 
 
 def test_initialize_without_params_still_answers() -> None:
