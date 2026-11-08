@@ -111,7 +111,7 @@ attempts instead of a transition's `32`.
 ### Work budget
 
 - [ ] [CAS-18] `status`'s two store reads (a fetch, then every claim's age) make one `ls-remote`, `fetch`, `ls-tree`, `archive`, `log` call and four `rev-parse` calls, ten live claims or three hundred alike.
-- [ ] [CAS-53] A command reads the ref once per checkout (except CAS-54, CAS-55, RESC-33's read under the item lock, CAS-58's re-read after rejection), never to judge its write; board, checks and first write read it.
+- [ ] [CAS-53] A command reads the ref once a checkout (except CAS-54, CAS-55, RESC-33's read under the item lock, CAS-58's re-read after rejection), never to judge its write; board, checks and first write read it.
 - [ ] [CAS-58] A later write of the same command applies to the state the write before it wrote; a write reads the ref afresh only after a rejected push, one `ls-remote` and one `fetch` each.
 - [ ] [CAS-54] `land` peeks the ref in its preflight, then observes it afresh to release after its merge -- two observations of the one command CAS-53 exempts.
 - [ ] [CAS-55] `start` observes it afresh in the main checkout after fetching the trunk, so its claim's checks read the item as it stands then (START-22); never again to judge its push (START-25).
