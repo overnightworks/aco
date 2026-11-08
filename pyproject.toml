@@ -88,7 +88,7 @@ layers = [
     "workboard",
     "items | expectations",
     "body",
-    "expectation_grammar",
+    "expectation_grammar | body_fence",
     "card_rules",
     "usage",
     "lineage_stamp",

@@ -32,14 +32,13 @@ from .body import (
     SliceRow,
     Storage,
     body_defect_text,
-    closing_fence_delimiter,
     locate_block,
     malformed_parsed_body,
     missing_or_empty_sections,
-    opening_fence_delimiter,
     parse_body,
     unprintable_slice_line_key,
 )
+from .body_fence import walk_fences
 
 DEFAULT_PRIORITY_LABELS = ("security", "data", "ci", "product", "ux", "cleanup")
 DEFAULT_CANONICAL_REMOTE = "origin"
@@ -893,43 +892,14 @@ def load_brief_config(path: Path = BRIEF_CONFIG_PATH) -> BriefConfig | None:
 
 
 def _live_text(body: str) -> str:
-    """The body's non-fenced lines, joined back in order — what GitHub
+    """The body's non-fenced lines, joined back in order -- what GitHub
     renders as running text, and the only text this module reads a marker
-    (a classification line, a `Refs #n` trailer) out of.
-
-    Walks the body once carrying CommonMark fence state: a line opens a fence
-    (an info string after the run is allowed, e.g. ` ```python `), and only a
-    later line with the *same* fence character, a run at least as long, and
-    nothing but trailing whitespace after the run closes it again — a line
-    like ` ```python ` never closes a fence, even one opened with backticks,
-    because CommonMark forbids an info string on a closing delimiter; it is
-    read as fence content instead. An opened fence that never closes runs to
-    the end of the document, exactly as GitHub renders it — so an operator
-    who left a fence unclosed, or wrote an info string on what they meant as
-    a close, sees the same code block the tool does; there is no invisible
-    divergence. An item body fences its example this way, and it must
-    never itself read as live.
-
-    Not modeled: a 4-space-indented code block (CommonMark's other fencing
-    form). A marker written there is read as live — visible on `board`/`next`
-    and correctable by fencing it properly, never a silent divergence.
-    """
-    lines: list[str] = []
-    fence_char: str | None = None
-    fence_length = 0
-    for line in body.splitlines():
-        if fence_char is None:
-            opening = opening_fence_delimiter(line)
-            if opening is not None:
-                fence_char, fence_length = opening
-                continue
-            lines.append(line)
-            continue
-        closing = closing_fence_delimiter(line)
-        if closing is not None and closing[0] == fence_char and closing[1] >= fence_length:
-            fence_char, fence_length = None, 0
-        # Still inside the fence (or just closed it): never scanned for a marker.
-    return "\n".join(lines)
+    (a classification line, a `Refs #n` trailer) out of. An item body fences
+    its example, and it must never itself read as live; `body_fence` owns
+    what counts as a fence, including the 4-space-indented code block it does
+    not model (a marker written there is read as live, visible on
+    `board`/`next` and correctable by fencing it properly)."""
+    return "\n".join(text for _index, text in walk_fences(body).outside_lines)
 
 
 @dataclass(frozen=True)
