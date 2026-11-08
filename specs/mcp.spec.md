@@ -49,7 +49,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-08] `tools/list` lists `read_inbox` (no properties, `readOnlyHint` true) and `ask` (`repository`, `item`, a card's keys; `readOnlyHint` false, `destructiveHint` false, `idempotentHint` true).
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
 - [ ] [MCP-10] `tools/call` of an unknown tool, of `read_inbox` with arguments, or of `ask` with arguments that are no object, is answered error `-32602`.
-- [ ] [MCP-20] Standard output carries only these answers, one per line; the process writes its logs to standard error, and every child process it starts reads the null device as its input.
+- [ ] [MCP-20] Standard output carries only these answers, one per line; the process writes its logs to standard error, and every child process it starts reads the null device or only the data aco pipes to it, never the host's stream.
 
 ## Reading the inbox
 
@@ -78,11 +78,11 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 
 ## Never
 
-- `aco mcp` writes only through `ask`: one option line per call, into the one item it names, never another line of it, another repository or the operator's configuration; `read_inbox` is read-only.
+- `aco mcp` writes only through `ask`: one option line per call, into the one item it names and in that item's turn, never another line of it, another repository or the operator's configuration; `read_inbox` is read-only.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
 - It never prints anything but protocol messages on standard output (MCP-20).
 - It never answers a notification (MCP-05).
-- It never lists a line that is with its head or already decided (MCP-12).
+- `read_inbox` never lists a line that is with its head or already decided (MCP-12); `ask` answers a line that stands whatever its state (MCP-22).
 
 ## Examples
 
