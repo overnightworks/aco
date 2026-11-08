@@ -20,17 +20,8 @@ from enum import Enum, StrEnum
 from typing import TypeGuard, cast
 
 from . import expectation_grammar, protocol
+from .body_fence import walk_fences
 from .expectation_grammar import NOT_A_LOCAL_DATE, block_expectation_defects, render_expectations
-
-# CommonMark fence delimiters: at most 3 leading spaces, then a run of 3+
-# backticks or 3+ tildes. An OPENING delimiter may carry an info string after
-# the run (` ```python `); a CLOSING delimiter may not — only trailing
-# spaces/tabs are allowed after the run (` ``` `, never ` ```python `), so
-# `Closing`'s stricter pattern requires nothing but whitespace to follow.
-# A 4-space-indented code block (CommonMark's other fencing form) is not
-# modeled here; see `workboard.py`'s `_live_text` for why that gap is safe.
-FENCE_OPENING_PATTERN = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})")
-FENCE_CLOSING_PATTERN = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})[ \t]*$")
 
 # A fresh container carries no automatic parent-provenance the way `cut`
 # gives a fresh child one, so `item new` with nothing piped states the prose
@@ -208,22 +199,6 @@ class ExpectationProgress:
     total: int
 
 
-def opening_fence_delimiter(line: str) -> tuple[str, int] | None:
-    match = FENCE_OPENING_PATTERN.match(line)
-    if match is None:
-        return None
-    run = match.group("run")
-    return run[0], len(run)
-
-
-def closing_fence_delimiter(line: str) -> tuple[str, int] | None:
-    match = FENCE_CLOSING_PATTERN.match(line)
-    if match is None:
-        return None
-    run = match.group("run")
-    return run[0], len(run)
-
-
 class BodyReadState(StrEnum):
     """How `parse_body` read one issue's body.
 
@@ -305,46 +280,13 @@ def names_parent(raw: str, label: str) -> bool:
 
 def _fence_matches(body: str) -> list[tuple[int, int | None, str]]:
     """Every fence in `body` whose info string is exactly `aco`:
-    `(opening line index, closing line index or None when
-    unclosed, interior text)`. Walks `body.splitlines(keepends=True)` --
-    stripping only each line's own ending before matching the CommonMark
-    fence patterns, so CRLF is recognized and every other byte, including
-    the fence's own line endings, is preserved for the caller. Only one
-    fence is ever open at a time, matching `_live_line_entries`: an
-    already-open fence, recognized or not, blocks a new opening delimiter
-    from being recognized until it closes.
-    """
-    lines = body.splitlines(keepends=True)
-    matches: list[tuple[int, int | None, str]] = []
-    index = 0
-    open_start: int | None = None
-    open_char = ""
-    open_length = 0
-    open_recognized = False
-    while index < len(lines):
-        bare = _line_without_ending(lines[index])
-        if open_start is None:
-            opening = FENCE_OPENING_PATTERN.match(bare)
-            if opening is not None:
-                run = opening.group("run")
-                info = bare[opening.end() :].strip(" \t")
-                open_start, open_char, open_length = index, run[0], len(run)
-                open_recognized = info == BLOCK_FENCE_INFO
-            index += 1
-            continue
-        closing = FENCE_CLOSING_PATTERN.match(bare)
-        if (
-            closing is not None
-            and closing.group("run")[0] == open_char
-            and len(closing.group("run")) >= open_length
-        ):
-            if open_recognized:
-                matches.append((open_start, index, "".join(lines[open_start + 1 : index])))
-            open_start, open_recognized = None, False
-        index += 1
-    if open_start is not None and open_recognized:
-        matches.append((open_start, None, ""))
-    return matches
+    `(opening line index, closing line index or None when unclosed, interior
+    text)`, read from the one walk in `body_fence`."""
+    return [
+        (fence.opening_line, fence.closing_line, fence.interior)
+        for fence in walk_fences(body).fences
+        if fence.info == BLOCK_FENCE_INFO
+    ]
 
 
 def _block_version_defect(data: dict[str, object]) -> ContractDefect | None:
@@ -759,12 +701,40 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
     )
 
 
+# A table header of the block's own tables on a line outside every fence: 0 to
+# 3 spaces of indent (four make an indented code block), blanks (spaces or tabs)
+# inside the brackets and around the dot, trailing blanks and a trailing `#` comment.
+_OUTSIDE_HEADER_PATTERN = re.compile(
+    r"^ {0,3}(?P<header>\[\[[ \t]*(?:expectation|expectation[ \t]*\.[ \t]*option|slice)[ \t]*\]\]"
+    rf"|\[[ \t]*{RECORD_KEY}[ \t]*\])[ \t]*(?:#.*)?$"
+)
+
+
+def _outside_header_defects(body: str) -> tuple[ContractDefect, ...]:
+    """One defect per block table header that stands outside every fence, in
+    body order: the block never reads it, so the board would not show it."""
+    matches = (
+        (index, _OUTSIDE_HEADER_PATTERN.match(text))
+        for index, text in walk_fences(body).outside_lines
+    )
+    return tuple(
+        ContractDefect(
+            BLOCK_FENCE_INFO,
+            f"{match.group('header')} on line {index + 1} is outside the {BLOCK_FENCE_INFO} block",
+        )
+        for index, match in matches
+        if match is not None
+    )
+
+
 def parse_body(body: str, *, storage: Storage = Storage.GITHUB) -> ParsedBody:
     """The one read of a work-item body:
     the typed `aco` block. Every consumer reads the
     returned `ParsedBody` instead of re-parsing the raw body. Human prose
     around the block is never parsed -- another repository may own its own
-    section headings in the same body.
+    section headings in the same body. The one prose read is a line outside
+    every fence that is a table header of the block's own tables: the block
+    never reads it, so the body is malformed instead of silently losing it.
 
     `storage` gates the one storage-specific extension, `[record]`:
     legal, and validated, only under `Storage.STATE_REF`; an unknown
@@ -774,6 +744,9 @@ def parse_body(body: str, *, storage: Storage = Storage.GITHUB) -> ParsedBody:
     data = _block_data(body)
     if isinstance(data, ParsedBody):
         return data
+    outside_defects = _outside_header_defects(body)
+    if outside_defects:
+        return malformed_parsed_body(outside_defects)
     defects = _block_schema_defects(data, storage)
     if defects:
         return malformed_parsed_body(defects)

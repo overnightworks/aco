@@ -14,7 +14,7 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1232
+"src/aco/body.py" = 1205
 "src/aco/checkout.py" = 2023
 "src/aco/cli.py" = 829
 "src/aco/cmd_claim.py" = 1132
@@ -23,7 +23,7 @@
 "src/aco/protocol.py" = 1865
 "src/aco/state_board.py" = 923
 "src/aco/store.py" = 1742
-"src/aco/workboard.py" = 2900
+"src/aco/workboard.py" = 2870
 "tests/support/cli_fixtures.py" = 888
 "tests/support/github_fixtures.py" = 830
 "tests/test_board.py" = 3588

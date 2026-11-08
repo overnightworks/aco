@@ -11,7 +11,9 @@ these IDs instead of restating them.
 Every defect sentence below is printed by `aco check -` on stderr, one
 line per defect, and by a reader as the item's own reason (BODY-50..BODY-52).
 `<n>` is an item number, `<path>` a repository-relative path, `<keys>` the
-empty projection keys, comma-joined in the order `Now, Next, Done when`.
+empty projection keys, comma-joined in the order `Now, Next, Done when`,
+`<line>` a 1-based line number counted as `str.splitlines` counts lines, `<header>`
+a bracketed table header alone, as written, with no surrounding space and no comment.
 
 ## Behavior table
 
@@ -51,6 +53,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `scope` defective | BODY-53..BODY-56 | BODY-50 | BODY-52 |
 | `size` valid or defective | BODY-57..BODY-59 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `whole` valid or defective | BODY-60..BODY-62 | BODY-50 (defective only) | BODY-52 (defective only) |
+| a block table header outside every fence | BODY-109 | BODY-50 | BODY-52 |
 | complete valid block | BODY-14 | — | — |
 
 ## Fence and surroundings
@@ -60,8 +63,10 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-03] A body with two `aco` fences makes `aco check -` print `body malformed: aco: multiple aco blocks; exactly one is allowed` on stderr, exit `2`.
 - [ ] [BODY-04] A fence whose content is not TOML makes `aco check -` print `body malformed: aco: aco block is not valid TOML: <reason>` on stderr, exit `2`.
 - [ ] [BODY-05] An `aco` fence quoted inside a longer documentation fence is not the item's block, so a body carrying only that one prints `body malformed: aco: no aco block`, exit `2`.
-- [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's own section — carries no contract, so a body of prose plus one complete block prints `body ok`, exit `0`.
+- [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's section — carries no contract: prose plus one complete block prints `body ok`, exit `0`, except BODY-109.
 - [ ] [BODY-07] A block whose lines end in CRLF is read like any other: a complete CRLF body prints `body ok`, exit `0`; a rewrite keeps CRLF but re-renders the block's fields canonically, not byte-for-byte.
+- [ ] [BODY-109] A header line (BODY-110) outside every fence prints `body malformed: aco: <header> on line <line> is outside the aco block` per line in body order, exit `2`, after BODY-01..04, alone (see E-BODY-20).
+- [ ] [BODY-110] A header line: `[[expectation]]`, `[[expectation.option]]`, `[[slice]]` or `[record]`, 0 to 3 leading spaces, blanks inside brackets or around the dot, trailing blanks, a `#` comment.
 
 ## Projection keys
 
@@ -1060,4 +1065,41 @@ BODY
 2> body malformed: expectation[0].ruling: expectation[0].ruling does not belong on a withdrawn line
 2> body malformed: expectation[0].asked_on: expectation[0].asked_on does not belong on a withdrawn line
 exit 2
+````
+
+### E-BODY-20 — a card below the block never reaches the board
+
+Setup: bare-remote, `storage = "github"`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+```
+
+[[expectation]]
+text = "Ship it?"
+
+   [[expectation.option]]  # lost
+BODY
+2> body malformed: aco: [[expectation]] on line 8 is outside the aco block
+2> body malformed: aco: [[expectation.option]] on line 11 is outside the aco block
+exit 2
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+```
+
+~~~toml
+[[expectation]]
+~~~
+BODY
+body ok
+exit 0
 ````
