@@ -1533,10 +1533,10 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
 # `workboard.py`'s renderers import it rather than keeping a second escape
 # table and drifting from what `tomllib.loads` (the reader) accepts back.
 # It escapes every control character TOML's basic-string grammar forbids
-# unescaped (U+0000-U+001F and U+007F), not only backslash and quote: the
-# short escapes where TOML has one, `\uXXXX` for the rest. A value carrying
-# U+000B would otherwise round-trip into TOML that `tomllib.loads` (the
-# reader) refuses to parse back.
+# unescaped (U+0000-U+001F and U+007F) and the line separators U+0085, U+2028
+# and U+2029, which `str.splitlines` ends a line at, so a raw one would split a
+# value in the body's line-wise fence walk: the short escapes where TOML has
+# one, `\uXXXX` for the rest.
 
 _TOML_STRING_ESCAPES = {
     "\\": "\\\\",
@@ -1579,7 +1579,7 @@ def toml_multiline_string(value: str) -> str:
 def _toml_string_escape(char: str) -> str:
     if char in _TOML_STRING_ESCAPES:
         return _TOML_STRING_ESCAPES[char]
-    if has_control_character(char):
+    if has_control_character(char) or char.splitlines() != [char]:
         return f"\\u{ord(char):04X}"
     return char
 

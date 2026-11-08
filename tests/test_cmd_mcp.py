@@ -1,6 +1,7 @@
 """`aco mcp` (`specs/mcp.spec.md`) as a real child process over pipes, its forge
 the board's test forge."""
 
+import fcntl
 import io
 import json
 import os
@@ -16,15 +17,19 @@ from typing import IO, Any, cast
 
 import board_forge
 import pytest
+from board_fixtures import board_issue
+from cli_fixtures import run_cli
 from discovery_fixtures import (
     configure_root,
     isolate_config_file,
     repository_with_card,
     write_config,
 )
-from option_cards import ask_card, open_option_entry
+from github_fixtures import FakeForge, serve_forge
+from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
 
-from aco import cli, session
+from aco import body_fence, cli, expectations, forge, session
+from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
 _CHILD_PROGRAM = (
@@ -135,7 +140,11 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         exit_code, rest, stderr = _finish(child)
 
     assert initialized["result"]["protocolVersion"] == "2025-06-18"
-    assert [tool["name"] for tool in listed["result"]["tools"]] == ["read_inbox", "ask"]
+    assert [tool["name"] for tool in listed["result"]["tools"]] == [
+        "read_inbox",
+        "ask",
+        "record_answer",
+    ]
     assert inbox["isError"] is False
     structured = inbox["structuredContent"]
     assert structured["root"] == str(root)
@@ -379,3 +388,275 @@ def test_an_unwritable_lock_directory_is_a_tool_error_that_writes_nothing(
     assert result["isError"] is True
     assert "cannot lock the item" in result["content"][0]["text"]
     assert here.body_writes() == []
+
+
+@pytest.fixture
+def here(root: Path) -> board_forge.BoardForge:
+    return repository_with_card(root / "here", 1, "Here")
+
+
+def _record_line(request_id: int = 1, /, **changes: object) -> str:
+    arguments: dict[str, object | None] = {
+        "repository": "board-forge/here",
+        "item": 1,
+        "line": 1,
+        "card_hash": GOLDEN_CARD_HASH,
+        "option": "A",
+        **changes,
+    }
+    given = {key: value for key, value in arguments.items() if value is not None}
+    return _call_line(request_id, "record_answer", given)
+
+
+def _stored_item(**changes: object) -> dict[str, object]:
+    return {**open_option_entry(), **changes}
+
+
+def _lock_is_held(tmp_path: Path) -> bool:
+    directory = tmp_path / "state" / "aco" / "item-locks"
+    for lock in directory.iterdir() if directory.is_dir() else ():
+        with lock.open("rb") as probe:
+            try:
+                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(probe, fcntl.LOCK_UN)
+    return False
+
+
+def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_line(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    before = here.stored_body(1)
+    lock_held_at_writes: list[bool] = []
+    write = board_forge.BoardForge.update_item_body
+
+    def witnessed(self: board_forge.BoardForge, number: int, body: str, *, replacing: str) -> None:
+        lock_held_at_writes.append(_lock_is_held(tmp_path))
+        write(self, number, body, replacing=replacing)
+
+    monkeypatch.setattr(board_forge.BoardForge, "update_item_body", witnessed)
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+
+    result = answer["result"]
+    [entry] = here.stored_entries(1)
+    assert result["isError"] is False
+    assert json.loads(result["content"][0]["text"]) == result["structuredContent"]
+    structured = result["structuredContent"]
+    assert (structured["repository"], structured["item"], structured["open"]) == (
+        "board-forge/here",
+        1,
+        0,
+    )
+    assert (
+        structured["line"]["index"],
+        structured["line"]["ruling"],
+        structured["line"]["via"],
+    ) == (
+        1,
+        "A",
+        "chat",
+    )
+    assert structured["line"]["ruled_on"] == board_forge.RULING_DAY.isoformat()
+    assert (entry["ruling"], entry["via"], entry["card_hash"]) == ("A", "chat", GOLDEN_CARD_HASH)
+    assert here.body_writes() == [1]
+    assert here.body_replacings() == [before]
+    assert lock_held_at_writes == [True]
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        "lieber morgen",
+        "  \N{LINE SEPARATOR}\n```\n[[expectation]]\n",
+        "\N{NEXT LINE}\N{PARAGRAPH SEPARATOR}```aco",
+        "x\N{LINE SEPARATOR}```\N{LINE SEPARATOR}y",
+        "x\N{NEXT LINE}```\N{NEXT LINE}y",
+        "x\N{PARAGRAPH SEPARATOR}```\N{PARAGRAPH SEPARATOR}y",
+    ],
+)
+def test_an_answer_in_the_operators_words_is_stored_verbatim_and_reads_back_equal(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, words: str
+) -> None:
+    _, [answer, inbox] = _serve_in_process(
+        monkeypatch, _record_line(option=None, other=words), _call_line(2)
+    )
+
+    [entry] = here.stored_entries(1)
+    fences = body_fence.walk_fences(here.stored_body(1)).fences
+    assert answer["result"]["isError"] is False
+    assert [fence.info for fence in fences] == ["aco"]
+    assert (entry["ruling"], entry["other"], entry["via"]) == ("other", words, "chat")
+    assert answer["result"]["structuredContent"]["line"]["ruling"] == "other"
+    assert inbox["result"]["structuredContent"]["repositories"][0].get("items", []) == []
+
+
+@pytest.mark.usefixtures("github_world")
+def test_a_chat_answer_binds_like_a_board_ruling(
+    here: board_forge.BoardForge,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    unruled = here.stored_body(1)
+    with monkeypatch.context() as served:
+        _, [inbox_before, _, inbox_after] = _serve_in_process(
+            served, _call_line(1), _record_line(2), _call_line(3)
+        )
+    ruled = here.stored_body(1)
+    serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(1, "Here", unruled),)))
+    next_before = run_cli(["next"], capsys).expect_success()
+    serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(1, "Here", ruled),)))
+    rulings = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
+    shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
+    [decision_row] = AcoSource(here.directory).rows()
+    next_after = run_cli(["next"], capsys).expect_success()
+
+    listed = inbox_before["result"]["structuredContent"]["repositories"][0]["items"]
+    assert [line["index"] for item in listed for line in item["lines"]] == [1]
+    assert inbox_after["result"]["structuredContent"]["repositories"][0].get("items", []) == []
+    [ruled_line] = rulings["rulings"][0]["lines"]
+    assert (ruled_line["ruling"], ruled_line["via"]) == ("A", "chat")
+    assert shown["expectation_state"] == "ruled"
+    [decision_line] = decision_row.lines
+    assert isinstance(decision_line, expectations.OptionLine)
+    decided = decision_line.decision
+    assert decided is not None
+    assert (decided.answer, decided.via.value) == ("A", "chat")
+    assert "expectations unruled" in next_before
+    assert "expectations unruled" not in next_after
+
+
+def test_a_repeat_is_refused_and_writes_nothing(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, [first, repeated] = _serve_in_process(
+        monkeypatch, _record_line(1), _record_line(2, option="B")
+    )
+
+    assert first["result"]["isError"] is False
+    assert repeated["result"]["isError"] is True
+    assert "already ruled" in repeated["result"]["content"][0]["text"]
+    assert here.stored_entries(1)[0]["ruling"] == "A"
+    assert here.body_writes() == [1]
+
+
+@pytest.mark.parametrize("arrange", ["close", "stranger"])
+def test_a_closed_item_and_an_item_a_non_member_wrote_are_ruled(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, arrange: str
+) -> None:
+    if arrange == "close":
+        here.close_item(1)
+    else:
+        here.put_item(1, here.stored_body(1), author_is_member=False)
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+
+    assert answer["result"]["isError"] is False
+    assert here.stored_entries(1)[0]["ruling"] == "A"
+
+
+def test_a_line_with_its_head_is_ruled_and_loses_its_returned_keys(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    returned = _stored_item(returned_on=date(2026, 10, 2), returned_note="unklar")
+    here.put_item(1, board_forge.item_body(returned))
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+
+    [entry] = here.stored_entries(1)
+    assert answer["result"]["isError"] is False
+    assert (entry["ruling"], "returned_on" in entry, "returned_note" in entry) == (
+        "A",
+        False,
+        False,
+    )
+
+
+_YES_NO = {"text": "Alt", "ruling": "no", "ruled_on": date(2026, 10, 1)}
+
+
+@pytest.mark.parametrize(
+    ("stored", "changes", "sentence"),
+    [
+        pytest.param([_stored_item()], {"item": 9}, "does not exist", id="missing-item"),
+        pytest.param([_stored_item()], {"line": 0}, "line 0 out of range", id="line-zero"),
+        pytest.param([_stored_item()], {"line": 3}, "line 3 out of range", id="line-past-the-end"),
+        pytest.param([_stored_item()], {"card_hash": "sha256:0"}, "changed since", id="card-hash"),
+        pytest.param([_stored_item()], {"option": "D"}, "has no option D", id="letter-off-card"),
+        pytest.param([_YES_NO], {}, "yes/no line", id="yes-no-line"),
+        pytest.param(
+            [{"text": "Weg", "withdrawn_on": date(2026, 10, 2)}], {}, "withdrawn", id="withdrawn"
+        ),
+        pytest.param(
+            [_stored_item(asked_on=date(2026, 12, 1))], {}, "after today", id="asked-after-today"
+        ),
+    ],
+)
+def test_a_refusal_of_the_ruling_is_a_tool_error_with_its_sentence_and_writes_nothing(
+    here: board_forge.BoardForge,
+    monkeypatch: pytest.MonkeyPatch,
+    stored: list[dict[str, object]],
+    changes: dict[str, object],
+    sentence: str,
+) -> None:
+    here.put_item(1, board_forge.item_body(*stored))
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line(**changes))
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert sentence in result["content"][0]["text"]
+    assert here.body_writes() == []
+
+
+def test_a_malformed_body_is_a_tool_error_that_writes_nothing(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    here.put_item(1, "no block in this body")
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+
+    assert answer["result"]["isError"] is True
+    assert "no aco block" in answer["result"]["content"][0]["text"]
+    assert here.body_writes() == []
+
+
+def test_an_undiscovered_repository_is_a_tool_error_that_writes_nothing(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, [answer] = _serve_in_process(monkeypatch, _record_line(repository="board-forge/nowhere"))
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert "no repository" in result["content"][0]["text"]
+    assert here.body_writes() == []
+
+
+@pytest.mark.parametrize(
+    "check_answer",
+    [
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(1, "2026-11-08T10:05:00Z", "ghost", kept=True),
+            id="overwritten-kept",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(1, "2026-11-08T10:05:00Z", "ghost", kept=False),
+            id="overwritten-lost",
+        ),
+        pytest.param(forge.ForgeBodyNotVerifiedError(1, "timeout"), id="not-verified"),
+    ],
+)
+def test_the_body_write_checks_answer_passes_through_as_the_calls_error(
+    here: board_forge.BoardForge,
+    monkeypatch: pytest.MonkeyPatch,
+    check_answer: forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError,
+) -> None:
+    here.answer_next_write(check_answer)
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert result["content"][0]["text"] == str(check_answer)
+    assert here.stored_entries(1)[0]["ruling"] == "A"

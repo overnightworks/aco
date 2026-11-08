@@ -9,8 +9,8 @@ only what no spec owns.
 aco coordinates agents working in one repository. Claims live in git, work
 items live on the forge, and the commands join the two. It runs no lease or
 coordination server; the state ref is the serialization point. An agent
-host can start `aco mcp` for one session to read the operator's inbox and to
-put a decision card on an item.
+host can start `aco mcp` for one session to read the operator's inbox, to
+put a decision card on an item and to record the operator's chat answer on one.
 
 ```mermaid
 flowchart LR
@@ -41,7 +41,7 @@ flowchart LR
     Mcp["aco mcp<br/>cmd_mcp.py, mcp_server.py"]
     Mcp --> Repos
     Mcp --> Inbox
-    Mcp -->|"ask: one card per call"| Dec
+    Mcp -->|"ask, record_answer: one line per call"| Dec
     Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
     Board --> Protocol
@@ -121,7 +121,8 @@ when the host closes stdin; it keeps no state and scans the same root
 
 The trust model is cooperating clients: the state ref and `aco rule --via` are
 aids for cooperative agents (`specs/rule.spec.md` declares `--via` a
-tripwire). Against anyone else the forge's permissions enforce who may write,
+tripwire). The `record_answer` tool of `aco mcp` takes the agent's word that the
+operator spoke and checks nothing of it. Against anyone else the forge's permissions enforce who may write,
 and its edit history records afterward what was written; neither stops an
 agent acting under the operator's own identity. Claimants need push rights to
 the canonical remote. The board adds its own boundary, described in
@@ -134,7 +135,10 @@ card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
 stay unfiltered. `aco mcp` lists only the lines of those items that wait on the
 operator, and its `ask` tool is a write boundary of its own: one option line per
 call, into an open item a member wrote, in any repository discovery finds, in
-that item's turn (`specs/mcp.spec.md`).
+that item's turn. Its `record_answer` tool rules one line per call in that
+turn, as `aco rule` does, so it refuses neither a closed item nor a
+non-member's: the card's hash binds the answer to what the agent read
+(`specs/mcp.spec.md`).
 
 ### The per-item turn
 
@@ -145,7 +149,7 @@ item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
 decision, `aco item edit --size/--whole`, `aco rescope` (through its claim
-transition) and the `ask` tool of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
+transition) and the `ask` and `record_answer` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
 `decide.write_item_body`, the one writer, which skips a body equal to the text it
