@@ -7,7 +7,17 @@ import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import body, checkout, cmd_claim, forge, github, policy, protocol, report, workboard
+from . import (
+    body,
+    checkout,
+    cmd_claim,
+    forge,
+    github_body_write,
+    policy,
+    protocol,
+    report,
+    workboard,
+)
 from .session import RunContext
 
 _ADOPT_COMMAND = "adopt"
@@ -26,11 +36,11 @@ _READ_BACK_FAILED = (
     "the claim stands; run adopt again"
 )
 _BODY_WRITE_FAILED = {
-    github.BodyWriteOutcome.REFUSED: (
+    github_body_write.BodyWriteOutcome.REFUSED: (
         "pull request #{number} body not written ({foreign}); "
         "the claim stands; run adopt again, or release it"
     ),
-    github.BodyWriteOutcome.UNKNOWN: (
+    github_body_write.BodyWriteOutcome.UNKNOWN: (
         "pull request #{number} body write sent, outcome unknown ({foreign}); "
         "the claim stands; run adopt again"
     ),
@@ -117,7 +127,7 @@ def _write_and_read_back(adoption: _Adoption, left_body: str, *, replacing: str)
     try:
         adoption.run.forge_writer.update_item_body(number, left_body, replacing=replacing)
     except protocol.ClaimError as error:
-        template = _BODY_WRITE_FAILED[github.body_write_outcome(error)]
+        template = _BODY_WRITE_FAILED[github_body_write.body_write_outcome(error)]
         raise _refusal_around_forge_error(template, number, error) from error
     try:
         written = adoption.run.forge.item_reference(number).body

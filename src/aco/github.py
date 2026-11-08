@@ -10,13 +10,13 @@ import threading
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
-from enum import StrEnum
 from pathlib import Path
 from typing import TypeVar
 
 from . import (
     forge,
     github_actions,
+    github_body_write,
     github_graphql,
     github_issue_payload,
     process,
@@ -276,26 +276,6 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
     if result.exit_status != 0:
         raise _nonzero_exit_failure(decoded, result.exit_status, purpose)
     return decoded
-
-
-class BodyWriteOutcome(StrEnum):
-    """What a failed `update_item_body` tells of the body: `REFUSED` wrote
-    nothing, `UNKNOWN` may have written it."""
-
-    REFUSED = "refused"
-    UNKNOWN = "unknown"
-
-
-def body_write_outcome(error: ClaimError) -> BodyWriteOutcome:
-    """The outcome of a body write that raised `error`: the forge's own
-    refusal of the call (authorization, no such item), and a `gh` that never
-    ran (a plain `ClaimError` -- `_bounded_command` raises only typed forge
-    errors once the process has started) wrote nothing; any other forge
-    failure may have come after the write."""
-    refused = isinstance(
-        error, forge.ForgePermissionDeniedError | forge.ForgeNotFoundError
-    ) or not isinstance(error, forge.ForgeError)
-    return BodyWriteOutcome.REFUSED if refused else BodyWriteOutcome.UNKNOWN
 
 
 class GitHubForge:
@@ -1399,11 +1379,7 @@ class GitHubForge:
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:  # NOSONAR(S1172)
         """`replacing` is the port's contract; the PATCH does not read it."""
-        path = f"repos/{self.repository}/issues/{number}"
-        self._run(
-            ["api", "--method", "PATCH", path, "--input", "-"],
-            input_data=json.dumps({"body": body}).encode("utf-8"),
-        )
+        github_body_write.patch_item_body(self._run, self.repository, number, body)
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
         """Set `number`'s organization issue type to `kind`'s by name, the
