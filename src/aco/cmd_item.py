@@ -379,7 +379,9 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
         with _item_turn(context, number, _ITEM_EDIT_SIZE_COMMAND) as fresh:
             located = body.locate_block(fresh.body)
             new_data = {**located.data, "size": parsed.size}
-            outcome = _write_block_data(context.forge_writer, fresh, located, new_data)
+            outcome = _write_block_data(
+                context.forge_writer, fresh.number, fresh.body, located, new_data
+            )
         _print_item_edit_size_result(number, parsed.size, fresh.storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
@@ -395,16 +397,17 @@ def _item_turn(
 
 def _write_block_data(
     client: forge.ForgeWriter,
-    fresh: decide.FreshItem,
+    number: int,
+    current_body: str,
     located: body.LocatedBlock,
     new_data: dict[str, object],
 ) -> _ItemReason:
-    """Writes `new_data` as the block of the item `fresh` read, every other byte
+    """Writes `new_data` as item `number`'s block, every other byte
     untouched, or nothing at all when the block already carries it,
     so a repeated narrow edit leaves no empty write behind."""
     if new_data == located.data:
         return _ItemReason.UNCHANGED
-    client.update_item_body(fresh.number, body.replace_block(fresh.body, located, new_data))
+    client.update_item_body(number, body.replace_block(current_body, located, new_data))
     return _ItemReason.EDITED
 
 
@@ -440,7 +443,9 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
             located = body.locate_block(fresh.body)
             reason = body.bounded_whole_reason(parsed.whole)
             new_data = {**located.data, "whole": reason}
-            outcome = _write_block_data(context.forge_writer, fresh, located, new_data)
+            outcome = _write_block_data(
+                context.forge_writer, fresh.number, fresh.body, located, new_data
+            )
         _print_item_edit_whole_result(number, reason, fresh.storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:

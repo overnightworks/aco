@@ -70,3 +70,24 @@ def test_the_notice_comes_once_when_another_holder_has_the_lock_and_never_when_i
         False,
         True,
     )
+
+
+def test_a_contender_that_asks_for_no_notice_waits_for_the_holder_in_silence(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "stamp"
+    acquired = threading.Event()
+
+    def contender() -> None:
+        with file_lock.held(path):
+            acquired.set()
+
+    thread = threading.Thread(target=contender)
+    try:
+        with file_lock.held(path):
+            thread.start()
+            acquired_while_held = acquired.wait(timeout=0.2)
+    finally:
+        if thread.ident is not None:
+            thread.join(timeout=10)
+    assert (acquired_while_held, acquired.is_set()) == (False, True)
