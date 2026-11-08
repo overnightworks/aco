@@ -241,7 +241,7 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` o
 ```console
 $ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash>
 2> waiting for the item lock at <state>/aco/item-locks/<digest>
-RULED #<n> line 1 A; 0 line(s) still open
+RULED <item-id> line 1 A; 0 line(s) still open
 exit 0
 ```
 
@@ -251,7 +251,7 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` o
 
 ```console
 $ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash>
-RULED #<n> line 1 A; 0 line(s) still open
+RULED <item-id> line 1 A; 0 line(s) still open
 exit 0
 ```
 
