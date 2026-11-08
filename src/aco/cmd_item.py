@@ -380,7 +380,8 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
     the block's own top-level `size` key (never `[record]`, a
     `state-ref`-only table BODY-15 refuses under `github`) and leaves every
     other byte untouched. Every refusal reports through the shared envelope
-    as `precondition_failed`."""
+    as `precondition_failed`, except a write the forge's check answers (ITEM-66), which
+    reports `overwritten` or `not_verified`."""
     as_json = parsed.json
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_SIZE_COMMAND)
@@ -439,7 +440,8 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
     `ForgeWriter.update_item_body` -- works under `storage = "github"` too,
     since it patches only the block's own top-level `whole` key and leaves
     every other byte untouched. Every refusal reports through the shared
-    envelope as `precondition_failed`."""
+    envelope as `precondition_failed`, except a write the forge's check answers (ITEM-66),
+    which reports `overwritten` or `not_verified`."""
     as_json = parsed.json
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_WHOLE_COMMAND)
