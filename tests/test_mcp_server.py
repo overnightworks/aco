@@ -2,6 +2,7 @@
 message in, the answer line out, the inbox read a function the test passes."""
 
 import json
+import re
 from collections.abc import Mapping
 from typing import Any, cast
 
@@ -92,7 +93,7 @@ def test_initialize_answers_the_clients_version_when_supported_else_the_newest(
 def test_the_instructions_name_every_tool_the_server_lists() -> None:
     instructions = _answer(_request("initialize"))["result"]["instructions"]
 
-    named = {name for name in _tools() if name in instructions}
+    named = set(re.findall(r"\bwith (\w+)", instructions)) & set(_tools())
 
     assert named == set(_tools())
 
