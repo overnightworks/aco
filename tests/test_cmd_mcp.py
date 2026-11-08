@@ -303,7 +303,9 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
     monkeypatch.setattr(
         session,
         "run_context",
-        lambda repo: session.RunContext(repo, build_forge=build_forge, today=lambda: board_forge.RULING_DAY),
+        lambda repo: session.RunContext(
+            repo, build_forge=build_forge, today=lambda: board_forge.RULING_DAY
+        ),
     )
     monkeypatch.setattr(sys, "stdin", _Script(_call_line(1)))
     replies = io.StringIO()
@@ -313,7 +315,8 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
 
     [answer] = [json.loads(line) for line in replies.getvalue().splitlines()]
     entries = {
-        entry["repository"]: entry for entry in answer["result"]["structuredContent"]["repositories"]
+        entry["repository"]: entry
+        for entry in answer["result"]["structuredContent"]["repositories"]
     }
     assert exit_code == 0
     assert entries["board-forge/here"]["steps"] == [

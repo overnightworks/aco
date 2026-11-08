@@ -96,7 +96,8 @@ output is committed under `src/aco/board/static/`.
 ## MCP
 
 `aco mcp` is a stdio MCP server an agent host starts for one session; its tool
-`read_inbox` returns the option lines that wait on the operator across the
+`read_inbox` returns the option lines and the steps (items labelled
+`needs-operator`, with their `next`) that wait on the operator across the
 same repositories `aco serve` finds, rescanned on every call, and its tool
 `ask` puts one decision card on an open item there, writing it once even when
 asked again, and its tool `record_answer` records the answer the operator gave

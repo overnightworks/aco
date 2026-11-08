@@ -133,7 +133,8 @@ state-ref item counts as a member's, since only a writer of the state ref can
 create one): in a public repository a stranger can open an issue carrying a
 card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
 stay unfiltered. `aco mcp` lists only the lines of those items that wait on the
-operator, and its `ask` tool is a write boundary of its own: one option line per
+operator and, from the same listing, the items of the same members labelled
+`needs-operator` with their `next`. Its `ask` tool is a write boundary of its own: one option line per
 call, into an open item a member wrote, in any repository discovery finds, in
 that item's turn. Its `record_answer` tool rules one line per call in that
 turn, as `aco rule` does, so it refuses neither a closed item nor a

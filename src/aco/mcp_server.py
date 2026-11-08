@@ -51,8 +51,8 @@ _INVALID_PARAMS: Final = -32602
 
 _INSTRUCTIONS: Final = (
     "Read the decisions and the steps waiting on the operator across every repository on "
-    f"this machine with {READ_INBOX}, put a decision card of your own on an item with {ASK}, and record "
-    f"the answer the operator gave in this chat with {RECORD_ANSWER}."
+    f"this machine with {READ_INBOX}, put a decision card of your own on an item with {ASK}, "
+    f"and record the answer the operator gave in this chat with {RECORD_ANSWER}."
 )
 _ENVELOPE_KEYS: Final = ("repository", "item")
 _OPTION: Final = "option"

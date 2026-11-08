@@ -1,6 +1,6 @@
 # `aco mcp`
 
-`aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions waiting on the operator across every
+`aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions and the steps waiting on the operator across every
 repository under the configured root; its tool `ask` puts one decision card on an item there; its tool `record_answer` records the answer the operator gave in the chat on a card's option line. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask` and `record_answer`: the CLI stays complete without it.
 It speaks the protocol of the `initialize` era, revisions `2025-11-25` and `2025-06-18`. The items and lines it returns are the ones `specs/rulings.spec.md` owns (RUL-10),
 so an agent holds the line index and the `card_hash` that `aco rule` takes. Which repositories exist and how the root is found is `specs/serve.spec.md`'s (ABRD-14, ABRD-108..ABRD-111).
@@ -44,6 +44,10 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | an unknown argument, or a value of the wrong type, or not exactly one of `option` and `other`, or a blank `other` | — | — | MCP-35 |
 | the forge's check of the answer's write answers `not verified` or `overwritten` | — | — | MCP-36 |
 | `read_inbox` with arguments | — | — | MCP-37 |
+| an open item a member wrote that carries the label `needs-operator` | — | — | MCP-39, MCP-41 |
+| such an item whose body has no readable block | — | — | MCP-40 |
+| such an item a non-member wrote, or one the store could not read | — | — | MCP-42 |
+| several such items in one repository, or one that also has a waiting line | — | — | MCP-43 |
 
 ## Serving
 
@@ -61,7 +65,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 
 ## Reading the inbox
 
-- [ ] [MCP-11] `read_inbox` answers `structuredContent` and the same JSON as text: `root`, per repository its `items` with their waiting lines or `unavailable` and a reason, and `unreadable` (see E-MCP-02).
+- [ ] [MCP-11] `read_inbox` answers `structuredContent` and the same JSON as text: `root`, per repository its `items` and `steps`, or `unavailable` and a reason, and `unreadable` (see E-MCP-02).
 - [ ] [MCP-12] A line waits on the operator when it is an option line neither ruled, nor returned to its head, nor withdrawn; no other line is listed.
 - [ ] [MCP-13] An item left with no waiting line is not listed; a repository left with none is listed with no `items`.
 - [ ] [MCP-14] Only items a member of the repository wrote are read (ABRD-06).
@@ -96,6 +100,11 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - [ ] [MCP-36] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
 - [ ] [MCP-37] `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
 - [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash` and `option` or `other`, and no `via`.
+- [ ] [MCP-39] An open item that carries the label `needs-operator`, in any letter case, is a step: `steps` lists its `number`, `title` and `step`, the `next` of its block (see E-MCP-11).
+- [ ] [MCP-40] A step whose body has no readable block, or a malformed one, is listed with `step` null; it is never left out and its title is not given as the step.
+- [ ] [MCP-41] `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
+- [ ] [MCP-42] Only items a member of the repository wrote are steps, as for cards (MCP-14); an item the store could not read is no step.
+- [ ] [MCP-43] Steps come by descending item number; an item with the label and a waiting line is in `items` and in `steps`; one listing of a repository's open items serves both.
 
 ## Never
 
@@ -126,7 +135,7 @@ Setup: `owner/a` holds item `#7` with one open option line; the forge of `owner/
 
 ```text
 > {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"read_inbox"}}
-< {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[{"number":7,"lines":[{"index":1,"form":"options"}]}]},{"repository":"owner/b","unavailable":"the forge is down"}],"unreadable":[]},"isError":false}}
+< {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[{"number":7,"lines":[{"index":1,"form":"options"}]}],"steps":[]},{"repository":"owner/b","unavailable":"the forge is down"}],"unreadable":[]},"isError":false}}
 ```
 
 The item and line objects carry every key `aco rulings --json` prints (RUL-10); only the keys shown are repeated here.
@@ -213,3 +222,14 @@ Setup: as E-MCP-08, with `line` sent as a string and both `option` and `other` g
 ```
 
 Nothing is read or written; a blank `other` answers `other must not be blank`.
+
+### E-MCP-11 -- an item that waits on a step only the operator can take
+
+Setup: `owner/a` holds item `#9` titled `Rotate the key`, labelled `needs-operator`, whose block has `next = "Rotate the deploy key in the host's settings."`
+
+```text
+> {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_inbox"}}
+< {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[],"steps":[{"number":9,"title":"Rotate the key","step":"Rotate the deploy key in the host's settings."}]}],"unreadable":[]},"isError":false}}
+```
+
+An item labelled the same whose body holds no readable block is listed with `"step":null`.
