@@ -255,9 +255,10 @@ def test_a_write_after_a_stale_read_refuses_and_keeps_the_other_writers_ruling(
     state_ref_board: BoardClient,
     listed_items: Lister,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    """CAS-20: a chat ruling lands after the board read the item and before it
-    writes; the board's write is refused and the chat ruling stays."""
+    """CAS-20: a ruling from another machine lands after the board read the item
+    and before it writes; the board's write is refused and that ruling stays."""
     shown = _first_card(state_ref_board, listed_items)
     read = decide.fresh_item
 
@@ -266,7 +267,9 @@ def test_a_write_after_a_stale_read_refuses_and_keeps_the_other_writers_ruling(
     ) -> decide.FreshItem:
         fresh = read(context, number, command=command)
         monkeypatch.setattr(decide, "fresh_item", read)
-        assert cli.main(_chat_ruling()) == 0
+        with monkeypatch.context() as other_machine:
+            other_machine.setenv("XDG_STATE_HOME", str(tmp_path / "other-machine"))
+            assert cli.main(_chat_ruling()) == 0
         return fresh
 
     monkeypatch.setattr(decide, "fresh_item", read_then_ruled_in_chat)
