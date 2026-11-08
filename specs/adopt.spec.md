@@ -42,8 +42,8 @@ directory in ADOPT-09.
 | the forge refuses the body write | ADOPT-24 |
 | the body write has an unknown outcome | ADOPT-25 |
 | this session's builder lane claim stands alone on the branch | ADOPT-26, ADOPT-31 |
-| the body reads back unlike the body written | ADOPT-27 |
-| the body cannot be read back | ADOPT-28 |
+| the check finds the written body overwritten in the meantime | ADOPT-27 |
+| the check cannot verify the written body | ADOPT-28 |
 | the body cannot be read before it is written | ADOPT-33 |
 | a claim lands on the branch after the checks | ADOPT-29 |
 | the rerun's body carries more than one classification line | ADOPT-30 |
@@ -51,6 +51,7 @@ directory in ADOPT-09.
 | a refusal sentence is long or carries display controls | ADOPT-19 |
 | the adopted branch is re-pushed | ADOPT-34 |
 | an adopted lane is released as abandoned | ADOPT-35 |
+| the check finds the body written over a change adopt had not read | ADOPT-36 |
 
 ## Checks, in order
 
@@ -87,7 +88,7 @@ list reads nothing after it.
    the checks read (ADOPT-10); the claim is written for the listing's path set (ADOPT-21,
    ADOPT-22, ADOPT-29).
 11. The body is read again (ADOPT-33) and judged once more on that copy (ADOPT-23), written (ADOPT-24,
-   ADOPT-25), read back (ADOPT-27, ADOPT-28), and the declaration printed (ADOPT-20).
+   ADOPT-25), checked (ADOPT-27, ADOPT-28, ADOPT-36), and the declaration printed (ADOPT-20).
 
 ## Checks, refusals and writes
 
@@ -117,8 +118,8 @@ list reads nothing after it.
 - [ ] [ADOPT-24] A body write the forge refused prints `pull request #<n> body not written (<error>); the claim stands; run adopt again, or release it`, exit `2`.
 - [ ] [ADOPT-25] A body write of unknown outcome prints `pull request #<n> body write sent, outcome unknown (<error>); the claim stands; run adopt again`, exit `2`.
 - [ ] [ADOPT-26] A rerun by this session's agent as builder, holding the branch's live lane claim with no other claim there, builds and claims nothing: it adds a missing line or keeps a present one, exit `0`.
-- [ ] [ADOPT-27] A body read back unlike the body written prints `pull request #<n> body changed after adopt wrote it; the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-28] A failed read-back prints `pull request #<n> body written, but reading it back failed (<error>); the claim stands; run adopt again`, exit `2`.
+- [ ] [ADOPT-27] A write the edit history shows overwritten prints `pull request #<n> body written, but overwritten in the meantime by <editor> at <time>; the claim stands; run adopt again`, exit `2`.
+- [ ] [ADOPT-28] A write the edit history cannot confirm prints `pull request #<n> body written, not verified (<cause>); the claim stands; run adopt again`, exit `2`.
 - [ ] [ADOPT-29] ADOPT-06 holds at the claim write itself (CLAIM-71): a claim landing on the branch after adopt's checks refuses it there, then ADOPT-21 drops the build; the body stays unwritten.
 - [ ] [ADOPT-30] On ADOPT-26's rerun a body with more than one live classification line refuses `pull request #<n> <the parser's defect>; adopt never changes a classification line`, exit `2`.
 - [ ] [ADOPT-31] ADOPT-26's rerun judges ADOPT-02..07 and ADOPT-16 again on the body it would leave, at the head it read; it never builds, fetches, rescopes or checks ADOPT-09, ADOPT-10, ADOPT-13 or ADOPT-17.
@@ -126,6 +127,7 @@ list reads nothing after it.
 - [ ] [ADOPT-33] A failed re-read before the write prints `pull request #<n> body could not be read before writing (<error>); the claim stands; run adopt again`, exit `2`.
 - [ ] [ADOPT-34] A re-push of an adopted branch ends no claim: `aco land --head` demands the new head (LANDCMD-31) and releases the lane like any lane (REL-57); the holder's rerun restores a lost line (ADOPT-26).
 - [ ] [ADOPT-35] `aco release --branch <branch> --abandoned` frees an adopted lane and keeps worktree, branch and `No-Item:` line (REL-33); then `aco land` refuses (LAND-16) and `aco adopt` refuses (ADOPT-05).
+- [ ] [ADOPT-36] A write kept over an unread change prints `pull request #<n> body written over a change by <editor> at <time> adopt had not read; the claim stands; that change is only in the edit history`, exit `2`.
 
 ## Never
 
@@ -138,7 +140,7 @@ list reads nothing after it.
 - `aco adopt` never adopts more than one pull request per call.
 - `aco adopt` never reads a linked worktree's own `.aco/board.toml`: every check judges the main checkout's.
 - `aco adopt` never gains a `--json` mode (`specs/output.spec.md`): a refusal is `ERROR: <sentence>` on stderr and the parser's own usage block, exit `2`.
-- Accepted residuals: GitHub's body write has no compare-and-swap, so an edit landing between ADOPT-23's read and the write can be lost, and ADOPT-27 sees edits after the write only. After a re-push the local branch stays at the old head until the adopter updates the worktree (ADOPT-34). After an abandonment (`aco release --abandoned`) the line stays, so ADOPT-05 refuses re-adoption until it is removed by hand (ADOPT-35). An ordinary issue claim may still land on an adopted branch (CLAIM-10); the holder's rerun then refuses ADOPT-06 until one claim is released. A force-push back to the exact head adopt first read, while it lists the files, is not detected.
+- Accepted residuals: GitHub's body write has no compare-and-swap, so an edit landing between ADOPT-23's read and the write is overwritten and shown only by the edit history (ADOPT-36), and ADOPT-27 finds edits after the write. After a re-push the local branch stays at the old head until the adopter updates the worktree (ADOPT-34). After an abandonment (`aco release --abandoned`) the line stays, so ADOPT-05 refuses re-adoption until it is removed by hand (ADOPT-35). An ordinary issue claim may still land on an adopted branch (CLAIM-10); the holder's rerun then refuses ADOPT-06 until one claim is released. A force-push back to the exact head adopt first read, while it lists the files, is not detected.
 
 ## Examples
 
@@ -208,9 +210,9 @@ CLAIMED lane dependabot/uv/x: <claim-id>
 exit 2
 ```
 
-### E-ADOPT-27 -- a body read back unlike the one written
+### E-ADOPT-27 -- a body overwritten in the meantime
 
-Setup: E-ADOPT-01 with the bot rewriting the body before adopt reads it back
+Setup: E-ADOPT-01 with `ghost` editing the body by hand right after adopt wrote it
 
 ```console
 $ aco adopt 45 --no-item deps
@@ -218,7 +220,21 @@ worktree: /work/agent-coordination-worktrees/pr-45
 branch: dependabot/uv/x
 CLAIMED lane dependabot/uv/x: <claim-id>
 2 of 6 versioned files (33%); overlaps no other open claims
-2> ERROR: pull request #45 body changed after adopt wrote it; the claim stands; run adopt again
+2> ERROR: pull request #45 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z; the claim stands; run adopt again
+exit 2
+```
+
+### E-ADOPT-36 -- a body written over a change adopt had not read
+
+Setup: E-ADOPT-01 with `ghost` having edited the body by hand after adopt read it and before it wrote
+
+```console
+$ aco adopt 45 --no-item deps
+worktree: /work/agent-coordination-worktrees/pr-45
+branch: dependabot/uv/x
+CLAIMED lane dependabot/uv/x: <claim-id>
+2 of 6 versioned files (33%); overlaps no other open claims
+2> ERROR: pull request #45 body written over a change by ghost at 2026-11-08T10:00:00Z adopt had not read; the claim stands; that change is only in the edit history
 exit 2
 ```
 

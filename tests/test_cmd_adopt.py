@@ -6,6 +6,7 @@ import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -837,18 +838,20 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
     assert claim_state_reads_by_adopt == 1
 
 
-def _serve_a_human_author(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
-    world.serve(lambda landing: replace(landing, author="octocat"))
+def _serve_the_author(author: str, world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
+    world.serve(lambda landing: replace(landing, author=author))
 
 
-def _serve_an_empty_body(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
-    world.serve(lambda landing: replace(landing, body=""))
+def _serve_the_body(body: str, world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
+    world.serve(lambda landing: replace(landing, body=body))
 
 
-def _edit_the_prose_before_the_re_read(
-    world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch
+def _the_re_read_serves(
+    reread: str | forge.ForgeError,
+    world: AdoptionWorld,
+    _monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    world.forge.scripted_item_reads = [None, "Bump x, edited"]
+    world.forge.scripted_item_reads = [None, reread]
 
 
 def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -861,7 +864,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
     ("arrange", "arguments", "kind", "bodies", "declaration", "whole_reason"),
     [
         pytest.param(
-            _serve_a_human_author,
+            partial(_serve_the_author, "octocat"),
             [],
             "fix",
             ("Bump x", "Bump x\n\nNo-Item: fix"),
@@ -888,7 +891,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             id="cell-17-run-from-a-linked-worktree",
         ),
         pytest.param(
-            _serve_an_empty_body,
+            partial(_serve_the_body, ""),
             [],
             "deps",
             ("", "No-Item: deps"),
@@ -897,7 +900,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             id="cell-21-empty-body",
         ),
         pytest.param(
-            _edit_the_prose_before_the_re_read,
+            partial(_the_re_read_serves, "Bump x, edited"),
             [],
             "deps",
             ("Bump x, edited", "Bump x, edited\n\nNo-Item: deps"),
@@ -929,8 +932,9 @@ def test_adopt_writes_the_line_onto_the_body_it_read_last(
     assert result.stdout.startswith(_build_lines(world) + _claimed_line(claim))
     assert result.stdout.endswith(declaration)
     assert (claim.agent, claim.role, claim.whole_reason) == ("Ada", "builder", whole_reason)
-    assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, bodies[1])]
-    assert world.forge.body_replacings == [bodies[0]]
+    read_body, written_body = bodies
+    assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, written_body)]
+    assert world.forge.body_replacings == [read_body]
 
 
 def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(
@@ -944,10 +948,16 @@ def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(
     patches: list[dict[str, str]] = []
 
     def gh(arguments: list[str], *, input_data: bytes | None = None) -> str:
+        if "graphql" in arguments:
+            edits = [
+                {"diff": diff, "editedAt": _EDIT_TIME, "deletedAt": None}
+                for diff in (current["body"], None)
+            ]
+            return json.dumps({"n0": {"userContentEdits": {"nodes": edits}}})
         if input_data is not None:
             patches.append(json.loads(input_data))
             current["body"] = patches[-1]["body"]
-            return ""
+            return json.dumps({"body": current["body"]})
         return json.dumps(
             {"state": "open", "title": "Bump x", "body": current["body"], "is_landing": True}
         )
@@ -1076,23 +1086,17 @@ def test_adopt_removes_the_pair_it_built_when_the_claim_is_refused_after_the_bui
     ] == holders
 
 
-def _the_claim_push_is_sent_and_lands_but_its_answer_is_lost(
-    _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
+def _the_claim_push_is_sent(
+    _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch, *, landed: bool
 ) -> None:
-    fail_every_state_ref_push(monkeypatch, protocol.ClaimError("push timed out"), lands=True)
-
-
-def _the_claim_push_is_sent_and_never_lands(
-    _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    fail_every_state_ref_push(monkeypatch, protocol.ClaimError("push timed out"))
+    fail_every_state_ref_push(monkeypatch, protocol.ClaimError("push timed out"), lands=landed)
 
 
 @pytest.mark.parametrize(
     ("unknown_outcome", "claim_landed", "rerun_status", "rerun_stdout", "rerun_stderr"),
     [
         pytest.param(
-            _the_claim_push_is_sent_and_lands_but_its_answer_is_lost,
+            partial(_the_claim_push_is_sent, landed=True),
             True,
             0,
             "{claimed}" + _declaration("deps"),
@@ -1100,7 +1104,7 @@ def _the_claim_push_is_sent_and_never_lands(
             id="cell-27-rerun-resumes-the-landed-claim",
         ),
         pytest.param(
-            _the_claim_push_is_sent_and_never_lands,
+            partial(_the_claim_push_is_sent, landed=False),
             False,
             2,
             "",
@@ -1149,50 +1153,37 @@ def test_adopt_keeps_the_pair_of_an_unknown_claim_outcome_and_a_rerun_settles_it
     assert world.forge.body_writes == ([(ADOPTED_PULL_REQUEST, ADOPTED_BODY)] * claim_landed)
 
 
-def _a_classification_line_appears_before_the_re_read(
-    world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch
+def _the_write_fails_with(
+    answer: protocol.ClaimError, world: AdoptionWorld, _: pytest.MonkeyPatch, *, landed: bool
 ) -> None:
-    world.forge.scripted_item_reads = [None, "Bump x\n\nWork-Item: #5"]
+    world.forge.update_item_body_error = answer
+    world.forge.update_item_body_lands_before_error = landed
 
 
-def _the_forge_refuses_the_write(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
-    world.forge.update_item_body_error = forge.ForgePermissionDeniedError("HTTP 403")
+_EDIT_TIME = "2026-11-08T10:05:00Z"
+_LOST = forge.ForgeBodyOverwrittenError(ADOPTED_PULL_REQUEST, _EDIT_TIME, "ghost", kept=False)
+_KEPT = forge.ForgeBodyOverwrittenError(ADOPTED_PULL_REQUEST, _EDIT_TIME, None, kept=True)
+_NOT_VERIFIED = forge.ForgeBodyNotVerifiedError(ADOPTED_PULL_REQUEST, "timeout")
 
-
-def _the_write_times_out_after_it_landed(
-    world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch
-) -> None:
-    world.forge.update_item_body_error = forge.ForgeTransientError("timeout")
-    world.forge.update_item_body_lands_before_error = True
-
-
-def _the_bot_rewrites_the_body_before_the_read_back(
-    world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch
-) -> None:
-    world.forge.scripted_item_reads = [None, None, "Bump x, rewritten by the bot"]
-
-
-def _the_re_read_before_the_write_fails(
-    world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch
-) -> None:
-    world.forge.scripted_item_reads = [None, forge.ForgeTransientError("timeout")]
-
-
-def _the_read_back_fails(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
-    world.forge.scripted_item_reads = [None, None, forge.ForgeTransientError("timeout")]
+_the_forge_refuses_the_write = partial(
+    _the_write_fails_with, forge.ForgePermissionDeniedError("HTTP 403"), landed=False
+)
+_the_write_times_out_after_it_landed = partial(
+    _the_write_fails_with, forge.ForgeTransientError("timeout"), landed=True
+)
 
 
 @pytest.mark.parametrize(
     ("arrange", "refusal", "written_bodies"),
     [
         pytest.param(
-            _a_classification_line_appears_before_the_re_read,
+            partial(_the_re_read_serves, "Bump x\n\nWork-Item: #5"),
             _refusal("already carries Work-Item: #5; adopt never changes a classification line"),
             [],
             id="cell-30-line-appears-before-the-re-read",
         ),
         pytest.param(
-            _the_re_read_before_the_write_fails,
+            partial(_the_re_read_serves, forge.ForgeTransientError("timeout")),
             _refusal(
                 "body could not be read before writing (timeout); the claim stands; run adopt again"
             ),
@@ -1216,19 +1207,28 @@ def _the_read_back_fails(world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch)
             id="cell-32-write-times-out",
         ),
         pytest.param(
-            _the_bot_rewrites_the_body_before_the_read_back,
-            _refusal("body changed after adopt wrote it; the claim stands; run adopt again"),
-            [ADOPTED_BODY],
-            id="cell-33-read-back-differs",
-        ),
-        pytest.param(
-            _the_read_back_fails,
+            partial(_the_write_fails_with, _LOST, landed=True),
             _refusal(
-                "body written, but reading it back failed (timeout); the claim stands; "
-                "run adopt again"
+                "body written, but overwritten in the meantime by ghost at "
+                f"{_EDIT_TIME}; the claim stands; run adopt again"
             ),
             [ADOPTED_BODY],
-            id="cell-34-read-back-fails",
+            id="cell-33-overwritten-in-the-meantime",
+        ),
+        pytest.param(
+            partial(_the_write_fails_with, _KEPT, landed=True),
+            _refusal(
+                f"body written over a change by an unknown editor at {_EDIT_TIME} adopt had "
+                "not read; the claim stands; that change is only in the edit history"
+            ),
+            [ADOPTED_BODY],
+            id="cell-33b-written-over-an-unread-change",
+        ),
+        pytest.param(
+            partial(_the_write_fails_with, _NOT_VERIFIED, landed=True),
+            _refusal("body written, not verified (timeout); the claim stands; run adopt again"),
+            [ADOPTED_BODY],
+            id="cell-34-not-verified",
         ),
     ],
 )

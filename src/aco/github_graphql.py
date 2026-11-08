@@ -223,7 +223,8 @@ _EDIT_HISTORY_SELECTION = (
 )
 EDIT_HISTORY_READ = BatchedRead(
     "issueOrPullRequest",
-    f"... on Issue {{ {_EDIT_HISTORY_SELECTION} }} ... on PullRequest {{ {_EDIT_HISTORY_SELECTION} }}",
+    f"... on Issue {{ {_EDIT_HISTORY_SELECTION} }} "
+    f"... on PullRequest {{ {_EDIT_HISTORY_SELECTION} }}",
     _EDIT_HISTORY_SUBJECT,
     _parsed_edit_history,
 )

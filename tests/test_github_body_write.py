@@ -245,7 +245,7 @@ def test_a_patch_answer_without_a_readable_body_is_not_verified_and_reads_no_his
     [
         pytest.param("not a list", id="nodes-not-a-list"),
         pytest.param([5, _node("old")], id="revision-not-an-object"),
-        pytest.param([_node(5), _node("old")], id="text-not-a-string"),
+        pytest.param([{**_node("new"), "diff": 5}, _node("old")], id="text-not-a-string"),
         pytest.param([{**_node("new"), "editor": {"login": 5}}, _node("old")], id="login-not-text"),
         pytest.param([{**_node("new"), "editedAt": None}, _node("old")], id="no-time"),
     ],

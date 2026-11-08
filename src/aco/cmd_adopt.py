@@ -24,15 +24,20 @@ _ADOPT_COMMAND = "adopt"
 _GITHUB_ONLY_REFUSAL = (
     "aco adopt is a github command; storage = state-ref has no pull requests to adopt"
 )
-_BODY_CHANGED = (
-    "pull request #{number} body changed after adopt wrote it; the claim stands; run adopt again"
-)
 _RE_READ_FAILED = (
     "pull request #{number} body could not be read before writing ({foreign}); "
     "the claim stands; run adopt again"
 )
-_READ_BACK_FAILED = (
-    "pull request #{number} body written, but reading it back failed ({foreign}); "
+_BODY_OVERWRITTEN = (
+    "pull request #{number} body written, but overwritten in the meantime by {foreign} at {time}; "
+    "the claim stands; run adopt again"
+)
+_BODY_WRITTEN_OVER_CHANGE = (
+    "pull request #{number} body written over a change by {foreign} at {time} adopt had not read; "
+    "the claim stands; that change is only in the edit history"
+)
+_BODY_NOT_VERIFIED = (
+    "pull request #{number} body written, not verified ({foreign}); "
     "the claim stands; run adopt again"
 )
 _BODY_WRITE_FAILED = {
@@ -112,29 +117,35 @@ def _refuse_head_branch_collisions(adoption: _Adoption) -> None:
         raise moved
 
 
-def _refusal_around_forge_error(
-    template: str, number: int, error: protocol.ClaimError
+def _refusal_around_foreign_text(
+    template: str, number: int, foreign: str, **words: object
 ) -> protocol.ClaimUnavailableError:
     return protocol.ClaimUnavailableError(
-        report.refusal_around_foreign_text(template, str(error), number=number)
+        report.refusal_around_foreign_text(template, foreign, number=number, **words)
     )
 
 
-def _write_and_read_back(adoption: _Adoption, left_body: str, *, replacing: str) -> None:
-    """ADOPT-24, ADOPT-25, ADOPT-27, ADOPT-28: writes `left_body` over `replacing`, then reads
-    the body back; every failure leaves the claim standing."""
+def _checked_write_refusal(
+    number: int, error: forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError
+) -> protocol.ClaimUnavailableError:
+    if isinstance(error, forge.ForgeBodyNotVerifiedError):
+        return _refusal_around_foreign_text(_BODY_NOT_VERIFIED, number, error.cause)
+    template = _BODY_WRITTEN_OVER_CHANGE if error.kept else _BODY_OVERWRITTEN
+    return _refusal_around_foreign_text(template, number, error.editor, time=error.edited_at)
+
+
+def _write_the_body(adoption: _Adoption, left_body: str, *, replacing: str) -> None:
+    """ADOPT-24, ADOPT-25, ADOPT-27, ADOPT-28: writes `left_body` over `replacing`; the
+    forge's own check says whether the write stands, and every failure leaves the claim
+    standing."""
     number = adoption.number
     try:
         adoption.run.forge_writer.update_item_body(number, left_body, replacing=replacing)
+    except (forge.ForgeBodyOverwrittenError, forge.ForgeBodyNotVerifiedError) as error:
+        raise _checked_write_refusal(number, error) from error
     except protocol.ClaimError as error:
         template = _BODY_WRITE_FAILED[github_body_write.body_write_outcome(error)]
-        raise _refusal_around_forge_error(template, number, error) from error
-    try:
-        written = adoption.run.forge.item_reference(number).body
-    except protocol.ClaimError as error:
-        raise _refusal_around_forge_error(_READ_BACK_FAILED, number, error) from error
-    if written != left_body:
-        raise protocol.ClaimUnavailableError(_BODY_CHANGED.format(number=number))
+        raise _refusal_around_foreign_text(template, number, str(error)) from error
 
 
 def _print_declaration(adoption: _Adoption) -> None:
@@ -151,7 +162,7 @@ def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
     try:
         reread = adoption.run.forge.item_reference(number).body
     except protocol.ClaimError as error:
-        raise _refusal_around_forge_error(_RE_READ_FAILED, number, error) from error
+        raise _refusal_around_foreign_text(_RE_READ_FAILED, number, str(error)) from error
     left_body = policy.adoption_body(
         adoption.context,
         replace(adoption.detail, body=reread),
@@ -161,7 +172,7 @@ def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
     if isinstance(left_body, workboard.ClassificationDefect):
         raise protocol.ClaimUnavailableError(f"pull request #{number} {left_body.message}")
     if left_body is not None:
-        _write_and_read_back(adoption, left_body, replacing=reread or "")
+        _write_the_body(adoption, left_body, replacing=reread or "")
     _print_declaration(adoption)
 
 
