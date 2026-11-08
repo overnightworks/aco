@@ -1,0 +1,8 @@
+claim_id = "c0beaf09192e47178044265c6aa7c893"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "c6820e0879a5e36da5297b0cf858eeb7e0ab04dc"
+branch = "claude/issue-744-record-answer-tool"
+scope = ["README.md", "docs/ARCHITECTURE.md", "specs/mcp.spec.md", "src/aco/cmd_mcp.py", "src/aco/decide.py", "src/aco/mcp_server.py", "src/aco/protocol.py", "tests/test_cmd_mcp.py", "tests/test_mcp_server.py", "tests/test_protocol_toml_string.py"]
+opened_commit = "edc01d546e14668ed61ff2ec01061b1b81b0c109"
+whole_reason = "The tool, the record of handlers that makes room for it and the one error answer that converges with it change the same dispatch, and the escape fix closes the hole the tool would widen, so they are one vertical slice; splitting them would change that dispatch twice or ship the tool over a known way to corrupt a body."
