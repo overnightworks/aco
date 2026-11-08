@@ -73,7 +73,7 @@ class TestBlockTableHeaderOutsideTheBlock:
     def test_each_header_outside_the_block_is_refused_with_its_line(
         self, capsys: pytest.CaptureFixture[str], raw_body: str, expected_stderr: str
     ) -> None:
-        """Spec: BODY-109."""
+        """Spec: BODY-109, BODY-110."""
         result = run_cli(["check", "-"], capsys, stdin=raw_body)
         assert (result.status, result.stdout, result.stderr) == (2, "", expected_stderr)
 
@@ -90,7 +90,7 @@ class TestBlockTableHeaderOutsideTheBlock:
     def test_a_line_that_is_no_block_header_outside_a_fence_passes(
         self, capsys: pytest.CaptureFixture[str], raw_body: str
     ) -> None:
-        """Spec: BODY-06, BODY-109."""
+        """Spec: BODY-06, BODY-109, BODY-110."""
         result = run_cli(["check", "-"], capsys, stdin=raw_body)
         assert (result.status, result.stdout, result.stderr) == (0, "body ok\n", "")
 
