@@ -1,8 +1,0 @@
-claim_id = "78301578d60a43448129d48d63102a73"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "bc9ddf8d0d6ca37801930e9796ed17b4d29d17c9"
-branch = "claude/issue-750-step-tool"
-scope = ["README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/mcp.spec.md", "src/aco/cmd_mcp.py", "src/aco/decide.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_issue_payload.py", "src/aco/mcp_server.py", "src/aco/state_board.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/support/mcp_lines.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_step.py", "tests/test_decide_step.py", "tests/test_github_labels.py", "tests/test_mcp_server.py", "tests/test_state_board_labels.py"]
-opened_commit = "2ce5d1a1a45681cc64ed5aae942ba8c0607c0270"
-whole_reason = "The port method, its one caller and the tool that declares it are one write path; the tool's two branches share its envelope, its answer and its recovery, so splitting them would declare the tool twice."
