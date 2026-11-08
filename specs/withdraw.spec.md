@@ -60,7 +60,7 @@ left, never a withdrawn one.
 | WITHDRAW-06 (out of range) | `line_out_of_range` |
 | WITHDRAW-10 (missing item, pull request), WITHDRAW-11 (malformed body) | `invalid_item` |
 | WITHDRAW-09 (a line named twice), WITHDRAW-12 (`--repo` under `storage = state-ref`), the parser's own refusals | `invalid_usage` |
-| WITHDRAW-13 (a forge failure) | `unavailable` |
+| WITHDRAW-13 (a forge failure), WITHDRAW-16 (the item's lock) | `unavailable` |
 
 An already withdrawn line answers its own `reason`, so a head that re-runs
 after an `unavailable` on `github`, where the write may have landed, tells

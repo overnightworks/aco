@@ -46,6 +46,8 @@ flowchart LR
     Board --> Port
     Board --> Inbox["inbox<br/>(members' items only)"]
     Inbox --> Dec
+    Dec --> Lock["file_lock<br/>(per-file flock)"]
+    Session --> Lock
     Board --> Dec["decide, rulings,<br/>expectations,<br/>expectation_grammar"]
 ```
 
