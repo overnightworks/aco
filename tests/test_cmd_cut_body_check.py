@@ -13,22 +13,17 @@ from aco import forge
 
 pytestmark = pytest.mark.usefixtures("github_world")
 
-CONTAINER = 79
-EDITED_AT = "2026-11-08T10:05:00Z"
-CUT_ARGUMENTS = ["cut", str(CONTAINER), "--title", "Slice A", "--not-a-twin"]
-ONE_ROW = MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 1\ntitle = "Slice A"\ndone_when = "D"\n'
-RERUN = "if row 1 is still in #79's aco block, re-run aco cut 79 --row 1 -- it adopts the child"
-
 
 def _serve_a_check_answering(
     monkeypatch: pytest.MonkeyPatch, answer: forge.ForgeBodyWrittenError
 ) -> FakeForge:
-    container = container_issue(CONTAINER, ONE_ROW)
+    one_row = MINIMAL_BLOCK_TOML + '[[slice]]\nindex = 1\ntitle = "Slice A"\ndone_when = "D"\n'
+    container = container_issue(79, one_row)
     return serve_forge(
         monkeypatch,
         FakeForge(
             issue_references={
-                CONTAINER: forge.ItemReference(forge.ItemState.OPEN, "Epic", container.body)
+                79: forge.ItemReference(forge.ItemState.OPEN, "Epic", container.body)
             },
             board_issues=(container,),
             update_item_body_error=answer,
@@ -37,18 +32,49 @@ def _serve_a_check_answering(
     )
 
 
+def _cut_line(check_sentence: str) -> str:
+    return (
+        f"created #900; {check_sentence}; if row 1 is still in #79's aco block, "
+        "re-run aco cut 79 --row 1 -- it adopts the child"
+    )
+
+
 @pytest.mark.parametrize(
     ("answer", "reason", "kept", "sentence"),
     [
         pytest.param(
-            forge.ForgeBodyOverwrittenError(CONTAINER, EDITED_AT, "ghost", kept=False),
+            forge.ForgeBodyOverwrittenError(79, "2026-11-08T10:05:00Z", "ghost", kept=False),
             "overwritten",
             False,
-            f"#79 body written, but overwritten in the meantime by ghost at {EDITED_AT}",
+            "#79 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z",
             id="overwritten",
         ),
         pytest.param(
-            forge.ForgeBodyNotVerifiedError(CONTAINER, "timeout"),
+            forge.ForgeBodyOverwrittenError(79, "2026-11-08T10:05:00Z", "ghost", kept=True),
+            "overwritten",
+            True,
+            "#79 body written over a change by ghost at 2026-11-08T10:05:00Z aco had not read; "
+            "that change is only in the edit history",
+            id="kept",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(79, "2026-11-08T10:05:00Z", None, kept=True),
+            "overwritten",
+            True,
+            "#79 body written over a change by an unknown editor at 2026-11-08T10:05:00Z "
+            "aco had not read; that change is only in the edit history",
+            id="kept-by-an-unknown-editor",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(79, "2026-11-08T10:05:00Z", None, kept=False),
+            "overwritten",
+            False,
+            "#79 body written, but overwritten in the meantime by an unknown editor "
+            "at 2026-11-08T10:05:00Z",
+            id="overwritten-by-an-unknown-editor",
+        ),
+        pytest.param(
+            forge.ForgeBodyNotVerifiedError(79, "timeout"),
             "not_verified",
             None,
             "#79 body written, not verified (timeout)",
@@ -66,39 +92,18 @@ def test_a_checked_row_removal_names_the_child_and_how_to_finish(
     sentence: str,
     as_json: bool,
 ) -> None:
-    """Spec: CUT-42, CUT-43 -- stderr names the created child, the check's sentence and the
-    re-run that adopts it; `--json` carries the reason, `written` and, for `overwritten`,
-    `kept`."""
+    """Spec: CUT-42, CUT-43 -- stderr names the created child, the check's whole sentence
+    and the re-run that adopts it; `--json` carries the reason, `written` and, for
+    `overwritten`, `kept`."""
     _serve_a_check_answering(monkeypatch, answer)
-    line = f"created #900; {sentence}; {RERUN}"
     envelope: dict[str, object] = {"ok": False, "reason": reason, "written": 900}
     if kept is not None:
         envelope["kept"] = kept
-    envelope["message"] = line
+    envelope["message"] = _cut_line(sentence)
 
-    result = run_cli([*CUT_ARGUMENTS, *(["--json"] * as_json)], capsys)
+    result = run_cli(
+        ["cut", "79", "--title", "Slice A", "--not-a-twin", *(["--json"] * as_json)], capsys
+    )
 
-    assert (result.status, result.stderr) == (2, f"ERROR: {line}\n")
+    assert (result.status, result.stderr) == (2, f"ERROR: {_cut_line(sentence)}\n")
     assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
-
-
-def test_a_row_removal_kept_over_an_unread_change_is_answered_with_the_rerun(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: CUT-42, CUT-43 -- the kept write keeps the words around the check's sentence:
-    the child, the sentence's start and the re-run."""
-    _serve_a_check_answering(
-        monkeypatch, forge.ForgeBodyOverwrittenError(CONTAINER, EDITED_AT, "ghost", kept=True)
-    )
-
-    result = run_cli([*CUT_ARGUMENTS, "--json"], capsys)
-
-    envelope = json.loads(result.stdout)
-    assert (result.status, envelope["reason"], envelope["kept"], envelope["written"]) == (
-        2,
-        "overwritten",
-        True,
-        900,
-    )
-    assert envelope["message"].startswith("created #900; #79 body written over a change by ghost")
-    assert envelope["message"].endswith(RERUN)

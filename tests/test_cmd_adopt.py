@@ -838,18 +838,12 @@ def test_adopt_builds_the_lane_claims_the_branch_and_appends_the_line(
     assert claim_state_reads_by_adopt == 1
 
 
-def _serve_the_author(author: str, world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
-    world.serve(lambda landing: replace(landing, author=author))
-
-
-def _serve_the_body(body: str, world: AdoptionWorld, _monkeypatch: pytest.MonkeyPatch) -> None:
-    world.serve(lambda landing: replace(landing, body=body))
+def _serve_the_landing_with(world: AdoptionWorld, _: pytest.MonkeyPatch, **changes: str) -> None:
+    world.serve(lambda landing: replace(landing, **changes))
 
 
 def _the_re_read_serves(
-    reread: str | forge.ForgeError,
-    world: AdoptionWorld,
-    _monkeypatch: pytest.MonkeyPatch,
+    reread: str | forge.ForgeError, world: AdoptionWorld, _: pytest.MonkeyPatch
 ) -> None:
     world.forge.scripted_item_reads = [None, reread]
 
@@ -864,7 +858,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
     ("arrange", "arguments", "kind", "bodies", "declaration", "whole_reason"),
     [
         pytest.param(
-            partial(_serve_the_author, "octocat"),
+            partial(_serve_the_landing_with, author="octocat"),
             [],
             "fix",
             ("Bump x", "Bump x\n\nNo-Item: fix"),
@@ -891,7 +885,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             id="cell-17-run-from-a-linked-worktree",
         ),
         pytest.param(
-            partial(_serve_the_body, ""),
+            partial(_serve_the_landing_with, body=""),
             [],
             "deps",
             ("", "No-Item: deps"),
@@ -950,7 +944,7 @@ def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(
     def gh(arguments: list[str], *, input_data: bytes | None = None) -> str:
         if "graphql" in arguments:
             edits = [
-                {"diff": diff, "editedAt": _EDIT_TIME, "deletedAt": None}
+                {"diff": diff, "editedAt": "2026-11-08T10:05:00Z"}
                 for diff in (current["body"], None)
             ]
             return json.dumps({"n0": {"userContentEdits": {"nodes": edits}}})
@@ -1087,7 +1081,7 @@ def test_adopt_removes_the_pair_it_built_when_the_claim_is_refused_after_the_bui
 
 
 def _the_claim_push_is_sent(
-    _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch, *, landed: bool
+    _world: AdoptionWorld, monkeypatch: pytest.MonkeyPatch, *, landed: bool = True
 ) -> None:
     fail_every_state_ref_push(monkeypatch, protocol.ClaimError("push timed out"), lands=landed)
 
@@ -1154,22 +1148,24 @@ def test_adopt_keeps_the_pair_of_an_unknown_claim_outcome_and_a_rerun_settles_it
 
 
 def _the_write_fails_with(
-    answer: protocol.ClaimError, world: AdoptionWorld, _: pytest.MonkeyPatch, *, landed: bool
+    answer: protocol.ClaimError, world: AdoptionWorld, _: pytest.MonkeyPatch, *, landed: bool = True
 ) -> None:
     world.forge.update_item_body_error = answer
     world.forge.update_item_body_lands_before_error = landed
 
 
-_EDIT_TIME = "2026-11-08T10:05:00Z"
-_LOST = forge.ForgeBodyOverwrittenError(ADOPTED_PULL_REQUEST, _EDIT_TIME, "ghost", kept=False)
-_KEPT = forge.ForgeBodyOverwrittenError(ADOPTED_PULL_REQUEST, _EDIT_TIME, None, kept=True)
-_NOT_VERIFIED = forge.ForgeBodyNotVerifiedError(ADOPTED_PULL_REQUEST, "timeout")
+def _the_check_finds(editor: str | None, *, kept: bool):
+    answer = forge.ForgeBodyOverwrittenError(
+        ADOPTED_PULL_REQUEST, "2026-11-08T10:05:00Z", editor, kept=kept
+    )
+    return partial(_the_write_fails_with, answer)
+
 
 _the_forge_refuses_the_write = partial(
     _the_write_fails_with, forge.ForgePermissionDeniedError("HTTP 403"), landed=False
 )
 _the_write_times_out_after_it_landed = partial(
-    _the_write_fails_with, forge.ForgeTransientError("timeout"), landed=True
+    _the_write_fails_with, forge.ForgeTransientError("timeout")
 )
 
 
@@ -1207,25 +1203,28 @@ _the_write_times_out_after_it_landed = partial(
             id="cell-32-write-times-out",
         ),
         pytest.param(
-            partial(_the_write_fails_with, _LOST, landed=True),
+            _the_check_finds("ghost", kept=False),
             _refusal(
                 "body written, but overwritten in the meantime by ghost at "
-                f"{_EDIT_TIME}; the claim stands; run adopt again"
+                "2026-11-08T10:05:00Z; the claim stands; run adopt again"
             ),
             [ADOPTED_BODY],
             id="cell-33-overwritten-in-the-meantime",
         ),
         pytest.param(
-            partial(_the_write_fails_with, _KEPT, landed=True),
+            _the_check_finds(None, kept=True),
             _refusal(
-                f"body written over a change by an unknown editor at {_EDIT_TIME} adopt had "
+                "body written over a change by an unknown editor at 2026-11-08T10:05:00Z adopt had "
                 "not read; the claim stands; that change is only in the edit history"
             ),
             [ADOPTED_BODY],
             id="cell-33b-written-over-an-unread-change",
         ),
         pytest.param(
-            partial(_the_write_fails_with, _NOT_VERIFIED, landed=True),
+            partial(
+                _the_write_fails_with,
+                forge.ForgeBodyNotVerifiedError(ADOPTED_PULL_REQUEST, "timeout"),
+            ),
             _refusal("body written, not verified (timeout); the claim stands; run adopt again"),
             [ADOPTED_BODY],
             id="cell-34-not-verified",
