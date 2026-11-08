@@ -50,6 +50,14 @@ def _refuse_a_body_on_stdin(command: str) -> None:
         raise protocol.ClaimUnavailableError(f"{command} reads no stdin; drop the redirect")
 
 
+def _snapshot_body(client: state_board.StateRefBoard, number: int) -> str:
+    """`number`'s snapshot body; a malformed item has no readable text, so it names none."""
+    try:
+        return client.item_reference(number).body or ""
+    except protocol.MalformedStateTreeError:
+        return ""
+
+
 def _state_ref_board(context: RunContext) -> state_board.StateRefBoard:
     """`context`'s own forge as the state-ref board, for an item command
     that has already refused every other storage pin: under `state-ref`
@@ -338,9 +346,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
             raise protocol.ClaimUnavailableError(
                 board_read.missing_item_refusal(number, client, context.config.storage)
             )
-        # The compare-and-swap on the snapshot's oid checks this write; a malformed
-        # item has no readable text to name.
-        client.update_item_body(number, new_body, replacing="")
+        client.update_item_body(number, new_body, replacing=_snapshot_body(client, number))
         _print_item_edit_result(
             items.format_item_id(number), number, client.item_oid(number), as_json=as_json
         )
