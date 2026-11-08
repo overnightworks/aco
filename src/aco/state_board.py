@@ -461,13 +461,11 @@ class StateRefBoard:
         decoded = self._decoded(number)
         if decoded is None:
             return forge.ItemReference(forge.ItemState.MISSING)
-        state = (
-            forge.ItemState.OPEN
-            if decoded.record.state is items.RecordState.OPEN
-            else forge.ItemState.CLOSED
-        )
+        record = decoded.record
+        is_open = record.state is items.RecordState.OPEN
+        state = forge.ItemState.OPEN if is_open else forge.ItemState.CLOSED
         return forge.ItemReference(
-            state, decoded.record.title, decoded.body, False, decoded.record.origin
+            state, record.title, decoded.body, False, record.origin, author_is_member=True
         )
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:

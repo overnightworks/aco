@@ -165,6 +165,8 @@ class ItemReference:
     to (`FORGE#N`): populated from `record.origin`
     under `state-ref`, always `None` under `github` -- a GitHub issue is
     never itself bound to another forge's issue.
+    `author_is_member` says whether a member of the repository wrote the item,
+    by the same rule as the board listing; the default is a stranger's.
     """
 
     state: ItemState
@@ -172,6 +174,7 @@ class ItemReference:
     body: str | None = None
     is_landing: bool = False
     origin: str | None = None
+    author_is_member: bool = False
 
 
 @dataclass(frozen=True)
