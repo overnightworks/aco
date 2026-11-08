@@ -175,8 +175,9 @@ _TOOLS: Final = (
             "letter or in his own words; use it only for an answer he gave, never for your "
             "own choice. The line and its card_hash come from read_inbox or, for a line sent "
             "back to its head, which read_inbox leaves out, from aco rulings --json. The "
-            "answer binds like a ruling on the board and shows in read_inbox, aco rulings "
-            "and the board; a line already ruled stays as it is and the call is refused. "
+            "answer binds like a ruling on the board: the line leaves read_inbox and shows as "
+            "ruled in aco rulings and the board; a line already ruled stays as it is and the "
+            "call is refused. "
             "A refusal that says a body was written means the answer reached the item, "
             "unless it says it was overwritten in the meantime."
         ),
