@@ -1,0 +1,8 @@
+claim_id = "f027cc1463634877a792af096117d29b"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "7e516c23fbd3db36c0ca5ecb7af64d85f30474a5"
+branch = "claude/issue-735-write-check-adopt-cut"
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/adopt.spec.md", "specs/cut.spec.md", "specs/rule.spec.md", "specs/withdraw.spec.md", "src/aco/cmd_adopt.py", "src/aco/cmd_cut.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_body_write.py", "src/aco/github_graphql.py", "tests/support/github_fixtures.py", "tests/test_cmd_adopt.py", "tests/test_cmd_cut_body_check.py", "tests/test_github.py", "tests/test_github_body_write.py"]
+opened_commit = "627567ea1ec396e05d3bfe636ca89a61bbc02db2"
+whole_reason = "The check cannot land without adopt and cut answering it: cut would advise a second cut over a written row removal and adopt would call a written body's outcome unknown, and adopt's read-back is the predecessor the check replaces."
