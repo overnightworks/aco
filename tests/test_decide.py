@@ -207,9 +207,12 @@ def item_locks(tmp_path: Path) -> list[str]:
 
 
 class RendezvousForge(FakeForge):
-    """The first reader of an item waits, bounded, for a second read before it
-    goes on: without a per-item turn the second reader reads the old body. A read
-    answers the body last written, as a real forge does."""
+    """The first reader of an item waits for a second read before it goes on:
+    without a per-item turn the second reader reads the old body. Both writers
+    have entered their turn before the first read answers, so the wait starts
+    with the contention established; its timeout only bounds the time a
+    serialized second writer is given to read, never which interleaving is
+    tested. A read answers the body last written, as a real forge does."""
 
     def __init__(self, reference: forge.ItemReference) -> None:
         super().__init__(issue_references={90: reference})
@@ -225,7 +228,7 @@ class RendezvousForge(FakeForge):
             self.reads += 1
             first = self.reads == 1
         if first:
-            self.second_read.wait(timeout=0.3)
+            self.second_read.wait(timeout=2)
         else:
             self.second_read.set()
         return reference
@@ -235,6 +238,7 @@ class TestTurn:
     def test_two_writers_of_distinct_lines_of_one_item_both_land(
         self, github_clone: Path, tmp_path: Path
     ) -> None:
+        """Spec: RULE-40, WITHDRAW-15, ABRD-113 -- writers of one item are serialized."""
         track_board_config(github_clone, 'storage = "github"\n')
         reference = forge.ItemReference(forge.ItemState.OPEN, TITLE, item_with(card(), card()))
         client = RendezvousForge(reference)
@@ -288,7 +292,10 @@ class TestTurn:
     def test_an_unwritable_lock_directory_refuses_naming_the_path_and_reads_nothing(
         self, github_clone: Path, tmp_path: Path
     ) -> None:
+        """Spec: RULE-41, WITHDRAW-16 -- no lock, so nothing is read or written."""
         context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        forges_built: list[RunContext] = []
+        context = RunContext(None, build_forge=lambda built: forges_built.append(built) or client)
         blocker = tmp_path / "blocker"
         blocker.write_text("a file, not a directory", encoding="utf-8")
         environment = {"XDG_STATE_HOME": str(blocker)}
@@ -299,4 +306,4 @@ class TestTurn:
             True,
             [],
         )
-        assert client.issue_reference_lookups == []
+        assert (client.issue_reference_lookups, forges_built) == ([], [])

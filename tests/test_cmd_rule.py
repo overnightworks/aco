@@ -475,7 +475,7 @@ def test_an_unwritable_lock_directory_refuses_unavailable_and_writes_nothing(
     tmp_path: Path,
     as_json: bool,
 ) -> None:
-    """Spec: RULE-11 -- a lock the item cannot take names its path and writes nothing."""
+    """Spec: RULE-41 -- a lock the item cannot take names its path and writes nothing."""
     blocker = tmp_path / "blocker"
     blocker.write_text("a file, not a directory", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(blocker))

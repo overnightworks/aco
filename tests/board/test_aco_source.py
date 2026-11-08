@@ -182,7 +182,7 @@ def test_a_card_on_a_strangers_item_is_not_listed(
 def test_a_decision_whose_lock_directory_is_unwritable_fails_and_writes_nothing(
     repository: BoardForge, board: BoardClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """ABRD-03: no lock, so the card fails naming it and no body is written."""
+    """ABRD-113: no lock, so the card fails naming it and no body is written."""
     repository.put_item(_ITEM, item_body(open_option_entry()))
     shown = first_listed_line(board)
     page_read = repository.requests

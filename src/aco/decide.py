@@ -101,9 +101,9 @@ def turn(
     gate and yields that read; the caller writes at most once before the turn
     ends. Not re-entrant. An unwritable lock directory refuses with
     `ItemLockUnavailableError` before any read or write."""
-    # The context refuses what it refuses (`--repo` under `state-ref`, no
-    # recognised host) when it builds its forge, before any lock is taken.
-    _ = context.forge_writer
+    # The target's own refusals (`--repo` under `state-ref`, no recognised host)
+    # come first; the forge, which reads and caches items, is built after the lock.
+    _ = context.repository_id
     lock_path = _item_lock_path(context, number, environment, home)
     with ExitStack() as held:
         try:
