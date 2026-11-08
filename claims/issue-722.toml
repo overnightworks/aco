@@ -1,0 +1,8 @@
+claim_id = "e645a01dee3349a8ba75d8b49ddd790d"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "78e471fed5f0317729ab67e188417fba3402ff75"
+branch = "claude/issue-722-item-writers-under-the-lock"
+scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/cut.spec.md", "specs/item.spec.md", "specs/rescope.spec.md", "specs/rule.spec.md", "specs/serve.spec.md", "specs/withdraw.spec.md", "src/aco/board/token_store.py", "src/aco/cmd_cut.py", "src/aco/cmd_item.py", "src/aco/cmd_rescope.py", "src/aco/decide.py", "src/aco/file_lock.py", "src/aco/repositories.py", "tests/board/test_token_store.py", "tests/support/github_fixtures.py", "tests/support/item_lock_witness.py", "tests/test_cmd_cut_turn.py", "tests/test_cmd_item_turn.py", "tests/test_cmd_item_whole.py", "tests/test_cmd_rescope_item_body.py", "tests/test_decide.py", "tests/test_file_lock.py", "tests/test_repositories.py"]
+opened_commit = "adea29c7458446b1d9ba73f33cd763249db9464a"
+whole_reason = "The remaining item writers take the one lock together with the turn's two review follow-ups, because each writer's spec states the wait line and its tests prove it; seven production files, about 120 lines, mostly moved calls."
