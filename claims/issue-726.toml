@@ -1,0 +1,8 @@
+claim_id = "2841abf9166b4196b018b1babe72e454"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "01e4cea891a5d3732c94be1c76ba929bfc08f56b"
+branch = "claude/issue-726-member-flag-on-the-item-read"
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_issue_payload.py", "src/aco/state_board.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/test_github.py", "tests/test_github_issue_payload.py", "tests/test_state_board_item_reference.py"]
+opened_commit = "64f262e4d763d21a88d163c428e77edb9383fbf4"
+whole_reason = "One owner for decoding a REST issue object: the moved board-issue parser and the single-item parser share the member rule, so the extraction, the field and both adapters land together."
