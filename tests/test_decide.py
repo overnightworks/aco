@@ -276,8 +276,11 @@ class TestTurn:
         turn = decide.turn(context, 90, command="rule", environment=environment, home=tmp_path)
         with pytest.raises(decide.ItemLockUnavailableError) as refused:
             turn.__enter__()
-        assert (str(blocker / "aco" / "item-locks") in str(refused.value), client.body_writes) == (
-            True,
+        assert (
+            str(refused.value).count(str(blocker / "aco" / "item-locks")),
+            client.body_writes,
+        ) == (
+            1,
             [],
         )
         assert (client.issue_reference_lookups, forges_built) == ([], [])

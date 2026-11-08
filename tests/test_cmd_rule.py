@@ -484,9 +484,10 @@ def test_an_unwritable_lock_directory_refuses_unavailable_and_writes_nothing(
     result = run_cli(["rule", "90", *decision(), *(["--json"] if as_json else [])], capsys)
     refusal = json_wire(result.stdout) if as_json else {"reason": "unavailable"}
     prefix = f"ERROR: cannot lock the item at {blocker / 'aco' / 'item-locks'}"
-    assert (result.status, result.stderr.startswith(prefix), refusal["reason"]) == (
-        2,
-        True,
-        "unavailable",
-    )
+    assert (
+        result.status,
+        result.stderr.startswith(prefix),
+        result.stderr.count(str(blocker)),
+        refusal["reason"],
+    ) == (2, True, 1, "unavailable")
     assert (client.item_bodies, client.issue_reference_lookups) == ({}, [])
