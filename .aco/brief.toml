@@ -32,8 +32,8 @@ checks = [
   "uv run --locked pyright src tests scripts",
   "uv run --locked vulture src scripts/vulture_whitelist.py --min-confidence 60",
   "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
-  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality hygiene .",
-  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality baseline write . (only when hygiene names a stale, shrunk ceiling; commit quality/baseline.toml in the same batch)",
+  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality check",
+  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality check --fix (only when check names a stale, shrunk or gone ceiling; commit quality/baseline.toml in the same batch)",
 ]
 
 [review]
@@ -67,8 +67,8 @@ checks = [
   "uv run --locked ruff format --check .",
   "uv run --locked pyright src tests scripts",
   "PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest <targeted modules or -k selection> --cov=aco --cov-report=term-missing",
-  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality hygiene .",
-  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality baseline write . (only when hygiene names a stale, shrunk ceiling; commit quality/baseline.toml in the same batch)",
+  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality check",
+  "uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality check --fix (only when check names a stale, shrunk or gone ceiling; commit quality/baseline.toml in the same batch)",
 ]
 
 [land]

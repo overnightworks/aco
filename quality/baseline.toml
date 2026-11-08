@@ -1,4 +1,4 @@
-# Measured by `quality baseline write`. Entries only ever go down.
+# Measured by `quality check --fix`. Entries only ever go down.
 
 [ccn."src/aco/cmd_cut.py"]
 "_adopt_existing_child" = 19
