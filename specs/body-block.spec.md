@@ -51,6 +51,7 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 | `scope` defective | BODY-53..BODY-56 | BODY-50 | BODY-52 |
 | `size` valid or defective | BODY-57..BODY-59 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `whole` valid or defective | BODY-60..BODY-62 | BODY-50 (defective only) | BODY-52 (defective only) |
+| a block table header outside every fence | BODY-109 | BODY-50 | BODY-52 |
 | complete valid block | BODY-14 | — | — |
 
 ## Fence and surroundings
@@ -60,8 +61,9 @@ empty projection keys, comma-joined in the order `Now, Next, Done when`.
 - [ ] [BODY-03] A body with two `aco` fences makes `aco check -` print `body malformed: aco: multiple aco blocks; exactly one is allowed` on stderr, exit `2`.
 - [ ] [BODY-04] A fence whose content is not TOML makes `aco check -` print `body malformed: aco: aco block is not valid TOML: <reason>` on stderr, exit `2`.
 - [ ] [BODY-05] An `aco` fence quoted inside a longer documentation fence is not the item's block, so a body carrying only that one prints `body malformed: aco: no aco block`, exit `2`.
-- [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's own section — carries no contract, so a body of prose plus one complete block prints `body ok`, exit `0`.
+- [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's section — carries no contract: prose plus one complete block prints `body ok`, exit `0`, except BODY-109.
 - [ ] [BODY-07] A block whose lines end in CRLF is read like any other: a complete CRLF body prints `body ok`, exit `0`; a rewrite keeps CRLF but re-renders the block's fields canonically, not byte-for-byte.
+- [ ] [BODY-109] A `[[expectation]]`, `[[expectation.option]]`, `[[slice]]` or `[record]` line outside every fence prints `body malformed: aco: <header> on line <n> is outside the aco block`, exit `2` (E-BODY-20).
 
 ## Projection keys
 
@@ -1060,4 +1062,41 @@ BODY
 2> body malformed: expectation[0].ruling: expectation[0].ruling does not belong on a withdrawn line
 2> body malformed: expectation[0].asked_on: expectation[0].asked_on does not belong on a withdrawn line
 exit 2
+````
+
+### E-BODY-20 — a card below the block never reaches the board
+
+Setup: bare-remote, `storage = "github"`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+```
+
+[[expectation]]
+text = "Ship it?"
+
+   [[expectation.option]]  # lost
+BODY
+2> body malformed: aco: [[expectation]] on line 8 is outside the aco block
+2> body malformed: aco: [[expectation.option]] on line 11 is outside the aco block
+exit 2
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Decide it."
+done_when = "It is decided."
+```
+
+~~~toml
+[[expectation]]
+~~~
+BODY
+body ok
+exit 0
 ````
