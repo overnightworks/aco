@@ -16,7 +16,6 @@ from typing import TypeVar
 from . import (
     forge,
     github_actions,
-    github_body_write,
     github_graphql,
     github_issue_payload,
     process,
@@ -24,6 +23,7 @@ from . import (
     workboard,
 )
 from .body import ItemKind
+from .github_body_write import check_item_body_write, patch_item_body
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
 _Page = TypeVar("_Page")
@@ -1377,9 +1377,9 @@ class GitHubForge:
             ) from error
         return child
 
-    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:  # NOSONAR(S1172)
-        """`replacing` is the port's contract; the PATCH does not read it."""
-        github_body_write.patch_item_body(self._run, self.repository, number, body)
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
+        answer = patch_item_body(self._run, self.repository, number, body)
+        check_item_body_write(self._graphql_block, number, answer, replacing)
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
         """Set `number`'s organization issue type to `kind`'s by name, the

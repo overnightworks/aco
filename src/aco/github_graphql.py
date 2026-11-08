@@ -178,3 +178,52 @@ REOPENED_AT_READ = BatchedRead(
     _REOPENED_SUBJECT,
     _parsed_reopened_node,
 )
+
+
+@dataclass(frozen=True)
+class BodyRevision:
+    """One revision of an item's body from its edit history: the full `text`,
+    the `edited_at` time as GitHub gives it, and the editor's login or none."""
+
+    text: str
+    edited_at: str
+    editor: str | None
+    deleted: bool
+
+
+def _parsed_revision(node: object) -> BodyRevision:
+    if not isinstance(node, dict):
+        raise malformed_response(_EDIT_HISTORY_SUBJECT)
+    text, edited_at = node.get("diff"), node.get("editedAt")
+    editor = node.get("editor")
+    login = editor.get("login") if isinstance(editor, dict) else None
+    if (
+        not isinstance(text, str | None)
+        or not isinstance(edited_at, str)
+        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(edited_at) is None
+        or not isinstance(login, str | None)
+    ):
+        raise malformed_response(_EDIT_HISTORY_SUBJECT)
+    return BodyRevision(text or "", edited_at, login, node.get("deletedAt") is not None)
+
+
+def _parsed_edit_history(node: object) -> tuple[BodyRevision, ...]:
+    """An item's newest revisions, newest first (`null` text read as empty).
+    A missing item or a revision that is no valid record raises loud."""
+    edits = node.get("userContentEdits") if isinstance(node, dict) else None
+    nodes = edits.get("nodes") if isinstance(edits, dict) else None
+    if not isinstance(nodes, list):
+        raise malformed_response(_EDIT_HISTORY_SUBJECT)
+    return tuple(_parsed_revision(revision) for revision in nodes)
+
+
+_EDIT_HISTORY_SUBJECT = "edit history"
+_EDIT_HISTORY_SELECTION = (
+    "userContentEdits(first: 2) { nodes { diff editedAt deletedAt editor { login } } }"
+)
+EDIT_HISTORY_READ = BatchedRead(
+    "issueOrPullRequest",
+    f"... on Issue {{ {_EDIT_HISTORY_SELECTION} }} ... on PullRequest {{ {_EDIT_HISTORY_SELECTION} }}",
+    _EDIT_HISTORY_SUBJECT,
+    _parsed_edit_history,
+)

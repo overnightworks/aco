@@ -129,6 +129,48 @@ class ForgePartialChildCreationError(ForgePartialCreationError):
         )
 
 
+UNKNOWN_EDITOR = "an unknown editor"
+
+
+class ForgeBodyWrittenError(ForgeError):
+    """The forge wrote the item's body, and the check after the write found
+    this: the answer names what the edit history shows of the write."""
+
+
+class ForgeBodyOverwrittenError(ForgeBodyWrittenError):
+    """The edit history shows a change this write did not read: after it
+    (`kept` false, this write lost) or before it (`kept` true, this write
+    stands and the change is only in the history). `edited_at` and `editor`
+    belong to that foreign revision, as GitHub gives them."""
+
+    def __init__(self, number: int, edited_at: str, editor: str | None, *, kept: bool) -> None:
+        self.number = number
+        self.edited_at = edited_at
+        self.editor = editor if editor is not None else UNKNOWN_EDITOR
+        self.kept = kept
+        if kept:
+            message = (
+                f"#{number} body written over a change by {self.editor} at {edited_at} "
+                "aco had not read; that change is only in the edit history"
+            )
+        else:
+            message = (
+                f"#{number} body written, but overwritten in the meantime "
+                f"by {self.editor} at {edited_at}"
+            )
+        super().__init__(message)
+
+
+class ForgeBodyNotVerifiedError(ForgeBodyWrittenError):
+    """The body was written, and the edit history does not show whether it
+    stands; `cause` says why."""
+
+    def __init__(self, number: int, cause: str) -> None:
+        self.number = number
+        self.cause = cause
+        super().__init__(f"#{number} body written, not verified ({cause})")
+
+
 @dataclass(frozen=True)
 class RepositoryId:
     """A repository's identity: the port owns this shape, an adapter owns its syntax."""

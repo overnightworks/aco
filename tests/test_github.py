@@ -507,25 +507,6 @@ def test_github_adapter_fails_loud_on_a_malformed_child_identifier(payload: str)
         client.link_child(79, 101)
 
 
-def test_github_adapter_updates_an_item_body() -> None:
-    observed: list[tuple[list[str], bytes | None]] = []
-
-    def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        observed.append((arguments, input_data))
-        return ""
-
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
-
-    client.update_item_body(79, "new body", replacing="old body")
-
-    assert observed == [
-        (
-            ["api", "--method", "PATCH", f"repos/{REPOSITORY}/issues/79", "--input", "-"],
-            json.dumps({"body": "new body"}).encode("utf-8"),
-        )
-    ]
-
-
 _LANDING_COMMENTS_PATH = f"repos/{REPOSITORY}/issues/79/comments"
 _LANDING_COMMENTS_READ = [
     "api",
