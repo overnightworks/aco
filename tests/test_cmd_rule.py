@@ -3,6 +3,7 @@
 import json
 import tomllib
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
@@ -464,3 +465,28 @@ def test_usage_and_help_name_every_flag_with_a_help_line_unclear_included(
     assert " ".join(help_text.split()).count("send an open option line back to its head") == 1
     words = (usage_text + help_text).replace("[", " ").replace("]", " ").split()
     assert [flag in words for flag in retired] == [False] * len(retired)
+
+
+@pytest.mark.usefixtures("github_world")
+@pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
+def test_an_unwritable_lock_directory_refuses_unavailable_and_writes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    as_json: bool,
+) -> None:
+    """Spec: RULE-11 -- a lock the item cannot take names its path and writes nothing."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
+    reference = forge.ItemReference(forge.ItemState.OPEN, "Decide", option_item(card()))
+    client = serve_forge(monkeypatch, FakeForge(issue_references={90: reference}))
+    result = run_cli(["rule", "90", *decision(), *(["--json"] if as_json else [])], capsys)
+    refusal = json_wire(result.stdout) if as_json else {"reason": "unavailable"}
+    prefix = f"ERROR: cannot lock the item at {blocker / 'aco' / 'item-locks'}"
+    assert (result.status, result.stderr.startswith(prefix), refusal["reason"]) == (
+        2,
+        True,
+        "unavailable",
+    )
+    assert (client.item_bodies, client.issue_reference_lookups) == ({}, [])

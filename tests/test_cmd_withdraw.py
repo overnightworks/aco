@@ -417,3 +417,27 @@ def test_help_names_each_flag_with_a_help_line(
 
     assert help_text != ""
     assert not help_text.startswith("-")
+
+
+@pytest.mark.usefixtures("github_world")
+@pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
+def test_an_unwritable_lock_directory_refuses_unavailable_and_writes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    as_json: bool,
+) -> None:
+    """Spec: WITHDRAW-13 -- a lock the item cannot take names its path and writes nothing."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
+    client = serve_forge(monkeypatch, item_forge(three_lines()))
+    result = run_cli(["withdraw", "7", "--line", "2", *(["--json"] if as_json else [])], capsys)
+    refusal = json.loads(result.stdout) if as_json else {"reason": "unavailable"}
+    prefix = f"ERROR: cannot lock the item at {blocker / 'aco' / 'item-locks'}"
+    assert (result.status, result.stderr.startswith(prefix), refusal["reason"]) == (
+        2,
+        True,
+        "unavailable",
+    )
+    assert (client.item_bodies, client.issue_reference_lookups) == ({}, [])

@@ -130,6 +130,18 @@ card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
 stay unfiltered. `aco mcp` lists only the lines of those items that wait on the
 operator (`specs/mcp.spec.md`).
 
+### The per-item turn
+
+Every write of an item's expectation lines (`aco rule`, `aco withdraw`, the
+board's decision) runs inside `decide.turn`: an exclusive `flock` (`file_lock`,
+shared with the lineage stamp) on one file per item under aco's XDG state
+directory, named by a digest of the forge repository id and the item number,
+then the fresh read, then one write. Writers on this machine therefore never
+overwrite each other's rulings. A GitHub body write has no precondition, so a
+hand edit or another machine is not covered; under `state-ref` the store's
+compare-and-swap still refuses a stale write. The board keeps its own
+in-process turn for its shutdown drain (`specs/serve.spec.md`).
+
 ### Proof strategy
 
 `specs/` owns each command's behaviour, with criterion IDs that tests

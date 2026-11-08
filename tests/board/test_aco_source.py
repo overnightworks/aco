@@ -5,6 +5,7 @@ what one decision reads and writes (ABRD-02, ABRD-41, ABRD-78)."""
 import http.client
 from collections.abc import Callable
 from datetime import date
+from pathlib import Path
 
 import pytest
 from aco_board_fixtures import BoardClient, Lister, first_listed_line, serving_two
@@ -176,3 +177,22 @@ def test_a_card_on_a_strangers_item_is_not_listed(
     repository.put_item(_OTHER_ITEM, item_body(open_option_entry()))
 
     assert [item["number"] for item in listed_items(board)] == [_OTHER_ITEM]
+
+
+def test_a_decision_whose_lock_directory_is_unwritable_fails_and_writes_nothing(
+    repository: BoardForge, board: BoardClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """ABRD-03: no lock, so the card fails naming it and no body is written."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    page_read = repository.requests
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    outcome = answered.status_and_message()
+    message = str(outcome["message"])
+    assert (outcome["status"], message.startswith("cannot lock the item at ")) == ("failed", True)
+    assert repository.request_log()[page_read:] == ()

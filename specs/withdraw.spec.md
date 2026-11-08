@@ -31,6 +31,8 @@ left, never a withdrawn one.
 | item body malformed | WITHDRAW-11 | WITHDRAW-14 |
 | `--repo` given, `storage = "state-ref"` | WITHDRAW-12 | WITHDRAW-14 |
 | a forge failure, the body write included | WITHDRAW-13 | WITHDRAW-13 |
+| the item's lock cannot be taken | WITHDRAW-16 | WITHDRAW-16 |
+| two writers of one item on this machine | WITHDRAW-15 | — |
 
 - [ ] [WITHDRAW-01] An open or returned option line makes `aco withdraw ITEM --line N` print `WITHDRAWN #<n> line <k>; <m> line(s) still open`, exit `0` (see E-WITHDRAW-01).
 - [ ] [WITHDRAW-02] That line's entry becomes its `text` and today's UTC `withdrawn_on`, nothing else, at the same index; every other entry keeps its values (BODY-88, BODY-104).
@@ -45,6 +47,8 @@ left, never a withdrawn one.
 - [ ] [WITHDRAW-11] A MALFORMED item body refuses `<label> <body defect sentence>; withdraw needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref`.
 - [ ] [WITHDRAW-12] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
 - [ ] [WITHDRAW-13] A forge failure, the item read and the body write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
+- [ ] [WITHDRAW-15] Every withdrawal runs in the item's turn (RULE-40): writers of one item through aco on this machine are serialized, so a withdrawal and a ruling on distinct lines both land.
+- [ ] [WITHDRAW-16] A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
 - [ ] [WITHDRAW-14] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
 
 `reason`, by which refusal fired:
@@ -64,7 +68,7 @@ after an `unavailable` on `github`, where the write may have landed, tells
 
 ## Never
 
-- `aco withdraw` never withdraws a ruled line: every check runs on the body it read in the same call. On `github` an issue body has no compare-and-swap, so a ruling stored between that read and the write is overwritten, as for `aco rule`; under `state-ref` that write refuses (CAS-20).
+- `aco withdraw` never withdraws a ruled line: every check runs on the body it read in the same call. Writers of one item through aco on this machine are serialized (WITHDRAW-15), so none overwrites another's ruling; a hand edit (`gh issue edit`, the browser) or another machine is unprotected on `github`, and under `state-ref` that write refuses (CAS-20).
 - `aco withdraw` never writes a key beside `text` and `withdrawn_on`: a returned line's `returned_on` and `returned_note` leave with it; the forge's edit history keeps the note.
 - `aco withdraw` never changes another expectation line's values or a byte outside the block; the block itself is rendered canonically (BODY-88), and under `state-ref` the record merge sets `updated_at` as for `rule`.
 - `aco withdraw` never takes `--via` or `--card-hash`: it decides nothing for the operator.
@@ -132,5 +136,16 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` o
 $ aco withdraw <item-id> --line 2 --json
 2> ERROR: line 2 was withdrawn by its head
 {"ok": false, "reason": "already_withdrawn", "message": "line 2 was withdrawn by its head"}
+exit 2
+```
+
+### E-WITHDRAW-05 — the item's lock cannot be taken
+
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with an open option line 1, `XDG_STATE_HOME` naming a regular file
+
+```console
+$ aco withdraw <item-id> --line 1 --json
+2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
+{"ok": false, "reason": "unavailable", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
 exit 2
 ```

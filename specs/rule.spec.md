@@ -59,6 +59,8 @@ withdrawn one.
 | item body malformed | RULE-28 | RULE-09 | — |
 | `--repo` given, `storage = "state-ref"` | RULE-10 | RULE-09 | — |
 | the body write itself fails | RULE-11 | RULE-11 | — |
+| the item's lock cannot be taken | RULE-41 | RULE-41 | — |
+| two writers of one item on this machine | RULE-40 | — | — |
 
 ## Ruling a line
 
@@ -116,6 +118,8 @@ withdrawn one.
 - [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
 - [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
+- [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
+- [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
 
 `reason`, by which refusal fired:
 
@@ -213,6 +217,17 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` o
 $ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash> --json
 2> ERROR: <detail>
 {"ok": false, "reason": "unavailable", "message": "<detail>"}
+exit 2
+```
+
+### E-RULE-17 — the item's lock cannot be taken
+
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with one open option line, `XDG_STATE_HOME` naming a regular file
+
+```console
+$ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash> --json
+2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
+{"ok": false, "reason": "unavailable", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
 exit 2
 ```
 
