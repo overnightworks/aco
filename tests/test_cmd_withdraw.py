@@ -441,3 +441,53 @@ def test_an_unwritable_lock_directory_refuses_unavailable_and_writes_nothing(
         "unavailable",
     )
     assert (client.item_bodies, client.issue_reference_lookups) == ({}, [])
+
+
+@pytest.mark.usefixtures("github_world")
+@pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
+@pytest.mark.parametrize(
+    ("answer", "reason", "sentence"),
+    [
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(7, "2026-11-08T10:05:00Z", "ghost", kept=False),
+            {"reason": "overwritten", "kept": False},
+            "#7 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z",
+            id="overwritten",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(7, "2026-11-08T10:05:00Z", "ghost", kept=True),
+            {"reason": "overwritten", "kept": True},
+            "#7 body written over a change by ghost at 2026-11-08T10:05:00Z aco had not read; "
+            "that change is only in the edit history",
+            id="kept",
+        ),
+        pytest.param(
+            forge.ForgeBodyNotVerifiedError(7, "timeout"),
+            {"reason": "not_verified"},
+            "#7 body written, not verified (timeout)",
+            id="not-verified",
+        ),
+    ],
+)
+def test_a_withdrawal_whose_write_the_check_answers_prints_the_check_sentence(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    answer: forge.ForgeBodyWrittenError,
+    reason: dict[str, object],
+    sentence: str,
+    as_json: bool,
+) -> None:
+    """Spec: WITHDRAW-17, OUT-10, OUT-11 -- the check's own sentence, exit 2, `overwritten` (with
+    `kept`) or `not_verified`; the withdrawal is written."""
+    initial = item_body(card())
+    served = item_forge(initial)
+    served.update_item_body_error = answer
+    served.update_item_body_lands_before_error = True
+    client = serve_forge(monkeypatch, served)
+
+    result = run_cli(["withdraw", "7", "--line", "2", *(["--json"] if as_json else [])], capsys)
+
+    envelope = {"ok": False, **reason, "message": sentence}
+    assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
+    assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
+    assert client.item_bodies[7] != initial

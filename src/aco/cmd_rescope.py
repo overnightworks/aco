@@ -35,7 +35,8 @@ class _RescopeReason(StrEnum):
     claimant, or a scope too wide for the width gate without `--whole`).
     Every other refusal -- an unresolved checkout, a missing state ref, a
     corrupted claim record -- falls to `unavailable`, matching `ask`/`rule`/
-    `brief`'s own catch-all."""
+    `brief`'s own catch-all. The forge's check of the body write is answered
+    with `report.BodyCheckReason`, not a member here."""
 
     RESCOPED = "rescoped"
     PRECONDITION_FAILED = "precondition_failed"
@@ -406,10 +407,14 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     `_rescope_write`'s two typed exceptions choose `invalid_usage`/
     `precondition_failed`; every other `protocol.ClaimError` -- an
     unresolved checkout, a missing state ref, a corrupted claim record --
-    falls to `unavailable`, matching `ask`/`rule`/`brief`'s own catch-all."""
+    falls to `unavailable`, matching `ask`/`rule`/`brief`'s own catch-all.
+    The forge's check of the body write (`forge.ForgeBodyWrittenError`) is
+    answered through `report.refuse_checked_write` before the claim moves."""
     as_json = parsed.json
     try:
         _rescope_write(parsed, context)
+    except forge.ForgeBodyWrittenError as error:
+        return report.refuse_checked_write(error, as_json=as_json)
     except _RescopeInvalidUsageError as error:
         return report.refuse(_RescopeReason.INVALID_USAGE, error, as_json=as_json)
     except _RescopePreconditionError as error:

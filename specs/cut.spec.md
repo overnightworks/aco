@@ -72,7 +72,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-41] `cut` holds the item's lock (RULE-40) from before its first forge read through its container write: a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-CUT-11).
 - [ ] [CUT-42] A row-removal write the body check answers refuses `created #<child>; <check sentence>; if row <idx> is still in #<n>'s aco block, re-run aco cut <n> --row <idx> -- it adopts the child`, exit `2`.
 - [ ] [CUT-43] CUT-42 reports `reason: "overwritten"` (with `kept`, true or false) or `"not_verified"` and `written` (`<child>`) as siblings, never `partial_write`, exit `2` (see E-CUT-12).
-- The check sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (kept) or `#<n> body written, not verified (<cause>)`.
+- The check sentence and its two `reason` tokens are `specs/output.spec.md`'s (OUT-10, OUT-11).
 
 ## The body precondition
 

@@ -150,7 +150,9 @@ one line to stderr and waits. Writers on this machine therefore never overwrite 
 bodies. A GitHub body write has no precondition, so a hand edit or another machine
 is not prevented: after each GitHub write the adapter reads the item's newest two
 edit revisions and raises a typed answer when its write was overwritten, kept over
-an unread change, or cannot be verified. The history is read once, right after the write, so a hand
+an unread change, or cannot be verified. Every `--json` writer answers it with the
+check's sentence and `overwritten` (with `kept`) or `not_verified`, through one owner in
+`report`; `cut` wraps the sentence in its own and `adopt` states its own; the board shows `failed`. The history is read once, right after the write, so a hand
 edit saved after that read over an older copy still overwrites the write unseen. Under `state-ref` the store's
 compare-and-swap refuses a stale write, and it alone guards the bare `aco item edit`, which writes outside the
 lock. The board keeps its own in-process turn for its shutdown drain

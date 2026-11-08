@@ -81,8 +81,8 @@ _CUT_BODY_CHECKED = (
 class _CheckedWriteError(protocol.ClaimError):
     """The forge's check after the row-removal write found `answer`: the child
     exists and the write landed, so a re-run adopts the child
-    (`_CUT_BODY_CHECKED`) and this is no `partial_write`. `reason`, `written`
-    and `kept` are `--json`'s own shape for it."""
+    (`_CUT_BODY_CHECKED`) and this is no `partial_write`. `run` answers it
+    through `report.refuse_checked_write`, carrying `written`."""
 
     def __init__(
         self,
@@ -92,9 +92,8 @@ class _CheckedWriteError(protocol.ClaimError):
         removal: _SliceRowRemoval,
         storage: body.Storage,
     ) -> None:
+        self.answer = answer
         self.written = child
-        self.kept = answer.kept if isinstance(answer, forge.ForgeBodyOverwrittenError) else None
-        self.reason = _CutReason.NOT_VERIFIED if self.kept is None else _CutReason.OVERWRITTEN
         super().__init__(
             _CUT_BODY_CHECKED.format(
                 check=answer,
@@ -147,15 +146,13 @@ class _CutReason(StrEnum):
     (`forge.ForgePartialChildCreationError`) is `partial_write` instead,
     carrying `written`/`failed` as structured siblings rather than only
     the prose sentence stderr already printed. The forge's check of that
-    write finding it overwritten or unverifiable is `overwritten` (with `kept`)
-    or `not_verified`, carrying `written`."""
+    write finding it overwritten or unverifiable is `report.BodyCheckReason`,
+    carrying `written`."""
 
     CUT = "cut"
     ADOPTED = "adopted"
     PRECONDITION_FAILED = "precondition_failed"
     PARTIAL_WRITE = "partial_write"
-    OVERWRITTEN = "overwritten"
-    NOT_VERIFIED = "not_verified"
 
 
 @dataclass(frozen=True)
@@ -543,7 +540,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     except PartialWriteError as error:
         return refuse_partial_write(error, _CutReason.PARTIAL_WRITE, as_json=as_json)
     except _CheckedWriteError as error:
-        kept = {} if error.kept is None else {"kept": error.kept}
-        return report.refuse(error.reason, error, as_json=as_json, written=error.written, **kept)
+        return report.refuse_checked_write(
+            error.answer, as_json=as_json, sentence=str(error), written=error.written
+        )
     except protocol.ClaimError as error:
         return report.refuse(_CutReason.PRECONDITION_FAILED, error, as_json=as_json)

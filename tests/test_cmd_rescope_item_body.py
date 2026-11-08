@@ -18,6 +18,7 @@ from claim_worktrees import (
     held_by_ada,
     lane_held_by_ada,
     make_stand_in,
+    replace_item_body,
     rescope_arguments,
     serve_body,
 )
@@ -187,6 +188,92 @@ def test_a_rescope_names_what_went_through_when_a_write_fails(
     assert claimed_here(standpoint).scope == HELD_SCOPE
     written = served.item_bodies.get(ISSUE)
     assert (None if written is None else body.parse_body(written).scope) == body_scope
+
+
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+@pytest.mark.parametrize(
+    ("answer", "reason", "sentence"),
+    [
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(ISSUE, "2026-11-08T10:05:00Z", "ghost", kept=False),
+            {"reason": "overwritten", "kept": False},
+            f"#{ISSUE} body written, but overwritten in the meantime by ghost "
+            "at 2026-11-08T10:05:00Z",
+            id="overwritten",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(ISSUE, "2026-11-08T10:05:00Z", "ghost", kept=True),
+            {"reason": "overwritten", "kept": True},
+            f"#{ISSUE} body written over a change by ghost at 2026-11-08T10:05:00Z "
+            "aco had not read; that change is only in the edit history",
+            id="kept",
+        ),
+        pytest.param(
+            forge.ForgeBodyNotVerifiedError(ISSUE, "timeout"),
+            {"reason": "not_verified"},
+            f"#{ISSUE} body written, not verified (timeout)",
+            id="not-verified",
+        ),
+    ],
+)
+def test_a_rescope_whose_body_write_the_check_answers_leaves_the_claim_and_a_rerun_completes_it(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    capsys: pytest.CaptureFixture[str],
+    answer: forge.ForgeBodyWrittenError,
+    reason: dict[str, object],
+    sentence: str,
+    as_json: bool,
+) -> None:
+    """Spec: RESC-34, OUT-10, OUT-11 -- the check's own sentence, exit 2, the reason, the claim as
+    it stood; the same rescope again completes it."""
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
+    served = serve_body(monkeypatch, complete_contract("Build it."))
+    served.update_item_body_error = answer
+    served.update_item_body_lands_before_error = True
+    flags = ("--add", NEW_FILE, *(["--json"] * as_json))
+
+    refused = run_cli(rescope_arguments(*flags), capsys)
+
+    envelope = {"ok": False, **reason, "message": sentence}
+    assert (refused.status, refused.stderr) == (2, f"ERROR: {sentence}\n")
+    assert refused.stdout == (json.dumps(envelope) + "\n" if as_json else "")
+    assert claimed_here(standpoint).scope == HELD_SCOPE
+    assert written_scope_and_whole(served) == ((NEW_FILE, "src/widget.py"), None)
+
+    served.update_item_body_error = None
+    replace_item_body(served, served.item_bodies[ISSUE])
+    rerun = run_cli(rescope_arguments(*flags), capsys)
+
+    assert (rerun.status, rerun.stderr) == (0, "")
+    assert claimed_here(standpoint).scope == (NEW_FILE, "src/widget.py")
+    assert len(served.body_replacings) == 1
+
+
+def test_a_rescope_rerun_after_an_overwritten_body_writes_the_body_again_and_completes_the_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: RESC-34. A later revision replaced the write, so the served body lacks the new
+    scope and the same rescope writes it again."""
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
+    served = serve_body(monkeypatch, complete_contract("Build it."))
+    foreign = complete_contract("Build it.")
+    served.update_item_body_error = forge.ForgeBodyOverwrittenError(
+        ISSUE, "2026-11-08T10:05:00Z", "ghost", kept=False
+    )
+    served.update_item_body_lands_before_error = True
+    flags = ("--add", NEW_FILE)
+    run_cli(rescope_arguments(*flags), capsys)
+
+    served.update_item_body_error = None
+    replace_item_body(served, foreign)
+    rerun = run_cli(rescope_arguments(*flags), capsys)
+
+    assert (rerun.status, rerun.stderr) == (0, "")
+    assert claimed_here(standpoint).scope == (NEW_FILE, "src/widget.py")
+    assert len(served.body_replacings) == 2
 
 
 def test_a_rescope_refuses_an_item_body_without_a_block_before_any_write(

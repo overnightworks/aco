@@ -11,7 +11,7 @@ import sys
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 
-from . import protocol
+from . import forge, protocol
 
 CLI_ERROR_PREFIX = "ERROR: "
 REFUSAL_LINE_LENGTH_LIMIT = 200
@@ -124,6 +124,32 @@ def refuse(
     return status
 
 
+class BodyCheckReason(StrEnum):
+    """The `--json` `reason` of a refusal that answers the forge's check of a
+    body write (`specs/output.spec.md`): shared by every writer that answers it."""
+
+    OVERWRITTEN = "overwritten"
+    NOT_VERIFIED = "not_verified"
+
+
+def refuse_checked_write(
+    answer: forge.ForgeBodyWrittenError,
+    *,
+    as_json: bool,
+    sentence: str | None = None,
+    **payload: object,
+) -> int:
+    """The refusal for a body write the forge's check found overwritten or
+    unverified: `overwritten` with `kept` after `payload`, or `not_verified`.
+    It prints `sentence`, the answer's own when none is given."""
+    shown = str(answer) if sentence is None else sentence
+    if isinstance(answer, forge.ForgeBodyOverwrittenError):
+        return refuse(
+            BodyCheckReason.OVERWRITTEN, shown, as_json=as_json, **payload, kept=answer.kept
+        )
+    return refuse(BodyCheckReason.NOT_VERIFIED, shown, as_json=as_json, **payload)
+
+
 type RefusalReasons[Reason: StrEnum] = Sequence[tuple[type[protocol.ClaimError], Reason]]
 
 
@@ -137,9 +163,13 @@ def refusing_by_type[Reason: StrEnum](
     """`work`'s exit status, or its refusal reported through `refuse` with the
     reason of the first type in `reasons` it is an instance of, `otherwise`
     for any other -- a command's whole run, so a failure inside its shared
-    write path still names that command's own reason."""
+    write path still names that command's own reason. The forge's check of a
+    write that landed (`forge.ForgeBodyWrittenError`) comes first, through
+    `refuse_checked_write`."""
     try:
         return work()
+    except forge.ForgeBodyWrittenError as error:
+        return refuse_checked_write(error, as_json=as_json)
     except protocol.ClaimError as error:
         reason = next((named for kind, named in reasons if isinstance(error, kind)), otherwise)
         return refuse(reason, error, as_json=as_json)

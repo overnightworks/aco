@@ -12,6 +12,7 @@ from aco_board_fixtures import BoardClient, Lister, first_listed_line, serving_t
 from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
 from option_cards import open_option_entry
 
+from aco import forge
 from aco.board.board import LINE_CHANGED
 
 _ITEM = 12
@@ -149,6 +150,49 @@ def test_an_item_read_that_fails_during_a_decision_is_relayed_and_nothing_writte
 
     assert answered.json() == {"status": "failed", "message": "the item read is down"}
     assert repository.item_requests() == (_READ,)
+
+
+def test_a_decision_hands_the_forge_the_body_it_read_as_the_text_it_replaces(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """The write names the body the decision read as the text it replaces."""
+    read_body = item_body(open_option_entry())
+    repository.put_item(_ITEM, read_body)
+    shown = first_listed_line(board)
+
+    board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert repository.body_replacings() == [read_body]
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(_ITEM, "2026-11-08T10:05:00Z", "ghost", kept=False),
+            id="overwritten",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(_ITEM, "2026-11-08T10:05:00Z", "ghost", kept=True),
+            id="kept",
+        ),
+        pytest.param(forge.ForgeBodyNotVerifiedError(_ITEM, "timeout"), id="not-verified"),
+    ],
+)
+def test_a_write_the_forges_check_answers_fails_the_decision_with_the_check_sentence(
+    repository: BoardForge,
+    board: BoardClient,
+    answer: forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError,
+) -> None:
+    """ABRD-41: the check's own sentence, with no prefix; the write landed."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    repository.answer_next_write(answer)
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert answered.json() == {"status": "failed", "message": str(answer)}
+    assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"
 
 
 def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_turn(

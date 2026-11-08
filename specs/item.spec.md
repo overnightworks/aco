@@ -27,7 +27,8 @@ owns the scope canonicalization grammar (CLAIM-19..CLAIM-23) `item new
 and `item close`'s live-claim re-check on every write attempt (CAS-52);
 `specs/output.spec.md` owns the `--json` envelope itself (key order, `ok`,
 `message`); this file names only its own `reason` vocabulary (ITEM-17,
-ITEM-25, ITEM-32) and cites the others by ID. A refusal prints `ERROR: <sentence>`
+ITEM-25, ITEM-32) and cites the others by ID, the check's `overwritten` and
+`not_verified` (ITEM-66) included. A refusal prints `ERROR: <sentence>`
 on stderr, exit `2`, and with `--json` also that envelope.
 `<item-id>` is a minted `aco-xxxxxx` id, `<n>` its number, `<oid>`/`<sha>` the
 runner's own git object ids. A printed `#<n>` outside `item show`'s header
@@ -71,6 +72,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | an `items/` entry whose file name names no item | PIN-36 | PIN-35 | PIN-35 | PIN-35 |
 | the item itself malformed | — | ITEM-38 | ITEM-39..ITEM-41 | ITEM-38 |
 | another item naming a blocker `items/` lacks | — | — | — | ITEM-55 |
+| `--size` or `--whole` on `github`, the body check answers the write | — | — | ITEM-66 | — |
 | a refusal reached with `--json` | ITEM-17, ITEM-18 | ITEM-17, ITEM-18 | ITEM-17, ITEM-18 | ITEM-17, ITEM-18 |
 
 ## `item new`
@@ -170,6 +172,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   exit 0
   ```
 - [ ] [ITEM-65] `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
+- [ ] [ITEM-66] A `--size` or `--whole` write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the field is written (see E-ITEM-18).
 - [ ] [ITEM-50] `--size`, `--whole` and `--kind` exclude one another: a second one refuses at argparse, `argument <second>: not allowed with argument <first>`, exit `2`, before any write.
 - [ ] [ITEM-51] A socket, terminal, `/dev/null` or closed stdin on `--kind`, `--size` or `--whole` passes unread, as an agent harness hands a socket when nothing was piped.
 
@@ -514,3 +517,14 @@ exit 2
 ```
 
 The refused run reads and writes nothing.
+
+### E-ITEM-18 — the check finds the `--size` write overwritten
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, `#<n>` open with a valid `aco` block, `ghost` editing `#<n>`'s body by hand right after `aco` wrote it
+
+```console
+$ aco item edit <n> --size L --json
+2> ERROR: #<n> body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z
+{"ok": false, "reason": "overwritten", "kept": false, "message": "#<n> body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z"}
+exit 2
+```

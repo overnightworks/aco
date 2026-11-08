@@ -56,7 +56,8 @@ class LineNamedTwiceError(protocol.ClaimError):
 
 
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
-# forge that failed, `unavailable`.
+# forge that failed, `unavailable`; the forge's check of a write that landed is
+# `report.refusing_by_type`'s own answer.
 _REFUSAL_REASONS: report.RefusalReasons[_WithdrawReason] = (
     (decide.InvalidTargetError, _WithdrawReason.INVALID_ITEM),
     (expectations.ExpectationOutOfRangeError, _WithdrawReason.LINE_OUT_OF_RANGE),
@@ -121,7 +122,8 @@ def _withdraw_lines(parsed: argparse.Namespace, context: RunContext) -> int:
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`withdraw` with its own `--json` refusals for the whole command, the
-    body write inside the shared path included."""
+    body write inside the shared path included; the forge's check of a write
+    that landed is `overwritten` or `not_verified`."""
     return report.refusing_by_type(
         partial(_withdraw_lines, parsed, context),
         _REFUSAL_REASONS,

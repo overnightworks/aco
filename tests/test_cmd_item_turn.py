@@ -60,6 +60,22 @@ def edit_arguments(edit: tuple[str, ...]) -> list[str]:
 
 
 @pytest.mark.parametrize("edit", FIELD_EDITS)
+def test_an_edit_hands_the_forge_the_body_it_read_as_the_text_it_replaces(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    lock_directory: Path,
+    edit: tuple[str, ...],
+) -> None:
+    """The write names the body the edit read as the text it replaces."""
+    client = served_witness(monkeypatch, lock_directory)
+
+    result = run_cli(edit_arguments(edit), capsys)
+
+    assert result.status == 0
+    assert client.body_replacings == [block_body(MINIMAL_BLOCK_TOML)]
+
+
+@pytest.mark.parametrize("edit", FIELD_EDITS)
 def test_the_item_is_read_and_written_while_its_lock_is_held(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

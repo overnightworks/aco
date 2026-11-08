@@ -31,6 +31,7 @@ left, never a withdrawn one.
 | item body malformed | WITHDRAW-11 | WITHDRAW-14 |
 | `--repo` given, `storage = "state-ref"` | WITHDRAW-12 | WITHDRAW-14 |
 | a forge failure, the body write included | WITHDRAW-13 | WITHDRAW-13 |
+| the body check answers the write | WITHDRAW-17 | WITHDRAW-17 |
 | the item's lock cannot be taken | WITHDRAW-16 | WITHDRAW-16 |
 | two writers of one item on this machine | WITHDRAW-15 | — |
 
@@ -46,7 +47,8 @@ left, never a withdrawn one.
 - [ ] [WITHDRAW-10] A missing item refuses `<label> does not exist`, a pull request `#<n> is a pull request, not an issue; withdraw needs an issue`, exit `2`, before any write.
 - [ ] [WITHDRAW-11] A MALFORMED item body refuses `<label> <body defect sentence>; withdraw needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref`.
 - [ ] [WITHDRAW-12] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
-- [ ] [WITHDRAW-13] A forge failure, the item read and the body write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
+- [ ] [WITHDRAW-17] A withdrawal write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the withdrawal is written (see E-WITHDRAW-06).
+- [ ] [WITHDRAW-13] Every other forge failure, the read and the write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
 - [ ] [WITHDRAW-15] Every withdrawal runs in the item's turn (RULE-40): writers of one item on this machine are serialized, so a withdrawal and a ruling on distinct lines both land; a held lock prints RULE-42's line.
 - [ ] [WITHDRAW-16] A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
 - [ ] [WITHDRAW-14] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
@@ -61,14 +63,15 @@ left, never a withdrawn one.
 | WITHDRAW-10 (missing item, pull request), WITHDRAW-11 (malformed body) | `invalid_item` |
 | WITHDRAW-09 (a line named twice), WITHDRAW-12 (`--repo` under `storage = state-ref`), the parser's own refusals | `invalid_usage` |
 | WITHDRAW-13 (a forge failure), WITHDRAW-16 (the item's lock) | `unavailable` |
+| WITHDRAW-17 (the body check answers the write) | `overwritten` (with `kept`) or `not_verified`, as OUT-11 |
 
 An already withdrawn line answers its own `reason`, so a head that re-runs
-after an `unavailable` on `github`, where the write may have landed, tells
-"done" from "stop, it is ruled".
+after an `unavailable`, an `overwritten` or a `not_verified` on `github`, where
+the write may have landed, tells "done" from "stop, it is ruled".
 
 ## Never
 
-- `aco withdraw` never withdraws a ruled line: every check runs on the body it read in the same call. Writers of one item through aco on this machine are serialized (WITHDRAW-15), so none overwrites another's ruling; on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (WITHDRAW-13); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
+- `aco withdraw` never withdraws a ruled line: every check runs on the body it read in the same call. Writers of one item through aco on this machine are serialized (WITHDRAW-15), so none overwrites another's ruling; on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (WITHDRAW-17); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
 - `aco withdraw` never writes a key beside `text` and `withdrawn_on`: a returned line's `returned_on` and `returned_note` leave with it; the forge's edit history keeps the note.
 - `aco withdraw` never changes another expectation line's values or a byte outside the block; the block itself is rendered canonically (BODY-88), and under `state-ref` the record merge sets `updated_at` as for `rule`.
 - `aco withdraw` never takes `--via` or `--card-hash`: it decides nothing for the operator.
@@ -147,5 +150,16 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` o
 $ aco withdraw <item-id> --line 1 --json
 2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
 {"ok": false, "reason": "unavailable", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
+exit 2
+```
+
+### E-WITHDRAW-06 — the check finds the withdrawal not verified
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, item `#7` open with an open option line 2, the edit history unreadable after the write
+
+```console
+$ aco withdraw 7 --line 2 --json
+2> ERROR: #7 body written, not verified (<cause>)
+{"ok": false, "reason": "not_verified", "message": "#7 body written, not verified (<cause>)"}
 exit 2
 ```
