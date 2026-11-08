@@ -5,6 +5,7 @@ from cli_fixtures import run_cli
 
 from aco import body
 
+
 def block(after: str = "", before: str = "") -> str:
     fence = '```aco\nversion = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n```\n'
     return before + fence + after
