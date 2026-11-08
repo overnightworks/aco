@@ -1399,15 +1399,9 @@ class GitHubForge:
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         # The after-write check reads `replacing`.
+        path = f"repos/{self.repository}/issues/{number}"
         self._run(
-            [
-                "api",
-                "--method",
-                "PATCH",
-                f"repos/{self.repository}/issues/{number}",
-                "--input",
-                "-",
-            ],
+            ["api", "--method", "PATCH", path, "--input", "-"],
             input_data=json.dumps({"body": body}).encode("utf-8"),
         )
 
