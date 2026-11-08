@@ -155,7 +155,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## Multiple repositories
 
 - [ ] [ABRD-14] `aco serve` serves each checkout under the config file's `root` tracking `.aco/board.toml`, labelled `owner/repo`, one per forge repository (first sorted path); it takes no `--repo`.
-- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence and no items or steps, others unaffected (E-ABRD-06); the page shows it per ABRD-101.
+- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence, no items or steps (E-ABRD-06); the page shows it per ABRD-101.
 - [ ] [ABRD-16] A decision naming a `repo` that the scan made for that decision does not find is refused `bad request: decision` before any forge request (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running write in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
@@ -168,7 +168,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 ## The JSON API
 
-- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items", "steps"}]}`; `items`: RUL-03's rows as `{"number", "title", "lines"}` (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06); `steps`: see ABRD-114.
+- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items", "steps"}]}`; `items`: RUL-03's rows (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06); `steps`: ABRD-114.
 - [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"`, the written item as ABRD-08 lists it, once stored; else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
