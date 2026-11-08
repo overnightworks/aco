@@ -74,4 +74,4 @@ def test_an_edit_whose_write_the_check_answers_prints_the_check_sentence(
     assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
     assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
     written = body.parse_body(client.item_bodies[ITEM])
-    assert (written.size, written.whole) != (None, None)
+    assert getattr(written, edit[0].removeprefix("--")) == edit[1]

@@ -18,6 +18,7 @@ from claim_worktrees import (
     held_by_ada,
     lane_held_by_ada,
     make_stand_in,
+    replace_item_body,
     rescope_arguments,
     serve_body,
 )
@@ -241,10 +242,12 @@ def test_a_rescope_whose_body_write_the_check_answers_leaves_the_claim_and_a_rer
     assert written_scope_and_whole(served) == ((NEW_FILE, "src/widget.py"), None)
 
     served.update_item_body_error = None
+    replace_item_body(served, served.item_bodies[ISSUE])
     rerun = run_cli(rescope_arguments(*flags), capsys)
 
     assert (rerun.status, rerun.stderr) == (0, "")
     assert claimed_here(standpoint).scope == (NEW_FILE, "src/widget.py")
+    assert len(served.body_replacings) == 1
 
 
 def test_a_rescope_refuses_an_item_body_without_a_block_before_any_write(

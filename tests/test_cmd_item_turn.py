@@ -66,7 +66,7 @@ def test_an_edit_hands_the_forge_the_body_it_read_as_the_text_it_replaces(
     lock_directory: Path,
     edit: tuple[str, ...],
 ) -> None:
-    """Spec: ITEM-65 -- the write names the body the edit read as the text it replaces."""
+    """The write names the body the edit read as the text it replaces."""
     client = served_witness(monkeypatch, lock_directory)
 
     result = run_cli(edit_arguments(edit), capsys)

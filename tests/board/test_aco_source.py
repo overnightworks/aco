@@ -155,7 +155,7 @@ def test_an_item_read_that_fails_during_a_decision_is_relayed_and_nothing_writte
 def test_a_decision_hands_the_forge_the_body_it_read_as_the_text_it_replaces(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-41: the write names the body the decision read as the text it replaces."""
+    """The write names the body the decision read as the text it replaces."""
     read_body = item_body(open_option_entry())
     repository.put_item(_ITEM, read_body)
     shown = first_listed_line(board)
