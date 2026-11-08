@@ -1398,7 +1398,7 @@ class GitHubForge:
         return child
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
-        # The after-write check reads `replacing`.
+        # `replacing` is accepted for the port and not read here.
         path = f"repos/{self.repository}/issues/{number}"
         self._run(
             ["api", "--method", "PATCH", path, "--input", "-"],
