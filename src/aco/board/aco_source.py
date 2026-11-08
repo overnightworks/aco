@@ -1,14 +1,15 @@
 """`DecisionPort` over aco's own library, in process.
 
 A read lists the members' open items through `inbox.rows`, the rows `aco rulings`
-prints on the items a member wrote. A decision reads its one item through
-`decide.fresh_item`, runs the board's check on aco's own lines of that read, and
-writes the whole card through `decide.rule`, the writer `aco rule` uses. Every
-read and every write builds its own context bound to the board's directory, so
-nothing read carries over between calls or threads, and one write's read, check
-and write share that one context.
+prints on the items a member wrote. A decision reads its one item inside
+`decide.turn` (the item's lock, then the fresh read), runs the board's check on
+aco's own lines of that read, and writes the whole card through `decide.rule`, the
+writer `aco rule` uses. Every read and every write builds its own context bound
+to the board's directory, so nothing read carries over between calls or threads,
+and one write's read, check and write share that one context.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -61,7 +62,15 @@ def _checked_and_written(
     context: session.RunContext, item: int, check: CardCheck
 ) -> DecisionResult | CardChanged:
     """One read of `item`, `check` on that read, then one write of the card."""
-    fresh = decide.fresh_item(context, item, command="rule")
+    with decide.turn(
+        context, item, command="rule", environment=os.environ, home=Path.home()
+    ) as fresh:
+        return _checked_and_written_in_turn(context, fresh, check)
+
+
+def _checked_and_written_in_turn(
+    context: session.RunContext, fresh: decide.FreshItem, check: CardCheck
+) -> DecisionResult | CardChanged:
     if fresh.state is not forge.ItemState.OPEN:
         return CardChanged()
     decision = check(expectations.expectation_lines(fresh.body, storage=fresh.storage))

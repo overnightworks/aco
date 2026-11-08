@@ -161,6 +161,7 @@ def _forge_checkout(workspace: Path) -> BoardForge:
     config_file.parent.mkdir(parents=True)
     config_file.write_text(f'root = "{root}"\n', encoding="utf-8")
     os.environ["XDG_CONFIG_HOME"] = str(workspace / "config")
+    os.environ["XDG_STATE_HOME"] = str(workspace / "state")
     return board_checkout(root / DEFAULT_LABEL)
 
 

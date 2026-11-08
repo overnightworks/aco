@@ -1,13 +1,17 @@
 """The one read-modify-write of expectation lines (`specs/rule.spec.md`,
 `specs/withdraw.spec.md`): `aco rule`, `aco withdraw` and the decision board
 read an item through the target gate and write its folded body once, here,
-so every ruling and every withdrawal takes the same path."""
+so every ruling and every withdrawal takes the same path. A writer reads and
+writes inside `turn`, which serializes the writers of one item on this machine."""
 
-from collections.abc import Sequence
+import hashlib
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 
-from . import board_read, body, expectations, forge, protocol, workboard
+from . import board_read, body, expectations, file_lock, forge, protocol, repositories, workboard
 from .session import RunContext
 
 type Outcome = expectations.OptionChoice | expectations.HeadReturn
@@ -67,6 +71,48 @@ def fresh_item(context: RunContext, number: int, *, command: str) -> FreshItem:
     except protocol.ClaimError as error:
         raise InvalidTargetError(str(error)) from error
     return FreshItem(number, reference.title or "", current_body, storage, reference.state)
+
+
+class ItemLockUnavailableError(protocol.ClaimUnavailableError):
+    """The per-item lock file could not be created or locked, so nothing was read or written."""
+
+
+def _item_lock_path(
+    context: RunContext, number: int, environment: Mapping[str, str], home: Path
+) -> Path:
+    """One flat file per item of a forge repository under aco's state directory,
+    named by a digest so no remote path can place it elsewhere."""
+    repository = context.remote_repository_id
+    key = f"{repository.host}\0{repository.path}\0{number}"
+    state = repositories.xdg_directory(environment, "XDG_STATE_HOME", home, ".local", "state")
+    return state / "aco" / "item-locks" / hashlib.sha256(key.encode()).hexdigest()
+
+
+@contextmanager
+def turn(
+    context: RunContext,
+    number: int,
+    *,
+    command: str,
+    environment: Mapping[str, str],
+    home: Path,
+) -> Iterator[FreshItem]:
+    """The per-item turn: holds the item's lock, reads it fresh through the target
+    gate and yields that read; the caller writes at most once before the turn
+    ends. Not re-entrant. An unwritable lock directory refuses with
+    `ItemLockUnavailableError` before any read or write."""
+    # The target's own refusals (`--repo` under `state-ref`, no recognised host)
+    # come first; the forge, which reads and caches items, is built after the lock.
+    _ = context.repository_id
+    lock_path = _item_lock_path(context, number, environment, home)
+    with ExitStack() as held:
+        try:
+            held.enter_context(file_lock.held(lock_path))
+        except OSError as error:
+            raise ItemLockUnavailableError(
+                f"cannot lock the item at {lock_path}: {error}"
+            ) from error
+        yield fresh_item(context, number, command=command)
 
 
 def _written_body(current_body: str, line: int, outcome: Outcome, today: date) -> str:

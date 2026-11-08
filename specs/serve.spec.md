@@ -41,7 +41,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a card post missing an open option line, or naming a changed or non-option line | — | ABRD-79 |
 | a card post naming a line already ruled | — | ABRD-80 |
 | a malformed card post | — | ABRD-81 |
-| a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17 |
+| a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17, ABRD-113 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
 | one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
@@ -60,6 +60,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 - ABRD-01 (removed).
 - [ ] [ABRD-02] A card whose shown fields (an option line's `card_hash`, ABRD-35) changed since shown is refused on its fresh read `Diese Zeile hat sich geändert, bitte neu laden`, nothing written (E-ABRD-02).
 - [ ] [ABRD-03] The board writes one decision at a time; a decision arriving meanwhile waits. Decisions on distinct lines are both stored; on the same line, the later one answers `already_ruled` (RULE-04).
+- [ ] [ABRD-113] Every decision also takes the item's per-machine lock (RULE-40), so aco's other writers of that item wait; a lock that cannot be taken fails the card naming it, nothing written (RULE-41).
 - [ ] [ABRD-04] Stopping the board waits for a write already running; a decision still waiting for its turn or arriving after stopping began is refused `board is shutting down`, nothing written.
 - [ ] [ABRD-05] A note or answer is at most `280` characters after trimming, holds no NUL, and is valid UTF-8; any other refuses it before any forge request; a blank note is no note, a blank answer is refused.
 - ABRD-39 (removed).
