@@ -64,6 +64,7 @@ _INSTRUCTIONS: Final = (
     f"only the operator can take with {STEP}."
 )
 _REPOSITORY: Final = "repository"
+_REPOSITORY_DESCRIPTION: Final = "the repository as read_inbox lists it, owner/repo"
 _ITEM: Final = "item"
 _ENVELOPE_KEYS: Final = (_REPOSITORY, _ITEM)
 _TITLE: Final = "title"
@@ -114,7 +115,7 @@ def _ask_schema() -> dict[str, object]:
     return {
         "type": "object",
         "properties": {
-            "repository": _string("the repository as read_inbox lists it, owner/repo"),
+            "repository": _string(_REPOSITORY_DESCRIPTION),
             "item": {"type": "integer", "description": "the number of an open item"},
             **{key: _line_property(key) for key in grammar.CARD_LINE_KEYS},
             grammar.OPTIONS: options,
@@ -136,7 +137,7 @@ def _record_answer_schema() -> dict[str, object]:
     return {
         "type": "object",
         "properties": {
-            "repository": _string("the repository as read_inbox lists it, owner/repo"),
+            "repository": _string(_REPOSITORY_DESCRIPTION),
             "item": {"type": "integer", "description": "the number of the item"},
             "line": {"type": "integer", "minimum": 1, "description": "the line's index"},
             "card_hash": _string("the line's card_hash"),
@@ -156,7 +157,7 @@ def _step_schema() -> dict[str, object]:
     return {
         "type": "object",
         "properties": {
-            _REPOSITORY: _string("the repository as read_inbox lists it, owner/repo"),
+            _REPOSITORY: _string(_REPOSITORY_DESCRIPTION),
             STEP: _string("what the operator must do"),
             _ITEM: {"type": "integer", "description": "the number of an open item; or give title"},
             _TITLE: _string("the title of a new item; give this or item"),
