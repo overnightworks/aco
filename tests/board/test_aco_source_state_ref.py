@@ -194,7 +194,7 @@ def test_a_bare_item_edit_hands_the_board_the_snapshot_body_it_replaces(
 
     _card_edited(capsys)
 
-    assert [_QUESTION in text for text in replaced] == [True]
+    assert replaced == [_item_file(*_two_open_lines()).decode()]
 
 
 def _line_ruled_in_chat(capsys: pytest.CaptureFixture[str]) -> None:
