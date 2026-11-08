@@ -347,7 +347,7 @@ def test_a_state_ref_repository_refuses_before_any_lookup_or_write(
     ],
 )
 def test_a_body_check_that_fails_is_the_calls_error_and_a_repeat_sets_the_label(
-    check_answer: forge.ForgeBodyWrittenError,
+    check_answer: forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError,
     here: board_forge.BoardForge,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
