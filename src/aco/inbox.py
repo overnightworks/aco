@@ -44,7 +44,7 @@ def waiting_rows(rows_read: Iterable[rulings.Row]) -> tuple[rulings.Row, ...]:
 class Step:
     number: int
     title: str
-    step: str | None
+    next_step: str | None
     """The block's `next`; `None` when the body has no readable block."""
 
 
@@ -123,7 +123,7 @@ def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbo
 
 
 def step_json(step: Step) -> dict[str, object]:
-    return {"number": step.number, "title": step.title, "step": step.step}
+    return {"number": step.number, "title": step.title, "step": step.next_step}
 
 
 def inbox_json(inbox: Inbox) -> dict[str, object]:

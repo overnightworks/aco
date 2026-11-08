@@ -230,7 +230,7 @@ def test_a_labelled_item_without_a_readable_block_is_a_step_with_no_text(body_te
 
     found = inbox.steps(issues, storage=body.Storage.GITHUB)
 
-    assert [(step.number, step.step) for step in found] == [(9, None), (8, "Fine.")]
+    assert [(step.number, step.next_step) for step in found] == [(9, None), (8, "Fine.")]
 
 
 def test_only_a_labelled_item_a_member_wrote_and_the_store_could_read_is_a_step() -> None:
