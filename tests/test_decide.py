@@ -10,9 +10,9 @@ from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import run_context_over, track_board_config
 from github_fixtures import FakeForge
 from item_lock_witness import LockWitnessForge
-from option_cards import GOLDEN_CARD_HASH, card, ruled_card
+from option_cards import GOLDEN_CARD_HASH, card, card_head, ruled_card
 
-from aco import body, decide, expectations, forge, protocol
+from aco import body, body_fence, decide, expectations, forge, protocol
 from aco.session import RunContext
 
 TODAY = date(2026, 10, 29)
@@ -308,3 +308,34 @@ class TestWriteItemBody:
         written = decide.write_item_body(client, 90, "new text", replacing="old text")
 
         assert (written, client.body_writes, replaced) == (True, [(90, "new text")], ["old text"])
+
+
+def test_ruling_a_line_whose_hand_written_picture_holds_a_fence_line_keeps_the_body_whole(
+    clone: Path,
+) -> None:
+    written_picture = card_head().split("picture = ")[1].split("\ncaption")[0]
+    hand_written = card().replace(written_picture, '"<svg/>\\n```\\nx"', 1)
+    given = item_with(hand_written)
+    shown = [
+        line
+        for line in expectations.expectation_lines(given, storage=body.Storage.GITHUB)
+        if isinstance(line, expectations.OptionLine)
+    ]
+    context, client = world(body.Storage.GITHUB, given, clone)
+
+    decide.rule(
+        context,
+        decide.fresh_item(context, 90, command="rule"),
+        [choose(1, shown[0].card_hash)],
+        TODAY,
+    )
+
+    written = client.item_bodies[90]
+    stored = [
+        line.picture
+        for line in expectations.expectation_lines(written, storage=body.Storage.GITHUB)
+        if isinstance(line, expectations.OptionLine)
+    ]
+    body.locate_block(written)
+    assert len(body_fence.walk_fences(written).fences) == 1
+    assert stored == ["<svg/>\n```\nx"]

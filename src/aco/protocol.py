@@ -1556,24 +1556,24 @@ def toml_string(value: object) -> str:
     return f'"{escaped}"'
 
 
-# A multi-line basic string may hold a newline and a tab literally; every
-# other character keeps `toml_string`'s own escape.
+# A multi-line basic string keeps a newline and a tab literally.
 _TOML_MULTILINE_LITERALS = frozenset("\n\t")
+_FENCE_CHARACTERS = frozenset("`~")
 
 
 def toml_multiline_string(value: str) -> str:
-    """A TOML multi-line basic string for `value` -- an `[[expectation]]`
-    `picture`'s inline SVG, which needs literal newlines a
-    single-line basic string cannot hold. Every other character takes
-    `toml_string`'s escape, so a quote run is never mistaken for the
-    closing `\"\"\"` and a control character the reader forbids literal
-    is written as `\\uXXXX`. `tomllib.loads` reads it back to
-    `value` unchanged -- the leading newline right after the opening
-    delimiter is the one TOML trims automatically, so none is added here."""
-    escaped = "".join(
-        char if char in _TOML_MULTILINE_LITERALS else _toml_string_escape(char) for char in value
-    )
+    """A TOML multi-line basic string for `value` -- a `picture`'s inline SVG.
+    The text stands inside a fenced block, so a raw run of backticks or tildes
+    could end it: each is written as `\\uXXXX`, every other character as
+    `toml_string` does. `tomllib.loads` reads it back to `value` unchanged."""
+    escaped = "".join(_multiline_escape(char) for char in value)
     return f'"""\n{escaped}"""'
+
+
+def _multiline_escape(char: str) -> str:
+    if char in _FENCE_CHARACTERS:
+        return f"\\u{ord(char):04X}"
+    return char if char in _TOML_MULTILINE_LITERALS else _toml_string_escape(char)
 
 
 def _toml_string_escape(char: str) -> str:
