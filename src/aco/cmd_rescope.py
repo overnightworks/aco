@@ -281,7 +281,7 @@ def _rescope_item_and_claim(
     refused body write leaves the claim as it stood, and a claim write that
     fails after it says the body already names the new scope and how to
     bring the claim in step -- the body write is not undone, and the same
-    rescope again writes the same body and the claim."""
+    rescope again skips the unchanged body and writes the claim."""
     _write_rescoped_body(context, item, intent.scope, whole)
     try:
         return context.transition(subject, intent)

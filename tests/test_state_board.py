@@ -1638,14 +1638,14 @@ class TestStateRefBoardWrites:
         writer = self._writer(bare_remote, worktree)
         first = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
         second = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
-        read = first.item_reference(CHILD_A_NUMBER).body or ""
-        second_body = second.item_reference(CHILD_A_NUMBER).body or ""
+        read = first.item_reference(CHILD_A_NUMBER).body
+        second_body = second.item_reference(CHILD_A_NUMBER).body
+        assert read is not None and second_body is not None
 
         first.update_item_body(
             CHILD_A_NUMBER, read.replace("Prose.", "First writer.", 1), replacing=""
         )
         second_writer_body = second_body.replace("Prose.", "Second writer.", 1)
-
         with pytest.raises(ClaimUnavailableError, match="written since it was read"):
             second.update_item_body(CHILD_A_NUMBER, second_writer_body, replacing="")
         state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
