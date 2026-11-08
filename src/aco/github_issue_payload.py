@@ -33,6 +33,12 @@ def _is_count(value: object, minimum: int = 0) -> TypeIs[int]:
     return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
 
 
+def _is_timestamp(value: object) -> TypeIs[str]:
+    return (
+        isinstance(value, str) and protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(value) is not None
+    )
+
+
 def _valid_children_progress(closed: object, total: object) -> bool:
     """`childrenClosed`/`childrenTotal` (`sub_issues_summary`) must arrive
     both present or both absent -- `ContainerProgress` has no
@@ -66,10 +72,8 @@ def board_issue(value: object) -> workboard.Issue:
         or not isinstance(labels, list)
         or not all(isinstance(label, str) for label in labels)
         or not isinstance(body, str)
-        or not isinstance(created_at, str)
-        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(created_at) is None
-        or not isinstance(updated_at, str)
-        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(updated_at) is None
+        or not _is_timestamp(created_at)
+        or not _is_timestamp(updated_at)
         or (kind_raw is not None and not isinstance(kind_raw, str))
         or not _valid_children_progress(children_closed, children_total)
         or not _is_count(blocked_by_count)
