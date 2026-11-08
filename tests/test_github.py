@@ -1562,10 +1562,9 @@ def test_github_adapter_item_reference_is_missing_after_a_404() -> None:
     ("raw", "match"),
     [
         pytest.param("not-json", "invalid issue reference JSON", id="not-json"),
-        pytest.param(json.dumps([]), "malformed issue reference", id="no-values"),
-        pytest.param(
-            json.dumps([{"a": 1}, {"b": 2}]), "malformed issue reference", id="two-values"
-        ),
+        pytest.param("", "malformed issue reference", id="no-values"),
+        pytest.param('{"a": 1}\n{"b": 2}', "malformed issue reference", id="two-values"),
+        pytest.param(json.dumps([]), "malformed issue reference", id="empty-list"),
         pytest.param(json.dumps(["not-a-dict"]), "malformed issue reference", id="not-a-dict"),
         pytest.param(
             json.dumps({"state": "unknown", "title": "x", "body": None}),
