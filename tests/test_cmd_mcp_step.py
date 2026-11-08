@@ -332,17 +332,36 @@ def test_a_state_ref_repository_refuses_before_any_lookup_or_write(
     assert here.request_log() == ()
 
 
+@pytest.mark.parametrize(
+    "check_answer",
+    [
+        pytest.param(forge.ForgeBodyNotVerifiedError(1, "timeout"), id="not-verified"),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(1, "2026-01-01T00:00:00Z", "someone", kept=True),
+            id="overwritten-kept",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(1, "2026-01-01T00:00:00Z", "someone", kept=False),
+            id="overwritten-lost",
+        ),
+    ],
+)
 def test_a_body_check_that_fails_is_the_calls_error_and_a_repeat_sets_the_label(
-    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+    check_answer: forge.ForgeBodyWrittenError,
+    here: board_forge.BoardForge,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    check_answer = forge.ForgeBodyNotVerifiedError(1, "timeout")
     here.answer_next_write(check_answer)
 
-    failed, repeated = _serve(monkeypatch, _step_line(1), _step_line(2))
+    [failed] = _serve(monkeypatch, _step_line(1))
 
     assert (failed["isError"], _text(failed)) == (True, str(check_answer))
+    assert _writes(here) == [("update_item_body", 1)]
+
+    [repeated] = _serve(monkeypatch, _step_line(2))
+
     assert repeated["isError"] is False
-    assert _writes(here) == [("update_item_body", 1), ("add_label", 1)]
+    assert body.locate_block(here.stored_body(1)).data["next"] == STEP
     assert here.stored_item(1).labels == [_LABEL]
 
 
