@@ -10,7 +10,7 @@ from cli_fixtures import track_board_config
 from github_fixtures import FakeForge
 from option_cards import SECOND_CARD, ask_card, card, other_card, returned_card, ruled_card
 
-from aco import body, decide, expectations, forge, protocol
+from aco import body, body_fence, decide, expectations, forge, protocol
 from aco.session import RunContext
 
 TODAY = date(2026, 11, 8)
@@ -160,16 +160,23 @@ def test_a_card_the_card_rules_refuse_writes_nothing(clone: Path) -> None:
     assert client.body_writes == []
 
 
-def test_a_picture_holding_a_fence_line_would_malform_the_body_and_is_refused(
+def test_a_picture_holding_a_fence_line_is_stored_and_reads_back_unchanged(
     clone: Path,
 ) -> None:
     context, client = world(clone, item_with(card()))
-    asked = ask_card(picture="<svg/>\n```\nclosed early")
+    picture = "<svg/>\n```\nclosed early"
+    asked = ask_card(picture=picture)
 
-    with pytest.raises(protocol.ClaimError, match="body malformed"):
-        ask(context, asked)
+    ask(context, asked)
 
-    assert client.body_writes == []
+    written = client.item_bodies[NUMBER]
+    stored = [
+        line.picture
+        for line in expectations.expectation_lines(written, storage=body.Storage.GITHUB)
+        if isinstance(line, expectations.OptionLine)
+    ]
+    assert len(body_fence.walk_fences(written).fences) == 1
+    assert stored[-1] == picture
 
 
 def test_an_item_whose_body_is_incomplete_refuses_a_new_card_with_the_missing_sections(

@@ -33,7 +33,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a card asked after its line was withdrawn | — | — | MCP-23 |
 | a repository not found, or an item missing, a pull request, malformed, closed or a non-member's | — | — | MCP-24 |
 | a card value the grammar refuses, a card rule broken, or an item with an incomplete body | — | — | MCP-25 |
-| a card that would leave the body malformed | — | — | MCP-26 |
+| a card whose picture holds a code-fence line | — | — | MCP-26 |
 | an unknown argument, a state key, or a `repository` or `item` of the wrong type | — | — | MCP-27 |
 | the forge's check of the write answers `not verified` or `overwritten` | — | — | MCP-28 |
 | an open option line and the operator's chat answer | — | — | MCP-29, MCP-30 |
@@ -84,7 +84,7 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - [ ] [MCP-23] A withdrawn line never matches a card: asking after its withdrawal appends a new line.
 - [ ] [MCP-24] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-06).
 - [ ] [MCP-25] A card value the grammar refuses, a card breaking BODY-96..BODY-99 or an item whose body is incomplete is a tool error naming every defect; nothing is written (see E-MCP-07).
-- [ ] [MCP-26] A card that would leave the body malformed, a picture holding a code-fence line for one, is refused as in MCP-25 before anything is written.
+- [ ] [MCP-26] A card whose picture holds a code-fence line is stored: the body keeps its one `aco` block and the picture reads back unchanged.
 - [ ] [MCP-27] An unknown argument, a state key (`asked_on`, `ruling`, `card_hash`, ...), a `repository` that is no string or an `item` that is no integer is a tool error naming each; nothing is written.
 - [ ] [MCP-28] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; asking the same card again then answers the line if it stands, else writes it.
 
