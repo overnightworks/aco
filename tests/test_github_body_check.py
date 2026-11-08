@@ -180,7 +180,7 @@ def test_the_judgement_says_what_the_newest_two_revisions_show_of_the_write(
         ),
     ],
 )
-def test_the_adapter_reads_the_history_once_after_one_patch(
+def test_the_adapter_answers_each_write_from_one_history_read_after_its_patch(
     patch_answer: str, nodes: object, sentence: str | None
 ) -> None:
     gh = _GitHub(patch_answer, nodes)
