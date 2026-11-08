@@ -31,7 +31,7 @@ by every writer that answers it.
 ## The envelope
 
 - [ ] [OUT-01] Every migrated command's `--json` object prints `ok` first and `reason` second, in that order, before any of the command's own payload keys.
-- [ ] [OUT-02] `ok` is `true` only for that command's own success outcome; `reason` is always one stable token from that command's own enum or a shared one this file owns (OUT-05, OUT-06, OUT-11), never a free sentence.
+- [ ] [OUT-02] `ok` is `true` only for that command's own success outcome; `reason` is always one stable token from that command's own enum or a shared one this file owns (OUT-11), never a free sentence.
 - [ ] [OUT-03] A refusal's `reason` names its enum member, never an `error` object; an optional `message` -- the refusal's own sentence, as its text form prints it -- is always the last key.
 - [ ] [OUT-05] A refusal raised before the named command starts -- a missing identity, `release`'s branch checks -- prints this envelope, `reason` `precondition_failed`, its sentence as `message`.
 - [ ] [OUT-06] A parser refusal on a command declaring `--json` -- an unknown flag, a missing required one, an unreadable positional -- prints this envelope, `invalid_usage`, exit `2` (see E-OUT-04).

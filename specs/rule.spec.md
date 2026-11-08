@@ -119,7 +119,7 @@ withdrawn one.
   - and before every other refusal of this file but RULE-39 and the parser's own
 - [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
 - [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
-- [ ] [RULE-43] A ruling write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; a re-run reads the body fresh, so it writes again or refuses RULE-04 (see E-RULE-19).
+- [ ] [RULE-43] A ruling write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; a re-run reads the body fresh (see E-RULE-19).
 - [ ] [RULE-11] Every other forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 - [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
 - [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).

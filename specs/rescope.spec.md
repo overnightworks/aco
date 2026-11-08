@@ -97,7 +97,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-22] For an issue claim, one rescope writes the combined scope into the item body's own `scope`, then the claim; a lane claim names no item, so only its claim moves (see E-RESC-01).
 - [ ] [RESC-23] A claim write failing after the body write refuses `<label> body scope now reads <scope>, but the claim was not rescoped: <error>; run the same rescope again`, exit `2` (see E-RESC-08).
 - [ ] [RESC-24] An item body without a valid `aco` block refuses `<label> <defect>; rescope needs a valid aco block`, exit `2`, before either write; a failed body write leaves the claim as it stood.
-- [ ] [RESC-34] A body write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the claim stands as it was, and the same rescope again completes it (see E-RESC-11).
+- [ ] [RESC-34] A body write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the claim stands, and the same rescope again completes it (see E-RESC-11).
 - [ ] [RESC-33] An issue claim's `rescope` reads the item and claim and writes both in the item's turn (RULE-40): a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (E-RESC-10).
 - [ ] [RESC-25] An issue claim's wide scope is admitted by `--whole`, the stored reason, or the body's own `whole`, as `claim` judges it (CLM-22), and `--whole` is written into the body too.
 
@@ -105,7 +105,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 
 - [ ] [RESC-15] A malformed `--add`/`--drop` value (RESC-01, RESC-05..09, RESC-19, RESC-30) reports `reason: "invalid_usage"` under `--json`.
 - [ ] [RESC-16] No live claim (RESC-14), a foreign claimant (CLAIM-37), a wide combined scope (RESC-10) or an item body that cannot take it (RESC-24) reports `reason: "precondition_failed"` (see E-RESC-04).
-- [ ] [RESC-17] Every other refusal -- an unresolved checkout (RESC-02..04, RESC-26, RESC-28/29/31/32), a failed write (RESC-23, but not RESC-34) or a corrupted record -- reports `reason: "unavailable"` (a missing identity: OUT-05).
+- [ ] [RESC-17] Every other refusal -- an unresolved checkout (RESC-02..04, RESC-26, RESC-28/29/31/32), a failed write (RESC-23) or a corrupted record -- reports `reason: "unavailable"` (a missing identity: OUT-05).
 
 ## Never
 
