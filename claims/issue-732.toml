@@ -1,8 +1,0 @@
-claim_id = "3595631413cf427e90a984a804332c44"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "b762ae6439a862956d09e86193adc9b066a38ce7"
-branch = "claude/issue-732-github-body-write-module"
-scope = ["pyproject.toml", "quality/baseline.toml", "src/aco/cmd_adopt.py", "src/aco/github.py", "src/aco/github_body_write.py", "tests/test_github.py", "tests/test_github_body_write.py"]
-opened_commit = "ecd4762765c808d7cedfb82842832a52e2032211"
-whole_reason = "The classifier, the PATCH and their tests move together so no name lives in two modules and the baseline shrinks in the same change."
