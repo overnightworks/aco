@@ -134,7 +134,8 @@ operator (`specs/mcp.spec.md`).
 
 ### The per-item turn
 
-Every write of an item's body runs under one per-item lock (`decide.item_lock`):
+Every write of an item's body except the bare `state-ref` `aco item edit`'s runs under
+one per-item lock (`decide.item_lock`):
 an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file per
 item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
@@ -146,7 +147,8 @@ listing, not the item read. A writer that finds the lock held prints one line to
 stderr and waits. Writers on this machine therefore never overwrite each other's
 bodies. A GitHub body write has no precondition, so a hand edit or another machine
 is not covered; under `state-ref` the store's compare-and-swap still refuses a
-stale write. The board keeps its own in-process turn for its shutdown drain
+stale write, and it alone guards the bare `aco item edit`, which writes outside the
+lock. The board keeps its own in-process turn for its shutdown drain
 (`specs/serve.spec.md`).
 
 ### Proof strategy

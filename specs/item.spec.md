@@ -161,7 +161,6 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   exit 2
   ```
 - [ ] [ITEM-64] `--size`, `--whole` or `--kind` naming the value already set prints `UNCHANGED #<n> <field>=<value>` (`--json`: `reason: "unchanged"`, ITEM-22/24/47's keys), exit `0`, and writes nothing.
-- [ ] [ITEM-65] `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
 
   ```console
   $ aco item edit 484 --size S
@@ -170,6 +169,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   UNCHANGED #484 size=S
   exit 0
   ```
+- [ ] [ITEM-65] `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
 - [ ] [ITEM-50] `--size`, `--whole` and `--kind` exclude one another: a second one refuses at argparse, `argument <second>: not allowed with argument <first>`, exit `2`, before any write.
 - [ ] [ITEM-51] A socket, terminal, `/dev/null` or closed stdin on `--kind`, `--size` or `--whole` passes unread, as an agent harness hands a socket when nothing was piped.
 

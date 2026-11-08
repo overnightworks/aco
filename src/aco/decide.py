@@ -1,8 +1,9 @@
 """The one read-modify-write of expectation lines (`specs/rule.spec.md`,
 `specs/withdraw.spec.md`): `aco rule`, `aco withdraw` and the decision board
 read an item through the target gate and write its folded body once, here,
-so every ruling and every withdrawal takes the same path. A writer reads and
-writes inside `turn`, which serializes the writers of one item on this machine."""
+so every ruling and every withdrawal takes the same path. `item_lock` serializes
+the writers of one item on this machine; `turn` is that lock plus the fresh read,
+and a writer that judges from another read (`aco cut`) holds `item_lock` alone."""
 
 import hashlib
 import sys
