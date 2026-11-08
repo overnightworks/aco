@@ -97,8 +97,9 @@ output is committed under `src/aco/board/static/`.
 
 `aco mcp` is a stdio MCP server an agent host starts for one session; its tool
 `read_inbox` returns the option lines that wait on the operator across the
-same repositories `aco serve` finds, rescanned on every call
-(`specs/mcp.spec.md`). For one session, `claude --strict-mcp-config
+same repositories `aco serve` finds, rescanned on every call, and its tool
+`ask` puts one decision card on an open item there, writing it once even when
+asked again (`specs/mcp.spec.md`). For one session, `claude --strict-mcp-config
 --mcp-config '{"mcpServers":{"aco":{"command":"aco","args":["mcp"]}}}'` or
 `codex exec -c 'mcp_servers.aco.command="aco"' -c 'mcp_servers.aco.args=["mcp"]'`
 registers it.
