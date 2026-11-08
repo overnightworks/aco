@@ -20,8 +20,7 @@ from discovery_fixtures import (
 )
 from mcp_lines import Script, call_line
 
-from aco import body, cli, cmd_mcp, forge, protocol, session, workboard
-from aco.session import RunContext
+from aco import body, cli, forge, protocol, session, workboard
 
 STEP = "Rotate the deploy key."
 TITLE = "Rotate the deploy key"
@@ -215,6 +214,13 @@ def _standing(
             {**_standing(2), **_standing(4), **_standing(3)}, TITLE, 4, False, id="highest"
         ),
         pytest.param(_standing(2, "Another step."), TITLE, 3, True, id="same-title-another-step"),
+        pytest.param(
+            {2: board_forge.StoredItem("Another title", complete_contract(STEP))},
+            TITLE,
+            3,
+            True,
+            id="same-step-another-title",
+        ),
         pytest.param(_standing(2, member=False), TITLE, 3, True, id="a-non-members-item"),
         pytest.param(
             {2: board_forge.StoredItem(TITLE, "no block here")}, TITLE, 3, True, id="unreadable"
@@ -251,24 +257,37 @@ def test_a_title_with_another_step_leaves_the_first_item_as_it_was(
     assert here.stored_item(2) == before
 
 
-def test_a_step_another_session_wrote_after_the_lookup_is_not_overwritten(
-    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("rewritten_title", "rewritten_step"),
+    [
+        pytest.param(TITLE, "Another step.", id="step-changed"),
+        pytest.param("Another title", STEP, id="title-changed"),
+    ],
+)
+def test_an_item_another_session_changed_after_the_lookup_is_not_overwritten(
+    rewritten_title: str,
+    rewritten_step: str,
+    here: board_forge.BoardForge,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     here.put_item(2, complete_contract(STEP), title=TITLE)
-    lookup = cmd_mcp._standing_step_item
+    real = board_forge.BoardForge.list_open_board_issues
 
-    def standing_then_rewritten(context: RunContext, title: str, text: str) -> int | None:
-        found = lookup(context, title, text)
-        here.put_item(2, complete_contract("Another step."), title=TITLE)
-        return found
+    def listing_before_the_rewrite(self: board_forge.BoardForge) -> object:
+        earlier = real(self)
+        here.put_item(2, complete_contract(rewritten_step), title=rewritten_title)
+        return earlier
 
-    monkeypatch.setattr(cmd_mcp, "_standing_step_item", standing_then_rewritten)
+    monkeypatch.setattr(
+        board_forge.BoardForge, "list_open_board_issues", listing_before_the_rewrite
+    )
 
     [result] = _serve(monkeypatch, _step_line(1, item=None, title=TITLE))
 
     assert result["structuredContent"]["item"] == 3
     assert result["structuredContent"]["created"] is True
-    assert here.stored_item(2).body == complete_contract("Another step.")
+    assert here.stored_item(2).title == rewritten_title
+    assert here.stored_item(2).body == complete_contract(rewritten_step)
 
 
 @pytest.mark.parametrize("arrange", ["close", "stranger", "missing", "malformed", "unknown"])

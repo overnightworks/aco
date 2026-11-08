@@ -125,7 +125,7 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - [ ] [MCP-45] The same call again writes no body and sets the label again; it answers the same, so a repeat finishes a call whose label failed.
 - [ ] [MCP-46] The rewritten body keeps every other field of the block, every ruling and every byte outside the block; the body is written before the label, both in the item's turn.
 - [ ] [MCP-47] `step` with a `title` that no open item holds opens one item of kind task whose body names `step` as its `next`, sets the label and answers `created` true; `read_inbox` lists it (see E-MCP-13).
-- [ ] [MCP-48] A `title` that an open, readable item a member wrote holds with that exact `next`, labelled or not, marks it (the highest number of several) and answers `created` false; another step opens one.
+- [ ] [MCP-48] A `title` that an open, readable item a member wrote holds with that exact `next`, labelled or not, marks it (the highest number of several) and answers `created` false; another step opens one. An item changed since the lookup is left as it is, judged as its turn reads it, and a new item opens.
 - [ ] [MCP-49] `step` and `title` are stripped before use; the stored `next` and the title matched are the stripped text.
 - [ ] [MCP-50] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
 - [ ] [MCP-51] A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit` as the way (see E-MCP-15).
