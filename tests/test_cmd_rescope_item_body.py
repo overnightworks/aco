@@ -19,10 +19,11 @@ from claim_worktrees import (
     serve_body,
 )
 from cli_fixtures import run_cli
-from github_fixtures import FakeForge
+from github_fixtures import FakeForge, serve_forge
+from item_lock_witness import LockWitnessForge, run_second_writer_beside_the_first
 from store_fixtures import fail_every_state_ref_push, state_ref_tip
 
-from aco import body
+from aco import body, cli, forge
 from aco.protocol import ClaimError
 
 TRUNK_FILES = ("src/widget.py",)
@@ -238,3 +239,51 @@ def test_a_rescope_with_a_defective_whole_changes_neither_the_claim_nor_the_body
     assert claimed_here(standpoint).scope == HELD_SCOPE
     assert served.board_issues[0].body == raw_body
     assert_no_item_body_written(served)
+
+
+def serve_witness(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, pause_first_call: bool = False
+) -> LockWitnessForge:
+    reference = forge.ItemReference(forge.ItemState.OPEN, "Claims", complete_contract("Build it."))
+    return serve_forge(
+        monkeypatch,
+        LockWitnessForge(
+            tmp_path / "state" / "aco" / "item-locks",
+            issue_references={ISSUE: reference},
+            pause_first_call=pause_first_call,
+        ),
+    )
+
+
+def test_a_rescope_reads_and_writes_the_item_body_while_its_lock_is_held(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: RESC-33 -- the item read and the body write are under the item's lock."""
+    stand_in(standing=held_by_ada(HELD_SCOPE))
+    client = serve_witness(monkeypatch, tmp_path)
+
+    result = run_cli(rescope_arguments("--add", NEW_FILE), capsys)
+
+    assert (result.status, result.stderr) == (0, "")
+    assert (client.lock_held_at_reads, client.lock_held_at_writes) == ([True], [True])
+
+
+def test_a_second_rescope_says_it_waits_for_the_lock_and_writes_after_the_first(
+    monkeypatch: pytest.MonkeyPatch, stand_in: StandIn, tmp_path: Path
+) -> None:
+    """Spec: RESC-33, RULE-42 -- the wait line, then the second run's read and write."""
+    stand_in(standing=held_by_ada(HELD_SCOPE))
+    client = serve_witness(monkeypatch, tmp_path, pause_first_call=True)
+
+    def writer() -> int:
+        return cli.main(rescope_arguments("--add", NEW_FILE))
+
+    contended = run_second_writer_beside_the_first(monkeypatch, client, writer)
+
+    assert contended.statuses == (0, 0)
+    assert contended.stderr == f"waiting for the item lock at {client.the_lock_file()}\n"
+    assert contended.body_writes_when_the_second_waited == 0
+    assert (client.lock_held_at_reads, client.lock_held_at_writes) == ([True, True], [True, True])

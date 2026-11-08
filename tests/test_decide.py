@@ -1,9 +1,7 @@
 """The shared ruling writer (`specs/rule.spec.md`) on a fake forge, on both storage pins."""
 
-import fcntl
 import re
 import threading
-from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -11,6 +9,7 @@ import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import run_context_over, track_board_config
 from github_fixtures import FakeForge
+from item_lock_witness import LockWitnessForge
 from option_cards import GOLDEN_CARD_HASH, card, ruled_card
 
 from aco import body, decide, expectations, forge, protocol
@@ -207,47 +206,6 @@ def item_locks(tmp_path: Path) -> list[str]:
     return sorted(path.name for path in directory.iterdir())
 
 
-class LockWitnessForge(FakeForge):
-    """Records, at every read of an item, whether the item's lock file is held by
-    another open file description: a read made under the per-item turn finds it
-    held, so no second writer can read the item before the first one has written;
-    the same holds at every write.
-    A read answers the body last written, as a real forge does."""
-
-    def __init__(self, reference: forge.ItemReference, lock_directory: Path) -> None:
-        super().__init__(issue_references={90: reference})
-        self.lock_directory = lock_directory
-        self.lock_held_at_reads: list[bool] = []
-        self.lock_held_at_writes: list[bool] = []
-
-    def item_reference(self, number: int) -> forge.ItemReference:
-        reference = super().item_reference(number)
-        if number in self.item_bodies:
-            reference = replace(reference, body=self.item_bodies[number])
-        self.lock_held_at_reads.append(self._lock_is_held())
-        return reference
-
-    def update_item_body(self, number: int, body: str) -> None:
-        self.lock_held_at_writes.append(self._lock_is_held())
-        super().update_item_body(number, body)
-
-    def _lock_is_held(self) -> bool:
-        if not self.lock_directory.is_dir():
-            return False
-        locks = list(self.lock_directory.iterdir())
-        return len(locks) == 1 and _held_by_another(locks[0])
-
-
-def _held_by_another(lock: Path) -> bool:
-    with lock.open("rb") as probe:
-        try:
-            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return True
-        fcntl.flock(probe, fcntl.LOCK_UN)
-        return False
-
-
 class TestTurn:
     def test_two_writers_of_distinct_lines_of_one_item_both_land(
         self, github_clone: Path, tmp_path: Path
@@ -255,7 +213,9 @@ class TestTurn:
         """Spec: RULE-40, WITHDRAW-15, ABRD-113 -- writers of one item are serialized."""
         track_board_config(github_clone, 'storage = "github"\n')
         reference = forge.ItemReference(forge.ItemState.OPEN, TITLE, item_with(card(), card()))
-        client = LockWitnessForge(reference, tmp_path / "state" / "aco" / "item-locks")
+        client = LockWitnessForge(
+            tmp_path / "state" / "aco" / "item-locks", issue_references={90: reference}
+        )
         failures: list[BaseException] = []
 
         def write(line: int) -> None:
