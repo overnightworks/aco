@@ -1,0 +1,8 @@
+claim_id = "2105646f9bce4c06b41fdd423b476751"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "b762ae6439a862956d09e86193adc9b066a38ce7"
+branch = "claude/issue-731-tables-outside-the-block"
+scope = ["pyproject.toml", "quality/baseline.toml", "specs/body-block.spec.md", "src/aco/body.py", "src/aco/body_fence.py", "src/aco/workboard.py", "tests/test_body_fence.py", "tests/test_body_outside_tables.py"]
+opened_commit = "a301c2fedd6d1ea70d17a508e8411b4f1b4845c2"
+whole_reason = "The refusal needs the fence walk, and the walk must leave body.py and workboard.py in the same change to keep both inside their size ceilings with one owner of what is fenced, so the move and the new check land together."
