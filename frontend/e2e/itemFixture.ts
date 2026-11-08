@@ -67,6 +67,10 @@ export interface Item {
 	number: number;
 	title: string;
 	entries: Entry[];
+	/** Labels the forge holds on the item, such as `needs-operator`. */
+	labels?: string[];
+	/** The `next` of the item's block; the fixture's own when left out. */
+	next?: string;
 }
 
 /** The first arranged item's open cards are asked on this day, each later one a day before. */
@@ -105,6 +109,11 @@ export function yesNoEntry(
 
 export function item(number: number, title: string, ...entries: Entry[]): Item {
 	return { number, title, entries };
+}
+
+/** An item the operator alone can act on: labelled `needs-operator`, its `next` naming the step. */
+export function stepItem(number: number, title: string, next: string): Item {
+	return { number, title, entries: [], labels: ['needs-operator'], next };
 }
 
 function isOpenOptionEntry(entry: Entry): entry is OptionEntry {

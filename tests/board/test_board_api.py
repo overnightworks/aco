@@ -453,7 +453,7 @@ def _listings_in(repository: BoardForge) -> int:
 def test_the_board_lists_each_repos_steps_from_its_one_listing_and_none_for_a_failed_repo(
     two_repositories: tuple[BoardForge, BoardForge],
 ) -> None:
-    """ABRD-06, ABRD-08, ABRD-116: a step is `{number, title, step}` by descending
+    """ABRD-06, ABRD-08, ABRD-114 to ABRD-116: a step is `{number, title, step}` by descending
     number, `step` is null without a readable block, and a repo that failed
     lists none."""
     repository_a, repository_b = two_repositories

@@ -24,7 +24,7 @@ const rotate = {
 	step: 'Run the rotate script, then say done.'
 };
 
-test('[ABRD-118] the section is a region headed Steps with the count of the rows it shows', () => {
+test('[ABRD-117] the section is a region headed Steps with the count of the rows it shows', () => {
 	renderSteps([
 		repo({ name: 'a', steps: [rotate] }),
 		repo({ name: 'b', steps: [{ number: 3, title: 'Pay', step: 'Pay the invoice.' }] })
@@ -34,7 +34,7 @@ test('[ABRD-118] the section is a region headed Steps with the count of the rows
 	expect(within(region).getAllByRole('listitem')).toHaveLength(2);
 });
 
-test('[ABRD-119] a row shows its repository, number, title and the step in full', () => {
+test('[ABRD-118] a row shows its repository, number, title and the step in full', () => {
 	const long = 'Open the console and '.repeat(40);
 	renderSteps([repo({ name: 'aco', steps: [{ ...rotate, step: long }] })]);
 
@@ -45,13 +45,13 @@ test('[ABRD-119] a row shows its repository, number, title and the step in full'
 	expect(row.querySelector('.step')?.textContent).toBe(long);
 });
 
-test('[ABRD-119] a row whose item names no step says so', () => {
+test('[ABRD-118] a row whose item names no step says so', () => {
 	renderSteps([repo({ steps: [{ ...rotate, step: null }] })]);
 
 	expect(screen.getByRole('listitem')).toHaveTextContent(NO_STEP_TEXT);
 });
 
-test('[ABRD-120] a row holds no control and takes no focus; its text is shown as text', () => {
+test('[ABRD-119] a row holds no control and takes no focus; its text is shown as text', () => {
 	const markup = '<a href="https://example.test">x</a>';
 	renderSteps([repo({ steps: [{ ...rotate, title: markup, step: markup }] })]);
 
@@ -60,7 +60,7 @@ test('[ABRD-120] a row holds no control and takes no focus; its text is shown as
 	expect(screen.getByRole('listitem')).toHaveTextContent(`${markup} ${markup}`);
 });
 
-test('[ABRD-121] with no step the heading stays and one sentence says no step waits', () => {
+test('[ABRD-120] with no step the heading stays and one sentence says no step waits', () => {
 	renderSteps([repo({ steps: [] })]);
 
 	expect(screen.getByRole('region')).toHaveTextContent(`${STEPS_HEADING} 0`);
@@ -68,14 +68,14 @@ test('[ABRD-121] with no step the heading stays and one sentence says no step wa
 	expect(screen.queryByRole('listitem')).toBeNull();
 });
 
-test('[ABRD-121] with no step and a repository not read the sentence claims only the projects read', () => {
+test('[ABRD-120] with no step and a repository not read the sentence claims only the projects read', () => {
 	renderSteps([repo({ name: 'a', steps: [] }), repo({ name: 'b', error: 'gh down', steps: [] })]);
 
 	expect(screen.getByText(NO_STEP_READ_TEXT)).toBeInTheDocument();
 	expect(screen.queryByText(NO_STEP_WAITING_TEXT)).toBeNull();
 });
 
-test('[ABRD-122] the kept steps of a repository not read carry Not read and the last read time', () => {
+test('[ABRD-121] the kept steps of a repository not read carry Not read and the last read time', () => {
 	const readAt = new Date(2026, 9, 31, 9, 41);
 	renderSteps([{ ...repo({ name: 'b', error: 'gh down', steps: [rotate] }), readAt }]);
 
@@ -86,7 +86,7 @@ test('[ABRD-122] the kept steps of a repository not read carry Not read and the 
 	expect(screen.getByRole('listitem')).toHaveTextContent('Rotate the key');
 });
 
-test('[ABRD-122] a repository never read before it failed shows no last read time', () => {
+test('[ABRD-121] a repository never read before it failed shows no last read time', () => {
 	renderSteps([repo({ name: 'b', error: 'gh down', steps: [rotate] })]);
 
 	expect(screen.getByRole('alert')).not.toHaveTextContent(LAST_READ_LABEL);

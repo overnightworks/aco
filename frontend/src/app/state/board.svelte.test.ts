@@ -276,7 +276,7 @@ test('[ABRD-105] a read that answers once the card no longer waits applies its i
 	expect(store.repos[0]?.items).toEqual([changed]);
 });
 
-test('[ABRD-122] a repository that fails inside an answer keeps its last steps; one never read has none', async () => {
+test('[ABRD-121] a repository that fails inside an answer keeps its last steps; one never read has none', async () => {
 	const store = new BoardStore();
 	const keptSteps = [{ number: 9, title: 'Rotate the key', step: 'Run the script.' }];
 	await store.load(
