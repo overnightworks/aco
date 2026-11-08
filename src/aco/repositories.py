@@ -17,6 +17,7 @@ from . import checkout, protocol, session, workboard
 _GIT_DIRECTORY = ".git"
 _CONFIG_FILE = Path("aco") / "config.toml"
 _CONFIG_HOME_VARIABLE = "XDG_CONFIG_HOME"
+_STATE_HOME_VARIABLE = "XDG_STATE_HOME"
 _ROOT_KEY = "root"
 
 
@@ -53,7 +54,7 @@ class Discovery:
     """Directories under the root that could not be read, in path order."""
 
 
-def xdg_directory(
+def _xdg_directory(
     environment: Mapping[str, str], variable: str, home: Path, *home_relative: str
 ) -> Path:
     """`$variable` when that is absolute, else `home` joined with `home_relative`."""
@@ -61,8 +62,14 @@ def xdg_directory(
     return Path(base) if Path(base).is_absolute() else home.joinpath(*home_relative)
 
 
+def state_directory(environment: Mapping[str, str], home: Path) -> Path:
+    """aco's own state directory: `$XDG_STATE_HOME/aco` when that is absolute, else
+    `~/.local/state/aco`. The item locks and the board token live under it."""
+    return _xdg_directory(environment, _STATE_HOME_VARIABLE, home, ".local", "state") / "aco"
+
+
 def config_path(environment: Mapping[str, str], home: Path) -> Path:
-    return xdg_directory(environment, _CONFIG_HOME_VARIABLE, home, ".config") / _CONFIG_FILE
+    return _xdg_directory(environment, _CONFIG_HOME_VARIABLE, home, ".config") / _CONFIG_FILE
 
 
 def configured_root(path: Path) -> Path:

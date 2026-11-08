@@ -2,13 +2,15 @@
 # ruff: noqa: T201 - the cut command writes its result lines to stdout
 
 import argparse
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from pathlib import Path
 
-from . import board_read, body, forge, protocol, report, workboard
+from . import board_read, body, decide, forge, protocol, report, workboard
 from .session import RunContext
 
 _CONTAINER_KINDS = frozenset({body.ItemKind.CONTAINER})
@@ -468,6 +470,14 @@ def refuse_partial_write(error: PartialWriteError, reason: StrEnum, *, as_json: 
     return report.refuse(reason, error, as_json=as_json, written=error.written, failed=error.failed)
 
 
+def _cut_container(parsed: argparse.Namespace, context: RunContext, number: int) -> int:
+    client = context.forge_writer
+    config = context.config
+    open_issues = client.list_open_board_issues()
+    target = _cut_target(client, open_issues, number, config.storage)
+    return _cut_slice(client, target, open_issues, parsed, config)
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`cut`'s own `--json` envelope: a partial write reports
     through `refuse_partial_write`'s own structured shape; every other
@@ -475,12 +485,11 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     command's single generic refusal bucket."""
     as_json = parsed.json
     try:
-        client = context.forge_writer
         number = int(parsed.issue)
-        config = context.config
-        open_issues = client.list_open_board_issues()
-        target = _cut_target(client, open_issues, number, config.storage)
-        return _cut_slice(client, target, open_issues, parsed, config)
+        # The lock opens before the first forge use, so the board snapshot cut
+        # judges from is taken under it (CUT-41).
+        with decide.item_lock(context, number, environment=os.environ, home=Path.home()):
+            return _cut_container(parsed, context, number)
     except PartialWriteError as error:
         return refuse_partial_write(error, _CutReason.PARTIAL_WRITE, as_json=as_json)
     except protocol.ClaimError as error:

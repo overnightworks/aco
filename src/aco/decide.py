@@ -5,6 +5,7 @@ so every ruling and every withdrawal takes the same path. A writer reads and
 writes inside `turn`, which serializes the writers of one item on this machine."""
 
 import hashlib
+import sys
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
@@ -84,8 +85,35 @@ def _item_lock_path(
     named by a digest so no remote path can place it elsewhere."""
     repository = context.remote_repository_id
     key = f"{repository.host}\0{repository.path}\0{number}"
-    state = repositories.xdg_directory(environment, "XDG_STATE_HOME", home, ".local", "state")
-    return state / "aco" / "item-locks" / hashlib.sha256(key.encode()).hexdigest()
+    state = repositories.state_directory(environment, home)
+    return state / "item-locks" / hashlib.sha256(key.encode()).hexdigest()
+
+
+@contextmanager
+def item_lock(
+    context: RunContext, number: int, *, environment: Mapping[str, str], home: Path
+) -> Iterator[None]:
+    """The item's lock, the one every item-body write holds (RULE-40): a holder
+    already running makes this say so once on stderr (RULE-42) and wait. Not
+    re-entrant. An unwritable lock directory refuses with `ItemLockUnavailableError`
+    before anything is read or written."""
+    # The target's own refusals (`--repo` under `state-ref`, no recognised host)
+    # come first; the forge, which reads and caches items, is built after the lock.
+    _ = context.repository_id
+    lock_path = _item_lock_path(context, number, environment, home)
+
+    def say_waiting() -> None:
+        sys.stderr.write(f"waiting for the item lock at {lock_path}\n")
+        sys.stderr.flush()
+
+    with ExitStack() as held:
+        try:
+            held.enter_context(file_lock.held(lock_path, say_waiting))
+        except OSError as error:
+            raise ItemLockUnavailableError(
+                f"cannot lock the item at {lock_path}: {error}"
+            ) from error
+        yield
 
 
 @contextmanager
@@ -99,19 +127,8 @@ def turn(
 ) -> Iterator[FreshItem]:
     """The per-item turn: holds the item's lock, reads it fresh through the target
     gate and yields that read; the caller writes at most once before the turn
-    ends. Not re-entrant. An unwritable lock directory refuses with
-    `ItemLockUnavailableError` before any read or write."""
-    # The target's own refusals (`--repo` under `state-ref`, no recognised host)
-    # come first; the forge, which reads and caches items, is built after the lock.
-    _ = context.repository_id
-    lock_path = _item_lock_path(context, number, environment, home)
-    with ExitStack() as held:
-        try:
-            held.enter_context(file_lock.held(lock_path))
-        except OSError as error:
-            raise ItemLockUnavailableError(
-                f"cannot lock the item at {lock_path}: {error}"
-            ) from error
+    ends. Not re-entrant."""
+    with item_lock(context, number, environment=environment, home=home):
         yield fresh_item(context, number, command=command)
 
 

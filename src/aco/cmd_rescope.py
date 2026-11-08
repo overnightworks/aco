@@ -2,12 +2,26 @@
 # ruff: noqa: T201 - the rescope command writes its result lines to stdout
 
 import argparse
+import os
 import uuid
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from . import board_read, body, checkout, policy, protocol, report, session, store, workboard
+from . import (
+    body,
+    checkout,
+    decide,
+    forge,
+    policy,
+    protocol,
+    report,
+    session,
+    store,
+    workboard,
+)
 
 
 class _RescopeReason(StrEnum):
@@ -209,28 +223,34 @@ class _RescopedItemBody:
     whole: str | None
 
 
-def _rescoped_item_body(
-    context: session.RunContext, identity: protocol.ClaimIdentity
-) -> _RescopedItemBody | None:
-    """The claimed item's own body, read before any write so an item whose
-    body cannot take the new scope refuses with nothing changed; `None` for
-    a lane claim, which names no item."""
-    if not isinstance(identity, protocol.IssueIdentity):
-        return None
-    client = context.forge_writer
-    storage = context.config.storage
-    number = identity.issue
-    try:
-        text = board_read.item_body_or_refuse(
-            client, number, command=_RESCOPE_COMMAND, storage=storage
-        )
-        located = workboard.located_block_or_refuse(
-            number, text, command=_RESCOPE_COMMAND, storage=storage
-        )
-    except protocol.ClaimError as error:
-        raise _RescopePreconditionError(str(error)) from error
-    whole = body.parse_body(text, storage=storage).whole
-    return _RescopedItemBody(number=number, text=text, located=located, whole=whole)
+def _rescoped_item_body(fresh: decide.FreshItem) -> _RescopedItemBody:
+    """The claimed item's own body as the turn read it, with its located `aco`
+    block and the `whole` reason that block names."""
+    located = body.locate_block(fresh.body)
+    whole = body.parse_body(fresh.body, storage=fresh.storage).whole
+    return _RescopedItemBody(number=fresh.number, text=fresh.body, located=located, whole=whole)
+
+
+@contextmanager
+def _item_turn(context: session.RunContext, number: int) -> Iterator[_RescopedItemBody]:
+    """The claimed item's turn (RESC-33), read before any write so an item whose
+    body cannot take the new scope refuses with nothing changed. Its target and
+    forge-read refusals are `precondition_failed`; a lock that cannot be taken stays
+    `unavailable`."""
+    with ExitStack() as turn:
+        try:
+            fresh = turn.enter_context(
+                decide.turn(
+                    context,
+                    number,
+                    command=_RESCOPE_COMMAND,
+                    environment=os.environ,
+                    home=Path.home(),
+                )
+            )
+        except (decide.InvalidTargetError, forge.ForgeError) as error:
+            raise _RescopePreconditionError(str(error)) from error
+        yield _rescoped_item_body(fresh)
 
 
 def _write_rescoped_body(
@@ -269,12 +289,26 @@ def _rescope_item_and_claim(
         ) from error
 
 
-def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) -> int:
+@dataclass(frozen=True)
+class _RescopeSelection:
+    """The claim a rescope names, resolved and judged before anything is read or
+    written: the checkout it runs in, the request, the live claim, the versioned
+    paths and the scope the claim ends with."""
+
+    context: session.RunContext
+    requested: protocol.RescopeRequest
+    selected: protocol.ActiveClaim
+    versioned: tuple[str, ...]
+    combined: tuple[str, ...]
+
+
+def _selected_rescope(
+    parsed: argparse.Namespace, run_context: session.RunContext
+) -> _RescopeSelection:
     paths = _rescope_paths(parsed.add, parsed.drop)
     path_checkout = _rescope_checkout(paths)
     checkout_context = run_context.for_directory(path_checkout.toplevel, is_toplevel=True)
     requested = _rescope_command(parsed, paths, path_checkout, checkout_context)
-    worktree = checkout_context.toplevel
     observed = checkout_context.observation
     protocol.require_state_ref(observed)
     try:
@@ -293,22 +327,30 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
             f"(holder={protocol.claimant_text(selected.agent, selected.role)!r}, "
             f"this session={protocol.claimant_text(requested.agent, selected.role)!r})"
         )
-    versioned = checkout.versioned_paths(directory=worktree)
+    versioned = checkout.versioned_paths(directory=checkout_context.toplevel)
     try:
         policy.reject_ungrounded_comma_scope(requested.add, versioned, flag="--add")
         combined = protocol.combined_scope(selected.scope, requested.add, requested.drop)
     except protocol.ClaimError as error:
         raise _RescopeInvalidUsageError(str(error)) from error
-    item = _rescoped_item_body(checkout_context, selected.identity)
+    return _RescopeSelection(checkout_context, requested, selected, versioned, combined)
+
+
+def _rescope_transition(
+    selection: _RescopeSelection, item: _RescopedItemBody | None
+) -> protocol.ClaimState:
+    """The claim's new scope judged, then written: with the claimed item's body
+    first, or alone for a lane claim (`item` is `None`)."""
+    context, requested, selected = selection.context, selection.requested, selection.selected
     directories = checkout.scope_directories(
-        combined,
-        directory=checkout_context.directory,
-        toplevel=lambda: checkout_context.toplevel,
+        selection.combined,
+        directory=context.directory,
+        toplevel=lambda: context.toplevel,
     )
     try:
         _covered_file_count, _versioned_file_count, _share, whole_reason = policy.reject_wide_scope(
-            combined,
-            versioned,
+            selection.combined,
+            selection.versioned,
             requested.whole_reason or selected.whole_reason,
             directories=directories,
             whole_from_body=None if item is None else lambda: item.whole,
@@ -319,23 +361,29 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
         claim_id=selected.claim_id,
         agent=requested.agent,
         role=selected.role,
-        scope=combined,
+        scope=selection.combined,
         operation_id=uuid.uuid4().hex,
         whole_reason=whole_reason,
     )
     subject = store.transition_subject(_RESCOPE_COMMAND, selected.identity, selected.branch)
-    new_state = (
-        checkout_context.transition(subject, intent)
-        if item is None
-        else _rescope_item_and_claim(
-            checkout_context, subject, intent, item, requested.whole_reason
-        )
-    )
+    if item is None:
+        return context.transition(subject, intent)
+    return _rescope_item_and_claim(context, subject, intent, item, requested.whole_reason)
+
+
+def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) -> int:
+    selection = _selected_rescope(parsed, run_context)
+    selected = selection.selected
+    if isinstance(selected.identity, protocol.IssueIdentity):
+        with _item_turn(selection.context, selected.identity.issue) as item:
+            new_state = _rescope_transition(selection, item)
+    else:
+        new_state = _rescope_transition(selection, None)
     rescoped = new_state.claims[protocol.claim_key(selected.identity, selected.branch)]
     if parsed.json:
         _rescope_json(rescoped)
         return 0
-    subject = workboard.claim_subject(rescoped, checkout_context.config.storage)
+    subject = workboard.claim_subject(rescoped, selection.context.config.storage)
     print(f"RESCOPED {subject}: {rescoped.claim_id}")
     return 0
 

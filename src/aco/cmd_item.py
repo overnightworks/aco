@@ -2,15 +2,19 @@
 # ruff: noqa: T201 - the item command writes its result lines to stdout
 
 import argparse
+import os
 import sys
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import cast
 
 from . import (
     board_read,
     body,
     cmd_cut,
+    decide,
     forge,
     items,
     protocol,
@@ -371,36 +375,36 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_SIZE_COMMAND)
-        client = context.forge_writer
         number = parsed.item
-        storage = context.config.storage
-        current_body = board_read.item_body_or_refuse(
-            client, number, command=_ITEM_EDIT_SIZE_COMMAND, storage=storage
-        )
-        located = workboard.located_block_or_refuse(
-            number, current_body, command=_ITEM_EDIT_SIZE_COMMAND, storage=storage
-        )
-        new_data = {**located.data, "size": parsed.size}
-        outcome = _write_block_data(client, number, current_body, located, new_data)
-        _print_item_edit_size_result(number, parsed.size, storage, outcome, as_json=as_json)
+        with _item_turn(context, number, _ITEM_EDIT_SIZE_COMMAND) as fresh:
+            located = body.locate_block(fresh.body)
+            new_data = {**located.data, "size": parsed.size}
+            outcome = _write_block_data(context.forge_writer, fresh, located, new_data)
+        _print_item_edit_size_result(number, parsed.size, fresh.storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
         return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
+def _item_turn(
+    context: RunContext, number: int, command: str
+) -> AbstractContextManager[decide.FreshItem]:
+    """The item's turn (ITEM-65) for a narrow `item edit`, refusing as `command`."""
+    return decide.turn(context, number, command=command, environment=os.environ, home=Path.home())
+
+
 def _write_block_data(
     client: forge.ForgeWriter,
-    number: int,
-    current_body: str,
+    fresh: decide.FreshItem,
     located: body.LocatedBlock,
     new_data: dict[str, object],
 ) -> _ItemReason:
-    """Writes `new_data` as item `number`'s block, every other byte
+    """Writes `new_data` as the block of the item `fresh` read, every other byte
     untouched, or nothing at all when the block already carries it,
     so a repeated narrow edit leaves no empty write behind."""
     if new_data == located.data:
         return _ItemReason.UNCHANGED
-    client.update_item_body(number, body.replace_block(current_body, located, new_data))
+    client.update_item_body(fresh.number, body.replace_block(fresh.body, located, new_data))
     return _ItemReason.EDITED
 
 
@@ -431,19 +435,13 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
     as_json = parsed.json
     try:
         _refuse_a_body_on_stdin(_ITEM_EDIT_WHOLE_COMMAND)
-        client = context.forge_writer
         number = parsed.item
-        storage = context.config.storage
-        current_body = board_read.item_body_or_refuse(
-            client, number, command=_ITEM_EDIT_WHOLE_COMMAND, storage=storage
-        )
-        located = workboard.located_block_or_refuse(
-            number, current_body, command=_ITEM_EDIT_WHOLE_COMMAND, storage=storage
-        )
-        reason = body.bounded_whole_reason(parsed.whole)
-        new_data = {**located.data, "whole": reason}
-        outcome = _write_block_data(client, number, current_body, located, new_data)
-        _print_item_edit_whole_result(number, reason, storage, outcome, as_json=as_json)
+        with _item_turn(context, number, _ITEM_EDIT_WHOLE_COMMAND) as fresh:
+            located = body.locate_block(fresh.body)
+            reason = body.bounded_whole_reason(parsed.whole)
+            new_data = {**located.data, "whole": reason}
+            outcome = _write_block_data(context.forge_writer, fresh, located, new_data)
+        _print_item_edit_whole_result(number, reason, fresh.storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
         return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
