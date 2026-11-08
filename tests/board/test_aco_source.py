@@ -13,7 +13,6 @@ from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
 from option_cards import open_option_entry
 
 from aco import forge
-from aco import forge
 from aco.board.board import LINE_CHANGED
 
 _ITEM = 12
