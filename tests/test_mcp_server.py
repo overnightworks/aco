@@ -34,13 +34,20 @@ def _echoing_record(
     }
 
 
+def _echoing_step(
+    label: str, step: str, item: int | None, title: str | None
+) -> Mapping[str, object]:
+    return {"repository": label, "step": step, "item": item, "title": title}
+
+
 def _answer(
     message: object,
     read_inbox: mcp_server.ReadInbox = lambda: _INBOX,
     ask: mcp_server.Ask = _echoing,
     record_answer: mcp_server.RecordAnswer = _echoing_record,
+    step: mcp_server.Step = _echoing_step,
 ) -> dict[str, Any]:
-    tools = mcp_server.Tools(read_inbox, ask, record_answer)
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step)
     line = mcp_server.reply(message if isinstance(message, str) else json.dumps(message), tools)
     assert line is not None
     assert "\n" not in line
@@ -118,7 +125,7 @@ def test_tools_list_offers_the_read_only_inbox_tool_without_arguments() -> None:
 def test_tools_list_offers_ask_as_a_repeatable_write_that_destroys_nothing() -> None:
     tool = _tools()["ask"]
 
-    assert list(_tools()) == ["read_inbox", "ask", "record_answer"]
+    assert list(_tools()) == ["read_inbox", "ask", "record_answer", "step"]
     assert tool["annotations"] == {
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -154,6 +161,27 @@ def test_the_record_answer_schema_takes_its_letters_from_the_grammar_and_offers_
     assert set(schema["required"]) == {"repository", "item", "line", "card_hash"}
     assert schema["properties"]["option"]["enum"] == list(expectation_grammar.OPTION_LETTERS)
     assert schema["properties"]["line"]["minimum"] == 1
+    assert schema["additionalProperties"] is False
+
+
+def test_tools_list_offers_step_as_a_repeatable_write_that_replaces_next() -> None:
+    tool = _tools()["step"]
+
+    assert tool["annotations"] == {
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": True,
+    }
+    assert tool["title"]
+    assert tool["description"]
+
+
+def test_the_step_schema_requires_the_repository_and_the_step_and_closes_its_keys() -> None:
+    schema = _tools()["step"]["inputSchema"]
+
+    assert set(schema["properties"]) == {"repository", "step", "item", "title"}
+    assert set(schema["required"]) == {"repository", "step"}
+    assert schema["properties"]["item"]["type"] == "integer"
     assert schema["additionalProperties"] is False
 
 
@@ -483,7 +511,109 @@ def test_every_record_answer_envelope_defect_is_named_in_one_error() -> None:
     ] == [True] * 8
 
 
-@pytest.mark.parametrize("name", ["read_inbox", "ask", "record_answer"])
+def _step_arguments(**changes: object) -> dict[str, object]:
+    return {"repository": "owner/repo", "step": "Rotate the key.", "item": 7, **changes}
+
+
+def test_a_step_call_on_an_item_hands_the_stripped_step_to_the_writer_and_answers_its_json() -> (
+    None
+):
+    arguments = _step_arguments(step="  Rotate the key.\n")
+
+    result = _answer(_call(arguments, name="step"))["result"]
+
+    expected = {"repository": "owner/repo", "step": "Rotate the key.", "item": 7, "title": None}
+    assert result["isError"] is False
+    assert result["structuredContent"] == expected
+    assert json.loads(result["content"][0]["text"]) == expected
+
+
+def test_a_step_call_with_a_title_hands_the_stripped_title_to_the_writer() -> None:
+    arguments = _without(_step_arguments(title="\tKey rotation "), "item")
+
+    result = _answer(_call(arguments, name="step"))["result"]
+
+    assert result["structuredContent"]["title"] == "Key rotation"
+    assert result["structuredContent"]["item"] is None
+
+
+def _refusing_step(
+    label: str, step: str, item: int | None, title: str | None
+) -> Mapping[str, object]:
+    raise protocol.ClaimError("item 7 is closed")
+
+
+def test_a_refused_step_is_a_tool_error_carrying_its_reason() -> None:
+    result = _answer(_call(_step_arguments(), name="step"), step=_refusing_step)["result"]
+
+    assert result["isError"] is True
+    assert result["content"] == [{"type": "text", "text": "item 7 is closed"}]
+    assert "structuredContent" not in result
+
+
+def _step_reaches_nothing(
+    label: str, step: str, item: int | None, title: str | None
+) -> Mapping[str, object]:
+    pytest.fail("a step call with a defective envelope reached the writer")
+
+
+@pytest.mark.parametrize(
+    ("arguments", "sentence"),
+    [
+        pytest.param(_step_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
+        pytest.param(_step_arguments(repository=3), "repository must be a string", id="repository"),
+        pytest.param(
+            _without(_step_arguments(), "repository"), "repository must be a string", id="no-repo"
+        ),
+        pytest.param(_step_arguments(step=3), "step must be a string", id="step-integer"),
+        pytest.param(_without(_step_arguments(), "step"), "step must be a string", id="no-step"),
+        pytest.param(_step_arguments(step=" \n"), "step must not be blank", id="step-blank"),
+        pytest.param(_step_arguments(item=True), "item must be an integer", id="item-boolean"),
+        pytest.param(_step_arguments(item="7"), "item must be an integer", id="item-string"),
+        pytest.param(_step_arguments(item=7.5), "item must be an integer", id="item-float"),
+        pytest.param(
+            _without(_step_arguments(), "item"), "give exactly one of item and title", id="neither"
+        ),
+        pytest.param(
+            _step_arguments(title="Key"), "give exactly one of item and title", id="both"
+        ),
+        pytest.param(
+            _without(_step_arguments(title=3), "item"), "title must be a string", id="title-integer"
+        ),
+        pytest.param(
+            _without(_step_arguments(title=" "), "item"), "title must not be blank", id="title-blank"
+        ),
+    ],
+)
+def test_a_step_argument_defect_is_a_tool_error_naming_it_and_nothing_is_written(
+    arguments: dict[str, object], sentence: str
+) -> None:
+    result = _answer(_call(arguments, name="step"), step=_step_reaches_nothing)["result"]
+
+    assert result["isError"] is True
+    assert sentence in result["content"][0]["text"]
+
+
+def test_every_step_envelope_defect_is_named_in_one_error() -> None:
+    arguments = {"repository": 3, "step": " ", "title": 4, "item": "x", "extra": 1}
+
+    result = _answer(_call(arguments, name="step"), step=_step_reaches_nothing)["result"]
+
+    text = result["content"][0]["text"]
+    assert [
+        sentence in text
+        for sentence in (
+            "unknown argument: extra",
+            "repository must be a string",
+            "step must not be blank",
+            "title must be a string",
+            "item must be an integer",
+            "give exactly one of item and title",
+        )
+    ] == [True] * 6
+
+
+@pytest.mark.parametrize("name", ["read_inbox", "ask", "record_answer", "step"])
 @pytest.mark.parametrize("arguments", [[], "card", 3, None], ids=["list", "string", "int", "null"])
 def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool(
     name: str, arguments: object

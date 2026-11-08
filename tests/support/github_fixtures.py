@@ -80,8 +80,7 @@ def landing_readiness(
 def serve_forge[ServedForge: "FakeForge | github.GitHubForge"](
     monkeypatch: pytest.MonkeyPatch, forge: ServedForge
 ) -> ServedForge:
-    """Install one arranged forge, a fake or a real adapter over a fake transport, at the
-    GitHub adapter boundary."""
+    """Installs one arranged forge, a fake or an adapter over a fake transport, as GitHub's."""
     monkeypatch.setattr(github, "GitHubForge", lambda repository: forge)
     return forge
 
@@ -143,6 +142,8 @@ class FakeForge:
     created_issues: list[tuple[str, str, body.ItemKind]] = field(default_factory=list)
     linked_children: list[tuple[int, int]] = field(default_factory=list)
     retyped_items: list[tuple[int, body.ItemKind]] = field(default_factory=list)
+    added_labels: list[tuple[int, str]] = field(default_factory=list)
+    add_label_error: protocol.ClaimError | None = None
     next_created_child_number: int = 900
     item_bodies: dict[int, str] = field(default_factory=dict)
     fail_update_item_body: bool = False
@@ -261,19 +262,21 @@ class FakeForge:
             raise forge.ForgeError("retype dropped (simulated)")
         self.retyped_items.append((number, kind))
 
+    def add_label(self, number: int, label: str) -> None:
+        """Records the call; `add_label_error` answers instead of the label."""
+        self.added_labels.append((number, label))
+        if self.add_label_error is not None:
+            raise self.add_label_error
+
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
-        """This fake's mirror of `GitHubForge.close_landed_item`: records the
-        comment and the close as state, the same
-        two facts a test asserts against the real adapter's own two `_run`
-        calls."""
+        """Records the comment and the close as state."""
         if self.close_error is not None:
             raise self.close_error
         self.landing_comments[number] = github.landing_comment(pull_request)
         self.closed_issues.add(number)
 
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
-        """This fake's mirror of `GitHubForge.landing_readiness`: a test seeds
-        `readiness_by_number` directly."""
+        """A test seeds `readiness_by_number` directly."""
         self._run()
         readiness = self.readiness_by_number.get(number)
         if readiness is None:
@@ -316,16 +319,10 @@ class FakeForge:
         title: str,
         body: str,
     ) -> str:
-        """This fake's mirror of `GitHubForge.merge_landing`:
-        records every call for an adapter-shaped assertion, and, when
-        `merge_remote` names a real bare repository (`land`'s own end-to-end
-        tests), merges there into its default branch with `method`, as the
-        forge does on its own side, so the landing checkout stands behind
-        until its own real fast-forward. `closes_on_merge` closes every issue
-        the pull request body names with `Closes #<n>`, as GitHub itself does
-        on the merge, before the release ever reads it. The
-        merged pull request keeps `head_sha` as its recorded head, as
-        GitHub does."""
+        """This fake's mirror of `GitHubForge.merge_landing`: records every call, merges
+        into `merge_remote`'s default branch with `method` when it names a real bare
+        repository, and closes every issue the body names with `Closes #<n>` when
+        `closes_on_merge`. The pull request keeps `head_sha` as its recorded head."""
         self._run()
         self.merge_requests.append((head_sha, method))
         if self.merge_error is not None:
@@ -488,6 +485,9 @@ class ReaderOnlyForge(FakeForge):
 
     def set_item_kind(self, number: int, kind: body.ItemKind) -> None:
         pytest.fail("a read-only command must never retype an item")
+
+    def add_label(self, number: int, label: str) -> None:
+        pytest.fail("a read-only command must never add a label")
 
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
         pytest.fail("a read-only command must never close a landed item")
