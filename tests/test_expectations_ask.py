@@ -71,7 +71,8 @@ def test_a_same_as_today_that_is_not_true_refuses() -> None:
     options = open_option_entry()["option"]
     assert isinstance(options, list)
     wrong = [{**options[0], "same_as_today": "yes"}, options[1]]
+    before = item_with(card())
     asked = ask_card(options=wrong)
 
     with pytest.raises(expectations.ExpectationCardDefectError, match="must be true"):
-        expectations.ask_line(item_with(card()), asked, ASKED_ON)
+        expectations.ask_line(before, asked, ASKED_ON)
