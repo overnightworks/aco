@@ -105,11 +105,21 @@ export interface BoardItem {
 	lines: ExpectationLine[];
 }
 
+/** A step only the operator can take (ABRD-116): an item labelled `needs-operator`;
+ * `step` is null when its body names none. */
+export interface OperatorStep {
+	number: number;
+	title: string;
+	step: string | null;
+}
+
 export interface RepoReading {
 	name: string;
 	/** aco's own failure sentence once this repo's read failed, else null. */
 	error: string | null;
 	items: BoardItem[];
+	/** Empty when this repo's read failed. */
+	steps: OperatorStep[];
 }
 
 export interface BoardResponse {

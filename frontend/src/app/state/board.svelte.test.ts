@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 function readingsOf(store: BoardStore) {
-	return store.repos.map(({ name, error, items }) => ({ name, error, items }));
+	return store.repos.map(({ name, error, items, steps }) => ({ name, error, items, steps }));
 }
 
 function throwingFetch(): typeof fetch {
@@ -110,7 +110,12 @@ test('[ABRD-101] a repository that fails inside an answer keeps its items and re
 		fakeFetch(200, { repos: [repo({ name: 'a', items: newItems }), flawed('b', 'gh down')] })
 	);
 
-	expect(readingsOf(store)[1]).toEqual({ name: 'b', error: 'gh down', items: keptItems });
+	expect(readingsOf(store)[1]).toEqual({
+		name: 'b',
+		error: 'gh down',
+		items: keptItems,
+		steps: []
+	});
 	expect(store.repos[1]?.readAt?.getTime()).toBe(firstReadAt);
 	expect(store.repos[0]?.items).toEqual(newItems);
 	expect(store.repos[0]?.readAt?.getTime()).toBe(new Date(2026, 9, 31, 10, 5).getTime());
@@ -121,7 +126,12 @@ test('[ABRD-101] a repository that fails on its first read has the sentence, no 
 
 	await store.load('t', fakeFetch(200, { repos: [repo({ name: 'a' }), flawed('b', 'gh down')] }));
 
-	expect(readingsOf(store)[1]).toEqual({ name: 'b', error: 'gh down', items: [] });
+	expect(readingsOf(store)[1]).toEqual({
+		name: 'b',
+		error: 'gh down',
+		items: [],
+		steps: []
+	});
 	expect(store.repos[1]?.readAt).toBeNull();
 });
 
@@ -134,7 +144,12 @@ test('[ABRD-101] a repository that reads again replaces its kept items, sentence
 
 	await store.load('t', fakeFetch(200, { repos: [repo({ name: 'b', items: fresh })] }));
 
-	expect(readingsOf(store)[0]).toEqual({ name: 'b', error: null, items: fresh });
+	expect(readingsOf(store)[0]).toEqual({
+		name: 'b',
+		error: null,
+		items: fresh,
+		steps: []
+	});
 	expect(store.repos[0]?.readAt?.getTime()).toBe(new Date(2026, 9, 31, 11, 30).getTime());
 });
 
@@ -259,4 +274,24 @@ test('[ABRD-105] a read that answers once the card no longer waits applies its i
 	await reading;
 
 	expect(store.repos[0]?.items).toEqual([changed]);
+});
+
+test('[ABRD-122] a repository that fails inside an answer keeps its last steps; one never read has none', async () => {
+	const store = new BoardStore();
+	const keptSteps = [{ number: 9, title: 'Rotate the key', step: 'Run the script.' }];
+	await store.load(
+		't',
+		fakeFetch(200, { repos: [repo({ name: 'a', steps: keptSteps }), repo({ name: 'c' })] })
+	);
+
+	await store.load(
+		't',
+		fakeFetch(200, { repos: [flawed('a', 'gh down'), flawed('b', 'gh down'), repo({ name: 'c' })] })
+	);
+
+	expect(store.repos.map(({ name, steps }) => ({ name, steps }))).toEqual([
+		{ name: 'a', steps: keptSteps },
+		{ name: 'b', steps: [] },
+		{ name: 'c', steps: [] }
+	]);
 });

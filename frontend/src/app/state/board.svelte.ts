@@ -75,7 +75,12 @@ function shownRepos(answered: RepoReading[], current: ShownRepo[], arrived: Date
 	return answered.map((reading) => {
 		if (reading.error === null) return { ...reading, readAt: arrived };
 		const kept = current.find(({ name }) => name === reading.name);
-		return { ...reading, items: kept?.items ?? [], readAt: kept?.readAt ?? null };
+		return {
+			...reading,
+			items: kept?.items ?? [],
+			steps: kept?.steps ?? [],
+			readAt: kept?.readAt ?? null
+		};
 	});
 }
 
