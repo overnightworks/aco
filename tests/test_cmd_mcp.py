@@ -28,7 +28,7 @@ from discovery_fixtures import (
 from github_fixtures import FakeForge, serve_forge
 from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
 
-from aco import body_fence, cli, forge, session
+from aco import body_fence, cli, expectations, forge, session
 from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
@@ -486,7 +486,7 @@ def test_an_answer_in_the_operators_words_is_stored_verbatim_and_reads_back_equa
     [entry] = here.stored_entries(1)
     fences = body_fence.walk_fences(here.stored_body(1)).fences
     assert answer["result"]["isError"] is False
-    assert [fence.info for fence in fences].count("aco") == 1
+    assert [fence.info for fence in fences] == ["aco"]
     assert (entry["ruling"], entry["other"], entry["via"]) == ("other", words, "chat")
     assert answer["result"]["structuredContent"]["line"]["ruling"] == "other"
     assert inbox["result"]["structuredContent"]["repositories"][0].get("items", []) == []
@@ -518,7 +518,9 @@ def test_a_chat_answer_binds_like_a_board_ruling(
     [ruled_line] = rulings["rulings"][0]["lines"]
     assert (ruled_line["ruling"], ruled_line["via"]) == ("A", "chat")
     assert shown["expectation_state"] == "ruled"
-    [decided] = [line.decision for line in decision_row.lines]
+    [decision_line] = decision_row.lines
+    assert isinstance(decision_line, expectations.OptionLine)
+    decided = decision_line.decision
     assert decided is not None
     assert (decided.answer, decided.via.value) == ("A", "chat")
     assert "expectations unruled" in next_before
