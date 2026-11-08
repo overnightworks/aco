@@ -120,6 +120,7 @@ def test_a_rescope_moves_the_claim_and_the_item_body_scope_together(
     claimed = claimed_here(standpoint)
     assert (claimed.scope, claimed.whole_reason) == (scope, whole)
     assert written_scope_and_whole(served) == (scope, whole)
+    assert served.body_replacings == [complete_contract("Build it.", **entries)]
 
 
 def test_a_rescope_whose_body_already_names_the_scope_writes_no_body_and_moves_the_claim(

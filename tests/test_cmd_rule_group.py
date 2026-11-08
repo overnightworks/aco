@@ -99,7 +99,7 @@ class TestSeveralLinesInOneWrite:
             (entry["ruling"], entry["card_hash"], entry["via"], str(entry["ruled_on"]))
             for entry in entries
         ] == [(ruled[0], HASH_2, via, TODAY), (ruled[1], HASH_3, via, TODAY)]
-        assert len(client.body_writes) == 1
+        assert (len(client.body_writes), client.body_replacings) == (1, [group_body()])
         checked = run_cli(["check", "-"], capsys, stdin=client.item_bodies[7])
         assert (checked.status, checked.stdout) == (0, "body ok\n")
 

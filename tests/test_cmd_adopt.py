@@ -928,9 +928,9 @@ def test_adopt_writes_the_line_onto_the_body_it_read_last(
     claim = _adopted_claim(world)
     assert result.stdout.startswith(_build_lines(world) + _claimed_line(claim))
     assert result.stdout.endswith(declaration)
-    assert (claim.agent, claim.role) == ("Ada", "builder")
-    assert claim.whole_reason == whole_reason
+    assert (claim.agent, claim.role, claim.whole_reason) == ("Ada", "builder", whole_reason)
     assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, written_body)]
+    assert world.forge.body_replacings == [written_body.removesuffix(f"No-Item: {kind}").rstrip()]
 
 
 def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(

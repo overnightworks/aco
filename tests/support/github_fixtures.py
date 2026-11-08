@@ -149,14 +149,14 @@ class FakeForge:
     update_item_body_error: protocol.ClaimError | None = None
     update_item_body_lands_before_error: bool = False
     body_writes: list[tuple[int, str]] = field(default_factory=list)
+    body_replacings: list[str] = field(default_factory=list)
     scripted_item_reads: list[str | forge.ForgeError | None] = field(default_factory=list)
     fail_create_child_relation: bool = False
     fail_set_item_kind: bool = False
     lists_pull_requests: bool = True
     drop_created_issue_type: bool = False
     readiness_by_number: dict[int, forge.LandingReadiness] = field(default_factory=dict)
-    # What each read after the first answers, the last state repeating: GitHub
-    # settling a pull request's `mergeable_state` between two reads.
+    # Each read after the first answers, the last state repeating: `mergeable_state` settling.
     later_readiness_by_number: dict[int, tuple[forge.LandingReadiness, ...]] = field(
         default_factory=dict
     )
@@ -241,13 +241,13 @@ class FakeForge:
         return number
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
-        """`update_item_body_error` is the forge's answer instead of a write,
-        unless `update_item_body_lands_before_error` says the write happened
-        and only its answer failed. A pull request's body is its landing's."""
+        """`update_item_body_error` answers instead of a write unless the write landed first
+        (`update_item_body_lands_before_error`). A pull request's body is its landing's."""
         if self.fail_update_item_body:
             raise protocol.ClaimError("update item body failed (simulated)")
         if self.update_item_body_error is None or self.update_item_body_lands_before_error:
             self.body_writes.append((number, body))
+            self.body_replacings.append(replacing)
             self.item_bodies[number] = body
             if number in self.landings:
                 self.landings[number] = replace(self.landings[number], body=body)

@@ -54,6 +54,7 @@ def test_the_board_is_listed_and_the_container_written_while_its_lock_is_held(
 
     assert (result.status, result.stderr) == (0, "")
     assert (client.lock_held_at_listings, client.lock_held_at_writes) == ([True], [True])
+    assert client.body_replacings == [container_issue(CONTAINER, ONE_ROW).body]
 
 
 def test_a_second_cut_says_it_waits_for_the_lock_and_lists_the_board_after_the_first(
