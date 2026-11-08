@@ -71,8 +71,10 @@ def test_the_item_is_read_and_written_while_its_lock_is_held(
 
     result = run_cli(edit_arguments(edit), capsys)
 
-    assert (result.status, result.stderr) == (0, "")
-    assert (client.lock_held_at_reads, client.lock_held_at_writes) == ([True], [True])
+    assert result.status == 0
+    assert result.stderr == ""
+    assert client.lock_held_at_reads == [True]
+    assert client.lock_held_at_writes == [True]
 
 
 @pytest.mark.parametrize(("edit", "other_edit"), TWO_DIFFERENT_EDITS)
@@ -94,9 +96,12 @@ def test_a_second_edit_says_it_waits_for_the_lock_and_writes_after_the_first(
     assert contended.statuses == (0, 0)
     assert contended.stderr == f"waiting for the item lock at {client.the_lock_file()}\n"
     assert contended.body_writes_when_the_second_waited == 0
-    assert (client.lock_held_at_reads, client.lock_held_at_writes) == ([True, True], [True, True])
+    assert client.lock_held_at_reads == [True, True]
+    assert client.lock_held_at_writes == [True, True]
     final = body.parse_body(client.item_bodies[ITEM])
-    assert (final.size, final.whole) == block_after(other_edit)
+    expected_size, expected_whole = block_after(other_edit)
+    assert final.size == expected_size
+    assert final.whole == expected_whole
 
 
 @pytest.mark.parametrize("edit", FIELD_EDITS)
@@ -114,11 +119,9 @@ def test_an_unwritable_lock_directory_refuses_precondition_failed_and_writes_not
 
     result = run_cli([*edit_arguments(edit), "--json"], capsys)
 
-    assert (
-        result.status,
-        result.stderr.startswith(
-            f"ERROR: cannot lock the item at {blocker / 'aco' / 'item-locks'}"
-        ),
-        json.loads(result.stdout)["reason"],
-        client.body_writes,
-    ) == (2, True, "precondition_failed", [])
+    assert result.status == 2
+    assert result.stderr.startswith(
+        f"ERROR: cannot lock the item at {blocker / 'aco' / 'item-locks'}"
+    )
+    assert json.loads(result.stdout)["reason"] == "precondition_failed"
+    assert client.body_writes == []
