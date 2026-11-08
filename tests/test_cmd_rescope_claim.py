@@ -307,7 +307,7 @@ def test_a_rescope_reads_the_checkout_its_path_names_never_the_working_directory
     github_clone: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: RESC-18, CAS-53. The checkout comes from the nearest existing
+    """Spec: RESC-18, RESC-33, CAS-53. The checkout comes from the nearest existing
     ancestor of the path, here `src` under a lane worktree while the process
     stands in the repository's own checkout; its toplevel is read there once and
     is the one the board configuration and the state ref are read from. An item
