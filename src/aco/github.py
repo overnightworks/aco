@@ -23,7 +23,7 @@ from . import (
     workboard,
 )
 from .body import ItemKind
-from .github_body_write import check_item_body_write, patch_item_body
+from .github_body_check import write_body_checked
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
 _Page = TypeVar("_Page")
@@ -1378,8 +1378,7 @@ class GitHubForge:
         return child
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
-        answer = patch_item_body(self._run, self.repository, number, body)
-        check_item_body_write(self._graphql_block, number, answer, replacing)
+        write_body_checked(self._run, self._graphql_block, self.repository, number, body, replacing)
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
         """Set `number`'s organization issue type to `kind`'s by name, the
