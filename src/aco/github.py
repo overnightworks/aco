@@ -12,9 +12,17 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
-from typing import TypeIs, TypeVar
+from typing import TypeVar
 
-from . import forge, github_actions, github_graphql, process, protocol, workboard
+from . import (
+    forge,
+    github_actions,
+    github_graphql,
+    github_issue_payload,
+    process,
+    protocol,
+    workboard,
+)
 from .body import ItemKind
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
@@ -38,22 +46,12 @@ API_ISSUE_STATES: dict[str, workboard.BlockerState] = {
     "open": workboard.BlockerState.OPEN,
     "closed": workboard.BlockerState.CLOSED,
 }
-# The organization's native issue types: casefolded so an org's own casing of
-# the type name never matters. An unrecognized type name maps to no kind at
-# all -- never guessed from a label -- so a repository whose org renames a type
-# loses that item's container/bug rules rather than silently misreading them.
-_ISSUE_TYPE_KINDS: dict[str, ItemKind] = {
-    "container": ItemKind.CONTAINER,
-    "bug": ItemKind.BUG,
-    "task": ItemKind.TASK,
-    "feature": ItemKind.FEATURE,
-}
 # The write-side names GitHub's issue-type API expects (`cut`'s
 # `create_child`), also the names a refusal tells a person to set -- derived
-# from the one read-side mapping above so the type name has a single owner,
+# from the one read-side mapping so the type name has a single owner,
 # capitalized the way GitHub itself names them.
 ITEM_KIND_TYPE_NAMES: dict[ItemKind, str] = {
-    kind: name.capitalize() for name, kind in _ISSUE_TYPE_KINDS.items()
+    kind: name.capitalize() for name, kind in github_issue_payload.ISSUE_TYPE_KINDS.items()
 }
 # GitHub's issues-list pagination fills every page but the last, so a result
 # strictly under this count could only have come from one request -- one live
@@ -280,13 +278,6 @@ def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | No
     return decoded
 
 
-_MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")  # tuple: unhashable input is no member
-
-
-def _is_count(value: object, minimum: int = 0) -> TypeIs[int]:
-    return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
-
-
 class BodyWriteOutcome(StrEnum):
     """What a failed `update_item_body` tells of the body: `REFUSED` wrote
     nothing, `UNKNOWN` may have written it."""
@@ -386,32 +377,15 @@ class GitHubForge:
                     "--jq",
                     # The issues endpoint answers for a pull request too, and
                     # only its `pull_request` member tells the two apart.
-                    '{state,title,body,is_landing:has("pull_request")}',
+                    '{state,title,body,author_association,is_landing:has("pull_request")}',
                 ]
             )
         except forge.ForgeNotFoundError:
             return forge.ItemReference(forge.ItemState.MISSING)
         values = self._json_lines(raw, "issue reference")
-        if len(values) != 1 or not isinstance(values[0], dict):
+        if len(values) != 1:
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed issue reference")
-        value = values[0]
-        state = value.get("state")
-        title = value.get("title")
-        body = value.get("body")
-        is_landing = value.get("is_landing")
-        if (
-            state not in {"open", "closed"}
-            or not isinstance(title, str)
-            or (body is not None and not isinstance(body, str))
-            or not isinstance(is_landing, bool)
-        ):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed issue reference")
-        return forge.ItemReference(
-            forge.ItemState.OPEN if state == "open" else forge.ItemState.CLOSED,
-            title,
-            body or "",
-            is_landing,
-        )
+        return github_issue_payload.item_reference(values[0])
 
     def _graphql_block(self, query: str, description: str) -> tuple[object, ...]:
         """One GraphQL round trip: the `repository` object `query` answers."""
@@ -488,64 +462,6 @@ class GitHubForge:
             if len(fetched[-1]) < per_page:
                 return tuple(pages)
             start += PARALLEL_FETCH_CONCURRENCY
-
-    def _issue_kind(self, value: object) -> ItemKind | None:
-        return _ISSUE_TYPE_KINDS.get(value.casefold()) if isinstance(value, str) else None
-
-    def _valid_children_progress(self, closed: object, total: object) -> bool:
-        """`childrenClosed`/`childrenTotal` (`sub_issues_summary`) must arrive
-        both present or both absent -- `ContainerProgress` has no
-        representation for "closed known, total unknown", and inventing one
-        would let the board show a progress figure the forge never sent.
-        `None` for both is preserved as `None`: `0/0` is a real container
-        state, never a stand-in for "the forge said nothing"."""
-        if closed is None and total is None:
-            return True
-        if closed is None or total is None:
-            return False
-        return _is_count(closed) and _is_count(total) and int(closed) <= int(total)
-
-    def _board_issue(self, value: object) -> workboard.Issue:
-        if not isinstance(value, dict):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed board issue")
-        number = value.get("number")
-        title = value.get("title")
-        labels = value.get("labels")
-        body = value.get("body")
-        created_at = value.get("createdAt")
-        updated_at = value.get("updatedAt")
-        kind_raw = value.get("kind")
-        children_closed = value.get("childrenClosed")
-        children_total = value.get("childrenTotal")
-        blocked_by_count = value.get("blockedByCount")
-        if (
-            not _is_count(number, minimum=1)
-            or not isinstance(title, str)
-            or not isinstance(labels, list)
-            or not all(isinstance(label, str) for label in labels)
-            or not isinstance(body, str)
-            or not isinstance(created_at, str)
-            or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(created_at) is None
-            or not isinstance(updated_at, str)
-            or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(updated_at) is None
-            or (kind_raw is not None and not isinstance(kind_raw, str))
-            or not self._valid_children_progress(children_closed, children_total)
-            or not _is_count(blocked_by_count)
-        ):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed board issue")
-        return workboard.Issue(
-            number,
-            title,
-            tuple(labels),
-            body,
-            created_at,
-            updated_at,
-            self._issue_kind(kind_raw),
-            children_closed,
-            children_total,
-            blocked_by_count,
-            author_is_member=value.get("authorAssociation") in _MEMBER_ASSOCIATIONS,
-        )
 
     def _board_pull_request(self, value: object) -> workboard.PullRequest:
         if not isinstance(value, dict):
@@ -1115,7 +1031,9 @@ class GitHubForge:
         if not isinstance(body, str) or (kind_raw is not None and not isinstance(kind_raw, str)):
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed parent issue")
         return workboard.ParentIssue(
-            self._issue_reference(value, "parent issue"), body, self._issue_kind(kind_raw)
+            self._issue_reference(value, "parent issue"),
+            body,
+            github_issue_payload.issue_kind(kind_raw),
         )
 
     def parent_number(self, number: int) -> int | None:
@@ -1185,7 +1103,7 @@ class GitHubForge:
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         values = self._fetch_pages(self._open_issue_page, per_page=ISSUES_PER_PAGE)
         return tuple(
-            self._board_issue(value)
+            github_issue_payload.board_issue(value)
             for value in values
             if not (isinstance(value, dict) and value.get("isPullRequest"))
         )
@@ -1412,7 +1330,10 @@ class GitHubForge:
         if isinstance(number, bool) or not isinstance(number, int) or number < 1:
             raise forge.ForgeMalformedResponseError("GitHub did not return a created issue")
         issue_type = created.get("type")
-        if not isinstance(issue_type, dict) or self._issue_kind(issue_type.get("name")) is not kind:
+        if (
+            not isinstance(issue_type, dict)
+            or github_issue_payload.issue_kind(issue_type.get("name")) is not kind
+        ):
             raise forge.ForgeIssueTypeNotSetError(
                 created=number, type_name=ITEM_KIND_TYPE_NAMES[kind]
             )
@@ -1508,7 +1429,7 @@ class GitHubForge:
             ],
             input_data=json.dumps({"type": type_name}).encode("utf-8"),
         )
-        if self._issue_kind(strip_ansi(raw).strip()) is not kind:
+        if github_issue_payload.issue_kind(strip_ansi(raw).strip()) is not kind:
             raise forge.ForgeError(
                 f"GitHub did not set #{number}'s type {type_name}; "
                 "set that type on the forge by hand"

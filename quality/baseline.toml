@@ -5,7 +5,6 @@
 
 [ccn."src/aco/github.py"]
 "GitHubForge._board_dependency" = 18
-"GitHubForge._board_issue" = 16
 "GitHubForge._landing" = 28
 
 [ccn."src/aco/workboard.py"]
@@ -20,9 +19,9 @@
 "src/aco/cli.py" = 829
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 919
-"src/aco/github.py" = 1569
+"src/aco/github.py" = 1490
 "src/aco/protocol.py" = 1865
-"src/aco/state_board.py" = 925
+"src/aco/state_board.py" = 923
 "src/aco/store.py" = 1742
 "src/aco/workboard.py" = 2900
 "tests/support/cli_fixtures.py" = 888
