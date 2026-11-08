@@ -68,7 +68,7 @@ after an `unavailable` on `github`, where the write may have landed, tells
 
 ## Never
 
-- `aco withdraw` never withdraws a ruled line: every check runs on the body it read in the same call. Writers of one item through aco on this machine are serialized (WITHDRAW-15), so none overwrites another's ruling; a hand edit (`gh issue edit`, the browser) or another machine is unprotected on `github`, and under `state-ref` that write refuses (CAS-20).
+- `aco withdraw` never withdraws a ruled line: every check runs on the body it read in the same call. Writers of one item through aco on this machine are serialized (WITHDRAW-15), so none overwrites another's ruling; on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check after the write and refuses with its sentence (WITHDRAW-13), under `state-ref` that write refuses (CAS-20).
 - `aco withdraw` never writes a key beside `text` and `withdrawn_on`: a returned line's `returned_on` and `returned_note` leave with it; the forge's edit history keeps the note.
 - `aco withdraw` never changes another expectation line's values or a byte outside the block; the block itself is rendered canonically (BODY-88), and under `state-ref` the record merge sets `updated_at` as for `rule`.
 - `aco withdraw` never takes `--via` or `--card-hash`: it decides nothing for the operator.

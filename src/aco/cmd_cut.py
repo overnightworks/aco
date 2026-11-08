@@ -69,6 +69,43 @@ class _SliceRowRemoval:
     replacing: str
     new_body: str
     step: str
+    row_index: int
+
+
+_CUT_BODY_CHECKED = (
+    "created {child}; {foreign}; if row {row} is still in {container}'s {fence} block, "
+    "re-run aco cut {number} --row {row} -- it adopts the child"
+)
+
+
+class _CheckedWriteError(protocol.ClaimError):
+    """The forge's check after the row-removal write found `answer`: the child
+    exists and the write landed, so a re-run adopts the child
+    (`_CUT_BODY_CHECKED`) and this is no `partial_write`. `reason`, `written`
+    and `kept` are `--json`'s own shape for it."""
+
+    def __init__(
+        self,
+        answer: forge.ForgeBodyWrittenError,
+        *,
+        child: int,
+        removal: _SliceRowRemoval,
+        storage: body.Storage,
+    ) -> None:
+        self.written = child
+        self.kept = answer.kept if isinstance(answer, forge.ForgeBodyOverwrittenError) else None
+        self.reason = _CutReason.NOT_VERIFIED if self.kept is None else _CutReason.OVERWRITTEN
+        super().__init__(
+            report.refusal_around_foreign_text(
+                _CUT_BODY_CHECKED,
+                str(answer),
+                child=workboard.item_label(child, storage),
+                container=workboard.item_label(removal.container, storage),
+                number=removal.container,
+                row=removal.row_index,
+                fence=body.BLOCK_FENCE_INFO,
+            )
+        )
 
 
 def _link_created_child(
@@ -81,12 +118,16 @@ def _link_created_child(
     raises the same `forge.ForgePartialChildCreationError` a failed relation
     write inside `create_child` itself would -- one type, so `run`
     renders one recovery message for either, `step` naming what an
-    identical re-run finishes.
+    identical re-run finishes. The forge's check of the write that landed
+    (`forge.ForgeBodyWrittenError`) is no failure to finish: it raises
+    `_CheckedWriteError`.
     """
     try:
         decide.write_item_body(
             client, removal.container, removal.new_body, replacing=removal.replacing
         )
+    except forge.ForgeBodyWrittenError as error:
+        raise _CheckedWriteError(error, child=child, removal=removal, storage=storage) from error
     except protocol.ClaimError as error:
         raise forge.ForgePartialChildCreationError(
             child=child,
@@ -106,12 +147,16 @@ class _CutReason(StrEnum):
     child but failed to finish recording it
     (`forge.ForgePartialChildCreationError`) is `partial_write` instead,
     carrying `written`/`failed` as structured siblings rather than only
-    the prose sentence stderr already printed."""
+    the prose sentence stderr already printed. The forge's check of that
+    write finding it overwritten or unverifiable is `overwritten` (with `kept`)
+    or `not_verified`, carrying `written`."""
 
     CUT = "cut"
     ADOPTED = "adopted"
     PRECONDITION_FAILED = "precondition_failed"
     PARTIAL_WRITE = "partial_write"
+    OVERWRITTEN = "overwritten"
+    NOT_VERIFIED = "not_verified"
 
 
 @dataclass(frozen=True)
@@ -455,6 +500,7 @@ def _cut_slice(
                 replacing=target.body,
                 new_body=body.replace_block(target.body, located, new_data),
                 step=f"remove row {link.index} from {label}'s {body.BLOCK_FENCE_INFO} block",
+                row_index=link.index,
             )
             _link_created_child(client, removal, child, storage)
     except forge.ForgeIssueTypeNotSetError as error:
@@ -497,5 +543,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
             return _cut_container(parsed, context, number)
     except PartialWriteError as error:
         return refuse_partial_write(error, _CutReason.PARTIAL_WRITE, as_json=as_json)
+    except _CheckedWriteError as error:
+        kept = {} if error.kept is None else {"kept": error.kept}
+        return report.refuse(error.reason, error, as_json=as_json, written=error.written, **kept)
     except protocol.ClaimError as error:
         return report.refuse(_CutReason.PRECONDITION_FAILED, error, as_json=as_json)

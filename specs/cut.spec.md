@@ -22,7 +22,8 @@ under `storage = "state-ref"` it prints the item id (PIN-30). A refusal reaching
 shared collection point prints `ERROR: <sentence>` on stderr, exit `2`, and
 with `--json` also `specs/output.spec.md`'s envelope, `reason`
 `precondition_failed` -- except CUT-17/CUT-18/CUT-32's own partial write, whose
-`reason` is `partial_write` instead (CUT-28).
+`reason` is `partial_write` instead (CUT-28), and CUT-42's checked write, whose `reason` is
+`overwritten` or `not_verified` (CUT-43).
 
 ## Behavior table
 
@@ -51,8 +52,9 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `--not-a-twin` given | CUT-31 | CUT-31 | CUT-31 | CUT-31 |
 | GitHub's own relation write fails | CUT-17 | — | — | CUT-28 |
 | the row-removal write fails, either storage | CUT-18 | — | — | CUT-28 |
+| the body check answers the row-removal write | CUT-42 | — | — | CUT-43 |
 | GitHub creates the child without its issue type | CUT-32 | — | — | CUT-28 |
-| an identical re-run after CUT-17, CUT-18, or a CUT-32 whose type is now set | CUT-19 | — | — | CUT-19 |
+| an identical re-run after CUT-17, CUT-18, CUT-42, or a CUT-32 whose type is now set | CUT-19 | — | — | CUT-19 |
 | a re-run while the CUT-32 child is still untyped | CUT-30 | — | — | CUT-30 |
 | a linked row's own `scope` is empty | — | — | CUT-20, CUT-22 | — |
 | a linked row already names a `scope` | — | — | CUT-21 | — |
@@ -68,6 +70,9 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-34] `aco next` never proposes a cut CUT-03 refuses: it names a nested container's repair under `SKIPPED` instead (`specs/next.spec.md` NEXT-25, E-NEXT-09).
 - CUT-04 (retired).
 - [ ] [CUT-41] `cut` holds the item's lock (RULE-40) from before its first forge read through its container write: a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-CUT-11).
+- [ ] [CUT-42] A row-removal write the body check answers refuses `created #<child>; <check sentence>; if row <idx> is still in #<n>'s aco block, re-run aco cut <n> --row <idx> -- it adopts the child`, exit `2`.
+- [ ] [CUT-43] CUT-42 reports `reason: "overwritten"` (with `kept`, true or false) or `"not_verified"` and `written` (`<child>`) as siblings, never `partial_write`, exit `2` (see E-CUT-12).
+- The check sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (kept) or `#<n> body written, not verified (<cause>)`.
 
 ## The body precondition
 
@@ -109,7 +114,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 
 - [ ] [CUT-17] GitHub's own failed sub-issue relation write refuses `created #<child> but failed to record #<child> as a sub-issue of #<n>: <cause>; re-run the same cut -- it adopts the child`, exit `2`.
 - [ ] [CUT-18] A failed row-removal write, either storage, refuses `created #<child> but failed to remove row <idx> from #<n>'s aco block: <cause>; re-run the same cut -- it adopts the child`, exit `2`.
-- [ ] [CUT-19] An identical re-run after CUT-17, CUT-18, or -- once its type is set -- CUT-32 prints `ADOPTED` (CUT-13) instead of a second child, then finishes the row removal when a row was linked (see E-CUT-06).
+- [ ] [CUT-19] An identical re-run after CUT-17, CUT-18, CUT-42, or -- once its type is set -- CUT-32 prints `ADOPTED` (CUT-13) instead of a second child, then finishes a linked row's removal (see E-CUT-06).
 - [ ] [CUT-38] An adoption (CUT-13, CUT-19) never writes the child's body. Accepted residual: a row `done_when` edited between a lost race and its retry is not copied; the container's edit history keeps it.
 - [ ] [CUT-32] A child created without its `Task` type refuses `created #<child> but GitHub did not set its type Task; set that type on the forge by hand, then re-run the same cut -- it adopts the child`, exit `2`.
 - [ ] [CUT-28] CUT-17/CUT-18/CUT-32's partial write reports `reason: "partial_write"`, `written` (`<child>`) and `failed` (the step) as siblings, exit `2` (see E-CUT-08).
@@ -362,3 +367,17 @@ exit 2
 ```
 
 The refused run reads and writes nothing.
+
+### E-CUT-12 -- the check finds the row removal overwritten, then `--json`
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, container `#90` with one `[[slice]]` row `index = 1` titled `Slice A`, `ghost` editing `#90`'s body by hand right after `cut` wrote it
+
+```console
+$ aco cut 90 --title "Slice A"
+2> ERROR: created #<child>; #90 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z; if row 1 is still in #90's aco block, re-run aco cut 90 --row 1 -- it adopts the child
+exit 2
+$ aco cut 90 --title "Slice A" --json
+{"ok": false, "reason": "overwritten", "written": <child>, "kept": false, "message": "created #<child>; #90 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z; if row 1 is still in #90's aco block, re-run aco cut 90 --row 1 -- it adopts the child"}
+2> ERROR: created #<child>; #90 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z; if row 1 is still in #90's aco block, re-run aco cut 90 --row 1 -- it adopts the child
+exit 2
+```

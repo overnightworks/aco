@@ -148,8 +148,10 @@ listing, not the item read. Every one of these writes the body through
 replaces and hands the port that text. A writer that finds the lock held prints
 one line to stderr and waits. Writers on this machine therefore never overwrite each other's
 bodies. A GitHub body write has no precondition, so a hand edit or another machine
-is not covered; under `state-ref` the store's compare-and-swap still refuses a
-stale write, and it alone guards the bare `aco item edit`, which writes outside the
+is not prevented: after each GitHub write the adapter reads the item's newest two
+edit revisions and raises a typed answer when its write was overwritten, kept over
+an unread change, or cannot be verified. Under `state-ref` the store's
+compare-and-swap refuses a stale write, and it alone guards the bare `aco item edit`, which writes outside the
 lock. The board keeps its own in-process turn for its shutdown drain
 (`specs/serve.spec.md`).
 

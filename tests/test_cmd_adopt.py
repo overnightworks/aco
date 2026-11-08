@@ -1240,9 +1240,9 @@ def test_adopt_keeps_the_claim_and_the_pair_when_the_body_step_goes_wrong(
     refusal: str,
     written_bodies: list[str],
 ) -> None:
-    """Spec: ADOPT-23, ADOPT-24, ADOPT-25, ADOPT-27, ADOPT-28, ADOPT-33 -- each failing body
-    step is one refusal line that says the claim stands; claim, worktree and branch stay, and
-    the body is written at most once."""
+    """Spec: ADOPT-23, ADOPT-24, ADOPT-25, ADOPT-27, ADOPT-28, ADOPT-33, ADOPT-36 -- each
+    failing body step is one refusal line that says the claim stands; claim, worktree and
+    branch stay, and the body is written at most once."""
     arrange(world, monkeypatch)
 
     result = adopt(capsys)
