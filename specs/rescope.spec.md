@@ -96,7 +96,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-22] For an issue claim, one rescope writes the combined scope into the item body's own `scope`, then the claim; a lane claim names no item, so only its claim moves (see E-RESC-01).
 - [ ] [RESC-23] A claim write failing after the body write refuses `<label> body scope now reads <scope>, but the claim was not rescoped: <error>; run the same rescope again`, exit `2` (see E-RESC-08).
 - [ ] [RESC-24] An item body without a valid `aco` block refuses `<label> <defect>; rescope needs a valid aco block`, exit `2`, before either write; a failed body write leaves the claim as it stood.
-- [ ] [RESC-33] For an issue claim, `rescope` runs from the item read through the claim write in the item's turn (RULE-40): a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-RESC-10).
+- [ ] [RESC-33] For an issue claim, `rescope` runs from the item read through the claim write in the item's turn (RULE-40), judging the live claim on the state ref read once the lock is held: a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-RESC-10).
 - [ ] [RESC-25] An issue claim's wide scope is admitted by `--whole`, the stored reason, or the body's own `whole`, as `claim` judges it (CLM-22), and `--whole` is written into the body too.
 
 ## `--json`'s own `reason` vocabulary
@@ -239,7 +239,7 @@ Setup: bare-remote, bootstrapped, `<n>` open with a valid `aco` block, a live cl
 ```console
 $ aco rescope <n> --add src/new.py
 2> waiting for the item lock at <state>/aco/item-locks/<digest>
-RESCOPED #<n>: <claim-id>
+RESCOPED issue #<n>: <claim-id>
 exit 0
 $ aco rescope <n> --add src/other.py --json
 2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
