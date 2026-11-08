@@ -1397,7 +1397,8 @@ class GitHubForge:
             ) from error
         return child
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
+        # The after-write check reads `replacing`.
         self._run(
             [
                 "api",

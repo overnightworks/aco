@@ -338,7 +338,9 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
             raise protocol.ClaimUnavailableError(
                 board_read.missing_item_refusal(number, client, context.config.storage)
             )
-        client.update_item_body(number, new_body)
+        # The compare-and-swap on the snapshot's oid checks this write; a malformed
+        # item has no readable text to name.
+        client.update_item_body(number, new_body, replacing="")
         _print_item_edit_result(
             items.format_item_id(number), number, client.item_oid(number), as_json=as_json
         )
@@ -377,11 +379,8 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
         _refuse_a_body_on_stdin(_ITEM_EDIT_SIZE_COMMAND)
         number = parsed.item
         with _item_turn(context, number, _ITEM_EDIT_SIZE_COMMAND) as fresh:
-            located = body.locate_block(fresh.body)
-            new_data = {**located.data, "size": parsed.size}
-            outcome = _write_block_data(
-                context.forge_writer, fresh.number, fresh.body, located, new_data
-            )
+            new_data = {**fresh.located.data, "size": parsed.size}
+            outcome = _write_block_data(context.forge_writer, fresh, new_data)
         _print_item_edit_size_result(number, parsed.size, fresh.storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:
@@ -396,18 +395,15 @@ def _item_turn(
 
 
 def _write_block_data(
-    client: forge.ForgeWriter,
-    number: int,
-    current_body: str,
-    located: body.LocatedBlock,
-    new_data: dict[str, object],
+    client: forge.ForgeWriter, fresh: decide.FreshItem, new_data: dict[str, object]
 ) -> _ItemReason:
     """Writes `new_data` as item `number`'s block, every other byte
     untouched, or nothing at all when the block already carries it,
     so a repeated narrow edit leaves no empty write behind."""
-    if new_data == located.data:
+    if new_data == fresh.located.data:
         return _ItemReason.UNCHANGED
-    client.update_item_body(number, body.replace_block(current_body, located, new_data))
+    new_body = body.replace_block(fresh.body, fresh.located, new_data)
+    decide.write_item_body(client, fresh.number, new_body, replacing=fresh.body)
     return _ItemReason.EDITED
 
 
@@ -440,12 +436,9 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
         _refuse_a_body_on_stdin(_ITEM_EDIT_WHOLE_COMMAND)
         number = parsed.item
         with _item_turn(context, number, _ITEM_EDIT_WHOLE_COMMAND) as fresh:
-            located = body.locate_block(fresh.body)
             reason = body.bounded_whole_reason(parsed.whole)
-            new_data = {**located.data, "whole": reason}
-            outcome = _write_block_data(
-                context.forge_writer, fresh.number, fresh.body, located, new_data
-            )
+            new_data = {**fresh.located.data, "whole": reason}
+            outcome = _write_block_data(context.forge_writer, fresh, new_data)
         _print_item_edit_whole_result(number, reason, fresh.storage, outcome, as_json=as_json)
         return 0
     except protocol.ClaimError as error:

@@ -281,3 +281,27 @@ class TestTurn:
             [],
         )
         assert (client.issue_reference_lookups, forges_built) == ([], [])
+
+
+class TestWriteItemBody:
+    def test_a_body_equal_to_the_one_it_replaces_makes_no_forge_call(self) -> None:
+        client = FakeForge()
+
+        written = decide.write_item_body(client, 90, "same text", replacing="same text")
+
+        assert written is False
+        assert client.body_writes == []
+
+    def test_another_body_is_written_and_the_port_gets_the_text_it_replaces(self) -> None:
+        replaced: list[str] = []
+
+        class RecordingForge(FakeForge):
+            def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
+                replaced.append(replacing)
+                super().update_item_body(number, body, replacing=replacing)
+
+        client = RecordingForge()
+
+        written = decide.write_item_body(client, 90, "new text", replacing="old text")
+
+        assert (written, client.body_writes, replaced) == (True, [(90, "new text")], ["old text"])

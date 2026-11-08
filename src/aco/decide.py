@@ -45,6 +45,7 @@ class FreshItem:
     body: str
     storage: body.Storage
     state: forge.ItemState
+    located: body.LocatedBlock
 
 
 @dataclass(frozen=True)
@@ -67,12 +68,14 @@ def fresh_item(context: RunContext, number: int, *, command: str) -> FreshItem:
     try:
         reference = board_read.item_or_refuse(client, number, command=command, storage=storage)
         current_body = reference.body or ""
-        workboard.located_block_or_refuse(number, current_body, command=command, storage=storage)
+        located = workboard.located_block_or_refuse(
+            number, current_body, command=command, storage=storage
+        )
     except forge.ForgeError:
         raise
     except protocol.ClaimError as error:
         raise InvalidTargetError(str(error)) from error
-    return FreshItem(number, reference.title or "", current_body, storage, reference.state)
+    return FreshItem(number, reference.title or "", current_body, storage, reference.state, located)
 
 
 class ItemLockUnavailableError(protocol.ClaimUnavailableError):
@@ -112,7 +115,7 @@ def item_lock(
             held.enter_context(file_lock.held(lock_path, say_waiting))
         except OSError as error:
             raise ItemLockUnavailableError(
-                f"cannot lock the item at {lock_path}: {error}"
+                f"cannot lock the item at {lock_path}: {error.strerror or str(error)}"
             ) from error
         yield
 
@@ -139,9 +142,22 @@ def _written_body(current_body: str, line: int, outcome: Outcome, today: date) -
     return expectations.rule_option(current_body, line, outcome, today)
 
 
+def write_item_body(
+    client: forge.ForgeWriter, number: int, new_body: str, *, replacing: str
+) -> bool:
+    """The one owner of an item-body write: `replacing` is the text the caller
+    read under the item's lock. A body equal to it writes nothing and returns
+    False, since a write that repeats the current body leaves no revision for
+    the port's check to find."""
+    if new_body == replacing:
+        return False
+    client.update_item_body(number, new_body, replacing=replacing)
+    return True
+
+
 def _committed(context: RunContext, fresh: FreshItem, new_body: str) -> Committed:
     """Writes `new_body` once and reads back the lines it holds."""
-    context.forge_writer.update_item_body(fresh.number, new_body)
+    write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
     lines = tuple(expectations.expectation_lines(new_body, storage=fresh.storage))
     open_remaining = sum(map(expectations.is_open, lines))
     return Committed(fresh.number, fresh.title, lines, open_remaining)

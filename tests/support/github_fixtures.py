@@ -240,7 +240,7 @@ class FakeForge:
             ) from error
         return number
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         """`update_item_body_error` is the forge's answer instead of a write,
         unless `update_item_body_lands_before_error` says the write happened
         and only its answer failed. A pull request's body is its landing's."""
@@ -483,7 +483,7 @@ class ReaderOnlyForge(FakeForge):
     def create_child(self, *, parent: int, title: str, body: str, kind: body.ItemKind) -> int:
         pytest.fail("a read-only command must never create a child")
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         pytest.fail("a read-only command must never update an item body")
 
     def set_item_kind(self, number: int, kind: body.ItemKind) -> None:

@@ -516,7 +516,7 @@ def test_github_adapter_updates_an_item_body() -> None:
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
 
-    client.update_item_body(79, "new body")
+    client.update_item_body(79, "new body", replacing="old body")
 
     assert observed == [
         (

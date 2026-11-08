@@ -755,7 +755,7 @@ class StateRefBoard:
         )
         return items.item_number(item_id)
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         """`body`, written back to `number`'s item file:
         `title`, `labels`, `blocked_by` come from `body`'s own `[record]`
         table when it carries one (`_delivered_content_fields`'s own owner
