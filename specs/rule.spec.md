@@ -122,7 +122,7 @@ withdrawn one.
 - [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
 - [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
 - [ ] [RULE-42] A writer that finds the item's lock held prints `waiting for the item lock at <lock path>` once to stderr, then waits and goes on; stdout and `--json` do not change (see E-RULE-18).
-- The turn is a per-machine lock: on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check after the write and refuses with its sentence (RULE-11), under `state-ref` that write refuses (CAS-20).
+- The turn is a per-machine lock: on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (RULE-11); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
 
 `reason`, by which refusal fired:
 
