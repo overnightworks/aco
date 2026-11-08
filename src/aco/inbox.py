@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import body, expectations, protocol, repositories, rulings, workboard
+from . import body, expectations, protocol, repositories, rulings, session, workboard
 
 
 def rows(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[rulings.Row, ...]:
@@ -77,6 +77,12 @@ def read_issues(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> 
     """The rows and the steps among `issues`, which are listed once."""
     listed = tuple(issues)
     return Reading(rows(listed, storage=storage), steps(listed, storage=storage))
+
+
+def read_context(context: session.RunContext) -> Reading:
+    """The rows and the steps of the checkout `context` is bound to, from one
+    listing of its open items."""
+    return read_issues(context.forge.list_open_board_issues(), storage=context.config.storage)
 
 
 type IssueReader = Callable[[repositories.Repository], Reading]

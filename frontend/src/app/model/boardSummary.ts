@@ -8,6 +8,7 @@
 import type {
 	BoardItem,
 	ExpectationLine,
+	OperatorStep,
 	OptionLine,
 	Outcome,
 	RepoReading,
@@ -28,6 +29,10 @@ export const EMPTY_DECIDED_TEXT = 'Your decisions show here with their answer an
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
 export const NOT_READ_LABEL = 'Not read';
 export const LAST_READ_LABEL = 'last read';
+export const STEPS_HEADING = 'Steps';
+export const NO_STEP_TEXT = 'This item names no step.';
+export const NO_STEP_WAITING_TEXT = 'No step waits for you.';
+export const NO_STEP_READ_TEXT = 'No step in the projects read.';
 export const REFRESH_LABEL = 'Refresh';
 export const READING_LABEL = 'Reading…';
 /** The page reads again on return to the tab once its last read is older than this. */
@@ -345,4 +350,30 @@ export function stageAfterReturned(repos: Readings, key: string): string {
  * ruled lines the Decided view lists. */
 export function tabCounts(repos: Readings): { open: number; decided: number } {
 	return { open: listedRows(repos).length, decided: rowsOf(decidedList(repos)).length };
+}
+
+/** The steps one repository lists; `error` and `readAt` say when they are the
+ * last read's, not current. */
+export interface StepGroup {
+	repo: string;
+	error: string | null;
+	readAt: Date | null;
+	steps: OperatorStep[];
+}
+
+/** The repositories that list at least one step, in the page's order. */
+export function stepGroups(repos: ShownRepo[]): StepGroup[] {
+	return repos
+		.filter(({ steps }) => steps.length > 0)
+		.map(({ name, error, readAt, steps }) => ({
+			repo: name,
+			error,
+			readAt,
+			steps
+		}));
+}
+
+/** What the section says with no row: an absence is only true of repositories read. */
+export function noStepText(repos: Readings): string {
+	return repos.every(({ error }) => error === null) ? NO_STEP_WAITING_TEXT : NO_STEP_READ_TEXT;
 }

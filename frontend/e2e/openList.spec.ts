@@ -66,7 +66,7 @@ async function serveThreeRepositories(page: Page): Promise<void> {
 				repos: [
 					{ ...source, name: 'songmaker' },
 					{ ...source, name: 'quality', items: longTopicItems },
-					{ ...source, name: 'webauth', items: [] }
+					{ ...source, name: 'webauth', items: [], steps: [] }
 				]
 			}
 		});
@@ -159,7 +159,7 @@ for (const viewport of [
 			});
 			await page.goto(`${appUrl}#t=${token}`);
 
-			await expect(page.locator('.tracks').getByRole('heading', { level: 2 })).toHaveText([
+			await expect(page.locator('.tracks h2:not(#steps-heading)')).toHaveText([
 				/^newer\s+1$/,
 				/^older\s+1$/
 			]);
@@ -185,8 +185,8 @@ for (const viewport of [
 				route.fulfill({
 					json: {
 						repos: [
-							{ name: 'quiet', error: null, items: [] },
-							{ name: 'broken', error: sentence, items: [] }
+							{ name: 'quiet', error: null, items: [], steps: [] },
+							{ name: 'broken', error: sentence, items: [], steps: [] }
 						]
 					}
 				})

@@ -1,6 +1,6 @@
 """The board's one narrow interface to its decision source.
 
-The board reads aco's rows and writes rulings through `DecisionPort` only;
+The board reads aco's rows and steps and writes rulings through `DecisionPort` only;
 `aco_source.AcoSource` is its one implementation, running aco's own library
 in process. Truth stays with the source: the board keeps no copy of a line or
 a ruling, and reads aco's own types rather than copies of them.
@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from .. import expectations, rulings
+from .. import expectations, inbox
 
 NOTE_MAX_LENGTH = 280
 """The longest note a decision may carry, after trimming. The item body stores
@@ -120,9 +120,10 @@ shown."""
 
 
 class DecisionPort(Protocol):
-    def rows(self) -> tuple[rulings.Row, ...]:
-        """Every open item with expectation lines, as `aco rulings` reads them,
-        in its order (RUL-03).
+    def reading(self) -> inbox.Reading:
+        """What one listing of the open items holds for the operator: every item
+        with expectation lines, as `aco rulings` reads them in its order (RUL-03),
+        and the steps only the operator can take.
 
         Raises `DecisionSourceUnavailableError` when the source cannot answer.
         """

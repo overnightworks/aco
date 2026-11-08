@@ -19,6 +19,7 @@
 	import { DecisionStore } from './app/state/decision.svelte';
 	import RefreshButton from './components/RefreshButton.svelte';
 	import Stage from './components/Stage.svelte';
+	import StepsList from './components/StepsList.svelte';
 	import TrackList from './components/TrackList.svelte';
 	import UndoStrip from './components/UndoStrip.svelte';
 
@@ -222,6 +223,7 @@
 		{@const store = decisions}
 		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
+				<StepsList repos={board.repos} />
 				<TrackList
 					repos={board.repos}
 					view="open"
