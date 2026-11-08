@@ -1,8 +1,0 @@
-claim_id = "23ab2b91519f40078f9bb9c4723ca3d4"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "78e471fed5f0317729ab67e188417fba3402ff75"
-branch = "claude/issue-724-quality-v0-10-0"
-scope = [".aco/brief.toml", ".github/workflows/ci.yml", ".github/workflows/codeql.yml", "AGENTS.md", "quality/baseline.toml", "quality/config.toml"]
-opened_commit = "25777e4ad50af49ccd93fe6036d9f474d672252a"
-whole_reason = "One pin bump: both pins, the words that name the pinned commands, and the baseline and config the gate judges at that pin must move in one commit or the gate is red."
