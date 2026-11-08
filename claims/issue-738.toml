@@ -1,8 +1,0 @@
-claim_id = "f63c376c64ab42ff83dff92274eb68bf"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "0d5237ce44ec675d73962254fc5629832c16e4d0"
-branch = "claude/issue-738-other-writers-answer-body-check"
-scope = ["docs/ARCHITECTURE.md", "specs/cut.spec.md", "specs/item.spec.md", "specs/output.spec.md", "specs/rescope.spec.md", "specs/rule.spec.md", "specs/withdraw.spec.md", "src/aco/cmd_cut.py", "src/aco/cmd_item.py", "src/aco/cmd_rescope.py", "src/aco/cmd_rule.py", "src/aco/cmd_withdraw.py", "src/aco/report.py", "tests/board/test_aco_source.py", "tests/support/board_forge.py", "tests/test_cmd_cut_body_check.py", "tests/test_cmd_item_body_check.py", "tests/test_cmd_item_turn.py", "tests/test_cmd_rescope_item_body.py", "tests/test_cmd_rule.py", "tests/test_cmd_withdraw.py"]
-opened_commit = "3d85e136307b0ebae505767d90a8838f724c9886"
-whole_reason = "One answer for every writer at once, with one spec owner move and one review: about 60 production lines over up to six files, two of them docstring-only."
