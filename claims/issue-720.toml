@@ -1,8 +1,0 @@
-claim_id = "7bfb5c6797bc4395938b9703d268d6a2"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "40a73925cbbcd45d7e4fbcc53b1b35b23f233b51"
-branch = "claude/issue-720-decide-per-item-turn"
-scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/rule.spec.md", "specs/serve.spec.md", "specs/withdraw.spec.md", "src/aco/board/aco_source.py", "src/aco/cmd_rule.py", "src/aco/cmd_withdraw.py", "src/aco/decide.py", "src/aco/file_lock.py", "src/aco/lineage_stamp.py", "src/aco/session.py", "tests/board/test_aco_source.py", "tests/board/test_aco_source_state_ref.py", "tests/board/test_board_cli.py", "tests/conftest.py", "tests/support/e2e_server.py", "tests/test_cmd_rule.py", "tests/test_cmd_withdraw.py", "tests/test_decide.py", "tests/test_file_lock.py", "tests/test_lineage_stamp.py"]
-opened_commit = "21c4a60a97f8336bad4922734c621c446a03add3"
-whole_reason = "One turn and its three callers: the lock has no honest proof without the writers that take it, the primitive moves once to its owner, and the specs, docs and test isolation change with it."
