@@ -1,7 +1,6 @@
 """`aco mcp` (`specs/mcp.spec.md`) as a real child process over pipes, its forge
 the board's test forge."""
 
-import fcntl
 import io
 import json
 import os
@@ -472,18 +471,6 @@ def _stored_item(**changes: object) -> dict[str, object]:
     return {**open_option_entry(), **changes}
 
 
-def _lock_is_held(tmp_path: Path) -> bool:
-    directory = tmp_path / "state" / "aco" / "item-locks"
-    for lock in directory.iterdir() if directory.is_dir() else ():
-        with lock.open("rb") as probe:
-            try:
-                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                return True
-            fcntl.flock(probe, fcntl.LOCK_UN)
-    return False
-
-
 def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_line(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -492,7 +479,7 @@ def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_lin
     write = board_forge.BoardForge.update_item_body
 
     def witnessed(self: board_forge.BoardForge, number: int, body: str, *, replacing: str) -> None:
-        lock_held_at_writes.append(_lock_is_held(tmp_path))
+        lock_held_at_writes.append(board_forge.item_lock_is_held(tmp_path))
         write(self, number, body, replacing=replacing)
 
     monkeypatch.setattr(board_forge.BoardForge, "update_item_body", witnessed)

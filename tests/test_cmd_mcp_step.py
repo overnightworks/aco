@@ -2,7 +2,6 @@
 board's test forge: marking an item, opening one, finding the one a failed call
 left, and what each refusal and each failure after a write leaves behind."""
 
-import fcntl
 import io
 import json
 import sys
@@ -110,18 +109,6 @@ def _steps_of(inbox: dict[str, Any]) -> list[dict[str, Any]]:
     return inbox["structuredContent"]["repositories"][0]["steps"]
 
 
-def _lock_is_held(tmp_path: Path) -> bool:
-    directory = tmp_path / "state" / "aco" / "item-locks"
-    for lock in directory.iterdir() if directory.is_dir() else ():
-        with lock.open("rb") as probe:
-            try:
-                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                return True
-            fcntl.flock(probe, fcntl.LOCK_UN)
-    return False
-
-
 def _fail_once(
     monkeypatch: pytest.MonkeyPatch,
     operation: str,
@@ -151,7 +138,7 @@ def _witness_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, operation: st
     held: list[bool] = []
 
     def witnessed(self: board_forge.BoardForge, *args: object, **kwargs: object) -> None:
-        held.append(_lock_is_held(tmp_path))
+        held.append(board_forge.item_lock_is_held(tmp_path))
         real(self, *args, **kwargs)
 
     monkeypatch.setattr(board_forge.BoardForge, operation, witnessed)

@@ -8,6 +8,7 @@ to a log beside it. `run_context` is the one replacement for
 it, so the board's aco source reaches this forge and never GitHub.
 """
 
+import fcntl
 import json
 import os
 import threading
@@ -353,6 +354,19 @@ class BoardForge:
         written = stored.with_name(f"{stored.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         written.write_text(state.to_json(), encoding="utf-8")
         written.replace(stored)
+
+
+def item_lock_is_held(state_home: Path) -> bool:
+    """Whether another holder has an item lock under the state home a test set."""
+    directory = state_home / "state" / "aco" / "item-locks"
+    for lock in directory.iterdir() if directory.is_dir() else ():
+        with lock.open("rb") as probe:
+            try:
+                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(probe, fcntl.LOCK_UN)
+    return False
 
 
 def _unsupported(operation: str) -> NoReturn:
