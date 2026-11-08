@@ -107,7 +107,6 @@ def _standing_step_item(context: RunContext, title: str, text: str) -> int | Non
         issue.number
         for issue in context.forge.list_open_board_issues()
         if issue.author_is_member
-        and issue.unreadable is None
         and issue.title == title
         and body.parse_body(issue.body, storage=storage).contract.next == text
     )
@@ -126,17 +125,31 @@ def step(label: str, text: str, target: int | str) -> dict[str, object]:
             f"{label} keeps its items in state-ref storage, where a step cannot be labelled; "
             "write it into the item's next with aco item edit"
         )
-    if isinstance(target, str):
-        standing = _standing_step_item(context, target, text)
-        if standing is None:
-            opened = decide.open_step_item(context, target, text)
-            return {"repository": label, "item": opened, "step": text, "created": True}
-        target = standing
+    if isinstance(target, int):
+        _mark_in_turn(context, target, text, standing_title=None)
+        return {"repository": label, "item": target, "step": text, "created": False}
+    standing = _standing_step_item(context, target, text)
+    if standing is not None and _mark_in_turn(context, standing, text, standing_title=target):
+        return {"repository": label, "item": standing, "step": text, "created": False}
+    opened = decide.open_step_item(context, target, text)
+    return {"repository": label, "item": opened, "step": text, "created": True}
+
+
+def _mark_in_turn(
+    context: RunContext, number: int, text: str, *, standing_title: str | None
+) -> bool:
+    """Marks item `number` in its turn. With a `standing_title`, the item must
+    still hold that title and the step `text` as the turn reads it; one another
+    session changed since the lookup is left as it is and answers False."""
     with decide.turn(
-        context, target, command="step", environment=os.environ, home=Path.home()
+        context, number, command="step", environment=os.environ, home=Path.home()
     ) as fresh:
+        if standing_title is not None and (
+            fresh.title != standing_title or fresh.located.data.get("next") != text
+        ):
+            return False
         decide.mark_step(context, fresh, text)
-    return {"repository": label, "item": target, "step": text, "created": False}
+    return True
 
 
 def serve(requests: Iterable[bytes], replies: TextIO) -> None:
