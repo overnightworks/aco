@@ -34,10 +34,9 @@ def lane_rescope_arguments(directory: Path) -> list[str]:
 
 
 def test_a_rescope_adds_a_path_to_the_lane_claim_a_branch_outside_docs_and_fix_holds(
-    stand_in: StandIn, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: RESC-27, RESC-12, RESC-33 -- a lane claim has no item body, so it takes
-    no item lock."""
+    """Spec: RESC-27, RESC-12."""
     standpoint = stand_in(
         branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_ada(OUTSIDE_LANE_BRANCH, HELD_SCOPE)
     )
@@ -52,7 +51,6 @@ def test_a_rescope_adds_a_path_to_the_lane_claim_a_branch_outside_docs_and_fix_h
         "",
     )
     assert (after.claim_id, after.scope) == (before.claim_id, (NEW_FILE, *HELD_SCOPE))
-    assert not (tmp_path / "state" / "aco" / "item-locks").exists()
 
 
 def test_a_rescope_on_a_branch_outside_docs_and_fix_no_lane_claim_holds_is_refused(

@@ -7,14 +7,16 @@ import json
 from pathlib import Path
 
 import pytest
-from board_fixtures import complete_contract
+from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import (
     ISSUE,
+    OUTSIDE_LANE_BRANCH,
     StandIn,
     assert_json_refusal_object,
     assert_no_item_body_written,
     claimed_here,
     held_by_ada,
+    lane_held_by_ada,
     make_stand_in,
     rescope_arguments,
     serve_body,
@@ -332,3 +334,18 @@ def test_an_unwritable_lock_directory_refuses_unavailable_and_changes_nothing(
         state_ref_tip(bare_remote),
         claimed_here(standpoint).scope,
     ) == (2, True, "unavailable", [], tip, held.scope)
+
+
+def test_a_rescope_of_a_lane_claim_takes_no_item_lock(
+    stand_in: StandIn, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: RESC-33 -- a lane claim names no item body, so it has no item turn."""
+    standpoint = stand_in(
+        branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_ada(OUTSIDE_LANE_BRANCH, HELD_SCOPE)
+    )
+    arguments = ["rescope", "--agent", "Ada", "--add", f"{standpoint.directory}/{NEW_FILE}"]
+
+    result = run_cli(["--repo", REPOSITORY, *arguments], capsys)
+
+    assert result.status == 0
+    assert not (tmp_path / "state" / "aco" / "item-locks").exists()
