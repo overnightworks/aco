@@ -54,7 +54,7 @@ OPTION_COUNT_MINIMUM = 2
 _CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 _CAPTION_NEEDS_PICTURE = "needs a picture beside it"
 _PICTURE = "picture"
-_SAME_AS_TODAY = "same_as_today"
+SAME_AS_TODAY = "same_as_today"
 _CAPTION = "caption"
 NOT_A_LOCAL_DATE = "must be a TOML local date"
 
@@ -103,7 +103,7 @@ OPTION_LINE_KEYS = (
     "recommended",
     "reason",
 )
-_OPTION_LINE_OPTIONAL_KEYS = frozenset({_PICTURE, _CAPTION})
+OPTION_LINE_OPTIONAL_KEYS = frozenset({_PICTURE, _CAPTION})
 _OPTION_LINE_ONLY_KEYS = frozenset(OPTION_LINE_KEYS) - {"question", _PICTURE}
 _OPTION_LINE_REFUSED_KEYS = ("example",)
 # Every key of one `[[expectation.option]]` table, in rendering order; an
@@ -113,7 +113,7 @@ OPTION_KEYS = (
     "name",
     "effect",
     _PICTURE,
-    _SAME_AS_TODAY,
+    SAME_AS_TODAY,
     _CAPTION,
     "notice",
     "cost",
@@ -121,8 +121,8 @@ OPTION_KEYS = (
     "undo_how",
     "contract",
 )
-_OPTION_REQUIRED_KEYS = tuple(
-    key for key in OPTION_KEYS if key not in {_PICTURE, _SAME_AS_TODAY, _CAPTION}
+OPTION_REQUIRED_KEYS = tuple(
+    key for key in OPTION_KEYS if key not in {_PICTURE, SAME_AS_TODAY, _CAPTION}
 )
 
 
@@ -484,7 +484,7 @@ def _option_line_key_defects(
     for key in OPTION_LINE_KEYS:
         path = f"{prefix}.{key}"
         if key not in entry:
-            if key not in _OPTION_LINE_OPTIONAL_KEYS:
+            if key not in OPTION_LINE_OPTIONAL_KEYS:
                 defects.append(FieldDefect(path, f"{path} is required"))
         elif key != _PICTURE:
             defects.extend(
@@ -501,13 +501,13 @@ def _option_line_key_defects(
 
 
 def _option_result_defects(path: str, option: dict[str, object]) -> list[FieldDefect]:
-    has_picture, has_same_as_today = _PICTURE in option, _SAME_AS_TODAY in option
-    if has_same_as_today and option[_SAME_AS_TODAY] is not True:
-        return _field_defect(f"{path}.{_SAME_AS_TODAY}", "must be true")
+    has_picture, has_same_as_today = _PICTURE in option, SAME_AS_TODAY in option
+    if has_same_as_today and option[SAME_AS_TODAY] is not True:
+        return _field_defect(f"{path}.{SAME_AS_TODAY}", "must be true")
     if has_same_as_today and has_picture:
         return [
             FieldDefect(
-                f"{path}.{_SAME_AS_TODAY}",
+                f"{path}.{SAME_AS_TODAY}",
                 f"{path} must carry at most one of picture and same_as_today = true",
             )
         ]
@@ -518,7 +518,7 @@ def _option_result_defects(path: str, option: dict[str, object]) -> list[FieldDe
 
 def _option_defects(path: str, option: dict[str, object]) -> list[FieldDefect]:
     defects: list[FieldDefect] = []
-    for key in _OPTION_REQUIRED_KEYS:
+    for key in OPTION_REQUIRED_KEYS:
         key_path = f"{path}.{key}"
         if key not in option:
             defects.append(FieldDefect(key_path, f"{key_path} is required"))

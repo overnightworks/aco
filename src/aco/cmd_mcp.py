@@ -1,14 +1,14 @@
-"""The `mcp` command (`specs/mcp.spec.md`): the stdio loop and the inbox read
-it serves."""
+"""The `mcp` command (`specs/mcp.spec.md`): the stdio loop, the inbox read and
+the card write it serves."""
 
 import argparse
 import os
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import TextIO
 
-from . import inbox, mcp_server, protocol, report, repositories, rulings, session, usage
+from . import decide, inbox, mcp_server, protocol, report, repositories, rulings, session, usage
 from .session import RunContext
 
 _GLOBAL_REPO_MESSAGE = "aco mcp finds its repositories itself; --repo does not apply to it"
@@ -22,15 +22,40 @@ def _repository_rows(repository: repositories.Repository) -> tuple[rulings.Row, 
     return inbox.rows(issues, storage=context.config.storage)
 
 
-def read_inbox() -> dict[str, object]:
-    """One fresh scan of the configured root and the read of every repository
-    found; refused, naming the file or the root, when there is none to read."""
+def _discovered() -> repositories.Discovery:
+    """One fresh scan of the configured root; refused, naming the file or the
+    root, when there is no repository to read."""
     root = repositories.configured_root(repositories.config_path(os.environ, Path.home()))
     discovery = repositories.discover(root)
     if not discovery.repositories:
         reasons = "; ".join(f"{entry.directory}: {entry.reason}" for entry in discovery.unavailable)
         raise protocol.ClaimError(f"no repository could be read under {root} ({reasons})")
-    return inbox.inbox_json(inbox.read(discovery, _repository_rows))
+    return discovery
+
+
+def read_inbox() -> dict[str, object]:
+    """The read of every repository the scan found."""
+    return inbox.inbox_json(inbox.read(_discovered(), _repository_rows))
+
+
+def ask(label: str, number: int, card: Mapping[str, object]) -> dict[str, object]:
+    """Puts `card` on item `number` of the discovered repository `label` in the
+    item's turn, and answers its line as `aco rulings --json` gives it; refused
+    when no repository found has that label."""
+    found = {repository.label: repository for repository in _discovered().repositories}
+    if label not in found:
+        raise protocol.ClaimError(f"no repository {label} found; read_inbox lists them")
+    context = session.run_context(None).for_directory(found[label].directory)
+    with decide.turn(
+        context, number, command="ask", environment=os.environ, home=Path.home()
+    ) as fresh:
+        asked = decide.ask(context, fresh, card)
+    return {
+        "repository": label,
+        "item": number,
+        "written": asked.written,
+        "line": rulings.line_json(asked.line),
+    }
 
 
 def serve(requests: Iterable[bytes], replies: TextIO) -> None:
@@ -40,7 +65,7 @@ def serve(requests: Iterable[bytes], replies: TextIO) -> None:
         if not request.strip():
             continue
         try:
-            answer = mcp_server.reply(request.decode("utf-8"), read_inbox)
+            answer = mcp_server.reply(request.decode("utf-8"), read_inbox, ask)
         except UnicodeDecodeError:
             answer = mcp_server.unparsable_reply()
         if answer is not None:
@@ -50,7 +75,9 @@ def serve(requests: Iterable[bytes], replies: TextIO) -> None:
 
 def add_parser(commands: usage.Subcommands, name: str) -> None:
     """`mcp`'s parser: it takes no flags."""
-    commands.add_parser(name, help="serve the operator's inbox to an agent host over MCP on stdio")
+    commands.add_parser(
+        name, help="serve the operator's inbox and a card writer to an agent host over MCP on stdio"
+    )
 
 
 def run(parsed: argparse.Namespace, _context: RunContext) -> int:

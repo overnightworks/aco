@@ -4,7 +4,7 @@ them, and the byte-preserving edits that rule one. The entry grammar
 is `expectation_grammar`'s; the block codec is `body`'s.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
@@ -14,7 +14,9 @@ from . import protocol
 from .body import (
     BodyReadState,
     Storage,
+    ContractDefect,
     block_expectation_dicts,
+    body_defect_text,
     locate_block,
     parse_body,
     replace_block,
@@ -29,6 +31,7 @@ from .expectation_grammar import (
     DecisionKind,
     RulingVia,
     Undo,
+    block_expectation_defects,
     card_hash,
     is_open_line,
     is_option_line,
@@ -368,6 +371,10 @@ class ExpectationWithHeadError(protocol.ClaimError):
     refuses."""
 
 
+class ExpectationCardDefectError(protocol.ClaimError):
+    """A card to ask whose values the entry grammar refuses; its message holds every defect."""
+
+
 class ExpectationOptionChoiceError(protocol.ClaimError):
     """`rule_option`'s refusal of a letter the card does not offer, or of a
     kept recommendation that names another letter."""
@@ -431,6 +438,24 @@ def _rule_entry(body: str, index: int, decide: _Decide, option_flag: str = _OPTI
     return _replaced_entry(
         body, index, lambda entries: decide(_open_entry(entries, index, option_flag))
     )
+
+
+def ask_line(body: str, card: Mapping[str, object], asked_on: date) -> str:
+    """`body` with the option line `card` -- `text`, the option-line keys and its
+    `options` -- appended as the last line, dated `asked_on`. The grammar judges
+    every entry of the folded block before anything is rendered, so a value of
+    the wrong type refuses with its sentence, naming every defect."""
+    located = locate_block(body)
+    entries = block_expectation_dicts(located.data)
+    keys = {key: value for key, value in card.items() if key not in ("text", "options")}
+    asked = {"text": card.get("text"), ASKED_ON: asked_on, **keys}
+    new_entries = [*entries, {**asked, "option": card.get("options", [])}]
+    defects = block_expectation_defects(cast(list[object], new_entries))
+    if defects:
+        raise ExpectationCardDefectError(
+            "; ".join(body_defect_text(ContractDefect(*defect)) for defect in defects)
+        )
+    return replace_block(body, located, {**located.data, "expectation": new_entries})
 
 
 def withdraw_line(body: str, index: int, withdrawn_on: date) -> str:
