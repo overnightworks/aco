@@ -32,10 +32,11 @@ def body_write_outcome(error: ClaimError) -> BodyWriteOutcome:
 
 def patch_item_body(
     run: GitHubRunner, repository: forge.RepositoryId, number: int, body: str
-) -> None:
-    """Send `body` as issue `number`'s body through the caller's `run`."""
+) -> str:
+    """Send `body` as issue `number`'s body through the caller's `run`; the
+    answer is the PATCH response's text."""
     path = f"repos/{repository}/issues/{number}"
-    run(
+    return run(
         ["api", "--method", "PATCH", path, "--input", "-"],
         input_data=json.dumps({"body": body}).encode("utf-8"),
     )

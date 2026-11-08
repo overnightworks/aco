@@ -1,6 +1,8 @@
+import json
+
 import pytest
 
-from aco import forge, github_body_write
+from aco import forge, github, github_body_write
 from aco.protocol import ClaimError
 
 
@@ -26,4 +28,24 @@ def test_a_failed_body_write_is_refused_only_when_nothing_was_written(
     never ran, wrote nothing; every other failure may have written."""
     assert (
         github_body_write.body_write_outcome(error) is github_body_write.BodyWriteOutcome[outcome]
+    )
+
+
+def test_the_write_patches_the_item_with_the_body_as_json() -> None:
+    calls: list[tuple[list[str], bytes | None]] = []
+
+    def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
+        calls.append((arguments, input_data))
+        return '{"body": "new"}'
+
+    answer = github_body_write.patch_item_body(run, github.repository_id("octo/demo"), 79, "new")
+
+    assert (answer, calls) == (
+        '{"body": "new"}',
+        [
+            (
+                ["api", "--method", "PATCH", "repos/octo/demo/issues/79", "--input", "-"],
+                json.dumps({"body": "new"}).encode("utf-8"),
+            )
+        ],
     )
