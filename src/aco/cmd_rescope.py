@@ -380,7 +380,7 @@ def _rescope_transition(
     return _rescope_item_and_claim(context, subject, intent, item, requested.whole_reason)
 
 
-def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) -> int:
+def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) -> None:
     selection = _selected_rescope(parsed, run_context)
     selected = selection.selected
     if isinstance(selected.identity, protocol.IssueIdentity):
@@ -392,10 +392,9 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
     rescoped = new_state.claims[protocol.claim_key(selected.identity, selected.branch)]
     if parsed.json:
         _rescope_json(rescoped)
-        return 0
+        return
     subject = workboard.claim_subject(rescoped, selection.context.config.storage)
     print(f"RESCOPED {subject}: {rescoped.claim_id}")
-    return 0
 
 
 def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
@@ -406,10 +405,11 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     falls to `unavailable`, matching `ask`/`rule`/`brief`'s own catch-all."""
     as_json = parsed.json
     try:
-        return _rescope_write(parsed, context)
+        _rescope_write(parsed, context)
     except _RescopeInvalidUsageError as error:
         return report.refuse(_RescopeReason.INVALID_USAGE, error, as_json=as_json)
     except _RescopePreconditionError as error:
         return report.refuse(_RescopeReason.PRECONDITION_FAILED, error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_RescopeReason.UNAVAILABLE, error, as_json=as_json)
+    return 0
