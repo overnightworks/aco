@@ -705,8 +705,8 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
 # 3 spaces of indent (four make an indented code block), optional space inside
 # the brackets and around the dot, trailing space and a trailing `#` comment.
 _OUTSIDE_HEADER_PATTERN = re.compile(
-    r"^ {0,3}(?P<header>\[\[ *(?:expectation|expectation *\. *option|slice) *\]\]"
-    rf"|\[ *{RECORD_KEY} *\])[ \t]*(?:#.*)?$"
+    r"^ {0,3}(?P<header>\[\[[ \t]*(?:expectation|expectation[ \t]*\.[ \t]*option|slice)[ \t]*\]\]"
+    rf"|\[[ \t]*{RECORD_KEY}[ \t]*\])[ \t]*(?:#.*)?$"
 )
 
 

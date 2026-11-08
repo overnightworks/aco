@@ -65,7 +65,8 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-05] An `aco` fence quoted inside a longer documentation fence is not the item's block, so a body carrying only that one prints `body malformed: aco: no aco block`, exit `2`.
 - [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's section — carries no contract: prose plus one complete block prints `body ok`, exit `0`, except BODY-109.
 - [ ] [BODY-07] A block whose lines end in CRLF is read like any other: a complete CRLF body prints `body ok`, exit `0`; a rewrite keeps CRLF but re-renders the block's fields canonically, not byte-for-byte.
-- [ ] [BODY-109] A `[[expectation]]`, `[[expectation.option]]`, `[[slice]]` or `[record]` line outside every fence, with 0 to 3 leading spaces (four do not count), space inside the brackets or around the dot, trailing space and a trailing `#` comment allowed, prints one `body malformed: aco: <header> on line <line> is outside the aco block` per such line in body order, exit `2` (E-BODY-20); it runs after BODY-01..BODY-04 and is the only defect printed.
+- [ ] [BODY-109] A header line (BODY-110) outside every fence prints `body malformed: aco: <header> on line <n> is outside the aco block` per line in body order, exit `2`, after BODY-01..04, alone.
+- [ ] [BODY-110] A header line: `[[expectation]]`, `[[expectation.option]]`, `[[slice]]` or `[record]`, 0 to 3 leading spaces, blanks inside brackets or around the dot, trailing blanks, a `#` comment.
 
 ## Projection keys
 

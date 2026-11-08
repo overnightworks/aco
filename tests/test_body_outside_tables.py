@@ -47,6 +47,11 @@ class TestBlockTableHeaderOutsideTheBlock:
                 id="space-around-the-dot",
             ),
             pytest.param(
+                block("\n[[\texpectation\t.\toption\t]]\n"),
+                refusal("[[\texpectation\t.\toption\t]]", 8),
+                id="tabs-inside-brackets-and-around-the-dot",
+            ),
+            pytest.param(
                 block(before="[[slice]]\n\n"), refusal("[[slice]]", 1), id="header-above-the-block"
             ),
             pytest.param(
