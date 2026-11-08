@@ -527,7 +527,7 @@ def test_a_ruling_whose_write_the_check_answers_prints_the_check_sentence(
     sentence: str,
     as_json: bool,
 ) -> None:
-    """Spec: RULE-43, OUT-07 -- the check's own sentence, exit 2, `overwritten` (with
+    """Spec: RULE-43, OUT-10, OUT-11 -- the check's own sentence, exit 2, `overwritten` (with
     `kept`) or `not_verified`; the ruling is written."""
     initial = option_item(card())
     reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)

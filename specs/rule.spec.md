@@ -59,6 +59,7 @@ withdrawn one.
 | item body malformed | RULE-28 | RULE-09 | — |
 | `--repo` given, `storage = "state-ref"` | RULE-10 | RULE-09 | — |
 | the body write itself fails | RULE-11 | RULE-11 | — |
+| the body check answers the write | RULE-43 | RULE-43 | — |
 | the item's lock cannot be taken | RULE-41 | RULE-41 | — |
 | two writers of one item on this machine | RULE-40 | — | — |
 | the item's lock is held by another writer | RULE-42 | — | — |
@@ -118,11 +119,12 @@ withdrawn one.
   - and before every other refusal of this file but RULE-39 and the parser's own
 - [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
 - [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
-- [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
+- [ ] [RULE-43] A ruling write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; a re-run reads the body fresh, so it writes again or refuses RULE-04 (see E-RULE-19).
+- [ ] [RULE-11] Every other forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 - [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
 - [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
 - [ ] [RULE-42] A writer that finds the item's lock held prints `waiting for the item lock at <lock path>` once to stderr, then waits and goes on; stdout and `--json` do not change (see E-RULE-18).
-- The turn is a per-machine lock: on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (RULE-11); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
+- The turn is a per-machine lock: on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (RULE-43); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
 
 `reason`, by which refusal fired:
 
@@ -135,6 +137,7 @@ withdrawn one.
 | RULE-17 (the card changed), RULE-37 (the line was withdrawn) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
 | RULE-11 (the write itself fails), RULE-41 (the item's lock) | `unavailable` |
+| RULE-43 (the body check answers the write) | `overwritten` (with `kept`) or `not_verified`, as OUT-11 |
 
 ## Never
 
@@ -243,6 +246,21 @@ $ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash>
 2> waiting for the item lock at <state>/aco/item-locks/<digest>
 RULED <item-id> line 1 A; 0 line(s) still open
 exit 0
+```
+
+### E-RULE-19 — the check finds the ruling written over a change
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, item `#90` open with one open option line, `ghost` editing `#90`'s body by hand between aco's read and its write
+
+```console
+$ aco rule 90 --line 1 --option A --via chat --card-hash <hash> --json
+2> ERROR: #90 body written over a change by ghost at 2026-11-08T10:05:00Z aco had not read; that change is only in the edit history
+{"ok": false, "reason": "overwritten", "kept": true, "message": "#90 body written over a change by ghost at 2026-11-08T10:05:00Z aco had not read; that change is only in the edit history"}
+exit 2
+$ aco rule 90 --line 1 --option A --via chat --card-hash <hash> --json
+2> ERROR: line 1 is already ruled; a changed ruling is a new line
+{"ok": false, "reason": "already_ruled", "message": "line 1 is already ruled; a changed ruling is a new line"}
+exit 2
 ```
 
 ### E-RULE-08 — card fields survive a ruling

@@ -1,5 +1,5 @@
 """`aco item edit --size` and `--whole` answer the forge's check of their body write
-(`specs/output.spec.md` OUT-07, `specs/item.spec.md` ITEM-76): the body was written, so
+(`specs/output.spec.md` OUT-10, OUT-11, `specs/item.spec.md` ITEM-66): the body was written, so
 the answer is never `precondition_failed`. The forge is the only fake."""
 
 import json
@@ -53,7 +53,7 @@ def test_an_edit_whose_write_the_check_answers_prints_the_check_sentence(
     edit: tuple[str, ...],
     as_json: bool,
 ) -> None:
-    """Spec: ITEM-76, OUT-07 -- the check's own sentence, exit 2, `overwritten` (with
+    """Spec: ITEM-66, OUT-10, OUT-11 -- the check's own sentence, exit 2, `overwritten` (with
     `kept`) or `not_verified`; the field is written."""
     client = serve_forge(
         monkeypatch,

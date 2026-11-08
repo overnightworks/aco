@@ -11,7 +11,10 @@ own `reason` vocabulary with examples (`specs/rule.spec.md`,
 own spec cites this file, including the refusals that fire
 before the
 named command starts (OUT-05) and the ones the argument parser itself
-raises on the way into a command that declares `--json` (OUT-06).
+raises on the way into a command that declares `--json` (OUT-06). It also
+owns the sentences and the two `reason` tokens, `overwritten` and
+`not_verified`, of a body write the forge's check answers (OUT-10, OUT-11), shared
+by every writer that answers it.
 
 ## Behavior table
 
@@ -23,18 +26,22 @@ raises on the way into a command that declares `--json` (OUT-06).
 | a refusal the argument parser itself raises | OUT-01, OUT-06 |
 | `--repo` given a value not shaped OWNER/REPO | OUT-08 |
 | a long option spelled short of its full name | OUT-09 |
+| a body write the forge's check finds overwritten or not verified | OUT-10, OUT-11 |
 
 ## The envelope
 
 - [ ] [OUT-01] Every migrated command's `--json` object prints `ok` first and `reason` second, in that order, before any of the command's own payload keys.
-- [ ] [OUT-02] `ok` is `true` only for that command's own success outcome; `reason` is always one stable token from that command's own enum, documented by its own spec, never a free sentence.
+- [ ] [OUT-02] `ok` is `true` only for that command's own success outcome; `reason` is always one stable token from that command's own enum or a shared one this file owns (OUT-05, OUT-06, OUT-11), never a free sentence.
 - [ ] [OUT-03] A refusal's `reason` names its enum member, never an `error` object; an optional `message` -- the refusal's own sentence, as its text form prints it -- is always the last key.
 - [ ] [OUT-05] A refusal raised before the named command starts -- a missing identity, `release`'s branch checks -- prints this envelope, `reason` `precondition_failed`, its sentence as `message`.
 - [ ] [OUT-06] A parser refusal on a command declaring `--json` -- an unknown flag, a missing required one, an unreadable positional -- prints this envelope, `invalid_usage`, exit `2` (see E-OUT-04).
 - [ ] [OUT-07] The exit code answers before the object does: a refusal is never exit `0`, so a caller reads the code, then `ok` and `reason`, then the payload keys.
 - [ ] [OUT-08] On every command, `--repo` not shaped OWNER/REPO refuses `repository must be OWNER/REPO, not '<value>'`, exit `2`, before any git or forge call; with `--json` as OUT-06 (see E-OUT-05).
 - [ ] [OUT-09] On every command, a long option spelled short of its full name is never read as that option: it is a parser refusal, exit `2`, with `--json` as OUT-06 (see E-OUT-06).
+- [ ] [OUT-10] A body write the forge's check finds overwritten, written over a change aco had not read, or not verified refuses with the check's sentence, exit `2`; the body was written.
+- [ ] [OUT-11] Under `--json`, OUT-10 reports `reason: "overwritten"` with `kept` (true or false) after the command's payload keys, or `"not_verified"` without `kept`; `message` stays last (see E-OUT-07).
 - OUT-04 (retired).
+- The check's sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (`kept` true) or `#<n> body written, not verified (<cause>)`; `kept` false means a later revision replaced the write, true means the change it wrote over stands only in the edit history.
 
 ## Never
 
@@ -135,3 +142,16 @@ exit 2
 ```
 
 `refs/aco/state` is unchanged after the first call: no export, no delete.
+
+### E-OUT-07 -- the check finds a write overwritten, then not verified
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, item `#90` open with one open option line, `ghost` editing `#90`'s body by hand right after `aco rule` wrote it
+
+```console
+$ aco rule 90 --line 1 --option A --via chat --card-hash <hash> --json
+2> ERROR: #90 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z
+{"ok": false, "reason": "overwritten", "kept": false, "message": "#90 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z"}
+exit 2
+```
+
+With the edit history unreadable instead, `ERROR: #90 body written, not verified (<cause>)` and `{"ok": false, "reason": "not_verified", "message": "#90 body written, not verified (<cause>)"}`.

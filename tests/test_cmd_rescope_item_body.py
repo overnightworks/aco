@@ -224,7 +224,7 @@ def test_a_rescope_whose_body_write_the_check_answers_leaves_the_claim_and_a_rer
     sentence: str,
     as_json: bool,
 ) -> None:
-    """Spec: RESC-26, OUT-07 -- the check's own sentence, exit 2, the reason, the claim as
+    """Spec: RESC-34, OUT-10, OUT-11 -- the check's own sentence, exit 2, the reason, the claim as
     it stood; the same rescope again completes it."""
     standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
     served = serve_body(monkeypatch, complete_contract("Build it."))

@@ -477,7 +477,7 @@ def test_a_withdrawal_whose_write_the_check_answers_prints_the_check_sentence(
     sentence: str,
     as_json: bool,
 ) -> None:
-    """Spec: WITHDRAW-17, OUT-07 -- the check's own sentence, exit 2, `overwritten` (with
+    """Spec: WITHDRAW-17, OUT-10, OUT-11 -- the check's own sentence, exit 2, `overwritten` (with
     `kept`) or `not_verified`; the withdrawal is written."""
     initial = item_body(card())
     served = item_forge(initial)
