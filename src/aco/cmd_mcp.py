@@ -98,6 +98,12 @@ def record_answer(
     }
 
 
+def _holds_step(title: str, step: object, *, wanted_title: str, wanted_step: str) -> bool:
+    """Whether an item with `title` and `next` value `step` is the one a call
+    for `wanted_title` and `wanted_step` marks, padding of `next` ignored."""
+    return title == wanted_title and isinstance(step, str) and step.strip() == wanted_step
+
+
 def _standing_step_item(context: RunContext, title: str, text: str) -> int | None:
     """The highest number among the open, readable items a member wrote with
     exactly `title` and a block `next` equal to `text`, whether or not they
@@ -107,8 +113,12 @@ def _standing_step_item(context: RunContext, title: str, text: str) -> int | Non
         issue.number
         for issue in context.forge.list_open_board_issues()
         if issue.author_is_member
-        and issue.title == title
-        and body.parse_body(issue.body, storage=storage).contract.next == text
+        and _holds_step(
+            issue.title,
+            body.parse_body(issue.body, storage=storage).contract.next,
+            wanted_title=title,
+            wanted_step=text,
+        )
     )
     return max(standing, default=None)
 
@@ -144,8 +154,11 @@ def _mark_in_turn(
     with decide.turn(
         context, number, command="step", environment=os.environ, home=Path.home()
     ) as fresh:
-        if standing_title is not None and (
-            fresh.title != standing_title or fresh.located.data.get("next") != text
+        if standing_title is not None and not _holds_step(
+            fresh.title,
+            fresh.located.data.get("next"),
+            wanted_title=standing_title,
+            wanted_step=text,
         ):
             return False
         decide.mark_step(context, fresh, text)

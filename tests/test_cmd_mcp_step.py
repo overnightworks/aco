@@ -210,6 +210,7 @@ def _standing(
     [
         pytest.param(_standing(2), TITLE, 2, False, id="same-title-and-step-without-the-label"),
         pytest.param(_standing(2), f"  {TITLE}\n", 2, False, id="padded-title"),
+        pytest.param(_standing(2, f"  {STEP}\n"), TITLE, 2, False, id="hand-written-padded-next"),
         pytest.param(
             {**_standing(2), **_standing(4), **_standing(3)}, TITLE, 4, False, id="highest"
         ),
