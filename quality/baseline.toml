@@ -19,7 +19,7 @@
 "src/aco/cli.py" = 829
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 919
-"src/aco/github.py" = 1484
+"src/aco/github.py" = 1485
 "src/aco/protocol.py" = 1865
 "src/aco/state_board.py" = 923
 "src/aco/store.py" = 1742
