@@ -1640,7 +1640,8 @@ class TestStateRefBoardWrites:
         second = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
         read = first.item_reference(CHILD_A_NUMBER).body
         second_body = second.item_reference(CHILD_A_NUMBER).body
-        assert read is not None and second_body is not None
+        assert read is not None
+        assert second_body is not None
 
         first.update_item_body(
             CHILD_A_NUMBER, read.replace("Prose.", "First writer.", 1), replacing=""
