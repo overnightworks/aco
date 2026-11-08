@@ -47,7 +47,7 @@ left, never a withdrawn one.
 - [ ] [WITHDRAW-11] A MALFORMED item body refuses `<label> <body defect sentence>; withdraw needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref`.
 - [ ] [WITHDRAW-12] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
 - [ ] [WITHDRAW-13] A forge failure, the item read and the body write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
-- [ ] [WITHDRAW-15] Every withdrawal runs in the item's turn (RULE-40): writers of one item through aco on this machine are serialized, so a withdrawal and a ruling on distinct lines both land.
+- [ ] [WITHDRAW-15] Every withdrawal runs in the item's turn (RULE-40): writers of one item on this machine are serialized, so a withdrawal and a ruling on distinct lines both land; a held lock prints RULE-42's line.
 - [ ] [WITHDRAW-16] A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
 - [ ] [WITHDRAW-14] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
 

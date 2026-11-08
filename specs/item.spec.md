@@ -49,6 +49,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | `--size` given, valid or invalid | ITEM-20 | — | ITEM-21, ITEM-22, ITEM-49, ITEM-51 | — |
 | `--whole` given, valid or invalid | ITEM-23 | — | ITEM-24, ITEM-49, ITEM-51 | — |
 | `--size`, `--whole` or `--kind` naming the value already set | — | — | ITEM-64 | — |
+| the item's lock is held, or cannot be taken | — | — | ITEM-65 | — |
 | prose piped without a block, or nothing piped, either storage | ITEM-58, ITEM-60 | — | — | — |
 | a piped block a flag agrees with or contradicts, either storage | ITEM-59, ITEM-62 | — | — | — |
 | state-ref pin, a stored body leaving a section empty | ITEM-61 | — | — | — |
@@ -160,6 +161,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   exit 2
   ```
 - [ ] [ITEM-64] `--size`, `--whole` or `--kind` naming the value already set prints `UNCHANGED #<n> <field>=<value>` (`--json`: `reason: "unchanged"`, ITEM-22/24/47's keys), exit `0`, and writes nothing.
+- [ ] [ITEM-65] `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
 
   ```console
   $ aco item edit 484 --size S
@@ -495,3 +497,20 @@ exit 2
 
 `#95`'s body is `Ship the importer.`, a blank line, then the block holding
 `now`, `next`, `done_when` and `size = "S"`; the refused run creates nothing.
+
+### E-ITEM-17 — a narrow edit waits for the item's lock, or cannot take it
+
+Setup: bare-remote, bootstrapped, `<n>` open with a valid `aco` block, another `aco` writer of `<n>` running; then `XDG_STATE_HOME` naming a regular file
+
+```console
+$ aco item edit <n> --size L
+2> waiting for the item lock at <state>/aco/item-locks/<digest>
+EDITED #<n> size=L
+exit 0
+$ aco item edit <n> --size L --json
+2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
+{"ok": false, "reason": "precondition_failed", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
+exit 2
+```
+
+The refused run reads and writes nothing.

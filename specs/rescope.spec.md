@@ -49,6 +49,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 | combined scope equals the current scope | RESC-08 | RESC-08 | RESC-08 | — |
 | drop leaves nothing and nothing is added | — | RESC-09 | — | — |
 | the item body holds no valid block | RESC-24 | RESC-24 | — | — |
+| the item's lock is held, or cannot be taken | RESC-33 | RESC-33 | — | RESC-33 |
 | combined scope is wide | RESC-10, RESC-25 | RESC-10, RESC-25 | — | RESC-11, RESC-25 |
 | a clean combine | RESC-12, RESC-13, RESC-22 | RESC-12, RESC-13, RESC-22 | — | RESC-12, RESC-13, RESC-22 |
 | the claim write fails after the body write | RESC-23 | RESC-23 | — | RESC-23 |
@@ -95,6 +96,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-22] For an issue claim, one rescope writes the combined scope into the item body's own `scope`, then the claim; a lane claim names no item, so only its claim moves (see E-RESC-01).
 - [ ] [RESC-23] A claim write failing after the body write refuses `<label> body scope now reads <scope>, but the claim was not rescoped: <error>; run the same rescope again`, exit `2` (see E-RESC-08).
 - [ ] [RESC-24] An item body without a valid `aco` block refuses `<label> <defect>; rescope needs a valid aco block`, exit `2`, before either write; a failed body write leaves the claim as it stood.
+- [ ] [RESC-33] For an issue claim, `rescope` runs from the item read through the claim write in the item's turn (RULE-40): a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-RESC-10).
 - [ ] [RESC-25] An issue claim's wide scope is admitted by `--whole`, the stored reason, or the body's own `whole`, as `claim` judges it (CLM-22), and `--whole` is written into the body too.
 
 ## `--json`'s own `reason` vocabulary
@@ -229,3 +231,20 @@ $ aco rescope 42 --add <worktree>/README.md --json
 {"ok": false, "reason": "unavailable", "message": "cannot determine the trunk: canonical remote 'upstream' is not configured"}
 exit 2
 ```
+
+### E-RESC-10 — a rescope waits for the item's lock, or cannot take it
+
+Setup: bare-remote, bootstrapped, `<n>` open with a valid `aco` block, a live claim on `<n>` held by this session, another `aco` writer of `<n>` running; then `XDG_STATE_HOME` naming a regular file
+
+```console
+$ aco rescope <n> --add src/new.py
+2> waiting for the item lock at <state>/aco/item-locks/<digest>
+RESCOPED #<n>: <claim-id>
+exit 0
+$ aco rescope <n> --add src/other.py --json
+2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
+{"ok": false, "reason": "unavailable", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
+exit 2
+```
+
+The refused run changes neither the body nor the claim.

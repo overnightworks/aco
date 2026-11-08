@@ -134,15 +134,20 @@ operator (`specs/mcp.spec.md`).
 
 ### The per-item turn
 
-Every write of an item's expectation lines (`aco rule`, `aco withdraw`, the
-board's decision) runs inside `decide.turn`: an exclusive `flock` (`file_lock`,
-shared with the lineage stamp) on one file per item under aco's XDG state
-directory, named by a digest of the forge repository id and the item number,
-then the fresh read, then one write. Writers on this machine therefore never
-overwrite each other's rulings. A GitHub body write has no precondition, so a
-hand edit or another machine is not covered; under `state-ref` the store's
-compare-and-swap still refuses a stale write. The board keeps its own
-in-process turn for its shutdown drain (`specs/serve.spec.md`).
+Every write of an item's body runs under one per-item lock (`decide.item_lock`):
+an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file per
+item under aco's state directory (`repositories.state_directory`), named by a
+digest of the forge repository id and the item number. `decide.turn` is that lock
+plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
+decision, `aco item edit --size/--whole` and `aco rescope` (through its claim
+transition) write inside it. `aco cut` takes the lock alone, from before its first
+forge use through its container write, because it judges from the open-board
+listing, not the item read. A writer that finds the lock held prints one line to
+stderr and waits. Writers on this machine therefore never overwrite each other's
+bodies. A GitHub body write has no precondition, so a hand edit or another machine
+is not covered; under `state-ref` the store's compare-and-swap still refuses a
+stale write. The board keeps its own in-process turn for its shutdown drain
+(`specs/serve.spec.md`).
 
 ### Proof strategy
 
