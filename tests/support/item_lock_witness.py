@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from github_fixtures import FakeForge
 
-from aco import forge, workboard
+from aco import forge, protocol, store, workboard
 
 WAIT_SECONDS = 10
 
@@ -48,6 +48,8 @@ class LockWitnessForge(FakeForge):
         self.lock_held_at_reads: list[bool] = []
         self.lock_held_at_listings: list[bool] = []
         self.lock_held_at_writes: list[bool] = []
+        self.lock_held_at_state_fetches: list[bool] = []
+        self.lock_held_at_claim_writes: list[bool] = []
         self.pause_first_call = pause_first_call
         self.first_call_reached = threading.Event()
         self.release_first_call = threading.Event()
@@ -62,11 +64,40 @@ class LockWitnessForge(FakeForge):
 
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         self.lock_held_at_listings.append(self._witness())
-        return super().list_open_board_issues()
+        return tuple(
+            replace(issue, body=self.item_bodies[issue.number])
+            if issue.number in self.item_bodies
+            else issue
+            for issue in super().list_open_board_issues()
+        )
 
     def update_item_body(self, number: int, body: str) -> None:
         self.lock_held_at_writes.append(self._witness())
         super().update_item_body(number, body)
+
+    def witness_claim_store(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Also records, at every fetch of the state ref and every claim write of
+        the run, whether the item's lock is held."""
+        fetch_state, commit_transition = store.fetch_state, store.commit_transition
+
+        def fetch_witnessed(*, worktree: Path, remote: str) -> protocol.ClaimState:
+            self.lock_held_at_state_fetches.append(self._lock_is_held())
+            return fetch_state(worktree=worktree, remote=remote)
+
+        def commit_witnessed(
+            *,
+            observed: store.Observation,
+            subject: store.TransitionSubject,
+            intent: protocol.ClaimTransitionIntent,
+            transport: store.PushTransport | None = None,
+        ) -> protocol.ClaimState:
+            self.lock_held_at_claim_writes.append(self._lock_is_held())
+            return commit_transition(
+                observed=observed, subject=subject, intent=intent, transport=transport
+            )
+
+        monkeypatch.setattr(store, "fetch_state", fetch_witnessed)
+        monkeypatch.setattr(store, "commit_transition", commit_witnessed)
 
     def _witness(self) -> bool:
         held = self._lock_is_held()

@@ -3,6 +3,7 @@ worktrees and the real state ref: both owners of the scope move together, a
 failed write names what went through, and a body that cannot carry the scope
 or whose `whole` is defective changes neither. The forge is the only fake."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,7 @@ HELD_SCOPE = ("src/widget.py",)
 FOUR_FILE_REASON = "the four files share one lock"
 BOUND_SENTENCE = "whole reason must be one bounded non-empty line"
 NEW_FILE = "src/new.py"
+OTHER_NEW_FILE = "src/other.py"
 
 
 @pytest.fixture
@@ -261,14 +263,21 @@ def test_a_rescope_reads_and_writes_the_item_body_while_its_lock_is_held(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: RESC-33 -- the item read and the body write are under the item's lock."""
+    """Spec: RESC-33 -- the item read, the body write and the claim write are under the
+    item's lock, and the claim state the turn judges is read after the lock is taken."""
     stand_in(standing=held_by_ada(HELD_SCOPE))
     client = serve_witness(monkeypatch, tmp_path)
+    client.witness_claim_store(monkeypatch)
 
     result = run_cli(rescope_arguments("--add", NEW_FILE), capsys)
 
     assert (result.status, result.stderr) == (0, "")
-    assert (client.lock_held_at_reads, client.lock_held_at_writes) == ([True], [True])
+    assert (
+        client.lock_held_at_reads,
+        client.lock_held_at_writes,
+        client.lock_held_at_claim_writes,
+        client.lock_held_at_state_fetches[-1],
+    ) == ([True], [True], [True], True)
 
 
 def test_a_second_rescope_says_it_waits_for_the_lock_and_writes_after_the_first(
@@ -277,9 +286,12 @@ def test_a_second_rescope_says_it_waits_for_the_lock_and_writes_after_the_first(
     """Spec: RESC-33, RULE-42 -- the wait line, then the second run's read and write."""
     stand_in(standing=held_by_ada(HELD_SCOPE))
     client = serve_witness(monkeypatch, tmp_path, pause_first_call=True)
+    client.witness_claim_store(monkeypatch)
+
+    added = iter([NEW_FILE, OTHER_NEW_FILE])
 
     def writer() -> int:
-        return cli.main(rescope_arguments("--add", NEW_FILE))
+        return cli.main(rescope_arguments("--add", next(added)))
 
     contended = run_second_writer_beside_the_first(monkeypatch, client, writer)
 
@@ -287,3 +299,36 @@ def test_a_second_rescope_says_it_waits_for_the_lock_and_writes_after_the_first(
     assert contended.stderr == f"waiting for the item lock at {client.the_lock_file()}\n"
     assert contended.body_writes_when_the_second_waited == 0
     assert (client.lock_held_at_reads, client.lock_held_at_writes) == ([True, True], [True, True])
+    assert client.lock_held_at_claim_writes == [True, True]
+    assert written_scope_and_whole(client)[0] == (NEW_FILE, OTHER_NEW_FILE, *HELD_SCOPE)
+
+
+def test_an_unwritable_lock_directory_refuses_unavailable_and_changes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    tmp_path: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: RESC-33, RULE-41 -- a lock the item cannot take names its path; the body
+    and the claim stay."""
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
+    client = serve_witness(monkeypatch, tmp_path)
+    tip = state_ref_tip(bare_remote)
+    held = claimed_here(standpoint)
+
+    result = run_cli([*rescope_arguments("--add", NEW_FILE), "--json"], capsys)
+
+    assert (
+        result.status,
+        result.stderr.startswith(
+            f"ERROR: cannot lock the item at {blocker / 'aco' / 'item-locks'}"
+        ),
+        json.loads(result.stdout)["reason"],
+        client.body_writes,
+        state_ref_tip(bare_remote),
+        claimed_here(standpoint).scope,
+    ) == (2, True, "unavailable", [], tip, held.scope)

@@ -309,6 +309,15 @@ def _selected_rescope(
     path_checkout = _rescope_checkout(paths)
     checkout_context = run_context.for_directory(path_checkout.toplevel, is_toplevel=True)
     requested = _rescope_command(parsed, paths, path_checkout, checkout_context)
+    return _judged_selection(requested, checkout_context)
+
+
+def _judged_selection(
+    requested: protocol.RescopeRequest,
+    checkout_context: session.RunContext,
+) -> _RescopeSelection:
+    """`requested` judged against `checkout_context`'s own observation of the
+    state ref: the live claim, its claimant and the scope it would end with."""
     observed = checkout_context.observation
     protocol.require_state_ref(observed)
     try:
@@ -375,8 +384,9 @@ def _rescope_write(parsed: argparse.Namespace, run_context: session.RunContext) 
     selection = _selected_rescope(parsed, run_context)
     selected = selection.selected
     if isinstance(selected.identity, protocol.IssueIdentity):
-        with _item_turn(selection.context, selected.identity.issue) as item:
-            new_state = _rescope_transition(selection, item)
+        locked = selection.context.observed_afresh()
+        with _item_turn(locked, selected.identity.issue) as item:
+            new_state = _rescope_transition(_judged_selection(selection.requested, locked), item)
     else:
         new_state = _rescope_transition(selection, None)
     rescoped = new_state.claims[protocol.claim_key(selected.identity, selected.branch)]

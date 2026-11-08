@@ -73,21 +73,36 @@ def test_the_notice_comes_once_when_another_holder_has_the_lock_and_never_when_i
 
 
 def test_a_contender_that_asks_for_no_notice_waits_for_the_holder_in_silence(
-    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     path = tmp_path / "stamp"
+    refused = threading.Event()
+    released = threading.Event()
     acquired = threading.Event()
+    released_when_acquired: list[bool] = []
+    flock = fcntl.flock
+
+    def flock_noting_a_refusal(descriptor: int, operation: int) -> None:
+        try:
+            flock(descriptor, operation)
+        except BlockingIOError:
+            refused.set()
+            raise
+
+    monkeypatch.setattr(fcntl, "flock", flock_noting_a_refusal)
 
     def contender() -> None:
         with file_lock.held(path):
+            released_when_acquired.append(released.is_set())
             acquired.set()
 
     thread = threading.Thread(target=contender)
     try:
         with file_lock.held(path):
             thread.start()
-            acquired_while_held = acquired.wait(timeout=0.2)
+            assert refused.wait(timeout=10)
+            released.set()
     finally:
         if thread.ident is not None:
             thread.join(timeout=10)
-    assert (acquired_while_held, acquired.is_set()) == (False, True)
+    assert (released_when_acquired, acquired.is_set()) == ([True], True)
