@@ -361,4 +361,4 @@ $ aco cut <n> --title "Slice A" --json
 exit 2
 ```
 
-The refused run reads the board and writes nothing.
+The refused run reads and writes nothing.
