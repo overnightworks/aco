@@ -1397,16 +1397,11 @@ class GitHubForge:
             ) from error
         return child
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:  # NOSONAR(S1172)
+        """`replacing` is the port's contract; the PATCH does not read it."""
+        path = f"repos/{self.repository}/issues/{number}"
         self._run(
-            [
-                "api",
-                "--method",
-                "PATCH",
-                f"repos/{self.repository}/issues/{number}",
-                "--input",
-                "-",
-            ],
+            ["api", "--method", "PATCH", path, "--input", "-"],
             input_data=json.dumps({"body": body}).encode("utf-8"),
         )
 

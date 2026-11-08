@@ -201,7 +201,7 @@ class BoardForge:
             item_state, item.title, item.body, author_is_member=item.author_is_member
         )
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         self._log(ForgeRequest(ForgeOperation.WRITE_BODY, number))
         state = self._state()
         failure = state.write_failure

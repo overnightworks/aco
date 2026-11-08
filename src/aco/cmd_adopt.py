@@ -110,12 +110,12 @@ def _refusal_around_forge_error(
     )
 
 
-def _write_and_read_back(adoption: _Adoption, left_body: str) -> None:
-    """ADOPT-24, ADOPT-25, ADOPT-27, ADOPT-28: writes `left_body`, then reads
+def _write_and_read_back(adoption: _Adoption, left_body: str, *, replacing: str) -> None:
+    """ADOPT-24, ADOPT-25, ADOPT-27, ADOPT-28: writes `left_body` over `replacing`, then reads
     the body back; every failure leaves the claim standing."""
     number = adoption.number
     try:
-        adoption.run.forge_writer.update_item_body(number, left_body)
+        adoption.run.forge_writer.update_item_body(number, left_body, replacing=replacing)
     except protocol.ClaimError as error:
         template = _BODY_WRITE_FAILED[github.body_write_outcome(error)]
         raise _refusal_around_forge_error(template, number, error) from error
@@ -151,7 +151,7 @@ def _leave_the_line(adoption: _Adoption, *, resumed: bool) -> None:
     if isinstance(left_body, workboard.ClassificationDefect):
         raise protocol.ClaimUnavailableError(f"pull request #{number} {left_body.message}")
     if left_body is not None:
-        _write_and_read_back(adoption, left_body)
+        _write_and_read_back(adoption, left_body, replacing=reread or "")
     _print_declaration(adoption)
 
 

@@ -889,7 +889,7 @@ class TestMalformedItem:
         repair = _state_ref_body(_CHILD_A_PROJECTION, record)
 
         with pytest.raises(protocol.ClaimError) as refused:
-            adapter.update_item_body(MALFORMED_NUMBER, repair)
+            adapter.update_item_body(MALFORMED_NUMBER, repair, replacing="")
 
         assert str(refused.value) == refusal
 
@@ -903,7 +903,7 @@ class TestMalformedItem:
         )
 
         with pytest.raises(MalformedStateTreeError) as refused:
-            adapter.update_item_body(CHILD_A_NUMBER, edit)
+            adapter.update_item_body(CHILD_A_NUMBER, edit, replacing="")
 
         assert str(refused.value) == _malformed_item_refusal(_malformed_block(BLANK_TITLE_DEFECT))
 
@@ -1396,7 +1396,7 @@ class TestStateRefBoardWrites:
         before_record = _decoded_record(before_body, CHILD_A_ID)
         new_body = before_body.replace("Prose.", "Edited prose.", 1)
 
-        adapter.update_item_body(CHILD_A_NUMBER, new_body)
+        adapter.update_item_body(CHILD_A_NUMBER, new_body, replacing="")
 
         # Visible on this same instance without a re-fetch (proof 2: "the
         # same process sees it").
@@ -1474,7 +1474,7 @@ class TestStateRefBoardWrites:
         body = adapter.item_reference(CHILD_A_NUMBER).body
         assert body is not None
         edited = body.replace("Prose.", "Edited prose.", 1)
-        adapter.update_item_body(CHILD_A_NUMBER, edited)
+        adapter.update_item_body(CHILD_A_NUMBER, edited, replacing="")
         landed = adapter.item_reference(CHILD_A_NUMBER).body
         writer.write_item(
             MALFORMED_ID,
@@ -1487,7 +1487,7 @@ class TestStateRefBoardWrites:
         re_edited = edited.replace("Edited", "Re-edited", 1)
 
         with pytest.raises(protocol.ClaimUnavailableError) as refusal:
-            adapter.update_item_body(CHILD_A_NUMBER, re_edited)
+            adapter.update_item_body(CHILD_A_NUMBER, re_edited, replacing="")
 
         assert str(refusal.value) == protocol.ITEMS_WRITTEN_SINCE_CHECKED
         fresh = _fetch_state_ref_board(bare_remote, worktree)
@@ -1577,7 +1577,7 @@ class TestStateRefBoardWrites:
         before_record = _decoded_record(before_body, CHILD_B_ID)
         delivered_body = getattr(self, delivered_body_factory)()
 
-        adapter.update_item_body(CHILD_B_NUMBER, delivered_body)
+        adapter.update_item_body(CHILD_B_NUMBER, delivered_body, replacing="")
 
         after = adapter.item_reference(CHILD_B_NUMBER)
         assert after.body is not None
@@ -1621,7 +1621,7 @@ class TestStateRefBoardWrites:
             ),
         )
 
-        adapter.update_item_body(CONTAINER_NUMBER, delivered_body)
+        adapter.update_item_body(CONTAINER_NUMBER, delivered_body, replacing="")
 
         after = adapter.item_reference(CONTAINER_NUMBER)
         assert after.body is not None
@@ -1630,24 +1630,24 @@ class TestStateRefBoardWrites:
     def test_a_second_write_from_the_same_read_state_refuses_and_overwrites_nothing(
         self, bare_remote: Path, worktree: Path
     ) -> None:
-        """Proof 3: two writers both read the item at the same oid; the
-        first write lands, the second -- still holding that now-stale oid --
-        refuses with the CAS-20 sentence, and the remote keeps the first
-        writer's content."""
+        """Proof 3: two writers both read the item at the same oid; the first write
+        lands, the second -- still holding that now-stale oid -- refuses with the
+        CAS-20 sentence, and the remote keeps the first writer's content."""
         push_item_tree(bare_remote, worktree, _item_files())
         writer = self._writer(bare_remote, worktree)
         first = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
         second = _fetch_state_ref_board(bare_remote, worktree, writer=writer)
-        first_body = first.item_reference(CHILD_A_NUMBER).body
+        read = first.item_reference(CHILD_A_NUMBER).body
         second_body = second.item_reference(CHILD_A_NUMBER).body
-        assert first_body is not None
+        assert read is not None
         assert second_body is not None
 
-        first.update_item_body(CHILD_A_NUMBER, first_body.replace("Prose.", "First writer.", 1))
+        first.update_item_body(
+            CHILD_A_NUMBER, read.replace("Prose.", "First writer.", 1), replacing=""
+        )
         second_writer_body = second_body.replace("Prose.", "Second writer.", 1)
-
         with pytest.raises(ClaimUnavailableError, match="written since it was read"):
-            second.update_item_body(CHILD_A_NUMBER, second_writer_body)
+            second.update_item_body(CHILD_A_NUMBER, second_writer_body, replacing="")
         state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
         assert state.tip is not None
         stored = store.read_item_files(worktree, state.tip)[f"{CHILD_A_ID}.md"]
@@ -1672,7 +1672,7 @@ class TestStateRefBoardWrites:
         before = store.fetch_state(worktree=worktree, remote=str(bare_remote))
 
         with pytest.raises(ClaimUnavailableError) as refused:
-            adapter.update_item_body(CHILD_A_NUMBER, oversized)
+            adapter.update_item_body(CHILD_A_NUMBER, oversized, replacing="")
 
         assert str(refused.value) == (
             "body malformed: size: size must be S, M, or L; "
@@ -4764,7 +4764,7 @@ class TestCliStateRefForge:
 
         second_writer_body = second_body.replace("Prose.", "Second writer.", 1)
         with pytest.raises(ClaimUnavailableError, match="written since it was read"):
-            second.update_item_body(CHILD_A_NUMBER, second_writer_body)
+            second.update_item_body(CHILD_A_NUMBER, second_writer_body, replacing="")
 
         remote_url = f"file://{bare_remote}"
         state = store.fetch_state(worktree=worktree, remote=remote_url)

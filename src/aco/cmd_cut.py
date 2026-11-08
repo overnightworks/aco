@@ -61,10 +61,12 @@ def _cut_target(
 
 @dataclass(frozen=True)
 class _SliceRowRemoval:
-    """`container`'s rewritten body, the cut row removed by `body.remove_slice_row` from its
-    `aco` block, and `step`, the words naming that write."""
+    """`container`'s body as listed, `replacing`, and `new_body`, that body with the
+    cut row removed by `body.remove_slice_row` from its `aco` block, and
+    `step`, the words naming that write."""
 
     container: int
+    replacing: str
     new_body: str
     step: str
 
@@ -82,7 +84,9 @@ def _link_created_child(
     identical re-run finishes.
     """
     try:
-        client.update_item_body(removal.container, removal.new_body)
+        decide.write_item_body(
+            client, removal.container, removal.new_body, replacing=removal.replacing
+        )
     except protocol.ClaimError as error:
         raise forge.ForgePartialChildCreationError(
             child=child,
@@ -448,6 +452,7 @@ def _cut_slice(
             new_data = body.remove_slice_row(located, link.index)
             removal = _SliceRowRemoval(
                 container=number,
+                replacing=target.body,
                 new_body=body.replace_block(target.body, located, new_data),
                 step=f"remove row {link.index} from {label}'s {body.BLOCK_FENCE_INFO} block",
             )

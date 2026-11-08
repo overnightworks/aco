@@ -858,13 +858,13 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
 
 
 @pytest.mark.parametrize(
-    ("arrange", "arguments", "kind", "written_body", "declaration", "whole_reason"),
+    ("arrange", "arguments", "kind", "bodies", "declaration", "whole_reason"),
     [
         pytest.param(
             _serve_a_human_author,
             [],
             "fix",
-            "Bump x\n\nNo-Item: fix",
+            ("Bump x", "Bump x\n\nNo-Item: fix"),
             _declaration("fix", "octocat"),
             None,
             id="cell-19-human-author-fix",
@@ -873,7 +873,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             lambda world, _monkeypatch: _list_files_named(4)(world),
             ["--whole", "one pull request"],
             "fix",
-            "Bump x\n\nNo-Item: fix",
+            ("Bump x", "Bump x\n\nNo-Item: fix"),
             _declaration("fix"),
             "one pull request",
             id="cell-15-four-paths-with-a-whole-reason",
@@ -882,7 +882,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             _run_from_a_linked_worktree,
             [],
             "deps",
-            ADOPTED_BODY,
+            ("Bump x", ADOPTED_BODY),
             _declaration("deps"),
             None,
             id="cell-17-run-from-a-linked-worktree",
@@ -891,7 +891,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             _serve_an_empty_body,
             [],
             "deps",
-            "No-Item: deps",
+            ("", "No-Item: deps"),
             _declaration("deps"),
             None,
             id="cell-21-empty-body",
@@ -900,7 +900,7 @@ def _run_from_a_linked_worktree(world: AdoptionWorld, monkeypatch: pytest.Monkey
             _edit_the_prose_before_the_re_read,
             [],
             "deps",
-            "Bump x, edited\n\nNo-Item: deps",
+            ("Bump x, edited", "Bump x, edited\n\nNo-Item: deps"),
             _declaration("deps"),
             None,
             id="cell-29-prose-edited-between-the-check-and-the-re-read",
@@ -914,7 +914,7 @@ def test_adopt_writes_the_line_onto_the_body_it_read_last(
     arrange: Callable[[AdoptionWorld, pytest.MonkeyPatch], None],
     arguments: list[str],
     kind: str,
-    written_body: str,
+    bodies: tuple[str, str],
     declaration: str,
     whole_reason: str | None,
 ) -> None:
@@ -928,9 +928,9 @@ def test_adopt_writes_the_line_onto_the_body_it_read_last(
     claim = _adopted_claim(world)
     assert result.stdout.startswith(_build_lines(world) + _claimed_line(claim))
     assert result.stdout.endswith(declaration)
-    assert (claim.agent, claim.role) == ("Ada", "builder")
-    assert claim.whole_reason == whole_reason
-    assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, written_body)]
+    assert (claim.agent, claim.role, claim.whole_reason) == ("Ada", "builder", whole_reason)
+    assert world.forge.body_writes == [(ADOPTED_PULL_REQUEST, bodies[1])]
+    assert world.forge.body_replacings == [bodies[0]]
 
 
 def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(

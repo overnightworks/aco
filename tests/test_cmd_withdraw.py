@@ -168,7 +168,7 @@ class TestWithdrawn:
         result = run_cli(["withdraw", "7", "--line", "2", "--line", "3", *flags], capsys)
         before = entries(raw)
         assert (result.status, result.stdout) == (0, printed)
-        assert len(client.body_writes) == 1
+        assert (len(client.body_writes), client.body_replacings) == (1, [raw])
         assert entries(client.item_bodies[7]) == [before[0], *map(tombstone, before[1:])]
 
     def test_a_withdrawn_line_then_refuses_a_ruling(

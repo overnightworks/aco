@@ -71,9 +71,9 @@ class LockWitnessForge(FakeForge):
             for issue in super().list_open_board_issues()
         )
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         self.lock_held_at_writes.append(self._witness())
-        super().update_item_body(number, body)
+        super().update_item_body(number, body, replacing=replacing)
 
     def witness_claim_store(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Also records, at every fetch of the state ref and every claim write of

@@ -755,7 +755,7 @@ class StateRefBoard:
         )
         return items.item_number(item_id)
 
-    def update_item_body(self, number: int, body: str) -> None:
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:  # NOSONAR(S1172)
         """`body`, written back to `number`'s item file:
         `title`, `labels`, `blocked_by` come from `body`'s own `[record]`
         table when it carries one (`_delivered_content_fields`'s own owner
@@ -763,8 +763,8 @@ class StateRefBoard:
         field stays this item's own already-read `current.record`, and
         `updated_at` always moves to now. The CAS write's `expected` is
         `current.oid`, this instance's own already-read snapshot -- never a
-        re-read -- so a second writer holding the same stale oid refuses
-        with the CAS-20 refusal rather than merging or overwriting.
+        re-read -- so a second writer holding the same stale oid refuses with
+        the CAS-20 refusal; that stronger check leaves `replacing` unread.
         Every blocker the write adds must resolve to another readable item,
         and none may repeat, before the write: a missing one
         would stop every later `board`/`next` (PIN-17), a repeated one trip

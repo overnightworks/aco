@@ -15,6 +15,7 @@ from option_cards import assert_rewritten_alike, card, decide, ruled_card
 from store_fixtures import decoded_item_record
 
 from aco import body, cmd_item, cmd_rescope, forge, items, session, state_board
+from aco.decide import FreshItem
 
 OLD_YES_NO_CARD = (
     '[[expectation]]\ntext = "Alte Frage?"\nruling = "later"\nruled_on = 2026-10-01\n'
@@ -142,7 +143,8 @@ def test_item_edit_and_rescope_writes_keep_option_lines(item: str, newline: str)
     raw = item_body(item, newline=newline)
     located = body.locate_block(raw)
     client = FakeForge()
-    cmd_item._write_block_data(client, 7, raw, located, {**located.data, "next": "Weiter."})
+    fresh = FreshItem(7, "", raw, body.Storage.GITHUB, forge.ItemState.OPEN, located)
+    cmd_item._write_block_data(client, fresh, {**located.data, "next": "Weiter."})
     assert_rewritten_alike(raw, client.item_bodies[7], body.Storage.GITHUB)
     rescoped = cmd_rescope._RescopedItemBody(number=8, text=raw, located=located, whole=None)
     context = cast(session.RunContext, SimpleNamespace(forge_writer=client))

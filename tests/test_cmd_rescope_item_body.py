@@ -120,6 +120,26 @@ def test_a_rescope_moves_the_claim_and_the_item_body_scope_together(
     claimed = claimed_here(standpoint)
     assert (claimed.scope, claimed.whole_reason) == (scope, whole)
     assert written_scope_and_whole(served) == (scope, whole)
+    assert served.body_replacings == [complete_contract("Build it.", **entries)]
+
+
+def test_a_rescope_whose_body_already_names_the_scope_writes_no_body_and_moves_the_claim(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A body that comes out as read is not written, so no body write repeats the
+    current text; the claim still moves and the output is as for a written body."""
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
+    served = serve_body(
+        monkeypatch, complete_contract("Build it.", scope=[NEW_FILE, "src/widget.py"])
+    )
+
+    result = run_cli(rescope_arguments("--add", NEW_FILE), capsys)
+
+    assert (result.status, result.stderr) == (0, "")
+    assert claimed_here(standpoint).scope == (NEW_FILE, "src/widget.py")
+    assert_no_item_body_written(served)
 
 
 @pytest.mark.parametrize(

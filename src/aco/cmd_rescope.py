@@ -226,9 +226,10 @@ class _RescopedItemBody:
 def _rescoped_item_body(fresh: decide.FreshItem) -> _RescopedItemBody:
     """The claimed item's own body as the turn read it, with its located `aco`
     block and the `whole` reason that block names."""
-    located = body.locate_block(fresh.body)
     whole = body.parse_body(fresh.body, storage=fresh.storage).whole
-    return _RescopedItemBody(number=fresh.number, text=fresh.body, located=located, whole=whole)
+    return _RescopedItemBody(
+        number=fresh.number, text=fresh.body, located=fresh.located, whole=whole
+    )
 
 
 @contextmanager
@@ -261,8 +262,11 @@ def _write_rescoped_body(
     new_data: dict[str, object] = {**item.located.data, "scope": list(scope)}
     if whole is not None:
         new_data["whole"] = whole
-    context.forge_writer.update_item_body(
-        item.number, body.replace_block(item.text, item.located, new_data)
+    decide.write_item_body(
+        context.forge_writer,
+        item.number,
+        body.replace_block(item.text, item.located, new_data),
+        replacing=item.text,
     )
 
 
@@ -277,7 +281,7 @@ def _rescope_item_and_claim(
     refused body write leaves the claim as it stood, and a claim write that
     fails after it says the body already names the new scope and how to
     bring the claim in step -- the body write is not undone, and the same
-    rescope again writes the same body and the claim."""
+    rescope again skips the unchanged body and writes the claim."""
     _write_rescoped_body(context, item, intent.scope, whole)
     try:
         return context.transition(subject, intent)

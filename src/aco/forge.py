@@ -348,7 +348,10 @@ class ForgeWriter(ForgeReader, Protocol):
 
     def create_child(self, *, parent: int, title: str, body: str, kind: ItemKind) -> int: ...
 
-    def update_item_body(self, number: int, body: str) -> None: ...
+    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
+        """Writes `body` as item `number`'s body; `replacing` is the text the write
+        replaces, as the caller read it."""
+        ...
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:
         """Retype existing item `number` to `kind` -- `item new --parent`
