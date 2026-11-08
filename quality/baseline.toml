@@ -36,7 +36,7 @@
 "tests/test_cmd_release_cleanup.py" = 802
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2815
+"tests/test_github.py" = 2796
 "tests/test_state_board.py" = 5933
 "tests/test_store.py" = 5103
 
