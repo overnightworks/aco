@@ -61,6 +61,7 @@ withdrawn one.
 | the body write itself fails | RULE-11 | RULE-11 | — |
 | the item's lock cannot be taken | RULE-41 | RULE-41 | — |
 | two writers of one item on this machine | RULE-40 | — | — |
+| the item's lock is held by another writer | RULE-42 | — | — |
 
 ## Ruling a line
 
@@ -120,6 +121,7 @@ withdrawn one.
 - [ ] [RULE-11] A forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
 - [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
 - [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
+- [ ] [RULE-42] A writer that finds the item's lock held prints `waiting for the item lock at <lock path>` once to stderr, then waits and goes on; stdout and `--json` do not change (see E-RULE-18).
 - The turn is a per-machine lock: a hand edit (`gh issue edit`, the browser) or another machine is unprotected on `github`, and under `state-ref` that write refuses (CAS-20).
 
 `reason`, by which refusal fired:
@@ -230,6 +232,17 @@ $ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash> --json
 2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
 {"ok": false, "reason": "unavailable", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
 exit 2
+```
+
+### E-RULE-18 — the item's lock is held by another writer
+
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open with one open option line, another `aco` writer of `<item-id>` running
+
+```console
+$ aco rule <item-id> --line 1 --option A --via chat --card-hash <hash>
+2> waiting for the item lock at <state>/aco/item-locks/<digest>
+RULED <item-id> line 1 A; 0 line(s) still open
+exit 0
 ```
 
 ### E-RULE-08 — card fields survive a ruling

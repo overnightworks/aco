@@ -235,6 +235,22 @@ def test_the_config_file_is_under_an_absolute_xdg_config_home_else_under_home(
     assert repositories.config_path(environment, Path("/home/me")) == expected
 
 
+@pytest.mark.parametrize(
+    ("environment", "expected"),
+    [
+        pytest.param({"XDG_STATE_HOME": "/xdg"}, Path("/xdg/aco"), id="absolute-xdg"),
+        pytest.param(
+            {"XDG_STATE_HOME": "relative"}, Path("/home/me/.local/state/aco"), id="relative-xdg"
+        ),
+        pytest.param({}, Path("/home/me/.local/state/aco"), id="no-xdg"),
+    ],
+)
+def test_the_state_directory_is_under_an_absolute_xdg_state_home_else_under_home(
+    environment: dict[str, str], expected: Path
+) -> None:
+    assert repositories.state_directory(environment, Path("/home/me")) == expected
+
+
 def test_a_config_file_names_its_root(tmp_path: Path) -> None:
     config = tmp_path / "config.toml"
     config.write_text(f'root = "{tmp_path}"\n', encoding="utf-8")

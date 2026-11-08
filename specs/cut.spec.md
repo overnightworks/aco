@@ -33,6 +33,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `<n>` open but not a container | CUT-02 | CUT-02 | CUT-02 | CUT-02 |
 | `<n>` itself has a parent | CUT-03 | CUT-03 | CUT-03 | CUT-03 |
 | `<n>`'s body is malformed | CUT-05, CUT-40 | CUT-05, CUT-40 | — | CUT-05, CUT-40 |
+| the item's lock is held, or cannot be taken | CUT-41 | CUT-41 | CUT-41 | CUT-41 |
 | the linked row's `done_when` holds a display control | CUT-39 | CUT-39 | — | CUT-05 |
 | a slice table, no `--row` | CUT-06, CUT-11 | — | — | CUT-12 |
 | a slice table, `--row N` present | — | CUT-06, CUT-11 | — | CUT-12 |
@@ -66,6 +67,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-03] The same against a container that is itself a child of another item refuses `#<n> is itself a child of <ref>; nested containers are not supported`, exit `2`.
 - [ ] [CUT-34] `aco next` never proposes a cut CUT-03 refuses: it names a nested container's repair under `SKIPPED` instead (`specs/next.spec.md` NEXT-25, E-NEXT-09).
 - CUT-04 (retired).
+- [ ] [CUT-41] `cut` holds the item's lock (RULE-40) from before its first forge read through its container write: a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-CUT-11).
 
 ## The body precondition
 
@@ -343,3 +345,20 @@ $ aco cut <n> --title "Slice A" --json
 2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
 exit 2
 ```
+
+### E-CUT-11 -- `cut` waits for the item's lock, or cannot take it
+
+Setup: bare-remote, `storage = "github"` tracked, bootstrapped, `<n>` an open container with one `[[slice]]` row titled `Slice A`, another `aco` writer of `<n>` running; then `XDG_STATE_HOME` naming a regular file
+
+```console
+$ aco cut <n> --title "Slice A"
+2> waiting for the item lock at <state>/aco/item-locks/<digest>
+CUT #<n> row 1 -> #<child>
+exit 0
+$ aco cut <n> --title "Slice A" --json
+2> ERROR: cannot lock the item at <state>/aco/item-locks/<digest>: <detail>
+{"ok": false, "reason": "precondition_failed", "message": "cannot lock the item at <state>/aco/item-locks/<digest>: <detail>"}
+exit 2
+```
+
+The refused run reads and writes nothing.

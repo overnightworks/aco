@@ -61,9 +61,6 @@
 "_cmd_release_landed" = 98
 "release_transition" = 73
 
-[function_lines."src/aco/cmd_rescope.py"]
-"_rescope_write" = 69
-
 [function_lines."src/aco/github.py"]
 "GitHubForge._landing" = 60
 
