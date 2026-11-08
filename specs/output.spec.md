@@ -39,9 +39,9 @@ by every writer that answers it.
 - [ ] [OUT-08] On every command, `--repo` not shaped OWNER/REPO refuses `repository must be OWNER/REPO, not '<value>'`, exit `2`, before any git or forge call; with `--json` as OUT-06 (see E-OUT-05).
 - [ ] [OUT-09] On every command, a long option spelled short of its full name is never read as that option: it is a parser refusal, exit `2`, with `--json` as OUT-06 (see E-OUT-06).
 - [ ] [OUT-10] A body write the check finds overwritten, written over an unread change (`kept`: it stands only in the edit history) or not verified refuses with the check's sentence, exit `2`; the body was written.
-- [ ] [OUT-11] Under `--json`, OUT-10 reports `reason: "overwritten"` with `kept` (true or false) after the command's payload keys, or `"not_verified"` without `kept`; `message` stays last (see E-OUT-07).
+- [ ] [OUT-11] Under `--json`, OUT-10 reports `reason: "overwritten"` with `kept` (false: a later revision replaced the write) after the payload keys, or `"not_verified"` without `kept`; `message` stays last (see E-OUT-07).
 - OUT-04 (retired).
-- The check's sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (`kept` true) or `#<n> body written, not verified (<cause>)`; `kept` false means a later revision replaced the write, true means the change it wrote over stands only in the edit history.
+- The check's sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (`kept` true) or `#<n> body written, not verified (<cause>)`.
 
 ## Never
 
