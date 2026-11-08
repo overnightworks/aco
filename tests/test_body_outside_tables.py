@@ -5,12 +5,13 @@ from cli_fixtures import run_cli
 
 from aco import body
 
-BLOCK = '```aco\nversion = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n```\n'
-OUTSIDE = "is outside the aco block"
+def block(after: str = "", before: str = "") -> str:
+    fence = '```aco\nversion = 1\nnow = "N"\nnext = "X"\ndone_when = "D"\n```\n'
+    return before + fence + after
 
 
 def refusal(header: str, line: int) -> str:
-    return f"body malformed: aco: {header} on line {line} {OUTSIDE}\n"
+    return f"body malformed: aco: {header} on line {line} is outside the aco block\n"
 
 
 @pytest.mark.usefixtures("clone")
@@ -19,37 +20,45 @@ class TestBlockTableHeaderOutsideTheBlock:
         ("raw_body", "expected_stderr"),
         [
             pytest.param(
-                BLOCK + "\n[[expectation]]\ntext = 'Q'\n",
+                block("\n[[expectation]]\ntext = 'Q'\n"),
                 refusal("[[expectation]]", 8),
                 id="expectation",
             ),
             pytest.param(
-                BLOCK + "\n[[expectation.option]]\n",
+                block("\n[[expectation.option]]\n"),
                 refusal("[[expectation.option]]", 8),
                 id="option",
             ),
-            pytest.param(BLOCK + "\n[[slice]]\n", refusal("[[slice]]", 8), id="slice"),
-            pytest.param(BLOCK + "\n[record]\n", refusal("[record]", 8), id="record"),
-            pytest.param(BLOCK + "\n [[slice]]\n", refusal("[[slice]]", 8), id="one-leading-space"),
+            pytest.param(block("\n[[slice]]\n"), refusal("[[slice]]", 8), id="slice"),
+            pytest.param(block("\n[record]\n"), refusal("[record]", 8), id="record"),
+            pytest.param(block("\n [[slice]]\n"), refusal("[[slice]]", 8), id="one-leading-space"),
             pytest.param(
-                BLOCK + "\n   [[slice]]\n", refusal("[[slice]]", 8), id="three-leading-spaces"
+                block("\n   [[slice]]\n"), refusal("[[slice]]", 8), id="three-leading-spaces"
             ),
             pytest.param(
-                BLOCK + "\n[[ expectation.option ]]\n",
+                block("\n[[ expectation.option ]]\n"),
                 refusal("[[ expectation.option ]]", 8),
                 id="space-inside-brackets",
             ),
             pytest.param(
-                BLOCK + "\n[record]  # lost\n", refusal("[record]", 8), id="trailing-comment"
+                block("\n[[ expectation . option ]]\n"),
+                refusal("[[ expectation . option ]]", 8),
+                id="space-around-the-dot",
             ),
-            pytest.param(BLOCK + "\n[[slice]]   \n", refusal("[[slice]]", 8), id="trailing-space"),
             pytest.param(
-                "Prose.\n\n" + BLOCK + "\n[[slice]]\n\n[record]\n",
+                block(before="[[slice]]\n\n"), refusal("[[slice]]", 1), id="header-above-the-block"
+            ),
+            pytest.param(
+                block("\n[record]  # lost\n"), refusal("[record]", 8), id="trailing-comment"
+            ),
+            pytest.param(block("\n[[slice]]   \n"), refusal("[[slice]]", 8), id="trailing-space"),
+            pytest.param(
+                block("\n[[slice]]\n\n[record]\n", before="Prose.\n\n"),
                 refusal("[[slice]]", 10) + refusal("[record]", 12),
                 id="several-in-body-order",
             ),
             pytest.param(
-                BLOCK.replace("\n", "\r\n") + "\r\n[[slice]]\r\n",
+                block("\n[[slice]]\n").replace("\n", "\r\n"),
                 refusal("[[slice]]", 8),
                 id="crlf-body",
             ),
@@ -65,11 +74,11 @@ class TestBlockTableHeaderOutsideTheBlock:
     @pytest.mark.parametrize(
         "raw_body",
         [
-            pytest.param(BLOCK + "\n    [[slice]]\n", id="four-leading-spaces"),
-            pytest.param(BLOCK + "\n```toml\n[[expectation]]\n```\n", id="quoted-fence"),
-            pytest.param(BLOCK + "\n~~~\n[record]\n~~~\n", id="quoted-tilde-fence"),
-            pytest.param(BLOCK + "\n[[slices]]\n[other]\n", id="another-table"),
-            pytest.param(BLOCK + "\nText [record] here\n", id="header-inside-a-sentence"),
+            pytest.param(block("\n    [[slice]]\n"), id="four-leading-spaces"),
+            pytest.param(block("\n```toml\n[[expectation]]\n```\n"), id="quoted-fence"),
+            pytest.param(block("\n~~~\n[record]\n~~~\n"), id="quoted-tilde-fence"),
+            pytest.param(block("\n[[slices]]\n[other]\n"), id="another-table"),
+            pytest.param(block("\nText [record] here\n"), id="header-inside-a-sentence"),
         ],
     )
     def test_a_line_that_is_no_block_header_outside_a_fence_passes(
@@ -84,7 +93,7 @@ class TestBlockTableHeaderOutsideTheBlock:
         [
             pytest.param("[[slice]]\n", "body malformed: aco: no aco block\n", id="no-block"),
             pytest.param(
-                BLOCK + "```aco\n```\n\n[[slice]]\n",
+                block("```aco\n```\n\n[[slice]]\n"),
                 "body malformed: aco: multiple aco blocks; exactly one is allowed\n",
                 id="two-blocks",
             ),

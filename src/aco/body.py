@@ -703,9 +703,9 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
 
 # A table header of the block's own tables on a line outside every fence: 0 to
 # 3 spaces of indent (four make an indented code block), optional space inside
-# the brackets, trailing space and a trailing `#` comment.
+# the brackets and around the dot, trailing space and a trailing `#` comment.
 _OUTSIDE_HEADER_PATTERN = re.compile(
-    r"^ {0,3}(?P<header>\[\[ *(?:expectation|expectation\.option|slice) *\]\]"
+    r"^ {0,3}(?P<header>\[\[ *(?:expectation|expectation *\. *option|slice) *\]\]"
     rf"|\[ *{RECORD_KEY} *\])[ \t]*(?:#.*)?$"
 )
 
