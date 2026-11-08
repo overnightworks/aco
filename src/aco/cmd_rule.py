@@ -333,7 +333,8 @@ def _emit_returned_result(
 
 
 # Each refusal's `--json` `reason`, by its type; any other refusal is a
-# forge that failed, `unavailable`.
+# forge that failed, `unavailable`; the forge's check of a write that landed is
+# `report.refusing_by_type`'s own answer.
 _REFUSAL_REASONS: report.RefusalReasons[_RuleReason] = (
     (decide.InvalidTargetError, _RuleReason.INVALID_ITEM),
     (expectations.ExpectationAlreadyRuledError, _RuleReason.ALREADY_RULED),
@@ -375,7 +376,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`rule`'s own `--json` refusals, for the whole command and
     not only its first steps: the body write inside the shared
     ruling path can fail like any other forge call, and a failure there names
-    this command's own `unavailable` rather than escaping the envelope."""
+    this command's own `unavailable` rather than escaping the envelope; the
+    forge's check of a write that landed is `overwritten` or `not_verified`."""
     return report.refusing_by_type(
         partial(_rule_expectation_lines, parsed, context),
         _REFUSAL_REASONS,

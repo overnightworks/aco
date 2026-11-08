@@ -51,7 +51,8 @@ def _refuse_a_body_on_stdin(command: str) -> None:
 
 
 def _snapshot_body(client: state_board.StateRefBoard, number: int) -> str:
-    """`number`'s snapshot body; a malformed item has no readable text, so it names none."""
+    """`number`'s snapshot body; the snapshot read refuses a malformed item, so
+    the edit names no replaced text."""
     try:
         return client.item_reference(number).body or ""
     except protocol.MalformedStateTreeError:
@@ -389,6 +390,8 @@ def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
             outcome = _write_block_data(context.forge_writer, fresh, new_data)
         _print_item_edit_size_result(number, parsed.size, fresh.storage, outcome, as_json=as_json)
         return 0
+    except forge.ForgeBodyWrittenError as error:
+        return report.refuse_checked_write(error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
@@ -447,6 +450,8 @@ def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int
             outcome = _write_block_data(context.forge_writer, fresh, new_data)
         _print_item_edit_whole_result(number, reason, fresh.storage, outcome, as_json=as_json)
         return 0
+    except forge.ForgeBodyWrittenError as error:
+        return report.refuse_checked_write(error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 

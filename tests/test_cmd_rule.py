@@ -491,3 +491,58 @@ def test_an_unwritable_lock_directory_refuses_unavailable_and_writes_nothing(
         refusal["reason"],
     ) == (2, True, 1, "unavailable")
     assert (client.item_bodies, client.issue_reference_lookups) == ({}, [])
+
+
+@pytest.mark.usefixtures("github_world")
+@pytest.mark.parametrize("as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")])
+@pytest.mark.parametrize(
+    ("answer", "reason", "sentence"),
+    [
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(90, "2026-11-08T10:05:00Z", "ghost", kept=False),
+            {"reason": "overwritten", "kept": False},
+            "#90 body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z",
+            id="overwritten",
+        ),
+        pytest.param(
+            forge.ForgeBodyOverwrittenError(90, "2026-11-08T10:05:00Z", "ghost", kept=True),
+            {"reason": "overwritten", "kept": True},
+            "#90 body written over a change by ghost at 2026-11-08T10:05:00Z aco had not read; "
+            "that change is only in the edit history",
+            id="kept",
+        ),
+        pytest.param(
+            forge.ForgeBodyNotVerifiedError(90, "timeout"),
+            {"reason": "not_verified"},
+            "#90 body written, not verified (timeout)",
+            id="not-verified",
+        ),
+    ],
+)
+def test_a_ruling_whose_write_the_check_answers_prints_the_check_sentence(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    answer: forge.ForgeBodyWrittenError,
+    reason: dict[str, object],
+    sentence: str,
+    as_json: bool,
+) -> None:
+    """Spec: RULE-43, OUT-07 -- the check's own sentence, exit 2, `overwritten` (with
+    `kept`) or `not_verified`; the ruling is written."""
+    initial = option_item(card())
+    reference = forge.ItemReference(forge.ItemState.OPEN, "Decide something", initial)
+    client = serve_forge(
+        monkeypatch,
+        FakeForge(
+            issue_references={90: reference},
+            update_item_body_error=answer,
+            update_item_body_lands_before_error=True,
+        ),
+    )
+
+    result = run_cli(["rule", "90", *decision(), *(["--json"] if as_json else [])], capsys)
+
+    envelope = {"ok": False, **reason, "message": sentence}
+    assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
+    assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
+    assert client.item_bodies[90] != initial
