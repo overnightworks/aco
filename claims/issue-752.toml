@@ -1,8 +1,0 @@
-claim_id = "c92acaf053cc454296b3bb24ec305395"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "e972674e25d083be2424cd418df77c817279c73b"
-branch = "claude/issue-752-the-board-lists-steps"
-scope = ["README.md", "frontend/e2e/decideRow.ts", "frontend/e2e/decided.spec.ts", "frontend/e2e/itemFixture.ts", "frontend/e2e/openList.spec.ts", "frontend/e2e/steps.spec.ts", "frontend/src/App.svelte", "frontend/src/App.test.ts", "frontend/src/app/model/boardSummary.test.ts", "frontend/src/app/model/boardSummary.ts", "frontend/src/app/model/boardSummaryOrder.test.ts", "frontend/src/app/state/board.svelte.test.ts", "frontend/src/app/state/board.svelte.ts", "frontend/src/app/state/boardCommitted.svelte.test.ts", "frontend/src/components/StepsList.svelte", "frontend/src/components/StepsList.test.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "quality/baseline.toml", "specs/serve.spec.md", "src/aco/board/aco_source.py", "src/aco/board/api.py", "src/aco/board/board.py", "src/aco/board/ports.py", "src/aco/board/static", "src/aco/cmd_mcp.py", "src/aco/inbox.py", "tests/board/test_board_api.py", "tests/board/test_board_core.py", "tests/board/test_board_server.py", "tests/support/aco_board_fixtures.py", "tests/support/board_forge.py", "tests/support/e2e_server.py", "tests/test_cmd_mcp.py", "tests/test_inbox.py"]
-opened_commit = "5c599e8768de6574072ac8f012f1e09c04720145"
-whole_reason = "The wire field and the section that shows it are one vertical slice: the field alone is code built ahead of its caller, and the section alone cannot be driven."
