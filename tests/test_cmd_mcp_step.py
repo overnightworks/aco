@@ -5,7 +5,7 @@ left, and what each refusal and each failure after a write leaves behind."""
 import io
 import json
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +18,10 @@ from discovery_fixtures import (
     isolate_config_file,
     repository_with_card,
 )
+from mcp_lines import Script, call_line
 
-from aco import body, cli, forge, protocol, session, workboard
+from aco import body, cli, cmd_mcp, forge, protocol, session, workboard
+from aco.session import RunContext
 
 STEP = "Rotate the deploy key."
 TITLE = "Rotate the deploy key"
@@ -47,25 +49,6 @@ def here(tmp_path: Path, config_file: Path) -> board_forge.BoardForge:
     return repository_with_card(root / "here", 1, "Here")
 
 
-class _Script:
-    """Standard input that hands out its lines one by one."""
-
-    def __init__(self, *lines: str) -> None:
-        self._lines = lines
-
-    @property
-    def buffer(self) -> Iterator[bytes]:
-        for line in self._lines:
-            yield line.encode() + b"\n"
-
-
-def _call_line(request_id: int, name: str, arguments: dict[str, object]) -> str:
-    params = {"name": name, "arguments": arguments}
-    return json.dumps(
-        {"jsonrpc": "2.0", "id": request_id, "method": "tools/call", "params": params}
-    )
-
-
 def _step_line(request_id: int = 1, /, **changes: object) -> str:
     arguments: dict[str, object | None] = {
         "repository": "board-forge/here",
@@ -74,11 +57,11 @@ def _step_line(request_id: int = 1, /, **changes: object) -> str:
         **changes,
     }
     given = {key: value for key, value in arguments.items() if value is not None}
-    return _call_line(request_id, "step", given)
+    return call_line(request_id, "step", given)
 
 
 def _inbox_line(request_id: int) -> str:
-    return _call_line(request_id, "read_inbox", {})
+    return call_line(request_id, "read_inbox", {})
 
 
 def _serve(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
@@ -86,7 +69,7 @@ def _serve(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]
     replies = io.StringIO()
     with monkeypatch.context() as served:
         served.setattr(session, "run_context", board_forge.run_context)
-        served.setattr(sys, "stdin", _Script(*lines))
+        served.setattr(sys, "stdin", Script(*lines))
         served.setattr(sys, "stdout", replies)
         exit_code = cli.main(["mcp"])
     assert exit_code == 0
@@ -265,6 +248,26 @@ def test_a_title_with_another_step_leaves_the_first_item_as_it_was(
     _serve(monkeypatch, _step_line(1, item=None, title=TITLE))
 
     assert here.stored_item(2) == before
+
+
+def test_a_step_another_session_wrote_after_the_lookup_is_not_overwritten(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    here.put_item(2, complete_contract(STEP), title=TITLE)
+    lookup = cmd_mcp._standing_step_item
+
+    def standing_then_rewritten(context: RunContext, title: str, text: str) -> int | None:
+        found = lookup(context, title, text)
+        here.put_item(2, complete_contract("Another step."), title=TITLE)
+        return found
+
+    monkeypatch.setattr(cmd_mcp, "_standing_step_item", standing_then_rewritten)
+
+    [result] = _serve(monkeypatch, _step_line(1, item=None, title=TITLE))
+
+    assert result["structuredContent"]["item"] == 3
+    assert result["structuredContent"]["created"] is True
+    assert here.stored_item(2).body == complete_contract("Another step.")
 
 
 @pytest.mark.parametrize("arrange", ["close", "stranger", "missing", "malformed", "unknown"])

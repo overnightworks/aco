@@ -63,9 +63,9 @@ _INSTRUCTIONS: Final = (
     f"record the answer the operator gave in this chat with {RECORD_ANSWER}, and mark a step "
     f"only the operator can take with {STEP}."
 )
-_ENVELOPE_KEYS: Final = ("repository", "item")
 _REPOSITORY: Final = "repository"
 _ITEM: Final = "item"
+_ENVELOPE_KEYS: Final = (_REPOSITORY, _ITEM)
 _TITLE: Final = "title"
 _STEP_KEYS: Final = (_REPOSITORY, STEP, _ITEM, _TITLE)
 _OPTION: Final = "option"

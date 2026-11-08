@@ -136,7 +136,7 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 
 ## Never
 
-- `aco mcp` writes only through `ask`, `record_answer` and `step`: `ask` and `record_answer` one line per call, `step` one item's `next` or one new item per call, into the item it names and in that item's turn, never another repository or the operator's configuration; `read_inbox` is read-only.
+- `aco mcp` writes only through `ask`, `record_answer` and `step`: `ask` and `record_answer` one line per call, `step` one item's `next` in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
 - `step` never removes the label `needs-operator`: the head does, once the operator says the step is done.
 - `record_answer` never checks that the operator spoke: it records what the agent says he answered, and the forge's edit history is the record after the fact.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
