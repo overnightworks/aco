@@ -178,7 +178,7 @@ _TOOLS: Final = (
             "answer binds like a ruling on the board and shows in read_inbox, aco rulings "
             "and the board; a line already ruled stays as it is and the call is refused. "
             "A refusal that says a body was written means the answer reached the item, "
-            "unless it says it was written over a change."
+            "unless it says it was overwritten in the meantime."
         ),
         "inputSchema": _record_answer_schema(),
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True},

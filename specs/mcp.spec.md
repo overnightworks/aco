@@ -1,13 +1,13 @@
 # `aco mcp`
 
 `aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions waiting on the operator across every
-repository under the configured root; its tool `ask` puts one decision card on an item there. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask`: the CLI stays complete without it.
+repository under the configured root; its tool `ask` puts one decision card on an item there; its tool `record_answer` records the answer the operator gave in the chat on a card's option line. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask` and `record_answer`: the CLI stays complete without it.
 It speaks the protocol of the `initialize` era, revisions `2025-11-25` and `2025-06-18`. The items and lines it returns are the ones `specs/rulings.spec.md` owns (RUL-10),
 so an agent holds the line index and the `card_hash` that `aco rule` takes. Which repositories exist and how the root is found is `specs/serve.spec.md`'s (ABRD-14, ABRD-108..ABRD-111).
 
 ## Behavior table
 
-| state \ trigger | start | a message arrives | the `read_inbox` or `ask` call |
+| state \ trigger | start | a message arrives | the `read_inbox`, `ask` or `record_answer` call |
 |---|---|---|---|
 | the global `aco --repo OWNER/REPO` before `mcp` | MCP-01 | — | — |
 | stdin ends | MCP-02 | — | — |
@@ -16,9 +16,9 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a notification | — | MCP-05 | — |
 | `initialize` | — | MCP-06 | — |
 | `ping` | — | MCP-07 | — |
-| `tools/list` | — | MCP-08 | — |
+| `tools/list` | — | MCP-08, MCP-38 | — |
 | `server/discover` or any other method | — | MCP-09 | — |
-| an unknown tool or arguments | — | MCP-10 | — |
+| an unknown tool or arguments that are no object | — | MCP-10 | — |
 | an open option line | — | — | MCP-11 |
 | a ruled, returned, withdrawn or yes/no line | — | — | MCP-12 |
 | an item left with no waiting line | — | — | MCP-13 |
@@ -36,6 +36,14 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a card that would leave the body malformed | — | — | MCP-26 |
 | an unknown argument, a state key, or a `repository` or `item` of the wrong type | — | — | MCP-27 |
 | the forge's check of the write answers `not verified` or `overwritten` | — | — | MCP-28 |
+| an open option line and the operator's chat answer | — | — | MCP-29, MCP-30 |
+| an answer in the operator's own words | — | — | MCP-31 |
+| a repository not found, or an item missing, a pull request or malformed, a line out of range, ruled, withdrawn or a yes/no line, a changed card, a letter not on the card | — | — | MCP-32 |
+| a closed item, or one a non-member wrote | — | — | MCP-33 |
+| a line with its head | — | — | MCP-34 |
+| an unknown argument, or a value of the wrong type, or not exactly one of `option` and `other`, or a blank `other` | — | — | MCP-35 |
+| the forge's check of the answer's write answers `not verified` or `overwritten` | — | — | MCP-36 |
+| `read_inbox` with arguments | — | — | MCP-37 |
 
 ## Serving
 
@@ -44,11 +52,11 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-03] A host that closed the pipe ends the process, exit `0`, with no traceback on stderr.
 - [ ] [MCP-04] One message is one line holding one JSON object. Unparsable JSON is answered error `-32700`; an array (no batching), another JSON value or a non-request object, error `-32600`; each with a null `id`.
 - [ ] [MCP-05] A message without an `id` is a notification and is never answered; an empty line is skipped.
-- [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming both tools.
+- [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all three tools.
 - [ ] [MCP-07] `ping` is answered with the empty result.
-- [ ] [MCP-08] `tools/list` lists `read_inbox` (no properties, `readOnlyHint` true) and `ask` (`repository`, `item`, a card's keys; `readOnlyHint` false, `destructiveHint` false, `idempotentHint` true).
+- [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false) and `record_answer` (`destructiveHint` true), the last two with `readOnlyHint` false and `idempotentHint` true.
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
-- [ ] [MCP-10] `tools/call` of an unknown tool, of `read_inbox` with arguments, or of `ask` with arguments that are no object, is answered error `-32602`.
+- [ ] [MCP-10] `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
 - [ ] [MCP-20] Standard output carries only these answers, one per line; logs go to standard error; every child process reads the null device or only data aco pipes to it, never the host's stream.
 
 ## Reading the inbox
@@ -76,9 +84,23 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - [ ] [MCP-27] An unknown argument, a state key (`asked_on`, `ruling`, `card_hash`, ...), a `repository` that is no string or an `item` that is no integer is a tool error naming each; nothing is written.
 - [ ] [MCP-28] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; asking the same card again then answers the line if it stands, else writes it.
 
+## Recording an answer
+
+- [ ] [MCP-29] `record_answer` rules `line` as `aco rule --via chat` does, from `option` or `other` and the shown `card_hash`; it answers `repository`, `item`, the line as RUL-10 prints it and `open` (see E-MCP-08).
+- [ ] [MCP-30] The answer binds like a board ruling: `read_inbox` drops the line, `aco rulings` shows it ruled with `via` `chat`, the board shows it decided and `aco next` no longer calls the item unruled.
+- [ ] [MCP-31] An `other` is stored as given, whatever characters it holds; one that holds a line separator never ends the item's block, and the stored answer reads back equal.
+- [ ] [MCP-32] Every refusal of `aco rule --via chat` holds: it is a tool error with the refusal's sentence and nothing is written, a repeat on a ruled line included (see E-MCP-09).
+- [ ] [MCP-33] A closed item and an item a non-member wrote are ruled, as `aco rule` rules them.
+- [ ] [MCP-34] A line with its head is ruled by the answer and loses `returned_on` and `returned_note`.
+- [ ] [MCP-35] An unknown argument (`via` is none), a wrong type, not exactly one of `option` and `other`, or a blank `other` is a tool error naming each; nothing is read or written (see E-MCP-10).
+- [ ] [MCP-36] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
+- [ ] [MCP-37] `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
+- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash` and `option` or `other`, and no `via`.
+
 ## Never
 
-- `aco mcp` writes only through `ask`: one option line per call, into the one item it names and in that item's turn, never another line of it, another repository or the operator's configuration; `read_inbox` is read-only.
+- `aco mcp` writes only through `ask` and `record_answer`: one line per call, into the one item it names and in that item's turn, never another line of it, another repository or the operator's configuration; `read_inbox` is read-only.
+- `record_answer` never checks that the operator spoke: it records what the agent says he answered, and the forge's edit history is the record after the fact.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
 - It never prints anything but protocol messages on standard output (MCP-20).
 - It never answers a notification (MCP-05).
@@ -160,3 +182,34 @@ Setup: as E-MCP-04, with `text` sent as a list
 ```
 
 An item with an empty `now`, `next` or `done_when` answers `body incomplete: Now`, naming each missing section, and a card whose `problem` runs past 20 words the BODY-97 sentence; nothing is written.
+
+### E-MCP-08 -- the operator's answer recorded
+
+Setup: `owner/a` holds the open item `#7` whose line 1 is an open option line with the options `A` and `B`; `<hash>` is its `card_hash` as `read_inbox` lists it; today is `2026-11-08` in UTC
+
+```text
+> {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"record_answer","arguments":{"repository":"owner/a","item":7,"line":1,"card_hash":"<hash>","option":"A"}}}
+< {"jsonrpc":"2.0","id":9,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"line":{"index":1,"form":"options","ruling":"A","ruled_on":"2026-11-08","via":"chat"},"open":0},"isError":false}}
+```
+
+The line carries every key `aco rulings --json` prints (RUL-10); only the keys shown are repeated here. `open` counts the lines of the item still open.
+
+### E-MCP-09 -- the same answer again
+
+Setup: as E-MCP-08, after its call; the same arguments are sent again
+
+```text
+< {"jsonrpc":"2.0","id":10,"result":{"content":[{"type":"text","text":"line 1 is already ruled; a changed ruling is a new line"}],"isError":true}}
+```
+
+The item's body is unchanged. A `card_hash` that no longer matches the card answers `line 1 changed since its card was shown; show it again and rule what it shows now`.
+
+### E-MCP-10 -- arguments that do not fit
+
+Setup: as E-MCP-08, with `line` sent as a string and both `option` and `other` given
+
+```text
+< {"jsonrpc":"2.0","id":11,"result":{"content":[{"type":"text","text":"line must be an integer; give exactly one of option and other"}],"isError":true}}
+```
+
+Nothing is read or written; a blank `other` answers `other must not be blank`.
