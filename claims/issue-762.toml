@@ -1,0 +1,7 @@
+claim_id = "87398421b07a4b8d8cc29cc719f0c59b"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "0b91f08dd5535d2afe0a128bce42f8197e83592e"
+branch = "claude/issue-762-agents-md-one-shape"
+scope = ["AGENTS.md"]
+opened_commit = "21b38ec5399c0a2a3954ab6f59cd8cb234245f09"
