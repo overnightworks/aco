@@ -239,19 +239,13 @@ def test_a_branch_that_moves_between_the_check_and_the_delete_stays_with_its_com
     assert not world.pull_request_directory.exists()
 
 
-@pytest.mark.parametrize(
-    "error",
-    [
-        pytest.param(forge.ForgeError("merge refused"), id="the-forge-refuses-the-merge"),
-    ],
-)
 def test_a_landing_the_forge_refuses_removes_nothing_and_keeps_the_claim(
-    world: AdoptionWorld, capsys: pytest.CaptureFixture[str], error: forge.ForgeError
+    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: REL-61, LANDCMD-37 -- the proof is read only after a successful merge."""
     _adopt_and_re_push(world, capsys)
     claim = adopted_claim(world)
-    world.forge.merge_error = error
+    world.forge.merge_error = forge.ForgeError("merge refused")
 
     landed = _land_the_new_head(world, capsys)
 
@@ -267,9 +261,15 @@ def test_a_release_of_a_pull_request_the_forge_does_not_show_merged_removes_noth
     _adopt_and_re_push(world, capsys)
     claim = adopted_claim(world)
 
-    released = run_cli(["release", "--merged", str(ADOPTED_PULL_REQUEST)], capsys)
+    released = run_cli(
+        ["release", "--merged", str(ADOPTED_PULL_REQUEST), "--branch", ADOPTED_BRANCH], capsys
+    )
 
-    assert released.status != 0
+    assert (released.status, released.stdout, released.stderr) == (
+        2,
+        "",
+        refusal_line("is not merged"),
+    )
     assert _the_pair_is_there(world) == (True, True)
     assert _claims_on_the_branch(world) == (claim,)
 
@@ -506,6 +506,7 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
     assert state_moved == merged
     assert worktree_removed == (worktree_outcome == "removed")
     assert branch_kept == (worktree_outcome != "removed")
+    assert _the_branch_section_is_there(world) == (worktree_outcome != "removed")
     assert claims_left == (() if merged else (claim,))
     if merged:
         [(_number, _head, _method, _title, merge_body)] = world.forge.merge_calls
