@@ -1,7 +1,0 @@
-claim_id = "e49e14fa0cf54c0a8f6dba211cb6b179"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "023cc01740ff49bb98cf838e84d70dd3efdf61ab"
-branch = "claude/issue-757-vision-names-steps"
-scope = ["docs/VISION.md"]
-opened_commit = "8cb1f217977673421560786ee5860aa1f1ceccca"
