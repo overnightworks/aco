@@ -6,14 +6,16 @@
 - `PYTEST_XDIST_AUTO_NUM_WORKERS=4 uv run --locked pytest -n 4 <test paths or -k selection>`: run selected Python tests.
 - `uv lock --check`, `uv run --locked ruff check .`, `uv run --locked ruff format --check .`, `uv run --locked pyright src tests scripts`, `uv run --locked vulture src scripts/vulture_whitelist.py --min-confidence 60`: the static checks of CI's `check` job.
 - `pnpm --dir frontend install --frozen-lockfile`: install the frontend dependencies.
+- `pnpm --dir frontend check`, `pnpm --dir frontend lint`, `pnpm --dir frontend knip`: the static checks of CI's `frontend` job; run the install first.
 - `pnpm --dir frontend test <test paths>`: run selected frontend tests.
 - `pnpm --dir frontend build`: build the board into `src/aco/board/static/`; run the install first.
-- `uv run --locked --project <quality checkout at the commit .github/workflows/ci.yml pins> quality check`: run the gate's rules locally; add `--fix` to rewrite `quality/baseline.toml`.
+- `quality check`: runs the gate's rules locally at the release `.github/workflows/ci.yml` pins; needs an installed quality that runs as the pinned release.
+- `quality check --fix`: lowers or records the entries in `quality/baseline.toml`.
 
 ## Rules
 
 - A change under `frontend/` commits the rebuilt `src/aco/board/static/` in the same change; CI's step "Assets fresh" fails on any difference.
-- `quality/baseline.toml` is written only by `quality check --fix` from the pinned quality checkout, never by hand or by the installed `quality` CLI.
+- `quality/baseline.toml` is never edited by hand; only `quality check --fix` writes it.
 - In a worktree that uses the main checkout's shared virtualenv, run Python tests with `PYTHONPATH=src` from the worktree root: its editable install points at the main checkout.
 
 ## Owners
