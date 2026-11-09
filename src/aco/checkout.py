@@ -1699,7 +1699,7 @@ WORKTREE_KEPT_ELSEWHERE_REASON = "branch checked out elsewhere"
 
 
 def cleanup_landed_worktree(
-    matching: Path, branch: str, *, trunk: str, landed_head: str | None, directory: Path
+    matching: Path, branch: str, *, trunk: str, proven_tips: frozenset[str], directory: Path
 ) -> WorktreeCleanupOutcome:
     """`release --merged`'s own cleanup policy once a lane's linked worktree
     is already found: merged check, then
@@ -1707,20 +1707,18 @@ def cleanup_landed_worktree(
     removal itself, then the branch deletion -- in that order, since
     removing a dirty or still-needed worktree is unsafe and the two git
     writes below it are each worth reporting apart. A branch counts as
-    landed when the trunk contains its tip, or when its tip is
-    `landed_head`, the merged pull request's recorded head: a squash commit is no descendant of
-    that tip, so ancestry alone would keep
-    every squashed lane. `release`'s own cwd-equality guard and its "no
+    landed when the trunk contains its tip, or when its tip, read once, is
+    one of `proven_tips`: the merged pull request's recorded head (a squash
+    commit is no descendant of that tip, so ancestry alone would keep every
+    squashed lane) and an adopted lane's `base`. That tip is what
+    `remove_linked_worktree` receives as `landed_head`, so either proof
+    ends in the same compare-and-delete. `release`'s own cwd-equality guard and its "no
     worktree matches this branch" decision run before this and stay the
     caller's own job (they need the process's own cwd and worktree listing,
     neither of which this function reads)."""
+    tip = resolved_commit(f"refs/heads/{branch}", directory=directory)
     merged = branch_merged_into_default(branch, trunk=trunk, directory=directory)
-    squash_landed = (
-        not merged
-        and landed_head is not None
-        and resolved_commit(f"refs/heads/{branch}", directory=directory) == landed_head
-    )
-    if not merged and not squash_landed:
+    if not merged and tip not in proven_tips:
         return worktree_cleanup_kept(WORKTREE_KEPT_NOT_MERGED_REASON)
     matching_checkout = resolve_path_checkout(matching)
     if matching_checkout is not None and matching_checkout.kind is CheckoutKind.MAIN:
@@ -1728,9 +1726,7 @@ def cleanup_landed_worktree(
     dirty = git_output(["status", "--porcelain"], directory=matching)
     if dirty:
         return worktree_cleanup_kept(WORKTREE_KEPT_DIRTY_REASON)
-    return remove_linked_worktree(
-        matching, branch=branch, landed_head=landed_head if squash_landed else None
-    )
+    return remove_linked_worktree(matching, branch=branch, landed_head=None if merged else tip)
 
 
 def remove_linked_worktree(
@@ -1746,8 +1742,9 @@ def remove_linked_worktree(
     worktree it created, never the one it runs in. A worktree-removal failure
     still raises loud (nothing on disk has changed yet); a branch-deletion
     failure once the worktree is already gone returns a typed outcome
-    instead, so that success is never
-    lost behind a bare `kept`."""
+    instead, so that success is never lost behind a bare `kept`. `landed_head`
+    is the proven tip the branch is compare-and-deleted on: the merged pull
+    request's recorded head, or an adopted lane's `base`."""
     result = _git_run(["worktree", "remove", str(path)])
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))

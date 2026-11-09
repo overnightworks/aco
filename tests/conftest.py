@@ -5,7 +5,7 @@ than one module asks for by name -- plus `github_world`, the GitHub-checkout
 world check many modules share; everything else stays local to its test
 module. The one exception is registration: `cli_fixtures` is loaded as a
 pytest plugin (`pytest_plugins` below), so its `bare_remote` and `worktree`
-fixtures resolve by name in every test module, and its autouse
+fixtures resolve by name in every test module, as does `adoption_world`'s `world`, and its autouse
 `_isolate_agent_identity` applies to every test.
 """
 
@@ -15,7 +15,7 @@ import pytest
 
 # Registers `bare_remote` and `worktree` for every module by name: an import
 # of a fixture only to receive it as a parameter reads as unused to ruff.
-pytest_plugins = ["cli_fixtures"]
+pytest_plugins = ["cli_fixtures", "adoption_world"]
 
 
 @pytest.fixture(autouse=True)

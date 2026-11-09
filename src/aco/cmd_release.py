@@ -4,7 +4,7 @@
 import argparse
 import shlex
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
@@ -504,16 +504,14 @@ def _verify_and_close_merged_release(
     merged: protocol.MergedRelease,
     selected: protocol.ActiveClaim,
 ) -> _LandedLane:
-    """A github `--merged` release's forge half, run once `selected` is
-    resolved and its releaser authorized: an unauthorized
-    or mismatched-claim release never reaches the forge at all, so it can
-    neither verify, comment on, nor close a pull request's issue. `storage`
-    is proven `github` here (`release_transition` returned for
-    `state-ref`), so the cast is honest: `session._build_forge` builds exactly a
-    `github.GitHubForge` for every other storage pin. The close runs before
-    the release transition: a close failure -- a transient forge error,
-    most often -- raises before that transition ever runs, so the claim it
-    would have released stays exactly as live as it was."""
+    """A github `--merged` release's forge half, run once `selected` is resolved and its
+    releaser authorized: an unauthorized or mismatched-claim release never reaches the forge at
+    all, so it can neither verify, comment on, nor close a pull request's issue. `storage` is
+    proven `github` here (`release_transition` returned for `state-ref`), so the cast is
+    honest: `session._build_forge` builds exactly a `github.GitHubForge` for every other
+    storage pin. The close runs before the release transition: a close failure -- a transient
+    forge error, most often -- raises before that transition ever runs, so the claim it would
+    have released stays exactly as live as it was."""
     client = cast(github.GitHubForge, context.forge)
     storage = context.config.storage
     verified = _verify_merged_release(context, client, identity, merged)
@@ -527,9 +525,8 @@ def _verify_and_close_merged_release(
     pending_close = _pending_landing_close(client, identity, merged.pull_request)
     if pending_close is not None:
         client.close_landed_item(pending_close.issue, pull_request=pending_close.pull_request)
-    return _landed_lane(
-        identity, storage, str(merged.pull_request), selected.branch, verified.landed_head
-    )
+    tips = (verified.landed_head, *_adopted_base(selected))
+    return _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
 
 
 def _report_merged_pull_request_left_nothing(
@@ -561,7 +558,7 @@ def _report_merged_pull_request_left_nothing(
             storage,
             str(merged.pull_request),
             verified.source_branch,
-            verified.landed_head,
+            (verified.landed_head,),
         ),
         context.fetched_default_branch_ref,
     )
@@ -621,14 +618,14 @@ def _cleanup_unless_claimed_again(
 @dataclass(frozen=True)
 class _LandedLane:
     """The lane a `--merged` release cleans up after: its
-    identity and branch, the head the forge recorded as landed (`None` under
-    `storage = "state-ref"`, which has no pull request), and `rerun`, the
+    identity and branch, `proven_tips` (the head the forge recorded as landed, none under
+    `storage = "state-ref"`, plus an adopted lane's `base`), and `rerun`, the
     `release` line that repeats this cleanup in the checkout holding its
     worktree (REL-52)."""
 
     identity: protocol.ClaimIdentity
     branch: str
-    landed_head: str | None
+    proven_tips: frozenset[str]
     rerun: str
 
 
@@ -637,7 +634,7 @@ def _landed_lane(
     storage: body.Storage,
     landing: str,
     branch: str,
-    landed_head: str | None,
+    proven_tips: Iterable[str],
 ) -> _LandedLane:
     """`branch`'s lane, landed as `landing` -- a pull request number, or the
     verified trunk sha under `storage = "state-ref"` -- with its `rerun`
@@ -649,7 +646,14 @@ def _landed_lane(
         else (workboard.item_argument(identity.issue, storage),)
     )
     rerun = workboard.advice_command("release", *item, "--merged", landing, "--branch", branch)
-    return _LandedLane(identity, branch, landed_head, rerun)
+    return _LandedLane(identity, branch, frozenset(proven_tips), rerun)
+
+
+def _adopted_base(claim: protocol.ActiveClaim) -> tuple[str, ...]:
+    """The head `aco adopt` built when `claim` is an adopted lane's (a lane claim on a branch
+    that is no `fix/` or `docs/` one): a commit under the claim moves the tip off it."""
+    lane = isinstance(claim.identity, protocol.LaneIdentity)
+    return (claim.base,) if lane and not protocol.is_issueless_lane_branch(claim.branch) else ()
 
 
 _WORKTREE_KEPT_FLAG_REASON = "--keep-worktree was given"
@@ -669,13 +673,11 @@ _WORKTREE_KEPT_NO_WORKTREE_REASON = (
 
 
 def _worktree_cleanup_outcome_text(outcome: checkout.WorktreeCleanupOutcome) -> str:
-    """The tail `release` prints after `worktree: ` in text, and the exact
-    `--json` value of its `worktree` field:
-    one owner, so the two shapes can never drift apart. A branch-deletion
-    failure after the worktree is already gone names both halves -- never a
-    bare `kept`, which would hide that the worktree itself is gone; a
-    section git kept after the branch itself went names that section, never
-    the branch; a delete that timed out reads the branch
+    """The tail `release` prints after `worktree: ` in text, and the exact `--json` value of its
+    `worktree` field: one owner, so the two shapes can never drift apart. A branch-deletion
+    failure after the worktree is already gone names both halves -- never a bare `kept`, which
+    would hide that the worktree itself is gone; a section git kept after the branch itself
+    went names that section, never the branch; a delete that timed out reads the branch
     unknown, never kept."""
     if not outcome.worktree.removed:
         return f"kept -- {outcome.worktree.reason}"
@@ -693,22 +695,19 @@ def _cleanup_landed_worktree(
     context: RunContext,
     fetched_trunk_ref: Callable[[], str],
 ) -> checkout.WorktreeCleanupOutcome:
-    """After a successful `--merged` release, remove the lane's local
-    worktree and local branch when both are safe to remove, and report
-    exactly what happened either way:
-    loud for every outcome, never a silent decline. `--keep-worktree` opts
-    out outright; a worktree cannot remove its own cwd, so a release running
-    from inside it keeps both; neither needs `checkout.py`'s own merged/
-    elsewhere/dirty/removal policy (`checkout.cleanup_landed_worktree`),
-    since both read only this process's own cwd and worktree listing. A git
-    failure at any step -- including one resolving which worktree matches
-    `branch` at all -- is reported in the same `kept` line rather than
-    swallowed. The run's own checkout is judged from the toplevel its
-    context already holds, never resolved a second time.
-    `fetched_trunk_ref` names the ref the lane must be merged into -- the
-    one its release judged the landing on -- asked only here,
-    so a failure to resolve it reads as `kept` too. The remote branch
-    stays the forge merge's own business either way."""
+    """After a successful `--merged` release, remove the lane's local worktree and local branch
+    when both are safe to remove, and report exactly what happened either way: loud for every
+    outcome, never a silent decline. `--keep-worktree` opts out outright; a worktree cannot
+    remove its own cwd, so a release running from inside it keeps both; neither needs
+    `checkout.py`'s own merged/elsewhere/dirty/removal policy
+    (`checkout.cleanup_landed_worktree`), since both read only this process's own cwd and
+    worktree listing. A git failure at any step -- including one resolving which worktree
+    matches `branch` at all -- is reported in the same `kept` line rather than swallowed. The
+    run's own checkout is judged from the toplevel its context already holds, never resolved a
+    second time. `fetched_trunk_ref` names the ref the lane must be merged into -- the one its
+    release judged the landing on -- asked only here, so a failure to resolve it reads as
+    `kept` too. The lane's `proven_tips` are the tips it may be removed on besides trunk. The
+    remote branch stays the forge merge's own business either way."""
     if parsed.keep_worktree:
         return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_FLAG_REASON)
     branch = lane.branch
@@ -726,7 +725,7 @@ def _cleanup_landed_worktree(
             matching,
             branch,
             trunk=fetched_trunk_ref(),
-            landed_head=lane.landed_head,
+            proven_tips=lane.proven_tips,
             directory=toplevel,
         )
     except protocol.ClaimError as error:
@@ -779,7 +778,7 @@ def _cmd_release_landed(
             parsed,
             context,
             landing_label,
-            _landed_lane(identity, storage, commit, unclaimed_branch, None),
+            _landed_lane(identity, storage, commit, unclaimed_branch, ()),
             context.fetched_trunk_ref,
         )
         return ReleaseEnding.NOTHING_LEFT
@@ -814,7 +813,7 @@ def _cmd_release_landed(
     landing = _landing_report(context, identity, new_state, storage, trunk_ref)
     worktree_cleanup = _cleanup_landed_worktree(
         parsed,
-        _landed_lane(identity, storage, commit, resolved.selected.branch, None),
+        _landed_lane(identity, storage, commit, resolved.selected.branch, ()),
         context,
         context.fetched_trunk_ref,
     )
