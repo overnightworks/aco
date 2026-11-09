@@ -259,6 +259,12 @@ def _resolve_release_claimant(
     return authorize_releaser(parsed, selected, _release_repeat_command(parsed))
 
 
+def _is_adopted_lane(identity: protocol.ClaimIdentity, branch: str) -> bool:
+    """A lane claim off `docs/` and `fix/`: `aco adopt` built its base, a commit moves the tip."""
+    lane = isinstance(identity, protocol.LaneIdentity)
+    return lane and not protocol.is_issueless_lane_branch(branch)
+
+
 def _unclaimed_rerun_branch(
     parsed: argparse.Namespace,
     observed: protocol.ClaimState,
@@ -281,10 +287,8 @@ def _unclaimed_rerun_branch(
         return None
     if protocol.claim_key(identity, release_branch) in observed.claims:
         return None
-    if (
-        isinstance(identity, protocol.LaneIdentity)
-        and not protocol.is_issueless_lane_branch(release_branch)
-        and protocol.claims_on_branch(observed.claims, release_branch)
+    if _is_adopted_lane(identity, release_branch) and protocol.claims_on_branch(
+        observed.claims, release_branch
     ):
         return None
     return release_branch
@@ -525,7 +529,9 @@ def _verify_and_close_merged_release(
     pending_close = _pending_landing_close(client, identity, merged.pull_request)
     if pending_close is not None:
         client.close_landed_item(pending_close.issue, pull_request=pending_close.pull_request)
-    tips = (verified.landed_head, *_adopted_base(selected))
+    tips = (verified.landed_head,)
+    if _is_adopted_lane(selected.identity, selected.branch):
+        tips += (selected.base,)
     return _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
 
 
@@ -647,13 +653,6 @@ def _landed_lane(
     )
     rerun = workboard.advice_command("release", *item, "--merged", landing, "--branch", branch)
     return _LandedLane(identity, branch, frozenset(proven_tips), rerun)
-
-
-def _adopted_base(claim: protocol.ActiveClaim) -> tuple[str, ...]:
-    """The head `aco adopt` built when `claim` is an adopted lane's (a lane claim on a branch
-    that is no `fix/` or `docs/` one): a commit under the claim moves the tip off it."""
-    lane = isinstance(claim.identity, protocol.LaneIdentity)
-    return (claim.base,) if lane and not protocol.is_issueless_lane_branch(claim.branch) else ()
 
 
 _WORKTREE_KEPT_FLAG_REASON = "--keep-worktree was given"
