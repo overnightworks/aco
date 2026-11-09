@@ -1,7 +1,0 @@
-claim_id = "40bff3e6f54c4fa2a82f5d73129d9571"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "5a45d28460739b8e0d0a6dc56a61bf2a3df5233f"
-branch = "claude/issue-772-ci-limits-and-cancel"
-scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml"]
-opened_commit = "bd6bb7b55695752ab3b1e1ffc92fa6ec76bf39d6"
