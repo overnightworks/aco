@@ -13,9 +13,17 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels its older run. Every other run gets a
+# group of its own, so a run on main is never cancelled or replaced while
+# pending: aco land's trunk line reads it and needs it complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python: ['3.14']
@@ -52,6 +60,7 @@ jobs:
   package:
     name: Package smoke (wheel, sdist, tool install without Node)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
@@ -66,6 +75,7 @@ jobs:
   frontend:
     name: Frontend (svelte-check, lint, knip, vitest, assets fresh)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -113,6 +123,7 @@ jobs:
   e2e:
     name: E2E (Playwright, desktop)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
@@ -150,6 +161,7 @@ jobs:
   coverage:
     needs: [check, frontend]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/upload-artifact/merge@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
