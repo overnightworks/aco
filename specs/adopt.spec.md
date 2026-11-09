@@ -50,6 +50,7 @@ directory in ADOPT-09.
 | another role's claim, or a second claim, stands on the branch | ADOPT-32 |
 | a refusal sentence is long or carries display controls | ADOPT-19 |
 | the adopted branch is re-pushed | ADOPT-34 |
+| an adopted lane's claim is written, resumed or rescoped | ADOPT-37 |
 | an adopted lane is released as abandoned | ADOPT-35 |
 | the check finds the body written over a change adopt had not read | ADOPT-36 |
 
@@ -125,9 +126,10 @@ list reads nothing after it.
 - [ ] [ADOPT-31] ADOPT-26's rerun judges ADOPT-02..07 and ADOPT-16 again on the body it would leave, at the head it read; it never builds, fetches, rescopes or checks ADOPT-09, ADOPT-10, ADOPT-13 or ADOPT-17.
 - [ ] [ADOPT-32] A same-agent lane claim under another role, or any claim beside the holder's on the branch, is no such rerun: ADOPT-06 refuses, naming that claim, and nothing is written.
 - [ ] [ADOPT-33] A failed re-read before the write prints `pull request #<n> body could not be read before writing (<error>); the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-34] A re-push of an adopted branch ends no claim: `aco land --head` demands the new head (LANDCMD-31) and releases the lane like any lane (REL-57); the holder's rerun restores a lost line (ADOPT-26).
+- [ ] [ADOPT-34] A re-push of an adopted branch ends no claim; `aco land --head` demands the new head (LANDCMD-31), releases the lane (REL-57) and removes its clean worktree on `base` (REL-61).
 - [ ] [ADOPT-35] `aco release --branch <branch> --abandoned` frees an adopted lane and keeps worktree, branch and `No-Item:` line (REL-33); then `aco land` refuses (LAND-16) and `aco adopt` refuses (ADOPT-05).
 - [ ] [ADOPT-36] A write kept over an unread change prints `pull request #<n> body written over a change by <editor> at <time> adopt had not read; the claim stands; that change is only in the edit history`, exit `2`.
+- [ ] [ADOPT-37] An adopted lane's claim records as `base` the head adopt built (ADOPT-10); a rerun (ADOPT-26) writes no claim and a rescope keeps it (CLAIM-49).
 
 ## Never
 
@@ -140,7 +142,7 @@ list reads nothing after it.
 - `aco adopt` never adopts more than one pull request per call.
 - `aco adopt` never reads a linked worktree's own `.aco/board.toml`: every check judges the main checkout's.
 - `aco adopt` never gains a `--json` mode (`specs/output.spec.md`): a refusal is `ERROR: <sentence>` on stderr and the parser's own usage block, exit `2`.
-- Accepted residuals: GitHub's body write has no compare-and-swap, so an edit landing between ADOPT-23's read and the write is overwritten by adopt's write and shown only by the edit history (ADOPT-36); one landing between the write and the check right after it overwrites the write (ADOPT-27); a hand edit saved after that check over an older copy still overwrites the write unseen. After a re-push the local branch stays at the old head until the adopter updates the worktree (ADOPT-34). After an abandonment (`aco release --abandoned`) the line stays, so ADOPT-05 refuses re-adoption until it is removed by hand (ADOPT-35). An ordinary issue claim may still land on an adopted branch (CLAIM-10); the holder's rerun then refuses ADOPT-06 until one claim is released. A force-push back to the exact head adopt first read, while it lists the files, is not detected.
+- Accepted residuals: GitHub's body write has no compare-and-swap, so an edit landing between ADOPT-23's read and the write is overwritten by adopt's write and shown only by the edit history (ADOPT-36); one landing between the write and the check right after it overwrites the write (ADOPT-27); a hand edit saved after that check over an older copy still overwrites the write unseen. After a re-push the local branch stays at the old head; `aco land` removes it with its clean worktree on `base` (REL-61), and a worktree or branch holding a commit of its own stays for the adopter to update (ADOPT-34). After an abandonment (`aco release --abandoned`) the line stays, so ADOPT-05 refuses re-adoption until it is removed by hand (ADOPT-35). An ordinary issue claim may still land on an adopted branch (CLAIM-10); the holder's rerun then refuses ADOPT-06 until one claim is released. A force-push back to the exact head adopt first read, while it lists the files, is not detected.
 
 ## Examples
 

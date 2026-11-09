@@ -58,7 +58,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 | landing board read hits an unreachable forge | — | REL-22 | — |
 | no landing to report | — | — | REL-21 |
 | any refusal past the parser, with `--json` | REL-24 | REL-24 | REL-24 |
-| a successful outcome's own worktree/branch cleanup | — | REL-25..REL-32, REL-34, REL-42..REL-46, REL-52, REL-55, REL-59 | REL-33 |
+| a successful outcome's own worktree/branch cleanup | — | REL-25..REL-32, REL-34, REL-42..REL-46, REL-52, REL-55, REL-59, REL-61..REL-63 | REL-33 |
 
 ## Flags and outcome
 
@@ -170,7 +170,7 @@ never a commit; `git branch -u` restores it.
 - [ ] [REL-26] `--keep-worktree` skips that removal outright: `worktree: kept -- --keep-worktree was given`, worktree and branch both left exactly as found (see E-REL-09).
 - [ ] [REL-27] A release run from inside the lane's own worktree cannot remove its own cwd: `worktree: kept -- release ran from inside it`, and keeps both (see E-REL-10).
 - [ ] [REL-28] A dirty worktree keeps it: `worktree: kept -- dirty`, exit code unaffected (see E-REL-11).
-- [ ] [REL-29] A branch not yet provably merged into the default branch keeps it: `worktree: kept -- not merged into the default branch` (see E-REL-12).
+- [ ] [REL-29] A branch neither provably merged into the default branch nor REL-61's adopted lane on its `base` keeps it: `worktree: kept -- not merged into the default branch` (see E-REL-12).
 - [ ] [REL-30] No linked worktree on that branch here reads `worktree: kept -- no linked worktree on <branch> in this checkout; run <rerun> in the checkout that holds it` (see E-REL-13).
 - [ ] [REL-52] `<rerun>` is `aco release`, the item (none for a lane), `--merged` with the pull request or the verified `<sha>`, `--branch <branch>`; there it meets REL-47 (see E-REL-24).
 - [ ] [REL-31] The branch checked out on this repository's own shared main checkout, not a linked worktree, keeps it: `worktree: kept -- branch checked out elsewhere` (see E-REL-14).
@@ -179,6 +179,16 @@ never a commit; `git branch -u` restores it.
 - [ ] [REL-34] A git failure deleting the branch after the worktree is removed, by exit or launch, merged or squashed, names both halves: `worktree: removed; branch kept -- git failure: <detail>` (see E-REL-16).
 - [ ] [REL-45] A delete git that timed out after the worktree is removed may have deleted it: `worktree: removed; branch unknown -- git <subcommand> timed out; check git branch --list <branch>` (see E-REL-22).
 - [ ] [REL-46] A git step that timed out names itself wherever its `<detail>` stands: `git <subcommand> timed out`, never a step it did not run (see E-REL-23).
+- [ ] [REL-61] A clean linked worktree of an adopted lane (a lane claim on no `fix/` or `docs/` branch) whose tip is the released claim's `base` goes with its branch: `worktree: removed` (see E-REL-28).
+- [ ] [REL-62] That branch goes by compare-and-delete on that `base`, and its section goes as REL-42 says; a branch that moved on stays: `worktree: removed; branch kept -- git failure: <detail>` (REL-34).
+- [ ] [REL-63] Any other tip reads REL-29's `kept`, a commit on top included, dirty or not. A dirty worktree on its `base` reads REL-28's. An issue claim and a `fix/` or `docs/` lane never meet REL-61.
+
+Residuals of REL-61:
+
+- A rerun with no live claim (REL-47) has no `base`, so an adopted lane it finds behind still reads REL-29's `kept`.
+- An adopted `fix/` or `docs/` branch is judged like any lane.
+- A commit an agent made under the claim and then reset away, leaving the tip at `base`, goes with the worktree and branch, as it does today under REL-25 for a lane reset to the recorded head.
+- When the pull request's head at adopt time was an agent's own pushed commit and a later force-push dropped it, that `base` survives only in the forge's force-push history.
 
 ## Never
 
@@ -190,6 +200,7 @@ never a commit; `git branch -u` restores it.
 - A forge outage discovered after the release's own store transition already committed never undoes or fails that transition (LAND-50): the claim stays released regardless of whether `freed`/`next` could be reported.
 - A worktree/branch cleanup problem after that same commit never undoes or fails it either (REL-28..REL-32, REL-34): the claim stays released regardless of whether cleanup removed anything.
 - Cleanup never touches the remote branch a forge merge already owns: only the local worktree and local branch are ever removed.
+- Cleanup never removes a dirty tree, nor a branch whose tip is none of the proven tips: trunk, the pull request's recorded head, an adopted lane's `base` (REL-61). A commit reset away before the release is the named residual of REL-61.
 - A release with nothing left to release never closes an item or writes the claim state (REL-47); a claim REL-48 or REL-53 names is never released and never skipped.
 
 ## Examples
@@ -583,3 +594,23 @@ exit 2
 ```
 
 The claim stays live and nothing is read from the forge.
+
+### E-REL-28 — an adopted lane rebased by the bot is removed on its claim's base
+
+Setup: `storage = "github"`, pull request `#45` adopted from `dependabot/uv/x` by `Ada`, so the
+lane claim's `base` is the head `aco adopt` built, `0a5d32f`; the bot then force-pushed `#45` to
+`7be19c4`; this checkout holds a clean linked worktree on `dependabot/uv/x` still at `0a5d32f`,
+run from its main checkout
+
+```console
+$ aco release --merged 45 --branch dependabot/uv/x
+RELEASED lane dependabot/uv/x: <claim-id>
+freed: none
+next: none
+worktree: removed
+exit 0
+```
+
+The worktree, the local branch and its `branch.dependabot/uv/x` section are gone; the remote
+branch is untouched. The same lane with one local commit on top reads `worktree: kept -- not
+merged into the default branch`.

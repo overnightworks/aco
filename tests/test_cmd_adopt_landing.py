@@ -164,7 +164,7 @@ def test_landing_the_new_head_removes_an_adopted_lane_only_when_it_holds_nothing
     worktree_text: str,
     pair_goes: bool,
 ) -> None:
-    """Spec: REL-61, REL-62, REL-63, REL-29, REL-28, REL-30, REL-25, ADOPT-34 -- after the
+    """Spec: REL-61, REL-62, REL-63, REL-29, REL-28, REL-30, ADOPT-34, ADOPT-37 -- after the
     bot's force-push the worktree lags the pull request, yet it goes with its branch and
     section whenever its clean tip is still the head adopt built."""
     adopted_head = _adopt_and_re_push(world, capsys)
@@ -263,7 +263,7 @@ def test_a_landing_the_forge_refuses_removes_nothing_and_keeps_the_claim(
 def test_a_release_of_a_pull_request_the_forge_does_not_show_merged_removes_nothing(
     world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: REL-61, REL-10 -- an unverified landing frees no worktree and no claim."""
+    """Spec: REL-61, REL-16 -- an unverified landing frees no worktree and no claim."""
     _adopt_and_re_push(world, capsys)
     claim = adopted_claim(world)
 
