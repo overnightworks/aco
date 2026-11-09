@@ -25,12 +25,14 @@ The person who steers them sees only the decisions that are theirs.
 - It keeps one contract per piece of work that every agent reads the same
   way, with the operator's open questions and his answers in it.
 - It gathers the open questions of all repositories in one place for the
-  operator to decide; an answer he gives in chat counts the same.
+  operator to decide, and with them the steps only he can take; an answer he
+  gives in chat counts the same.
 
 ## What it deliberately is not
 
 - Not a reading room. Status, transcripts and evidence stay with the agents;
-  what reaches the operator is a decision.
+  what reaches the operator is a decision or a step only he can take, each
+  something to act on, not to read.
 - Not a code host or issue tracker. It uses the ones a repository already
   has and adds only what they cannot hold.
 - Not a standing service: nothing has to run between sessions. Agents
