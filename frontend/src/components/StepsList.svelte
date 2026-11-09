@@ -118,4 +118,14 @@
 		font-size: 13px;
 		color: var(--fg-3);
 	}
+	@media (max-width: 760px) {
+		.heading,
+		.group,
+		.bad-line,
+		li,
+		.empty {
+			padding-left: 16px;
+			padding-right: 16px;
+		}
+	}
 </style>
