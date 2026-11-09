@@ -1,0 +1,8 @@
+claim_id = "c7272929b3204149950fcb81a0fcb4e2"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "5a45d28460739b8e0d0a6dc56a61bf2a3df5233f"
+branch = "claude/issue-638-adopted-lane-cleanup-on-base"
+scope = ["quality/baseline.toml", "specs/adopt.spec.md", "specs/land.spec.md", "specs/release.spec.md", "src/aco/checkout.py", "src/aco/cmd_release.py", "tests/conftest.py", "tests/support/adoption_world.py", "tests/test_cmd_adopt.py", "tests/test_cmd_adopt_landing.py"]
+opened_commit = "4987db1f604b9798367a9905855a13813acbe442"
+whole_reason = "One cleanup rule with its specs, the adopted-landing test moved to a new module to keep the old one within its baseline, and the baseline lowered where files shrink."
