@@ -3,7 +3,8 @@
 aco is the agents' own tool, built by agents for agents. It lets many coding
 agents work in parallel across many repositories without getting in each
 other's way, and without any of them having to remember what the others do.
-The person who steers them sees only the decisions that are theirs.
+The person who steers them sees only the decisions that are his, and the
+steps only he can take.
 
 ## For whom, today
 
