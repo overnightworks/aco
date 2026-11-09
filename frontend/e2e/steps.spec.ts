@@ -85,6 +85,21 @@ for (const viewport of [
 			await shoot(page, (name) => testInfo.outputPath(name), `steps-${viewport.width}`);
 		});
 
+		test('[ABRD-114] the steps heading starts at the same x as the question list heading', async ({
+			page
+		}) => {
+			await arrange([card(), stepItem(9, 'Rotate the key', 'Rotate it.')]);
+			await show(page);
+
+			const stepsHeading = page.locator('#steps-heading > span').first();
+			const questionHeading = page.locator('.tracks h2.group > span').first();
+			await expect(stepsHeading).toBeVisible();
+			await expect(questionHeading).toBeVisible();
+			const stepsBox = await stepsHeading.boundingBox();
+			const questionBox = await questionHeading.boundingBox();
+			expect(stepsBox?.x).toBe(questionBox?.x);
+		});
+
 		test('[ABRD-119] a step row holds no control and the section sends no request', async ({
 			page
 		}) => {
