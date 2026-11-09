@@ -1,8 +1,0 @@
-claim_id = "dff050b4d8834f92a38087b0dfe670b5"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "023cc01740ff49bb98cf838e84d70dd3efdf61ab"
-branch = "claude/issue-756-steps-phone-gutter"
-scope = ["frontend/e2e/steps.spec.ts", "frontend/src/components/StepsList.svelte", "src/aco/board/static"]
-opened_commit = "25b8a9b514a5c56e7e76fd76f8cf7d3123cb6622"
-whole_reason = "The rule, its end-to-end proof and the assets a fresh build of it writes are one change to one component."
