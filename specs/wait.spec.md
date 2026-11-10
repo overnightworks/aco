@@ -39,7 +39,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 - [ ] [WAIT-05] `--line N` outside the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any waiting; `<m>` counts withdrawn lines (see E-WAIT-03).
 - [ ] [WAIT-06] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
 - [ ] [WAIT-07] The command reads the item once at its start, then only the modification time of the item's signal file (WAIT-12), every two seconds; waiting costs no forge read.
-  - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01.
+  - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01; every read is fresh from the store, under `state-ref` a new fetch of the state ref.
 - [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too.
 - [ ] [WAIT-09] The command has no timeout and no other end of its own; the session that started it stops it.
 - [ ] [WAIT-10] Every forge failure, at the start or on a later read, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; so does a signal file that cannot be read:

@@ -14,7 +14,7 @@ from option_cards import (
     ruled_card,
     unclear,
 )
-from wait_fixtures import ITEM, install, reflect_the_written_body, serve_item
+from wait_fixtures import ITEM, install, reads_of, serve_item, serve_snapshots
 
 from aco import body, cmd_wait, forge, github, store
 
@@ -71,7 +71,7 @@ class TestWaiting:
     ) -> None:
         """Spec: WAIT-01, WAIT-03 -- the command reads once and never pauses."""
         client = serve_item(monkeypatch, open_reference(raw))
-        ticks = install(monkeypatch, client)
+        ticks = install(monkeypatch, reads_of(client))
         arguments = [argument for line in named for argument in ("--line", line)]
         result = run_cli(["wait", "7", *arguments], capsys)
         assert (result.status, result.stderr, ticks.pauses) == (0, "", [])
@@ -83,7 +83,7 @@ class TestWaiting:
     ) -> None:
         """Spec: WAIT-02 -- the envelope's keys in order."""
         client = serve_item(monkeypatch, open_reference(group_body()))
-        install(monkeypatch, client)
+        install(monkeypatch, reads_of(client))
         result = run_cli(["wait", "7", "--line", "1", "--json"], capsys)
         expected = {
             "ok": True,
@@ -109,31 +109,29 @@ class TestWaiting:
         state: str,
     ) -> None:
         """Spec: WAIT-01, WAIT-07, WAIT-12 -- the real write signals; no read in between."""
-        client = serve_item(monkeypatch, open_reference(group_body()))
-        ticks = install(monkeypatch, client)
-
+        store = serve_snapshots(monkeypatch, open_reference(group_body()))
+        ticks = install(monkeypatch, store.reads)
         reads_by_the_change: list[int] = []
 
         def change() -> None:
-            before = len(client.issue_reference_lookups)
+            before = store.reads()
             assert run_cli(changer, capsys).status == 0
-            reads_by_the_change.append(len(client.issue_reference_lookups) - before)
-            reflect_the_written_body(client)
+            reads_by_the_change.append(store.reads() - before)
 
         ticks.afterwards[3] = change
         result = run_cli(["wait", "7", "--line", "2", "--line", "3"], capsys)
         assert (result.status, result.stderr, ticks.reads_seen[:3]) == (0, "", [1, 1, 1])
         assert re.fullmatch(rf"CHANGED #7 line 2: {state}\n", result.stdout)
-        assert len(client.issue_reference_lookups) == 1 + sum(reads_by_the_change) + 1
+        assert store.reads() == 1 + sum(reads_by_the_change) + 1
 
     def test_a_line_changed_by_hand_ends_it_at_the_slow_read_and_not_before(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: WAIT-08, WAIT-07 -- no signal moves; the item is read again every
         `ITEM_READ_SECONDS`."""
-        client = serve_item(monkeypatch, open_reference(group_body()))
-        ticks = install(monkeypatch, client)
-        ticks.afterwards[10] = lambda: client.issue_references.update(
+        store = serve_snapshots(monkeypatch, open_reference(group_body()))
+        ticks = install(monkeypatch, store.reads)
+        ticks.afterwards[10] = lambda: store.references.update(
             {ITEM: open_reference(group_body(ruled_card()))}
         )
         result = run_cli(["wait", "7", "--line", "3"], capsys)
@@ -141,7 +139,7 @@ class TestWaiting:
         assert re.fullmatch(rf"CHANGED #7 line 3: ruled A {DATE}\n", result.stdout)
         assert set(ticks.reads_seen) == {1}
         assert ticks.now >= cmd_wait.ITEM_READ_SECONDS
-        assert len(client.issue_reference_lookups) == 2
+        assert store.reads() == 2
 
     def test_a_forge_failure_while_it_waits_refuses_unavailable(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -149,7 +147,7 @@ class TestWaiting:
         """Spec: WAIT-10 -- a later read that fails ends the command loudly."""
         client = serve_item(monkeypatch, open_reference(group_body()))
         client.scripted_item_reads.extend([None, forge.ForgeError("the forge is down")])
-        install(monkeypatch, client)
+        install(monkeypatch, reads_of(client))
         result = run_cli(["wait", "7", "--line", "2", "--json"], capsys)
         message = "the forge is down"
         assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
@@ -206,7 +204,7 @@ def test_a_refusal_comes_before_any_waiting(
 ) -> None:
     """Spec: WAIT-04, WAIT-05, WAIT-11 -- exit 2, the reason of the table, no pause."""
     client = serve_item(monkeypatch, reference)
-    ticks = install(monkeypatch, client)
+    ticks = install(monkeypatch, reads_of(client))
     result = run_cli(["wait", "7", "--line", line, *(["--json"] if as_json else [])], capsys)
     envelope = {"ok": False, "reason": reason, "message": message}
     assert (result.status, result.stderr, ticks.pauses) == (2, f"ERROR: {message}\n", [])
@@ -219,7 +217,7 @@ def test_a_malformed_body_refuses_naming_the_command(
 ) -> None:
     """Spec: WAIT-04 -- the body defect sentence, then what `wait` needs."""
     client = serve_item(monkeypatch, open_reference("no block here"))
-    install(monkeypatch, client)
+    install(monkeypatch, reads_of(client))
     result = run_cli(["wait", "7", "--line", "1"], capsys)
     assert (result.status, result.stdout) == (2, "")
     assert result.stderr.startswith("ERROR: #7 ")
@@ -233,7 +231,7 @@ def test_a_forge_failure_at_the_start_refuses_unavailable(
     """Spec: WAIT-10 -- the first read fails."""
     client = serve_item(monkeypatch, open_reference(group_body()))
     client.scripted_item_reads.append(forge.ForgeError("the forge is down"))
-    ticks = install(monkeypatch, client)
+    ticks = install(monkeypatch, reads_of(client))
     result = run_cli(["wait", "7", "--line", "2", "--json"], capsys)
     assert (result.status, ticks.pauses) == (2, [])
     assert json.loads(result.stdout)["reason"] == "unavailable"
@@ -297,7 +295,7 @@ def test_a_signal_that_cannot_be_read_refuses_unavailable_before_the_item_is_rea
     blocker.write_text("a file, not a directory", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
     client = serve_item(monkeypatch, open_reference(group_body()))
-    ticks = install(monkeypatch, client)
+    ticks = install(monkeypatch, reads_of(client))
     result = run_cli(["wait", "7", "--line", "2", "--json"], capsys)
     refusal = json.loads(result.stdout)
     prefix = f"cannot watch the item's signal at {blocker / 'aco' / 'item-signals'}"

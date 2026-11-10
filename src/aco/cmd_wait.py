@@ -139,7 +139,8 @@ def _wait_for_lines(
     """`wait`'s own work, every refusal raised by name for `run` to report. The
     item is read once, then again only when its signal moved or `ITEM_READ_SECONDS`
     passed; the signal's time is taken before each read, so a ruling between the
-    two moves it again."""
+    two moves it again. A reread observes the state ref anew: under `state-ref`
+    a context reads it once."""
     number = int(parsed.item)
     named = tuple(dict.fromkeys(parsed.lines))
     # The target's own refusals (`--repo` under `state-ref`) come before anything is watched.
@@ -157,7 +158,8 @@ def _wait_for_lines(
         if moved == watched and now() - last_read < ITEM_READ_SECONDS:
             continue
         watched, last_read = moved, now()
-        changed = _changed_lines(decide.fresh_item(context, number, command="wait"), named)
+        reread = decide.fresh_item(context.observed_afresh(), number, command="wait")
+        changed = _changed_lines(reread, named)
     _emit_changed(changed, number, fresh.storage, as_json=parsed.json)
     return 0
 
