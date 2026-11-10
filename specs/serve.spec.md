@@ -42,6 +42,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a card post naming a line already ruled | — | ABRD-80 |
 | a malformed card post | — | ABRD-81 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17, ABRD-113 |
+| a decision written | — | ABRD-122 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
 | one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
@@ -199,6 +200,7 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - [ ] [ABRD-119] A step row holds no control and takes no focus, and the region sends no request; its text is shown as text, never as markup.
 - [ ] [ABRD-120] With no row the heading stays and reads `No step waits for you.`, or `No step in the projects read.` while any repo could not be read.
 - [ ] [ABRD-121] A repo not read keeps its last steps, shown under `Not read` with its `last read` time, so an older step is never shown as current.
+- [ ] [ABRD-122] A decision that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44), so a session waiting with `aco wait` learns it.
 
 ## The SPA shell
 

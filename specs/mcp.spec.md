@@ -28,6 +28,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a repository whose read fails | — | — | MCP-17 |
 | a directory under the root that cannot be read | — | — | MCP-18 |
 | a call after another call, or after a refusal | — | — | MCP-19 |
+| a `record_answer` written | — | — | MCP-56 |
 | a card on an open item a member wrote | — | — | MCP-21 |
 | the same card asked again | — | — | MCP-22 |
 | a card asked after its line was withdrawn | — | — | MCP-23 |
@@ -133,6 +134,7 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - [ ] [MCP-53] A label that fails after the body is written or the item opened is a tool error naming the item and the forge's reason; the same call again sets it (see E-MCP-16).
 - [ ] [MCP-54] A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
 - [ ] [MCP-55] An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step` or `title` is a tool error naming each; nothing is read or written (see E-MCP-17).
+- [ ] [MCP-56] A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
 
 ## Never
 

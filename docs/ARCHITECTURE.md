@@ -170,6 +170,19 @@ compare-and-swap refuses a stale write, and it alone guards the bare `aco item e
 lock. The board keeps its own in-process turn for its shutdown drain
 (`specs/serve.spec.md`).
 
+### The ruling signal
+
+`decide.rule` and `decide.withdraw`, the one write of a ruled, returned or
+withdrawn line for `aco rule`, `aco withdraw`, the board and `record_answer`,
+touch one file per item under aco's state directory after the verified write,
+named by the same digest as the item's lock (`decide.item_signal_path`). A
+session that asked a card starts `aco wait` in the background: it reads the item
+once, then watches only that file's modification time and reads the item again
+when it moves, and a slow read every ten minutes catches a line changed outside
+aco. The command ends when a named line is no longer open, which wakes the
+session. The signal carries no content, names no asker and never fails a write
+(`specs/wait.spec.md`).
+
 ### Proof strategy
 
 `specs/` owns each command's behaviour, with criterion IDs that tests
