@@ -1,0 +1,8 @@
+claim_id = "74717a34b255417dabf912b14fd17855"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "b8617f3d45ab2c22eb5b510dfc9f0e47d2641f9b"
+branch = "claude/issue-779-queue-coauthor-paragraph"
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/landing-grammar.spec.md", "specs/release.spec.md", "src/aco/checkout.py", "src/aco/trunk_message.py", "tests"]
+opened_commit = "caba75ae72518854152290f64412b33dbd79a369"
+whole_reason = "One reading rule with its one owner, its spec sentence and its tests; the tests directory is named whole because the trailer fixtures are spread over several modules."
