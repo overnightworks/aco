@@ -150,7 +150,9 @@ preflight, refused or not, exactly as `reset`'s own read does.
 
 Accepted residual: a squash-landed local branch behind or ahead of the pull request's recorded
 head is no clean lane on it (REL-42, REL-43), so its worktree still reads `kept -- not merged into
-the default branch` on every rerun; it is removed by hand.
+the default branch` on every rerun; it is removed by hand. An adopted lane whose clean tip is
+still the claim's `base` is removed on a first run, however far the bot's force-push moved the
+pull request's head (REL-61); a rerun with no live claim has no `base` (REL-47).
 
 ## Never
 
