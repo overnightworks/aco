@@ -1,8 +1,0 @@
-claim_id = "1213953d39e44f9cb8618999dafc29a1"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "dcba4a02df3900d26ea74148712477fa52160e32"
-branch = "claude/issue-775-wait-for-a-ruling"
-scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/mcp.spec.md", "specs/rule.spec.md", "specs/serve.spec.md", "specs/wait.spec.md", "specs/withdraw.spec.md", "src/aco/board/aco_source.py", "src/aco/cli.py", "src/aco/cmd_mcp.py", "src/aco/cmd_rule.py", "src/aco/cmd_wait.py", "src/aco/cmd_withdraw.py", "src/aco/decide.py", "tests"]
-opened_commit = "32916b29552cfc413bdafce28b9bc298e58f1e6d"
-whole_reason = "One capability end to end: the signal at the shared ruling write, the command that waits on it, their spec sentences and tests; neither half is reachable without the other."
