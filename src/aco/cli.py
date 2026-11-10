@@ -31,6 +31,7 @@ from . import (
     cmd_serve,
     cmd_start,
     cmd_status,
+    cmd_wait,
     cmd_withdraw,
     github,
     items,
@@ -40,9 +41,7 @@ from . import (
     usage,
     workboard,
 )
-from .session import (
-    RunContext,
-)
+from .session import RunContext
 
 NEXT_PULL_DESCRIPTION = (
     "Name the one next action: pull, cut, check or close an item. Pulling is not "
@@ -661,6 +660,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
     "rule": _RepositoryCommand(_add_rule_parser, cmd_rule.run),
     "withdraw": _RepositoryCommand(cmd_withdraw.add_parser, cmd_withdraw.run),
+    "wait": _RepositoryCommand(cmd_wait.add_parser, cmd_wait.run),
     "check": _RepositoryCommand(_add_check_parser, cmd_check.run),
     "brief": _RepositoryCommand(_add_brief_parser, cmd_brief.run),
     "item": _RepositoryCommand(_add_item_parser, cmd_item.run),

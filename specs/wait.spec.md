@@ -27,19 +27,31 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | a ruling, return or withdrawal written by aco | WAIT-12 | — |
 | the signal cannot be touched | WAIT-13 | — |
 
-- [ ] [WAIT-01] `aco wait ITEM --line N` ends, exit `0`, as soon as one named line is no longer open, and prints one `CHANGED <label> line <k>: <state>` per named line that is no longer open, in the order of the item's lines; `<state>` is the text `aco rulings` prints for that line after its index (RUL-02, RUL-18, RUL-22): `ruled <ruling> <date>`, `with head <date>` or `withdrawn <date>` (see E-WAIT-01).
+- [ ] [WAIT-01] `aco wait ITEM --line N` ends, exit `0`, as soon as one named line is no longer open, printing `CHANGED <label> line <k>: <state>` for each such named line (see E-WAIT-01).
+  - The lines come in the item's order; a line named twice counts once.
+  - `<state>` is the text `aco rulings` prints after the index (RUL-02, RUL-18, RUL-22): `ruled <ruling> <date>`, `with head <date>` or `withdrawn <date>`.
 - [ ] [WAIT-02] `--json` on the same call prints the envelope with `reason: "changed"`, then `"item": <n>, "lines": [{"index": <k>, "state": "<state>"}, …]`, the lines as WAIT-01 names them (see E-WAIT-01).
 - [ ] [WAIT-03] A named line that is not open when the command starts ends it at once, the same way as WAIT-01; a yes/no line is never open (see E-WAIT-02).
-- [ ] [WAIT-04] A missing item refuses `<label> does not exist`, a pull request `#<n> is a pull request, not an issue; wait needs an issue`, a closed item `<label> is closed; there is nothing to wait for`, a MALFORMED body `<label> <body defect sentence>; wait needs a valid aco block` (PIN-14/PIN-15's sentence replaces it under `state-ref`), exit `2`, before any waiting (see E-WAIT-03).
+- [ ] [WAIT-04] A missing item, a pull request, a closed item or a MALFORMED body refuses, exit `2`, before any waiting (see E-WAIT-03):
+  - a missing item: `<label> does not exist`; a pull request: `#<n> is a pull request, not an issue; wait needs an issue`
+  - a closed item: `<label> is closed; there is nothing to wait for`
+  - a MALFORMED body: `<label> <body defect sentence>; wait needs a valid aco block`; PIN-14/PIN-15's sentence replaces it under `state-ref`
 - [ ] [WAIT-05] `--line N` outside the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any waiting; `<m>` counts withdrawn lines (see E-WAIT-03).
 - [ ] [WAIT-06] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
-- [ ] [WAIT-07] The command reads the item once at its start and then only the modification time of the item's signal file (WAIT-12), every two seconds; it reads the item again when that time has moved, and ends or goes on waiting by WAIT-01. Waiting costs no forge read.
+- [ ] [WAIT-07] The command reads the item once at its start, then only the modification time of the item's signal file (WAIT-12), every two seconds; waiting costs no forge read.
+  - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01.
 - [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too.
 - [ ] [WAIT-09] The command has no timeout and no other end of its own; the session that started it stops it.
-- [ ] [WAIT-10] Every forge failure, the read at the start and a later read included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`.
+- [ ] [WAIT-10] Every forge failure, at the start or on a later read, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; so does a signal file that cannot be read:
+  - `cannot watch the item's signal at <signal path>: <detail>`, before the item is read
 - [ ] [WAIT-11] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
-- [ ] [WAIT-12] Every write of a ruled, returned or withdrawn line that aco makes (`aco rule`, `aco withdraw`, the board's decision, the `record_answer` tool) touches one file per item, `item-signals/<digest>` under aco's state directory, after the write has been verified; `<digest>` is the one that names the item's lock file (RULE-40), from one function. `ask`, `step`, `aco rescope` and `aco item edit` never touch it (see E-WAIT-04).
-- [ ] [WAIT-13] A signal that cannot be created or touched leaves the write standing, its result and exit status unchanged, and prints one `WARNING: the ruling stands, but its signal at <signal path> could not be touched: <detail>` line to stderr; a waiting session then learns the answer by WAIT-08 (see E-WAIT-04).
+- [ ] [WAIT-12] Every write of a ruled, returned or withdrawn line that aco makes touches one file per item, after the write has been verified (see E-WAIT-04):
+  - the writers are `aco rule`, `aco withdraw`, the board's decision and the `record_answer` tool
+  - the file is `item-signals/<digest>` under aco's state directory, `<digest>` the one that names the item's lock file (RULE-40)
+  - `ask`, `step`, `aco rescope` and `aco item edit` never touch it
+- [ ] [WAIT-13] A signal that cannot be created or touched leaves the write standing, its result and exit status unchanged, and prints one warning line to stderr (see E-WAIT-04):
+  - `WARNING: the ruling stands, but its signal at <signal path> could not be touched: <detail>`
+  - a waiting session then learns the answer by WAIT-08
 
 `reason`, by which refusal fired:
 

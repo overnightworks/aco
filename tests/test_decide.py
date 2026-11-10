@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_forge import item_signals
 from cli_fixtures import run_context_over, track_board_config
 from github_fixtures import FakeForge
 from item_lock_witness import LockWitnessForge
@@ -371,11 +372,6 @@ def test_ruling_a_line_whose_hand_written_picture_holds_a_fence_line_keeps_the_b
 
 
 type Write = Callable[[RunContext, decide.FreshItem, Path], object]
-
-
-def item_signals(tmp_path: Path) -> list[str]:
-    directory = tmp_path / "state" / "aco" / "item-signals"
-    return sorted(path.name for path in directory.iterdir()) if directory.is_dir() else []
 
 
 def write_in_a_turn(context: RunContext, tmp_path: Path, write: Write) -> None:

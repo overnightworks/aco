@@ -125,7 +125,7 @@ withdrawn one.
 - [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
 - [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
 - [ ] [RULE-42] A writer that finds the item's lock held prints `waiting for the item lock at <lock path>` once to stderr, then waits and goes on; stdout and `--json` do not change (see E-RULE-18).
-- [ ] [RULE-44] After a ruling or a return is written and verified, the item's signal is touched (WAIT-12), and a signal that cannot be touched changes neither the result nor the exit status (WAIT-13); a refused write touches nothing.
+- [ ] [RULE-44] A verified ruling or return touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
 - The turn is a per-machine lock: on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (RULE-43); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
 
 `reason`, by which refusal fired:
