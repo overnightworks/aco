@@ -395,6 +395,7 @@ UNREADABLE_TRAILER = (
     f"carries `{CONTROL_BYTE_TRAILER}`; a trunk trailer names #n, aco-xxxxxx, or the bare number n"
 )
 REPEATED_NO_ITEM = "carries more than one `No-Item:` trailer"
+QUEUED_FIX = "No-Item: fix\n\n---------\n\nCo-authored-by: Alice <alice@example.invalid>"
 PAST_THE_ID_SPACE = (
     "carries `Work-Item:` 16777216, which names no state-ref item; an item id ends at aco-ffffff"
 )
@@ -432,6 +433,10 @@ TRUNK = {
     ),
     "control-byte-in-a-trailer": refused_trunk(
         "main", UNREADABLE_TRAILER, world=tip_trailed(CONTROL_BYTE_TRAILER)
+    ),
+    "merge-queue-coauthor-paragraph": declared("main", "No-Item: fix", tip_trailed(QUEUED_FIX)),
+    "text-between-the-trailer-and-the-coauthor-paragraph": refused_trunk(
+        "main", NO_TRAILER, world=tip_trailed(QUEUED_FIX.replace("---------", "Thanks."))
     ),
 }
 PAST_THE_ID_SPACE_ROWS = {
@@ -523,7 +528,7 @@ def check_trunk(
 def test_a_trunk_commit_is_classified_by_its_own_trailer(
     case: TrunkCase, flags: Flags, check_trunk: TrunkCheck
 ) -> None:
-    """Spec: LAND-03, LAND-48, LAND-57, LAND-58, LAND-60, CHECK-12, CHECK-13, CHECK-14"""
+    """Spec: LAND-03, LAND-48, LAND-57, LAND-58, LAND-60, LAND-83, LAND-84, CHECK-12..14"""
     check_trunk(case, flags)
 
 

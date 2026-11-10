@@ -1058,8 +1058,8 @@ def test_trunk_landings_walk_the_trunk_ref_they_are_given_not_the_work_branch(
         assert arguments[0] == "log"
         assert arguments[-3:] == ["-n", "20", "refs/remotes/hub/main"]
         return _fake_trunk_log_record(
-            "sha1", "2026-08-29T00:00:00+00:00", "", ""
-        ) + _fake_trunk_log_record("sha2", "2026-08-30T00:00:00Z", "#10", "")
+            "sha1", "2026-08-29T00:00:00+00:00", "", "", ""
+        ) + _fake_trunk_log_record("sha2", "2026-08-30T00:00:00Z", "#10", "", "")
 
     monkeypatch.setattr(checkout, "git_output", git_output)
     landings = _LIVE_TRUNK_LANDINGS("refs/remotes/hub/main", 20, directory=tmp_path)
@@ -1222,7 +1222,7 @@ def test_trunk_landings_fails_loud_on_a_malformed_commit_timestamp(
     monkeypatch.setattr(
         checkout,
         "git_output",
-        lambda _arguments, **_kwargs: _fake_trunk_log_record("sha1", raw_commit_time, "", ""),
+        lambda _arguments, **_kwargs: _fake_trunk_log_record("sha1", raw_commit_time, "", "", ""),
     )
     with pytest.raises(ClaimError, match="git returned a malformed trunk landing timestamp"):
         _LIVE_TRUNK_LANDINGS("refs/remotes/origin/main", 20, directory=tmp_path)
@@ -1232,7 +1232,7 @@ def test_trunk_landings_fails_loud_on_a_log_stream_that_is_not_nul_framed_record
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """A raw `git log -z` stream always ends in the same NUL that separates
-    each record's own four fields (`_fake_trunk_log_record`); anything else
+    each record's own five fields (`_fake_trunk_log_record`); anything else
     -- here, a caller that fed back plain newline-joined text -- is git (or
     the fake) misbehaving, not a shape this reads silently."""
 
