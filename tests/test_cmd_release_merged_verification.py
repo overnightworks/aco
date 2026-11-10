@@ -79,7 +79,7 @@ def arrange_lane_landing(
         "No-Item: docs",
         "No-Item: fix",
         "No-Item: deps",
-        "No-Item: fix\n\n---------\n\nCo-authored-by: Alice <alice@example.invalid>",
+        "No-Item: fix\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
     ],
     ids=["docs", "fix", "deps", "fix-then-the-merge-queues-coauthor-paragraph"],
 )
