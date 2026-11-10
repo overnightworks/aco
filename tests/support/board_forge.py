@@ -375,6 +375,12 @@ def item_lock_is_held(state_home: Path) -> bool:
     return False
 
 
+def item_signals(state_home: Path) -> list[str]:
+    """The item signals, by file name, under the state home a test set."""
+    directory = state_home / "state" / "aco" / "item-signals"
+    return sorted(signal.name for signal in directory.iterdir()) if directory.is_dir() else []
+
+
 def _unsupported(operation: str) -> NoReturn:
     raise forge.ForgeUnsupportedError(f"the board's test forge has no {operation}")
 

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .. import decide, expectations, forge, inbox, protocol, session
+from .. import decide, expectations, forge, inbox, protocol, repositories, session
 from .ports import (
     CardAnswer,
     CardChanged,
@@ -76,7 +76,13 @@ def _checked_and_written_in_turn(
     decision = check(expectations.expectation_lines(fresh.body, storage=fresh.storage))
     if decision is None:
         return CardChanged()
-    committed = decide.rule(context, fresh, _line_outcomes(decision), context.today())
+    committed = decide.rule(
+        context,
+        fresh,
+        _line_outcomes(decision),
+        context.today(),
+        state=repositories.state_directory(os.environ, Path.home()),
+    )
     returned = isinstance(decision.answer, UnclearCardAnswer)
     status = DecisionStatus.RETURNED if returned else DecisionStatus.RULED
     return DecisionResult(status, item=committed)

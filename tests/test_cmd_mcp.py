@@ -679,3 +679,15 @@ def test_the_body_write_checks_answer_passes_through_as_the_calls_error(
     assert result["isError"] is True
     assert result["content"][0]["text"] == str(check_answer)
     assert here.stored_entries(1)[0]["ruling"] == "A"
+
+
+def test_a_chat_answer_touches_the_items_signal_and_an_ask_does_not(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Spec: MCP-56, WAIT-12 -- `record_answer` signals the ruling it wrote."""
+    _serve_in_process(monkeypatch, _ask_line(1))
+    asked = board_forge.item_signals(tmp_path)
+
+    _serve_in_process(monkeypatch, _record_line())
+
+    assert (asked, len(board_forge.item_signals(tmp_path))) == ([], 1)

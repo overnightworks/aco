@@ -10,7 +10,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import body, decide, expectations, protocol, report, usage, workboard
+from . import body, decide, expectations, protocol, report, repositories, usage, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -115,7 +115,13 @@ def _withdraw_lines(parsed: argparse.Namespace, context: RunContext) -> int:
     with decide.turn(
         context, int(parsed.item), command="withdraw", environment=os.environ, home=Path.home()
     ) as fresh:
-        committed = decide.withdraw(context, fresh, indexes, today)
+        committed = decide.withdraw(
+            context,
+            fresh,
+            indexes,
+            today,
+            state=repositories.state_directory(os.environ, Path.home()),
+        )
     _emit_withdrawn(committed, indexes, today, fresh.storage, as_json=parsed.json)
     return 0
 

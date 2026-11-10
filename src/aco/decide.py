@@ -2,7 +2,8 @@
 `specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
 decision board and the MCP `ask`, `record_answer` and `step` read an item through the
 target gate and write its folded body once, here, so every ruling, withdrawal, card and
-step takes the same path. `item_lock` serializes the writers of one item on this
+step takes the same path, and a ruling or withdrawal touches the item's signal
+(`specs/wait.spec.md`). `item_lock` serializes the writers of one item on this
 machine; `turn` is that lock plus the fresh read, and a writer that judges from
 another read (`aco cut`) holds `item_lock` alone."""
 
@@ -103,15 +104,27 @@ class ItemLockUnavailableError(protocol.ClaimUnavailableError):
     """The per-item lock file could not be created or locked, so nothing was read or written."""
 
 
+def _item_state_file(context: RunContext, number: int, state: Path, *, directory: str) -> Path:
+    """One flat file per item of a forge repository in `directory` under aco's
+    state directory `state`, named by a digest so no remote path can place it
+    elsewhere. The lock and the signal of one item share the digest."""
+    repository = context.remote_repository_id
+    key = f"{repository.host}\0{repository.path}\0{number}"
+    return state / directory / hashlib.sha256(key.encode()).hexdigest()
+
+
 def _item_lock_path(
     context: RunContext, number: int, environment: Mapping[str, str], home: Path
 ) -> Path:
-    """One flat file per item of a forge repository under aco's state directory,
-    named by a digest so no remote path can place it elsewhere."""
-    repository = context.remote_repository_id
-    key = f"{repository.host}\0{repository.path}\0{number}"
     state = repositories.state_directory(environment, home)
-    return state / "item-locks" / hashlib.sha256(key.encode()).hexdigest()
+    return _item_state_file(context, number, state, directory="item-locks")
+
+
+def item_signal_path(context: RunContext, number: int, state: Path) -> Path:
+    """The file `rule` and `withdraw` touch after a verified write of a ruled,
+    returned or withdrawn line (WAIT-12) and `aco wait` watches, under aco's
+    state directory `state` (`repositories.state_directory`)."""
+    return _item_state_file(context, number, state, directory="item-signals")
 
 
 @contextmanager
@@ -184,30 +197,64 @@ def _committed(context: RunContext, fresh: FreshItem, new_body: str) -> Committe
     return Committed(fresh.number, fresh.title, lines, open_remaining)
 
 
+def _committed_and_signalled(
+    context: RunContext,
+    fresh: FreshItem,
+    new_body: str,
+    state: Path,
+) -> Committed:
+    """`_committed`, then the item's signal touched (WAIT-12). A signal that
+    cannot be touched never fails the write that stands: one warning goes to
+    stderr and a waiting command learns the change by its slow read (WAIT-13)."""
+    committed = _committed(context, fresh, new_body)
+    signal = item_signal_path(context, fresh.number, state)
+    try:
+        signal.parent.mkdir(parents=True, exist_ok=True)
+        signal.touch()
+    except OSError as error:
+        sys.stderr.write(
+            f"WARNING: the ruling stands, but its signal at {signal} "
+            f"could not be touched: {error.strerror or str(error)}\n"
+        )
+        sys.stderr.flush()
+    return committed
+
+
 def rule(
-    context: RunContext, fresh: FreshItem, named: Sequence[LineOutcome], today: date
+    context: RunContext,
+    fresh: FreshItem,
+    named: Sequence[LineOutcome],
+    today: date,
+    *,
+    state: Path,
 ) -> Committed:
     """Folds every named line over the fresh body with the one date `today` and
-    writes it once. Raises `protocol.ClaimError` by name for every refusal
-    (already ruled, out of range, a changed card, a bad outcome) before the
-    write, so none of the lines is stored (RULE-29)."""
+    writes it once, then touches the item's signal. Raises `protocol.ClaimError`
+    by name for every refusal (already ruled, out of range, a changed card, a
+    bad outcome) before the write, so none of the lines is stored (RULE-29)."""
     new_body = fresh.body
     for line in named:
         new_body = _written_body(new_body, line.index, line.outcome, today)
-    return _committed(context, fresh, new_body)
+    return _committed_and_signalled(context, fresh, new_body, state)
 
 
 def withdraw(
-    context: RunContext, fresh: FreshItem, indexes: Sequence[int], today: date
+    context: RunContext,
+    fresh: FreshItem,
+    indexes: Sequence[int],
+    today: date,
+    *,
+    state: Path,
 ) -> Committed:
     """Withdraws every named line of the fresh body with the one date `today`
-    and writes it once. Raises `protocol.ClaimError` by name for every refusal
-    (out of range, already withdrawn, ruled) before the write, so none of the
-    lines is stored (WITHDRAW-04)."""
+    and writes it once, then touches the item's signal. Raises
+    `protocol.ClaimError` by name for every refusal (out of range, already
+    withdrawn, ruled) before the write, so none of the lines is stored
+    (WITHDRAW-04)."""
     new_body = fresh.body
     for index in indexes:
         new_body = expectations.withdraw_line(new_body, index, today)
-    return _committed(context, fresh, new_body)
+    return _committed_and_signalled(context, fresh, new_body, state)
 
 
 def _refuse_a_shape_verdict(check: body.BodyShapeCheck, verdict: body.BodyShapeVerdict) -> None:
