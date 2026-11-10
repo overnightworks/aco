@@ -16,7 +16,18 @@ from datetime import date
 from pathlib import Path
 from typing import cast
 
-from . import board_read, body, expectations, file_lock, forge, protocol, repositories, workboard
+from . import (
+    board_read,
+    body,
+    expectations,
+    file_lock,
+    forge,
+    protocol,
+    report,
+    repositories,
+    usage,
+    workboard,
+)
 from .session import RunContext
 
 type Outcome = expectations.OptionChoice | expectations.HeadReturn
@@ -70,6 +81,25 @@ class Committed:
     title: str
     lines: tuple[expectations.ExpectationLine, ...]
     open_remaining: int
+
+
+def add_lines_command_parser(
+    commands: usage.Subcommands, name: str, *, help: str, item_help: str, lines_help: str
+) -> None:
+    """The parser of a command that names option lines of one item (`withdraw`,
+    `wait`): the item, the repeatable `--line N` and `--json`."""
+    parser = commands.add_parser(name, help=help)
+    parser.add_argument("item", type=workboard.parse_item_reference, help=item_help)
+    parser.add_argument(
+        "--line",
+        dest="lines",
+        action="append",
+        type=int,
+        required=True,
+        metavar="N",
+        help=lines_help,
+    )
+    report.add_json_flag(parser)
 
 
 def fresh_item(context: RunContext, number: int, *, command: str) -> FreshItem:

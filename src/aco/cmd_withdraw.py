@@ -10,32 +10,17 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import body, decide, expectations, protocol, report, repositories, usage, workboard
+from . import body, decide, expectations, protocol, report, repositories, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
-
-def add_parser(commands: usage.Subcommands, name: str) -> None:
-    """`withdraw`'s parser: no `--via` and no `--card-hash`, since it decides
-    nothing for the operator."""
-    withdraw = commands.add_parser(
-        name, help="withdraw an expectation line of your own that nobody has ruled"
-    )
-    withdraw.add_argument(
-        "item",
-        type=workboard.parse_item_reference,
-        help="the item whose expectation line is withdrawn",
-    )
-    withdraw.add_argument(
-        "--line",
-        dest="lines",
-        action="append",
-        type=int,
-        required=True,
-        metavar="N",
-        help="the 1-based expectation line index, as rulings prints it; "
-        "repeat it to withdraw several lines of the item in one write",
-    )
-    report.add_json_flag(withdraw)
+# No `--via` and no `--card-hash`: withdrawing decides nothing for the operator.
+add_parser = partial(
+    decide.add_lines_command_parser,
+    help="withdraw an expectation line of your own that nobody has ruled",
+    item_help="the item whose expectation line is withdrawn",
+    lines_help="the 1-based expectation line index, as rulings prints it; "
+    "repeat it to withdraw several lines of the item in one write",
+)
 
 
 class _WithdrawReason(StrEnum):

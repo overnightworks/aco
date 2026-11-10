@@ -12,7 +12,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import body, decide, expectations, forge, protocol, report, repositories, usage, workboard
+from . import body, decide, expectations, forge, protocol, report, repositories, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 # How often the item's signal file is looked at, and how often the item is read
@@ -25,25 +25,13 @@ pause_between_checks = time.sleep
 clock = time.monotonic
 
 
-def add_parser(commands: usage.Subcommands, name: str) -> None:
-    """`wait`'s parser: the item, the lines to wait on and `--json`; no timeout."""
-    wait = commands.add_parser(
-        name, help="wait until an expectation line is ruled, returned or withdrawn"
-    )
-    wait.add_argument(
-        "item", type=workboard.parse_item_reference, help="the item whose lines are waited on"
-    )
-    wait.add_argument(
-        "--line",
-        dest="lines",
-        action="append",
-        type=int,
-        required=True,
-        metavar="N",
-        help="the 1-based expectation line index, as rulings prints it; "
-        "repeat it to wait on several lines of the item",
-    )
-    report.add_json_flag(wait)
+add_parser = partial(
+    decide.add_lines_command_parser,
+    help="wait until an expectation line is ruled, returned or withdrawn",
+    item_help="the item whose lines are waited on",
+    lines_help="the 1-based expectation line index, as rulings prints it; "
+    "repeat it to wait on several lines of the item",
+)
 
 
 class _WaitReason(StrEnum):
