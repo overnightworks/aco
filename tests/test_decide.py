@@ -427,8 +427,9 @@ class TestSignal:
     def test_a_refused_write_touches_no_signal(self, github_clone: Path, tmp_path: Path) -> None:
         """Spec: WAIT-12, RULE-44 -- the signal follows a verified write only."""
         context, _ = world(body.Storage.GITHUB, item_with(ruled_card()), github_clone)
+        write = rule_line(1)
         with pytest.raises(expectations.ExpectationAlreadyRuledError):
-            write_in_a_turn(context, tmp_path, rule_line(1))
+            write_in_a_turn(context, tmp_path, write)
         assert item_signals(tmp_path) == []
 
     def test_a_body_write_the_forge_refuses_touches_no_signal(
@@ -437,8 +438,9 @@ class TestSignal:
         """Spec: WAIT-12 -- a body write that raises is not a verified write."""
         context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
         client.fail_update_item_body = True
+        write = rule_line(1)
         with pytest.raises(protocol.ClaimError):
-            write_in_a_turn(context, tmp_path, rule_line(1))
+            write_in_a_turn(context, tmp_path, write)
         assert item_signals(tmp_path) == []
 
     def test_an_ask_touches_no_signal(self, github_clone: Path, tmp_path: Path) -> None:
