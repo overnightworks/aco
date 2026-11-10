@@ -1,18 +1,21 @@
 """The shared ruling writer (`specs/rule.spec.md`) on a fake forge, on both storage pins."""
 
+import os
 import re
 import threading
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_forge import item_signals
 from cli_fixtures import run_context_over, track_board_config
 from github_fixtures import FakeForge
 from item_lock_witness import LockWitnessForge
-from option_cards import GOLDEN_CARD_HASH, card, card_head, ruled_card
+from option_cards import GOLDEN_CARD_HASH, SECOND_CARD, ask_card, card, card_head, ruled_card
 
-from aco import body, body_fence, decide, expectations, forge, protocol
+from aco import body, body_fence, decide, expectations, forge, protocol, repositories
 from aco.session import RunContext
 
 TODAY = date(2026, 10, 29)
@@ -37,59 +40,81 @@ def option_rulings(lines: tuple[expectations.ExpectationLine, ...]) -> list[str 
     return [line.ruling for line in lines if isinstance(line, expectations.OptionLine)]
 
 
-def world(storage: body.Storage, item_body: str, clone: Path) -> tuple[RunContext, FakeForge]:
+def world(
+    storage: body.Storage, item_body: str, github_clone: Path
+) -> tuple[RunContext, FakeForge]:
     """A checkout pinned to `storage` whose issue 90 is `item_body`, behind a fake forge."""
-    track_board_config(clone, f'storage = "{storage.value}"\n')
+    track_board_config(github_clone, f'storage = "{storage.value}"\n')
     reference = forge.ItemReference(forge.ItemState.OPEN, TITLE, item_body)
     client = FakeForge(issue_references={90: reference})
     return run_context_over(client), client
 
 
+def write_ruling(
+    context: RunContext, fresh: decide.FreshItem, named: list[decide.LineOutcome]
+) -> decide.Committed:
+    """The ruling write, its signal landing in this test's own state directory."""
+    return decide.rule(
+        context, fresh, named, TODAY, state=repositories.state_directory(os.environ, Path.home())
+    )
+
+
+def write_withdrawal(
+    context: RunContext, fresh: decide.FreshItem, indexes: list[int]
+) -> decide.Committed:
+    """The withdrawal write, its signal landing in this test's own state directory."""
+    return decide.withdraw(
+        context, fresh, indexes, TODAY, state=repositories.state_directory(os.environ, Path.home())
+    )
+
+
 @pytest.mark.parametrize("storage", STORAGE_PINS)
 class TestCommitted:
     def test_committed_lines_are_the_expectation_lines_of_the_written_body(
-        self, storage: body.Storage, clone: Path
+        self, storage: body.Storage, github_clone: Path
     ) -> None:
-        context, client = world(storage, item_with(card(), card()), clone)
-        committed = decide.rule(
-            context, decide.fresh_item(context, 90, command="rule"), [choose(2)], TODAY
+        context, client = world(storage, item_with(card(), card()), github_clone)
+        committed = write_ruling(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(2)]
         )
         written = client.item_bodies[90]
         assert committed.lines == tuple(expectations.expectation_lines(written, storage=storage))
         assert option_rulings(committed.lines) == [None, "A"]
 
     def test_committed_carries_the_title_of_the_item_the_gate_read(
-        self, storage: body.Storage, clone: Path
+        self, storage: body.Storage, github_clone: Path
     ) -> None:
-        context, _ = world(storage, item_with(card()), clone)
-        committed = decide.rule(
-            context, decide.fresh_item(context, 90, command="rule"), [choose(1)], TODAY
+        context, _ = world(storage, item_with(card()), github_clone)
+        committed = write_ruling(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(1)]
         )
         assert (committed.number, committed.title) == (90, TITLE)
 
     def test_committed_counts_the_lines_still_open(
-        self, storage: body.Storage, clone: Path
+        self, storage: body.Storage, github_clone: Path
     ) -> None:
-        context, _ = world(storage, item_with(card(), card(), card()), clone)
-        committed = decide.rule(
-            context, decide.fresh_item(context, 90, command="rule"), [choose(2)], TODAY
+        context, _ = world(storage, item_with(card(), card(), card()), github_clone)
+        committed = write_ruling(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(2)]
         )
         assert committed.open_remaining == 2
 
-    def test_two_named_lines_land_in_one_write(self, storage: body.Storage, clone: Path) -> None:
-        context, client = world(storage, item_with(card(), card()), clone)
-        committed = decide.rule(
-            context, decide.fresh_item(context, 90, command="rule"), [choose(1), choose(2)], TODAY
+    def test_two_named_lines_land_in_one_write(
+        self, storage: body.Storage, github_clone: Path
+    ) -> None:
+        context, client = world(storage, item_with(card(), card()), github_clone)
+        committed = write_ruling(
+            context, decide.fresh_item(context, 90, command="rule"), [choose(1), choose(2)]
         )
         assert len(client.body_writes) == 1
         assert option_rulings(committed.lines) == ["A", "A"]
 
     def test_withdraw_writes_every_named_line_once_and_counts_the_rest(
-        self, storage: body.Storage, clone: Path
+        self, storage: body.Storage, github_clone: Path
     ) -> None:
-        context, client = world(storage, item_with(card(), card(), card()), clone)
+        context, client = world(storage, item_with(card(), card(), card()), github_clone)
         fresh = decide.fresh_item(context, 90, command="withdraw")
-        committed = decide.withdraw(context, fresh, [1, 3], TODAY)
+        committed = write_withdrawal(context, fresh, [1, 3])
         written = client.item_bodies[90]
         forms = [line.form for line in committed.lines]
         withdrawn, options = expectations.LineForm.WITHDRAWN, expectations.LineForm.OPTIONS
@@ -98,12 +123,12 @@ class TestCommitted:
         assert (forms, committed.open_remaining) == ([withdrawn, options, withdrawn], 1)
 
     def test_withdraw_refusing_a_later_line_writes_nothing(
-        self, storage: body.Storage, clone: Path
+        self, storage: body.Storage, github_clone: Path
     ) -> None:
-        context, client = world(storage, item_with(card(), ruled_card()), clone)
+        context, client = world(storage, item_with(card(), ruled_card()), github_clone)
         fresh = decide.fresh_item(context, 90, command="withdraw")
         with pytest.raises(expectations.ExpectationAlreadyRuledError):
-            decide.withdraw(context, fresh, [1, 2], TODAY)
+            write_withdrawal(context, fresh, [1, 2])
         assert client.body_writes == []
 
     @pytest.mark.parametrize(
@@ -141,12 +166,12 @@ class TestCommitted:
         item_body: str,
         named: list[decide.LineOutcome],
         refusal: type[protocol.ClaimError],
-        clone: Path,
+        github_clone: Path,
     ) -> None:
-        context, client = world(storage, item_body, clone)
+        context, client = world(storage, item_body, github_clone)
         fresh = decide.fresh_item(context, 90, command="rule")
         with pytest.raises(refusal):
-            decide.rule(context, fresh, named, TODAY)
+            write_ruling(context, fresh, named)
         assert client.body_writes == []
 
     @pytest.mark.parametrize(
@@ -163,17 +188,17 @@ class TestCommitted:
         ],
     )
     def test_the_gate_refuses_an_item_that_is_not_a_writable_issue(
-        self, storage: body.Storage, reference: forge.ItemReference, clone: Path
+        self, storage: body.Storage, reference: forge.ItemReference, github_clone: Path
     ) -> None:
-        context, client = world(storage, item_with(card()), clone)
+        context, client = world(storage, item_with(card()), github_clone)
         client.issue_references[90] = reference
         with pytest.raises(decide.InvalidTargetError):
             decide.fresh_item(context, 90, command="rule")
         assert client.body_writes == []
 
 
-def test_the_gate_names_the_command_it_guards(clone: Path) -> None:
-    context, client = world(body.Storage.GITHUB, item_with(card()), clone)
+def test_the_gate_names_the_command_it_guards(github_clone: Path) -> None:
+    context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
     client.issue_references[90] = forge.ItemReference(
         forge.ItemState.OPEN, TITLE, "no block", is_landing=True
     )
@@ -182,17 +207,17 @@ def test_the_gate_names_the_command_it_guards(clone: Path) -> None:
     assert str(refused.value) == "#90 is a pull request, not an issue; withdraw needs an issue"
 
 
-def test_a_failed_item_read_stays_a_forge_failure(clone: Path) -> None:
+def test_a_failed_item_read_stays_a_forge_failure(github_clone: Path) -> None:
     """Spec: RULE-11, WITHDRAW-13 -- a forge failure is `unavailable`, never a bad target."""
-    context, client = world(body.Storage.GITHUB, item_with(card()), clone)
+    context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
     client.scripted_item_reads.append(forge.ForgeError("item read failed"))
     with pytest.raises(forge.ForgeError) as failed:
         decide.fresh_item(context, 90, command="rule")
     assert not isinstance(failed.value, decide.InvalidTargetError)
 
 
-def test_the_gate_reads_the_item_once(clone: Path) -> None:
-    context, client = world(body.Storage.GITHUB, item_with(card()), clone)
+def test_the_gate_reads_the_item_once(github_clone: Path) -> None:
+    context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
     decide.fresh_item(context, 90, command="rule")
     assert client.issue_reference_lookups == [90]
 
@@ -228,7 +253,13 @@ class TestTurn:
                     environment=lock_environment(tmp_path),
                     home=tmp_path,
                 ) as fresh:
-                    decide.rule(context, fresh, [choose(line)], TODAY)
+                    decide.rule(
+                        context,
+                        fresh,
+                        [choose(line)],
+                        TODAY,
+                        state=repositories.state_directory(lock_environment(tmp_path), tmp_path),
+                    )
             except BaseException as failure:
                 failures.append(failure)
 
@@ -311,7 +342,7 @@ class TestWriteItemBody:
 
 
 def test_ruling_a_line_whose_hand_written_picture_holds_a_fence_line_keeps_the_body_whole(
-    clone: Path,
+    github_clone: Path,
 ) -> None:
     written_picture = card_head().split("picture = ")[1].split("\ncaption")[0]
     hand_written = card().replace(written_picture, '"<svg/>\\n```\\nx"', 1)
@@ -321,13 +352,12 @@ def test_ruling_a_line_whose_hand_written_picture_holds_a_fence_line_keeps_the_b
         for line in expectations.expectation_lines(given, storage=body.Storage.GITHUB)
         if isinstance(line, expectations.OptionLine)
     ]
-    context, client = world(body.Storage.GITHUB, given, clone)
+    context, client = world(body.Storage.GITHUB, given, github_clone)
 
-    decide.rule(
+    write_ruling(
         context,
         decide.fresh_item(context, 90, command="rule"),
         [choose(1, shown[0].card_hash)],
-        TODAY,
     )
 
     written = client.item_bodies[90]
@@ -339,3 +369,106 @@ def test_ruling_a_line_whose_hand_written_picture_holds_a_fence_line_keeps_the_b
     body.locate_block(written)
     assert len(body_fence.walk_fences(written).fences) == 1
     assert stored == ["<svg/>\n```\nx"]
+
+
+type Write = Callable[[RunContext, decide.FreshItem, Path], object]
+
+
+def write_in_a_turn(context: RunContext, tmp_path: Path, write: Write) -> None:
+    """Runs `write` on a fresh read of item 90 under its turn, the way every command does."""
+    environment = lock_environment(tmp_path)
+    with decide.turn(context, 90, command="rule", environment=environment, home=tmp_path) as fresh:
+        write(context, fresh, repositories.state_directory(environment, tmp_path))
+
+
+def rule_line(index: int) -> Write:
+    return lambda context, fresh, state: decide.rule(
+        context, fresh, [choose(index)], TODAY, state=state
+    )
+
+
+def return_line_1(context: RunContext, fresh: decide.FreshItem, state: Path) -> object:
+    outcome = expectations.HeadReturn("Was kostet B?", GOLDEN_CARD_HASH)
+    return decide.rule(context, fresh, [decide.LineOutcome(1, outcome)], TODAY, state=state)
+
+
+def withdraw_line_1(context: RunContext, fresh: decide.FreshItem, state: Path) -> object:
+    return decide.withdraw(context, fresh, [1], TODAY, state=state)
+
+
+class TestSignal:
+    @pytest.mark.parametrize(
+        "write",
+        [
+            pytest.param(rule_line(1), id="ruled"),
+            pytest.param(return_line_1, id="returned"),
+            pytest.param(withdraw_line_1, id="withdrawn"),
+        ],
+    )
+    def test_a_ruled_returned_or_withdrawn_line_touches_the_signal_the_lock_is_named_by(
+        self, write: Write, github_clone: Path, tmp_path: Path
+    ) -> None:
+        """Spec: WAIT-12, RULE-44, WITHDRAW-18 -- one file per item, named as its lock."""
+        context, _ = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        write_in_a_turn(context, tmp_path, write)
+        assert item_signals(tmp_path) == item_locks(tmp_path)
+
+    def test_a_second_write_moves_the_modification_time_of_the_signal(
+        self, github_clone: Path, tmp_path: Path
+    ) -> None:
+        """Spec: WAIT-07, WAIT-12 -- a waiting command sees the signal move."""
+        context, _ = world(body.Storage.GITHUB, item_with(card(), card()), github_clone)
+        write_in_a_turn(context, tmp_path, rule_line(1))
+        (signal,) = (tmp_path / "state" / "aco" / "item-signals").iterdir()
+        os.utime(signal, ns=(1, 1))
+        write_in_a_turn(context, tmp_path, rule_line(2))
+        assert signal.stat().st_mtime_ns > 1
+
+    def test_a_refused_write_touches_no_signal(self, github_clone: Path, tmp_path: Path) -> None:
+        """Spec: WAIT-12, RULE-44 -- the signal follows a verified write only."""
+        context, _ = world(body.Storage.GITHUB, item_with(ruled_card()), github_clone)
+        write = rule_line(1)
+        with pytest.raises(expectations.ExpectationAlreadyRuledError):
+            write_in_a_turn(context, tmp_path, write)
+        assert item_signals(tmp_path) == []
+
+    def test_a_body_write_the_forge_refuses_touches_no_signal(
+        self, github_clone: Path, tmp_path: Path
+    ) -> None:
+        """Spec: WAIT-12 -- a body write that raises is not a verified write."""
+        context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        client.fail_update_item_body = True
+        write = rule_line(1)
+        with pytest.raises(protocol.ClaimError):
+            write_in_a_turn(context, tmp_path, write)
+        assert item_signals(tmp_path) == []
+
+    def test_an_ask_touches_no_signal(self, github_clone: Path, tmp_path: Path) -> None:
+        """Spec: WAIT-12 -- `ask` is no ruling, return or withdrawal."""
+        context, client = world(body.Storage.GITHUB, item_with(SECOND_CARD), github_clone)
+        client.issue_references[90] = forge.ItemReference(
+            forge.ItemState.OPEN, TITLE, item_with(SECOND_CARD), author_is_member=True
+        )
+        write_in_a_turn(
+            context,
+            tmp_path,
+            lambda context, fresh, _state: decide.ask(context, fresh, ask_card()),
+        )
+        assert (client.body_writes != [], item_signals(tmp_path)) == (True, [])
+
+    def test_a_signal_that_cannot_be_touched_leaves_the_ruling_standing_and_warns_once(
+        self, github_clone: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: WAIT-13 -- the write stands, one warning names the signal path."""
+        context, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
+        blocker = tmp_path / "state" / "aco" / "item-signals"
+        blocker.parent.mkdir(parents=True)
+        blocker.write_text("a file, not a directory", encoding="utf-8")
+        write_in_a_turn(context, tmp_path, rule_line(1))
+        warnings = [
+            line for line in capsys.readouterr().err.splitlines() if line.startswith("WARNING")
+        ]
+        assert len(client.body_writes) == 1
+        assert len(warnings) == 1
+        assert warnings[0].startswith("WARNING: the ruling stands, but its signal at ")
+        assert str(blocker) in warnings[0]

@@ -3,6 +3,7 @@ the line is open or returned, a TOML local date, outside the card hash, read by
 `rulings`, and kept when `rule` rewrites the body."""
 
 import json
+import os
 import tomllib
 from datetime import date
 from pathlib import Path
@@ -27,7 +28,7 @@ from option_cards import (
     serve_item,
 )
 
-from aco import body, expectations, forge
+from aco import body, expectations, forge, repositories
 from aco import decide as decide_module
 from aco.expectation_grammar import card_hash
 
@@ -44,7 +45,7 @@ def with_asked_on(line: str, value: str) -> str:
     return line.replace(ASKED_ON, f"asked_on = {value}\n", 1)
 
 
-@pytest.mark.usefixtures("clone")
+@pytest.mark.usefixtures("github_clone")
 class TestAskedOnCheck:
     @pytest.mark.parametrize(
         "line",
@@ -131,15 +132,19 @@ class TestAskedOnKeptByRule:
         assert ruled.status == 0, ruled.stderr
         assert ASKED_ON in client.item_bodies[7]
 
-    def test_a_line_ruled_in_a_state_ref_checkout_keeps_it(self, clone: Path) -> None:
+    def test_a_line_ruled_in_a_state_ref_checkout_keeps_it(self, github_clone: Path) -> None:
         """Spec: BODY-101, RUL-19 -- the shared writer drops no key on the state-ref pin."""
-        track_board_config(clone, f'storage = "{body.Storage.STATE_REF.value}"\n')
+        track_board_config(github_clone, f'storage = "{body.Storage.STATE_REF.value}"\n')
         reference = forge.ItemReference(forge.ItemState.OPEN, "Karte", item_body(card()))
         client = FakeForge(issue_references={7: reference})
         context = run_context_over(client)
         choice = expectations.OptionChoice("A", expectations.RulingVia.CHAT, GOLDEN_CARD_HASH)
         outcome = decide_module.LineOutcome(2, choice)
         decide_module.rule(
-            context, decide_module.fresh_item(context, 7, command="rule"), [outcome], TODAY
+            context,
+            decide_module.fresh_item(context, 7, command="rule"),
+            [outcome],
+            TODAY,
+            state=repositories.state_directory(os.environ, Path.home()),
         )
         assert ASKED_ON in client.item_bodies[7]

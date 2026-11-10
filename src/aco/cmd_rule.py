@@ -18,6 +18,7 @@ from . import (
     expectations,
     protocol,
     report,
+    repositories,
     workboard,
 )
 from .session import RepoMeaninglessUnderStateRefError, RunContext
@@ -357,7 +358,13 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
     with decide.turn(
         context, number, command="rule", environment=os.environ, home=Path.home()
     ) as fresh:
-        committed = decide.rule(context, fresh, named, context.today())
+        committed = decide.rule(
+            context,
+            fresh,
+            named,
+            context.today(),
+            state=repositories.state_directory(os.environ, Path.home()),
+        )
     # A successful write names only option lines: every other form refused before it.
     ruled = cast(
         tuple[expectations.OptionLine, ...],

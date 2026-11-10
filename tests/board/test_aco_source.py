@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from aco_board_fixtures import BoardClient, Lister, first_listed_line, serving_two
-from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body
+from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body, item_signals
 from option_cards import open_option_entry
 
 from aco import forge
@@ -240,3 +240,15 @@ def test_a_decision_whose_lock_directory_is_unwritable_fails_and_writes_nothing(
     message = str(outcome["message"])
     assert (outcome["status"], message.startswith("cannot lock the item at ")) == ("failed", True)
     assert repository.request_log()[page_read:] == ()
+
+
+def test_a_decision_touches_the_items_signal(
+    repository: BoardForge, board: BoardClient, tmp_path: Path
+) -> None:
+    """ABRD-122, WAIT-12: a decision the board writes signals a waiting command."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+
+    board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert len(item_signals(tmp_path)) == 1

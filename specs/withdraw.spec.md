@@ -34,6 +34,7 @@ left, never a withdrawn one.
 | the body check answers the write | WITHDRAW-17 | WITHDRAW-17 |
 | the item's lock cannot be taken | WITHDRAW-16 | WITHDRAW-16 |
 | two writers of one item on this machine | WITHDRAW-15 | — |
+| a withdrawal written | WITHDRAW-18 | — |
 
 - [ ] [WITHDRAW-01] An open or returned option line makes `aco withdraw ITEM --line N` print `WITHDRAWN #<n> line <k>; <m> line(s) still open`, exit `0` (see E-WITHDRAW-01).
 - [ ] [WITHDRAW-02] That line's entry becomes its `text` and today's UTC `withdrawn_on`, nothing else, at the same index; every other entry keeps its values (BODY-88, BODY-104).
@@ -51,6 +52,7 @@ left, never a withdrawn one.
 - [ ] [WITHDRAW-13] Every other forge failure, the read and the write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
 - [ ] [WITHDRAW-15] Every withdrawal runs in the item's turn (RULE-40): writers of one item on this machine are serialized, so a withdrawal and a ruling on distinct lines both land; a held lock prints RULE-42's line.
 - [ ] [WITHDRAW-16] A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
+- [ ] [WITHDRAW-18] A verified withdrawal touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
 - [ ] [WITHDRAW-14] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
 
 `reason`, by which refusal fired:

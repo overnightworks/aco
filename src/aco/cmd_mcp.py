@@ -88,7 +88,13 @@ def record_answer(
     with decide.turn(
         context, number, command="record_answer", environment=os.environ, home=Path.home()
     ) as fresh:
-        committed = decide.rule(context, fresh, [decide.LineOutcome(line, choice)], context.today())
+        committed = decide.rule(
+            context,
+            fresh,
+            [decide.LineOutcome(line, choice)],
+            context.today(),
+            state=repositories.state_directory(os.environ, Path.home()),
+        )
     return {
         "repository": label,
         "item": number,
