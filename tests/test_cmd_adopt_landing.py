@@ -374,11 +374,21 @@ def test_an_issue_claim_beside_the_adopted_lane_stands_when_the_lane_goes(
 
 
 @pytest.mark.parametrize(
-    ("identity", "branch", "body"),
+    ("identity", "branch", "body", "released_first_line"),
     [
-        pytest.param(protocol.LaneIdentity(), "fix/x", "Fix x\n\nNo-Item: fix", id="fix-lane"),
         pytest.param(
-            protocol.IssueIdentity(7), "issue-7", "Closes #7\n\nWork-Item: #7", id="issue-claim"
+            protocol.LaneIdentity(),
+            "fix/x",
+            "Fix x\n\nNo-Item: fix",
+            "RELEASED lane fix/x: c1",
+            id="fix-lane",
+        ),
+        pytest.param(
+            protocol.IssueIdentity(7),
+            "issue-7",
+            "Closes #7\n\nWork-Item: #7",
+            "RELEASED issue #7: c1",
+            id="issue-claim",
         ),
     ],
 )
@@ -388,14 +398,15 @@ def test_a_claim_that_is_no_adopted_lane_is_kept_at_its_claimed_base_when_merged
     identity: protocol.ClaimIdentity,
     branch: str,
     body: str,
+    released_first_line: str,
 ) -> None:
     """Spec: REL-63, REL-29 -- only an adopted lane meets REL-61: a `fix/` lane or an issue
     claim may hold commits that were never pushed."""
     lane_directory = world.clone.parent / "claimed-lane"
     real_git(world.clone, "worktree", "add", "-q", "-b", branch, str(lane_directory))
-    (lane_directory / "fix.txt").write_text("fix\n")
-    real_git(lane_directory, "add", "fix.txt")
-    real_git(lane_directory, "commit", "-q", "-m", "fix")
+    (lane_directory / "work.txt").write_text("work\n")
+    real_git(lane_directory, "add", "work.txt")
+    real_git(lane_directory, "commit", "-q", "-m", "work")
     tip = real_git(lane_directory, "rev-parse", "HEAD").stdout.strip()
     real_git(lane_directory, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
     store.commit_transition(
@@ -427,6 +438,10 @@ def test_a_claim_that_is_no_adopted_lane_is_kept_at_its_claimed_base_when_merged
         ["release", *item, "--merged", str(ADOPTED_PULL_REQUEST), "--branch", branch], capsys
     )
 
+    state = store.fetch_state(worktree=world.clone, remote=str(world.remote))
+    assert (released.status, released.stderr) == (0, "")
+    assert released.stdout.splitlines()[0] == released_first_line
+    assert protocol.claims_on_branch(state.claims, branch) == ()
     assert _worktree_line(released) == KEPT_NOT_MERGED
     assert lane_directory.is_dir()
     assert real_git(world.clone, "rev-parse", "--verify", branch).stdout.strip() == tip
