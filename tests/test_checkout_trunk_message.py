@@ -91,6 +91,12 @@ Co-authored-by: Drive Author <drive@example.invalid>
 
 No-Item: fix
 """
+CARRIAGE_RETURN_INSIDE_A_VALUE = """Add b10 file (#14)
+
+Work-Item: #12\r#13
+
+Co-authored-by: Drive Author <drive@example.invalid>
+"""
 
 
 def landings_of(tmp_path: Path, message: bytes) -> tuple[checkout.TrunkLanding, ...]:
@@ -127,6 +133,14 @@ def landings_of(tmp_path: Path, message: bytes) -> tuple[checkout.TrunkLanding, 
         ),
         pytest.param(
             TWO_WORK_ITEMS, workboard.TrunkWorkItemClassification((20, 21)), id="work-items"
+        ),
+        pytest.param(
+            CARRIAGE_RETURN_INSIDE_A_VALUE,
+            workboard.ClassificationDefect(
+                "carries `Work-Item: #12\r#13`; "
+                "a trunk trailer names #n, aco-xxxxxx, or the bare number n"
+            ),
+            id="control-byte-in-a-value-stays-refused",
         ),
         pytest.param(
             WORK_ITEM_AND_NO_ITEM,

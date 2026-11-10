@@ -1263,7 +1263,7 @@ def message_trailers(message: str) -> tuple[str, ...]:
         message_path = Path(scratch) / "message"
         message_path.write_text(message, encoding="utf-8")
         parsed = git_output(["interpret-trailers", "--parse", "--no-divider", str(message_path)])
-    return tuple(parsed.splitlines())
+    return tuple(parsed.split("\n")) if parsed else ()
 
 
 def fast_forward_default_branch(trunk: str, *, directory: Path) -> None:
