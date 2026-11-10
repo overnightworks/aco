@@ -97,6 +97,13 @@ Work-Item: #12\r#13
 
 Co-authored-by: Drive Author <drive@example.invalid>
 """
+NO_BREAK_SPACE_ONLY_LINE = """Add b11 file (#15)
+
+No-Item: fix
+\u00a0
+
+Co-authored-by: Drive Author <drive@example.invalid>
+"""
 
 
 def landings_of(tmp_path: Path, message: bytes) -> tuple[checkout.TrunkLanding, ...]:
@@ -134,6 +141,7 @@ def landings_of(tmp_path: Path, message: bytes) -> tuple[checkout.TrunkLanding, 
         pytest.param(
             TWO_WORK_ITEMS, workboard.TrunkWorkItemClassification((20, 21)), id="work-items"
         ),
+        pytest.param(NO_BREAK_SPACE_ONLY_LINE, None, id="no-break-space-is-content-to-git"),
         pytest.param(
             CARRIAGE_RETURN_INSIDE_A_VALUE,
             workboard.ClassificationDefect(
