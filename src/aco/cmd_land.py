@@ -657,6 +657,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         protocol.require_coordinator_override(parsed.role)
     client = cast(github.GitHubForge, context.forge)
     detail = _land_read_head_checked(client, parsed.pull_request, client.repository.path)
+    # A rerun's own preflight never ran, so it verified no classification:
+    # `_land_release_routing` reads the merge commit's own trailer instead.
     classification: workboard.Classification | None = None
     if detail.merged:
         assert detail.merge_commit is not None  # noqa: S101 - `merged` is true; github.py guarantees this.
