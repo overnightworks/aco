@@ -1,8 +1,0 @@
-claim_id = "6890f8c1cd9548009d6dd8113faa07c8"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "d80edbe8b96b37d60666cc6710139d313732f702"
-branch = "claude/issue-776-release-path"
-scope = [".github/workflows/ci.yml", ".github/workflows/release.yml", "README.md", "scripts/package_smoke.sh"]
-opened_commit = "5ffffdcf9a6325b7ad5787f53cd363b90787fa66"
-whole_reason = "The release workflow and the three texts that name how a release is made change together."
