@@ -2,7 +2,7 @@
 
 `aco land <pr>` merges one green pull request under `storage = "github"`
 with a pinned head sha and its own composed commit message, or, where the
-default branch requires GitHub's merge queue, queues it pinned to that head with
+target branch requires GitHub's merge queue, queues it pinned to that head with
 the same message and waits for the queue to merge it (LANDCMD-59..70), then runs the
 existing `release --merged <pr>` path (`specs/release.spec.md`,
 `specs/landing-grammar.spec.md` LAND-29..39, 49, 50, 55, 62/63/64) unchanged
@@ -145,7 +145,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 ## Merge, through the merge queue
 
 - [ ] [LANDCMD-59] Where a `merge_queue` rule applies to the pull request's target branch, `aco land` queues it (LANDCMD-61..68) instead of LANDCMD-12; no flag or setting chooses, and it merges nothing directly.
-- [ ] [LANDCMD-60] The preflight and the checkout check run first and unchanged, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
+- [ ] [LANDCMD-60] The preflight and the checkout check run unchanged before any write (after the reads of LANDCMD-69), the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
 - [ ] [LANDCMD-61] After every check passed, the pull request's body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue's squash takes; a body that already is that message is not written.
 - [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n>`, exit `2`; nothing is queued.
 - [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 (`pull request #<n> changed while it was checked; re-run land`), exit `2`.

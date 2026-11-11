@@ -1,4 +1,4 @@
-"""`aco land` where the default branch requires the merge queue: the landing message written
+"""`aco land` where the target branch requires the merge queue: the landing message written
 into the pull request, one enqueue pinned to the preflight head, the wait for the queue's
 verdict and the re-run that picks it up again, against a fake forge that expresses the queue."""
 
@@ -10,7 +10,7 @@ from cli_fixtures import CliRun, run_cli
 from github_fixtures import LandedWorld, landed_world, landing_readiness, serve_forge
 from queue_forge import LANDS, QueueForge, QueueRead
 
-from aco import cmd_land, cmd_land_queue, forge, github, protocol, store
+from aco import cmd_land_queue, forge, github, protocol, store
 
 NUMBER = 12
 MINUTE = 60.0
@@ -83,7 +83,6 @@ def world(
 ) -> QueueWorld:
     case: QueueCase = request.param
     pauses: list[float] = []
-    monkeypatch.setattr(cmd_land, "pause_between_reads", lambda _seconds: None)
     monkeypatch.setattr(cmd_land_queue, "pause_between_queue_reads", pauses.append)
     landed = landed_world(github_clone, bare_remote, monkeypatch, body=case.body)
     queue = QueueForge.over(landed.landing.forge)
@@ -183,7 +182,7 @@ class TestLandThroughTheMergeQueue:
             ),
             pytest.param(
                 QueueCase(reads=(LANDS,), body=COMPOSED, written=(), enqueues=0, pauses=0),
-                id="a-re-run-finds-it-merged-and-releases",
+                id="a-queue-merge-seen-before-the-preflight-releases",
             ),
             pytest.param(
                 QueueCase(
