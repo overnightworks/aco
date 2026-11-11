@@ -1,0 +1,8 @@
+claim_id = "055aa800f4cb49739c722750b684eb52"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "6ab8ad630afe6c2174c2e7fc398d46d01075c61e"
+branch = "claude/issue-780-land-through-merge-queue"
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/cmd_land_queue.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_merge_queue.py", "tests/support/github_fixtures.py", "tests/support/queue_forge.py", "tests/test_cmd_land_queue.py", "tests/test_github_merge_queue.py"]
+opened_commit = "3bfce12d0ac34111e370c740dd9561a424865930"
+whole_reason = "The land path, the one adapter case it needs (a closed removed pull request), the specification and the fake that drives them prove one behaviour end to end; the import layers, whitelist and baseline follow mechanically."
