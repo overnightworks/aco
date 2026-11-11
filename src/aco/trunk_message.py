@@ -51,6 +51,7 @@ def trailer_values(trailers: tuple[str, ...], key: str) -> tuple[str, ...]:
     """The values of `trailers`' `key` lines (`Token: value`, as git's trailer
     parsing prints them), as `%(trailers:key=...,valueonly)` lists them."""
     split_lines = (line.partition(":") for line in trailers)
-    return tuple(
+    values = (
         value.removeprefix(" ") for token, _, value in split_lines if token.lower() == key.lower()
     )
+    return tuple(value for value in values if value)
