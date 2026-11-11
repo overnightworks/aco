@@ -1,8 +1,0 @@
-claim_id = "36506641f5fb49b999dee61b904db6ec"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "6ab8ad630afe6c2174c2e7fc398d46d01075c61e"
-branch = "claude/issue-792-steps-own-view"
-scope = ["frontend/e2e", "frontend/src", "specs/serve.spec.md", "src/aco/board/static"]
-opened_commit = "791ec544264d1b84ed8bd8dd8a7c6a69a7118b98"
-whole_reason = "The view, its model, their unit and browser tests and the rebuilt static board change together; CI's assets-fresh step fails on any split."
