@@ -66,6 +66,12 @@ class ForgeMergeRefusedError(ForgeError):
     is a re-run."""
 
 
+class ForgeEnqueueHeadMovedError(ForgeError):
+    """`enqueue_pull_request` was refused because the pull request's head is no
+    longer the commit the caller pinned: the caller re-reads and decides again
+    rather than queueing a commit it never validated."""
+
+
 class ForgePartialCreationError(ForgeError):
     """The forge created issue `created`, but `step` did not finish it.
 
@@ -280,6 +286,30 @@ class Landing:
     merge_commit: str | None
     title: str
     head_sha: str
+
+
+@dataclass(frozen=True)
+class MergedPullRequest:
+    """A pull request the forge merged, through the merge queue or not."""
+
+    merge_commit: str
+
+
+@dataclass(frozen=True)
+class QueuedPullRequest:
+    """An open pull request with an entry in the merge queue."""
+
+
+@dataclass(frozen=True)
+class UnqueuedPullRequest:
+    """An open pull request with no queue entry. `removal_reason` is GitHub's own
+    reason (`failed_checks`, ...) for the latest queue removal on its timeline,
+    `None` where none is recorded: never queued, or dropped without an event."""
+
+    removal_reason: str | None
+
+
+MergeQueueState = MergedPullRequest | QueuedPullRequest | UnqueuedPullRequest
 
 
 # GitHub's own open vocabularies for a pull request's `mergeable_state` and a
