@@ -77,6 +77,29 @@ for (const viewport of [
 			await shoot(page, (name) => testInfo.outputPath(name), `open-${viewport.width}`);
 		});
 
+		test('[ABRD-117] [ABRD-123] the header stays inside the page with wider glyphs and clips no tab label', async ({
+			page
+		}) => {
+			await arrange([card(), stepItem(9, 'Rotate the key', LONG_STEP)]);
+			await show(page);
+			await page.evaluate(() => {
+				const wider = new CSSStyleSheet();
+				wider.replaceSync('* { letter-spacing: 0.12em !important; }');
+				document.adoptedStyleSheets = [...document.adoptedStyleSheets, wider];
+			});
+
+			const views = page.getByRole('navigation', { name: 'Views' });
+			await expect(views.getByRole('button', { name: 'Steps 1' })).toBeVisible();
+			const geometry = await page.evaluate(() => ({
+				overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+				clipped: [...document.querySelectorAll('nav button')].filter(
+					(tab) =>
+						tab.scrollWidth > tab.clientWidth || tab.getBoundingClientRect().right > innerWidth
+				).length
+			}));
+			expect(geometry).toEqual({ overflow: 0, clipped: 0 });
+		});
+
 		test('[ABRD-117] [ABRD-118] the Steps tab shows the steps in full under its count, and no question row', async ({
 			page
 		}, testInfo) => {

@@ -480,9 +480,12 @@
 	}
 	@media (max-width: 760px) {
 		.top {
-			height: 52px;
+			height: auto;
+			min-height: 52px;
+			flex-wrap: wrap;
+			align-content: center;
 			padding: 0 16px;
-			gap: 8px;
+			gap: 0 8px;
 		}
 		.brand {
 			position: absolute;
@@ -511,6 +514,7 @@
 			margin-left: auto;
 		}
 		nav {
+			flex-wrap: wrap;
 			gap: 2px;
 		}
 		.tracks {
