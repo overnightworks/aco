@@ -7,7 +7,7 @@ import {
 	NO_STEP_TEXT,
 	NO_STEP_WAITING_TEXT,
 	NOT_READ_LABEL,
-	STEPS_HEADING
+	STEPS_LABEL
 } from '../app/model/boardSummary';
 import { repo } from '../test-support/board';
 import StepsList from './StepsList.svelte';
@@ -24,14 +24,17 @@ const rotate = {
 	step: 'Run the rotate script, then say done.'
 };
 
-test('[ABRD-117] the section is a region headed Steps with the count of the rows it shows', () => {
+test('[ABRD-117] the section is a region headed Steps, its heading without a count', () => {
 	renderSteps([
 		repo({ name: 'a', steps: [rotate] }),
 		repo({ name: 'b', steps: [{ number: 3, title: 'Pay', step: 'Pay the invoice.' }] })
 	]);
 
-	const region = screen.getByRole('region', { name: `${STEPS_HEADING} 2` });
+	const region = screen.getByRole('region', { name: STEPS_LABEL });
 	expect(within(region).getAllByRole('listitem')).toHaveLength(2);
+	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+		new RegExp(`^${STEPS_LABEL}$`)
+	);
 });
 
 test('[ABRD-118] a row shows its repository, number, title and the step in full', () => {
@@ -63,7 +66,7 @@ test('[ABRD-119] a row holds no control and takes no focus; its text is shown as
 test('[ABRD-120] with no step the heading stays and one sentence says no step waits', () => {
 	renderSteps([repo({ steps: [] })]);
 
-	expect(screen.getByRole('region')).toHaveTextContent(`${STEPS_HEADING} 0`);
+	expect(screen.getByRole('region', { name: STEPS_LABEL })).toBeInTheDocument();
 	expect(screen.getByText(NO_STEP_WAITING_TEXT)).toBeInTheDocument();
 	expect(screen.queryByRole('listitem')).toBeNull();
 });

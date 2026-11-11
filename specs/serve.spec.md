@@ -112,9 +112,9 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-104] Refresh shows a turning arrow, `Refresh` (`Reading…` and `aria-busy` while a read runs, still clickable) and the last read's `HH:MM`, named `<label> · read HH:MM`; phones hide the label.
 - [ ] [ABRD-105] A read leaves the item of a card that waits (ABRD-99) as shown, kept when the read omits it; a read that answers once the card no longer waits applies as ABRD-98 allows.
 - [ ] [ABRD-106] A card's meta ends in `Asked DD.MM.YYYY` when its line carries `asked_on`, a card of points its newest point's day; its row shows that day as `DD.MM.`, a Decided row its decision day.
-- [ ] [ABRD-107] On both tabs groups stand by their first row: open before with head, then the newest day, then the higher item; a failed repository with kept cards too, one without cards after every other group.
+- [ ] [ABRD-107] On the Open and Decided tabs groups stand by their first row: open before with head, then the newest day, then the higher item; a failed repository with kept cards too, one without cards last.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
-- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n` and `Decided n` and Refresh (ABRD-104): n counts the open list's rows and the ruled lines Decided lists.
+- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n`, `Steps n`, `Decided n` and Refresh (ABRD-104); n counts the open rows, the steps shown and the ruled lines.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
 - [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.
 - [ ] [ABRD-64] A card post's `other` (ABRD-78) is the trimmed answer within ABRD-05, written once for every posted line with `via board` (E-ABRD-13).
@@ -195,12 +195,13 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - [ ] [ABRD-114] Each repo lists `steps`: `{"number", "title", "step"}` per member-written open item labelled `needs-operator`, by descending number, from the one listing of ABRD-06 (E-ABRD-20).
 - [ ] [ABRD-115] A step's `step` is the `next` of its item's block, `null` when the body has no readable block (E-ABRD-20).
 - [ ] [ABRD-116] A repo whose read failed lists `"steps": []` beside `"items": []` (E-ABRD-20).
-- [ ] [ABRD-117] The page's Open view shows the steps as their own region headed `Steps` with its row count, above the questions; a step is no question row and no part of the counts.
+- [ ] [ABRD-117] Open shows no step; the Steps view shows the steps alone, as a region headed `Steps`. A step is no question row and no part of the Open or Decided count.
 - [ ] [ABRD-118] A step row shows its repo, `#<number>`, its title and its step in full, wrapping and never cut off; a `null` step reads `This item names no step.`
 - [ ] [ABRD-119] A step row holds no control and takes no focus, and the region sends no request; its text is shown as text, never as markup.
 - [ ] [ABRD-120] With no row the heading stays and reads `No step waits for you.`, or `No step in the projects read.` while any repo could not be read.
 - [ ] [ABRD-121] A repo not read keeps its last steps, shown under `Not read` with its `last read` time, so an older step is never shown as current.
 - [ ] [ABRD-122] A decision that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44), so a session waiting with `aco wait` learns it.
+- [ ] [ABRD-123] The board opens on Open at every width; a reload returns to Open, as Steps and Decided are not kept across a reload.
 
 ## The SPA shell
 

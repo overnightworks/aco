@@ -9,6 +9,7 @@
 		OPEN_TAB_LABEL,
 		SERVER_SILENT_SENTENCE,
 		DECIDED_TAB_LABEL,
+		STEPS_LABEL,
 		SELF_REFRESH_MINUTES,
 		isStale,
 		lastReadAt,
@@ -35,7 +36,7 @@
 	let showDecidedCard = $state(false);
 	let view: ListView = $state('open');
 	const counts = $derived(tabCounts(board.repos));
-	const cardView = $derived(view === 'open' ? showQuestion : showDecidedCard);
+	const cardView = $derived(view === 'open' ? showQuestion : view === 'decided' && showDecidedCard);
 	let initialized = $state(false);
 	let tracks: HTMLDivElement | undefined = $state();
 	let question: HTMLDivElement | undefined = $state();
@@ -85,7 +86,7 @@
 	}
 
 	function keepFocusVisible() {
-		if (view === 'decided') return;
+		if (view !== 'open') return;
 		const active = document.activeElement;
 		if (
 			active === document.body ||
@@ -199,6 +200,12 @@
 				>
 				<button
 					type="button"
+					aria-current={view === 'steps' ? 'page' : undefined}
+					onclick={() => (view = 'steps')}
+					>{STEPS_LABEL} <span class="n">{counts.steps}</span></button
+				>
+				<button
+					type="button"
 					aria-current={view === 'decided' ? 'page' : undefined}
 					onclick={openDecided}>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
 				>
@@ -223,7 +230,6 @@
 		{@const store = decisions}
 		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
-				<StepsList repos={board.repos} />
 				<TrackList
 					repos={board.repos}
 					view="open"
@@ -267,6 +273,11 @@
 						<Stage repos={board.repos} selectedKey={decidedKey} {decisions} />
 					</div>
 				</div>
+			</div>
+		{/if}
+		{#if view === 'steps'}
+			<div class="steps-view">
+				<StepsList repos={board.repos} />
 			</div>
 		{/if}
 	{/if}
@@ -382,6 +393,13 @@
 		grid-template-rows: auto minmax(0, 1fr);
 		flex: 1;
 		min-height: 0;
+	}
+	.steps-view {
+		flex: 1;
+		min-height: 0;
+		overflow: auto;
+		background: var(--surface);
+		padding: 8px 0 24px;
 	}
 	.tracks,
 	.question-pane {
