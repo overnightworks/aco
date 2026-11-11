@@ -115,6 +115,14 @@ Work-Item: #12
 
 Co-authored-by: Drive Author <drive@example.invalid>
 """
+NO_BREAK_SPACE_BEFORE_A_VALUE = """Add b14 file (#18)
+
+Work-Item: \N{NO-BREAK SPACE}#12
+
+---------
+
+Co-authored-by: Drive Author <drive@example.invalid>
+"""
 
 
 def landings_of(tmp_path: Path, message: bytes) -> tuple[checkout.TrunkLanding, ...]:
@@ -156,6 +164,14 @@ def landings_of(tmp_path: Path, message: bytes) -> tuple[checkout.TrunkLanding, 
             EMPTY_WORK_ITEM_VALUE_BEFORE_A_VALUE,
             workboard.TrunkWorkItemClassification((12,)),
             id="empty-work-item-value-is-no-value-to-git",
+        ),
+        pytest.param(
+            NO_BREAK_SPACE_BEFORE_A_VALUE,
+            workboard.ClassificationDefect(
+                "carries `Work-Item: \N{NO-BREAK SPACE}#12`; "
+                "a trunk trailer names #n, aco-xxxxxx, or the bare number n"
+            ),
+            id="no-break-space-before-a-value-stays-refused",
         ),
         pytest.param(NO_BREAK_SPACE_ONLY_LINE, None, id="no-break-space-is-content-to-git"),
         pytest.param(
