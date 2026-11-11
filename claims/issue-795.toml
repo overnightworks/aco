@@ -1,0 +1,7 @@
+claim_id = "eff58f46298c4e03b259534327cf9b8d"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "7430fd6b6e6c383e39f664abc0ada9a74477ae36"
+branch = "claude/issue-795-ci-on-merge-group"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml"]
+opened_commit = "5e4d2f83a0ae063e15b4175100fe53cb3b26dc8a"
