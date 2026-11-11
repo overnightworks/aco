@@ -13,6 +13,13 @@ from . import forge, protocol, workboard
 
 MERGE_QUEUE_RULE = "merge_queue"
 
+_TYPE_KEY = "type"
+_RULE_SUBJECT = "branch merge rule"
+_REMOVAL_SUBJECT = "queue removal"
+_QUEUE_STATE_SUBJECT = "pull request queue state"
+_LOOKUP_SUBJECT = "pull request lookup"
+_ENQUEUE_SUBJECT = "enqueue result"
+
 # GraphQL reference: `PullRequest.mergeQueueEntry` is null outside the queue,
 # `RemovedFromMergeQueueEvent.reason` is the removal's own reason. `last: 1` is the
 # latest removal on the timeline.
@@ -63,32 +70,32 @@ def _malformed(subject: str) -> forge.ForgeMalformedResponseError:
 
 
 def _rule(rule: object) -> Mapping[str, object]:
-    return _object(rule, "branch merge rule")
+    return _object(rule, _RULE_SUBJECT)
 
 
 def has_merge_queue_rule(rules: Iterable[object]) -> bool:
     """Whether one of the branch's rules is a `merge_queue` rule."""
-    return MERGE_QUEUE_RULE in [_rule(rule).get("type") for rule in rules]
+    return MERGE_QUEUE_RULE in [_rule(rule).get(_TYPE_KEY) for rule in rules]
 
 
 def rule_merge_methods(rule: object) -> frozenset[workboard.MergeMethod] | None:
     """The methods one branch rule allows, or None where it restricts none."""
     values = _rule(rule)
-    if values.get("type") == "required_linear_history":
+    if values.get(_TYPE_KEY) == "required_linear_history":
         return frozenset(workboard.MergeMethod) - {workboard.MergeMethod.MERGE}
-    if values.get("type") != "pull_request":
+    if values.get(_TYPE_KEY) != "pull_request":
         return None
     parameters = values.get("parameters")
     if parameters is None:
         return None
-    methods = _object(parameters, "branch merge rule").get("allowed_merge_methods")
+    methods = _object(parameters, _RULE_SUBJECT).get("allowed_merge_methods")
     if methods is None:
         return None
     known = {method.value for method in workboard.MergeMethod}
     if not isinstance(methods, list) or not all(
         isinstance(method, str) and method in known for method in methods
     ):
-        raise _malformed("branch merge rule")
+        raise _malformed(_RULE_SUBJECT)
     return frozenset(workboard.MergeMethod(method) for method in methods)
 
 
@@ -107,23 +114,23 @@ def _object(value: object, subject: str) -> Mapping[str, object]:
 def _removal_reason(pull_request: Mapping[str, object]) -> str | None:
     """The reason of the latest queue removal, `None` where the timeline records none
     or the removal names no reason."""
-    nodes = _object(pull_request.get("timelineItems"), "queue removal").get("nodes")
+    nodes = _object(pull_request.get("timelineItems"), _REMOVAL_SUBJECT).get("nodes")
     if not isinstance(nodes, list) or len(nodes) > 1:
-        raise _malformed("queue removal")
+        raise _malformed(_REMOVAL_SUBJECT)
     if not nodes:
         return None
-    reason = _object(nodes[0], "queue removal").get("reason")
+    reason = _object(nodes[0], _REMOVAL_SUBJECT).get("reason")
     if reason is not None and not isinstance(reason, str):
-        raise _malformed("queue removal")
+        raise _malformed(_REMOVAL_SUBJECT)
     return reason
 
 
 def _queue_state(pull_request: object, number: int) -> forge.MergeQueueState:
-    values = _object(pull_request, "pull request queue state")
+    values = _object(pull_request, _QUEUE_STATE_SUBJECT)
     try:
         state = _PullRequestState(values.get("state"))
     except ValueError as error:
-        raise _malformed("pull request queue state") from error
+        raise _malformed(_QUEUE_STATE_SUBJECT) from error
     if state is _PullRequestState.MERGED:
         merge_commit = _object(values.get("mergeCommit"), "merge commit").get("oid")
         return forge.MergedPullRequest(_commit(merge_commit, "merge commit"))
@@ -167,20 +174,18 @@ class MergeQueue:
 
     def state(self, number: int) -> forge.MergeQueueState:
         """Whether pull request `number` is merged, queued or open and not queued."""
-        return _queue_state(
-            self._pull_request(_STATE_QUERY, number, "pull request queue state"), number
-        )
+        return _queue_state(self._pull_request(_STATE_QUERY, number, _QUEUE_STATE_SUBJECT), number)
 
     def _lookup(self, number: int) -> tuple[str, str]:
         """The pull request's node identifier and current head."""
         values = _object(
-            self._pull_request(_LOOKUP_QUERY, number, "pull request lookup"),
-            "pull request lookup",
+            self._pull_request(_LOOKUP_QUERY, number, _LOOKUP_SUBJECT),
+            _LOOKUP_SUBJECT,
         )
         node_id = values.get("id")
         if not isinstance(node_id, str) or not node_id:
-            raise _malformed("pull request lookup")
-        return node_id, _commit(values.get("headRefOid"), "pull request lookup")
+            raise _malformed(_LOOKUP_SUBJECT)
+        return node_id, _commit(values.get("headRefOid"), _LOOKUP_SUBJECT)
 
     def enqueue(self, number: int, expected_head: str) -> None:
         """Enqueue pull request `number` pinned to `expected_head`. A refusal while
@@ -193,7 +198,7 @@ class MergeQueue:
                 _ENQUEUE_MUTATION,
                 {"pullRequestId": node_id, "expectedHeadOid": expected_head},
                 ".data.enqueuePullRequest",
-                "enqueue result",
+                _ENQUEUE_SUBJECT,
             )
         except (
             forge.ForgeTransientError,
@@ -206,5 +211,5 @@ class MergeQueue:
             if head != expected_head:
                 raise forge.ForgeEnqueueHeadMovedError(str(refusal)) from refusal
             raise
-        if _object(payload, "enqueue result").get("mergeQueueEntry") is None:
-            raise _malformed("enqueue result")
+        if _object(payload, _ENQUEUE_SUBJECT).get("mergeQueueEntry") is None:
+            raise _malformed(_ENQUEUE_SUBJECT)
