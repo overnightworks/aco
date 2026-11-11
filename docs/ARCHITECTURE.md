@@ -99,7 +99,7 @@ sequenceDiagram
     A-->>H: worktree and branch
     H->>F: push branch, open pull request
     H->>A: aco land pr --head sha
-    A->>F: check pinned head, merge
+    A->>F: check pinned head, merge (or enqueue and wait where the merge queue is required)
     A->>R: release transition
     A-->>H: freed items
 ```

@@ -1,7 +1,9 @@
 # `aco land`
 
 `aco land <pr>` merges one green pull request under `storage = "github"`
-with a pinned head sha and its own composed commit message, then runs the
+with a pinned head sha and its own composed commit message, or, where the
+default branch requires GitHub's merge queue, queues it pinned to that head with
+the same message and waits for the queue to merge it (LANDCMD-59..70), then runs the
 existing `release --merged <pr>` path (`specs/release.spec.md`,
 `specs/landing-grammar.spec.md` LAND-29..39, 49, 50, 55, 62/63/64) unchanged
 -- one command instead of "merge, delete the branch, fetch, fast-forward,
@@ -75,6 +77,12 @@ order `merge`, `squash`, `rebase`.
 | a pull request already merged (rerun) | LANDCMD-18 |
 | the head branch is no safe name, or a merged pull request comes from another repository | LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53 |
 | a rerun whose release already succeeded | LANDCMD-38 |
+| a `merge_queue` rule applies to the target branch | LANDCMD-59, LANDCMD-60 |
+| the queue path writes the landing message | LANDCMD-61, LANDCMD-62 |
+| the queue path enqueues | LANDCMD-63, LANDCMD-64 |
+| the queue path waits | LANDCMD-65, LANDCMD-66, LANDCMD-67, LANDCMD-68 |
+| a rerun finds the pull request queued, merged or removed | LANDCMD-69 |
+| the rules or the queue state cannot be read | LANDCMD-70 |
 
 ## Preflight, read-only, in order
 
@@ -99,7 +107,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
 - [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n>`, exit `2`.
 - [ ] [LANDCMD-49] `was not merged` means this run merged nothing: it also holds when an earlier run merged the pull request and a read of this rerun fails (LANDCMD-18).
-- [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions` or `its merge rules`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
+- [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions`, `its merge rules` or `its merge queue state`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
 - [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable or invalid `quality/config.toml` takes LANDCMD-46).
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
@@ -134,6 +142,21 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-14] A pull request whose head sha changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run land`, exit `2`; nothing merges.
 - [ ] [LANDCMD-37] A merge GitHub refuses to perform (HTTP 405) refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (see E-LANDCMD-37).
 
+## Merge, through the merge queue
+
+- [ ] [LANDCMD-59] Where a `merge_queue` rule applies to the pull request's target branch, `aco land` queues it (LANDCMD-61..68) instead of LANDCMD-12; no flag or setting chooses, and it merges nothing directly.
+- [ ] [LANDCMD-60] The preflight and the checkout check run first and unchanged, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
+- [ ] [LANDCMD-61] After every check passed, the pull request's body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue's squash takes; a body that already is that message is not written.
+- [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n>`, exit `2`; nothing is queued.
+- [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 (`pull request #<n> changed while it was checked; re-run land`), exit `2`.
+- [ ] [LANDCMD-64] Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n>`, exit `2`; `aco land` never repeats an enqueue.
+- [ ] [LANDCMD-65] Then `aco land` reads the pull request's queue state every 60 seconds or slower; merged, it runs the steps after the merge (LANDCMD-15..17, LANDCMD-54..58) unchanged, and the claim stays until then.
+- [ ] [LANDCMD-66] An open pull request with a recorded removal, or without a queue entry in two reads in a row, refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n>`, exit `2`.
+- [ ] [LANDCMD-67] A pull request closed after its removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's own or `no reason recorded`.
+- [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n>`, exit `2`, claim kept.
+- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits again (LANDCMD-65), writing and enqueueing nothing; merged, it releases (LANDCMD-18); else it starts at the preflight.
+- [ ] [LANDCMD-70] A read of the rules or of the queue state before the preflight that fails refuses as LANDCMD-46, with `<what>` `its merge rules` or `its merge queue state`.
+
 ## After the merge
 
 - [ ] [LANDCMD-15] A failed branch delete, fast-forward, or delegated `release --merged` prints `MERGED pull request #<n> as <sha>; follow-up incomplete: <step> (<error>); re-run aco land <n>`, exit `2`.
@@ -156,7 +179,8 @@ pull request's head (REL-61); a rerun with no live claim has no `base` (REL-47).
 
 ## Never
 
-- `aco land` never calls `gh pr merge`: every merge is a pinned REST call, never a re-read of the pull request's current head at merge time.
+- `aco land` never calls `gh pr merge`: a direct merge is a pinned REST call and a queued one a pinned enqueue, never a re-read of the pull request's current head at merge time.
+- `aco land` never retries an enqueue, never merges directly where a `merge_queue` rule applies, and never writes the pull request's body before every preflight check passed (LANDCMD-59, LANDCMD-61, LANDCMD-64).
 - `aco land` never runs `release`'s own close, store transition, `freed`/`next` report, or worktree cleanup a second time; it delegates to the one existing `release --merged` path (`specs/release.spec.md`).
 - A step after the merge never re-merges: recovery always resumes from the pull request's own already-merged state, read fresh on every rerun.
 - Once merged, the delegated release never reads the pull request's own mutable body for routing: a fixer editing it away afterward changes nothing this pull request already landed (LAND-64).
@@ -511,3 +535,85 @@ exit 0
 
 That `aco release` line, run in the original checkout, prints REL-49's line and `worktree: removed`
 (E-REL-24).
+
+### E-LANDCMD-65 — a queued landing waits for the queue and releases
+
+Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, a `merge_queue` rule on `main`, the queue merging it on its second read
+
+```console
+$ aco land 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+merged: <sha>
+exit 0
+```
+
+The pull request's body was written once (LANDCMD-61), it was enqueued once pinned to the head the preflight read (LANDCMD-63), and the two reads were at least 60 seconds apart; no direct merge was requested.
+
+### E-LANDCMD-62 — a body the forge does not take queues nothing
+
+Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the forge refusing the body write with `update item body failed`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 was not queued: writing its landing message failed (update item body failed); re-run aco land 57
+exit 2
+```
+
+### E-LANDCMD-64 — an enqueue GitHub refuses is not repeated
+
+Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the enqueue answered `HTTP 502`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 was not queued: enqueueing it failed (HTTP 502); re-run aco land 57
+exit 2
+```
+
+### E-LANDCMD-66 — a pull request the queue removed is refused with GitHub's reason
+
+Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the queue removing the entry for `failed_checks` while the pull request stays open
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 was removed from the merge queue (failed_checks); re-run aco land 57
+exit 2
+```
+
+The claim stands; the re-run starts at the preflight (LANDCMD-69). Where GitHub records no reason, two reads in a row without an entry refuse the same way with `(no reason recorded)`.
+
+### E-LANDCMD-67 — a pull request removed and closed is refused
+
+Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the queue removing the entry for `failed_checks` and the pull request closed
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 was removed from the merge queue and closed (failed_checks)
+exit 2
+```
+
+### E-LANDCMD-68 — a queue read that fails while waiting keeps the claim
+
+Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the second queue state read answered `HTTP 502`
+
+```console
+$ aco land 57
+2> ERROR: reading the merge queue state of pull request #57 failed (HTTP 502); re-run aco land 57
+exit 2
+```
+
+### E-LANDCMD-69 — a rerun finds the pull request queued and waits again
+
+Setup: bare-remote, fake `gh`, pull request `#57` already queued with its body holding the composed message, a `merge_queue` rule on `main`, the pull request not mergeable (`dirty`), the queue merging it on its next read
+
+```console
+$ aco land 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+merged: <sha>
+exit 0
+```
+
+Nothing was written or enqueued, and the preflight did not run: its `dirty` refusal (LANDCMD-03) never showed.
