@@ -8,6 +8,13 @@ on:
   pull_request:
     branches:
       - main
+  # A merge queue needs a code scanning analysis of its merge group commit for
+  # the code_scanning rule to pass there.
+  merge_group:
+    types:
+      - checks_requested
+    branches:
+      - main
   push:
     branches:
       - main
