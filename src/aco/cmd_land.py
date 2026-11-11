@@ -12,6 +12,7 @@ from . import (
     board_read,
     body,
     checkout,
+    cmd_land_queue,
     cmd_release,
     forge,
     github,
@@ -433,9 +434,7 @@ def _land_merge(
             body=_land_merge_body(title, detail.body, classification),
         )
     except forge.ForgeMergeConflictError as error:
-        raise protocol.ClaimUnavailableError(
-            f"pull request #{detail.number} changed while it was checked; re-run land"
-        ) from error
+        raise cmd_land_queue.head_moved_refusal(detail.number) from error
     except forge.ForgeMergeRefusedError as error:
         raise protocol.ClaimUnavailableError(
             f"GitHub refused the merge of pull request #{detail.number}: "
@@ -651,37 +650,94 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     check placed only there left a rerun free to delete the branch and
     fast-forward -- and `cmd_release.release_transition` free to close the item -- on a bare
     `--coordinator-override` with no coordinator role behind it."""
-    toplevel = context.toplevel
-    config = context.config
-    if config.storage is not body.Storage.GITHUB:
+    if context.config.storage is not body.Storage.GITHUB:
         raise protocol.ClaimUnavailableError(_LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:
         protocol.require_coordinator_override(parsed.role)
     client = cast(github.GitHubForge, context.forge)
-    number = parsed.pull_request
-    repository = client.repository.path
-    detail = _land_read_head_checked(client, number, repository)
-    classification: workboard.Classification | None
+    detail = _land_read_head_checked(client, parsed.pull_request, client.repository.path)
+    classification: workboard.Classification | None = None
     if detail.merged:
         assert detail.merge_commit is not None  # noqa: S101 - `merged` is true; github.py guarantees this.
         merge_sha = detail.merge_commit
-        checkout.refuse_unlandable_checkout(context.default_branch, directory=toplevel)
-        # A rerun: this run's own preflight never ran, so it never verified a
-        # classification -- `_land_release_routing` reads the merge commit's
-        # own trailer instead.
-        classification = None
+        checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
     else:
-        check_context = policy.LandingCheckContext(context, repository, config.storage)
-        detail, classification, readiness = _land_read(
-            number,
-            "its landing preconditions",
-            lambda: _land_preflight(
-                client, lambda: _land_peek_claims(context), check_context, number, parsed
-            ),
+        detail, classification, merge_sha = _land_merge_unmerged(parsed, context, client, detail)
+    _land_after_merge(parsed, context, detail, classification, merge_sha)
+    return 0
+
+
+def _land_queue_standing(
+    client: github.GitHubForge, detail: forge.Landing
+) -> forge.MergeQueueState | None:
+    """Where the pull request stands in the merge queue of its target branch, `None` where
+    a direct merge is the way: no `merge_queue` rule applies (LANDCMD-59). The target is
+    read from the pull request, so a closed one reads nothing of the default branch."""
+    number = detail.number
+    if not _land_read(
+        number, "its merge rules", lambda: client.requires_merge_queue(detail.target_branch)
+    ):
+        return None
+    return _land_read(number, "its merge queue state", lambda: client.merge_queue_state(number))
+
+
+def _land_merge_unmerged(
+    parsed: argparse.Namespace,
+    context: RunContext,
+    client: github.GitHubForge,
+    detail: forge.Landing,
+) -> tuple[forge.Landing, workboard.Classification | None, str]:
+    """The pull request `run` found open, merged: through the merge queue where a rule
+    requires one, directly otherwise. The queue state is read before the preflight, so a
+    pull request already queued or merged by it waits or releases without one (LANDCMD-62);
+    the classification is `None` there, which `_land_release_routing` reads from the
+    merge commit's own trailer. Returns the pull request, that classification and the
+    merge commit."""
+    number = detail.number
+    standing = _land_queue_standing(client, detail)
+    pause = cmd_land_queue.pause_between_queue_reads
+    if isinstance(standing, forge.MergedPullRequest | forge.QueuedPullRequest):
+        checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
+        return detail, None, cmd_land_queue.await_merge(client, number, standing, pause)
+    check_context = policy.LandingCheckContext(
+        context, client.repository.path, context.config.storage
+    )
+    detail, classification, readiness = _land_read(
+        number,
+        "its landing preconditions",
+        lambda: _land_preflight(
+            client, lambda: _land_peek_claims(context), check_context, number, parsed
+        ),
+    )
+    checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
+    if standing is None:
+        method = _land_merge_method(
+            context.config.merge_method, client, number, context.default_branch
         )
-        checkout.refuse_unlandable_checkout(context.default_branch, directory=toplevel)
-        method = _land_merge_method(config.merge_method, client, number, context.default_branch)
-        merge_sha = _land_merge(client, detail, readiness, classification, method)
+        return (
+            detail,
+            classification,
+            _land_merge(client, detail, readiness, classification, method),
+        )
+    message = _land_merge_body(
+        _land_merge_title(workboard.MergeMethod.SQUASH, detail), detail.body, classification
+    )
+    cmd_land_queue.enqueue(client, detail, readiness.head_sha, message)
+    queued = forge.QueuedPullRequest()
+    return detail, classification, cmd_land_queue.await_merge(client, number, queued, pause)
+
+
+def _land_after_merge(
+    parsed: argparse.Namespace,
+    context: RunContext,
+    detail: forge.Landing,
+    classification: workboard.Classification | None,
+    merge_sha: str,
+) -> None:
+    """What follows the merge on every path: the branch's deletion, the fast-forward and
+    the delegated release with its notes."""
+    client = cast(github.GitHubForge, context.forge)
+    number, toplevel = detail.number, context.toplevel
     _land_step(
         number, merge_sha, "delete-branch", lambda: client.delete_branch(detail.source_branch)
     )
@@ -707,4 +763,3 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     # The run whose release succeeded already printed it (LANDCMD-38).
     if ending is cmd_release.ReleaseEnding.RELEASED:
         _land_print_released_notes(client, merge_sha, toplevel)
-    return 0

@@ -310,6 +310,10 @@ class FakeForge:
         self._run()
         return self.branch_rules.get(branch, ())
 
+    def requires_merge_queue(self, branch: str) -> bool:
+        self._run()
+        return False
+
     def merge_landing(
         self,
         number: int,
