@@ -3281,8 +3281,8 @@ def test_trunk_commit_classification_reports_a_malformed_work_item_as_a_defect(
 def test_trunk_log_classifies_valid_neighbors_of_a_malformed_work_item(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, malformed_first: bool
 ) -> None:
-    malformed_record = "bad-sha\x002026-09-20T10:00:00+00:00\x00fix/x\x00\x00"
-    valid_record = "good-sha\x002026-09-20T11:00:00+00:00\x00#10\naco-00000b\x00\x00"
+    malformed_record = "bad-sha\x002026-09-20T10:00:00+00:00\x00fix/x\x00\x00\x00"
+    valid_record = "good-sha\x002026-09-20T11:00:00+00:00\x00#10\naco-00000b\x00\x00\x00"
     records = (
         (malformed_record, valid_record) if malformed_first else (valid_record, malformed_record)
     )

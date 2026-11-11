@@ -32,7 +32,10 @@ field never uses `<label>` -- it is always the bare number. `<sha>` is a commit 
 `<branch>` a git branch name, `<author>` a pull request's author, `<kind>`
 `docs`, `fix` or `deps`. A trailer block is read through git's own trailer parsing
 (`%(trailers:key=...,valueonly)`), never by scanning the message body for a
-matching line.
+matching line. A commit that git reads as carrying neither trailer, and whose
+message ends in the block GitHub's merge queue appends (an optional line of
+hyphens, then a paragraph of `Co-authored-by:` trailers), is read once more
+through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 
 ## Behavior table
 
@@ -49,6 +52,8 @@ matching line.
 | no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62, LAND-80 | — |
 | contradictory trunk trailer (both, or repeated `No-Item:`) | — (lands nothing, LAND-42) | LAND-60 | LAND-61 | — |
 | state-ref `Work-Item:` trailer number past `aco-ffffff` | — | LAND-68 | — | — |
+| trunk classification followed by the merge queue's `Co-authored-by:` paragraph | LAND-83 | LAND-83 | LAND-83 | LAND-83 |
+| trunk classification followed by any other text | — | LAND-84 | LAND-84 | — |
 | classification line inside a fenced block | — | LAND-07 | — | — |
 | two classification lines | — | LAND-08 | LAND-32 | — |
 | two `Work-Item:` lines | — | LAND-09 | LAND-32 | — |
@@ -203,6 +208,8 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-54] `board --json`'s `"landings"` rows each carry `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null`.
 
 - LAND-46 (retired).
+- [ ] [LAND-83] A trunk commit ending in the classification paragraph, then only a paragraph of `Co-authored-by:` lines (a hyphen line may precede it), reads that classification like LAND-01/LAND-48.
+- [ ] [LAND-84] Any other text after the classification paragraph, or another kind of line among the `Co-authored-by:` lines, leaves the commit unclassified; LAND-60/LAND-61 still refuse a doubled one.
 
 ## Never
 
@@ -371,5 +378,25 @@ Setup: bare-remote, `storage = "state-ref"`, item `#20` open and claimed, `main`
 ```console
 $ aco release 20 --merged <sha>
 2> ERROR: <sha> carries both `Work-Item:` and `No-Item:` trailers; a landed commit is one or the other
+exit 2
+```
+
+### E-LAND-83 — a merge queue's appended co-author paragraph leaves the classification readable
+
+Setup: bare-remote, `main` carrying a commit whose message ends `No-Item: fix`, a blank line, `---------`, a blank line and a paragraph of two `Co-authored-by:` lines
+
+```console
+$ aco check <sha>
+<sha> declares No-Item: fix
+exit 0
+```
+
+### E-LAND-84 — other text after the classification still leaves the commit unclassified
+
+Setup: bare-remote, `main` carrying a commit whose message ends `No-Item: fix`, a blank line, the line `Thanks.`, a blank line and a `Co-authored-by:` paragraph
+
+```console
+$ aco check <sha>
+2> REFUSED: <sha> carries no `Work-Item:` or `No-Item:` trailer
 exit 2
 ```

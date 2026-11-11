@@ -73,16 +73,25 @@ def arrange_lane_landing(
     return landing
 
 
-@pytest.mark.parametrize("kind", ["docs", "fix", "deps"])
+@pytest.mark.parametrize(
+    "classification",
+    [
+        "No-Item: docs",
+        "No-Item: fix",
+        "No-Item: deps",
+        "No-Item: fix\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+    ],
+    ids=["docs", "fix", "deps", "fix-then-the-merge-queues-coauthor-paragraph"],
+)
 def test_release_merged_accepts_an_issueless_lane_that_landed_without_an_item(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     github_clone: Path,
     bare_remote: Path,
-    kind: str,
+    classification: str,
 ) -> None:
-    """Spec: LAND-37, REL-16."""
-    arrange_lane_landing(monkeypatch, github_clone, bare_remote, trailers=(f"No-Item: {kind}",))
+    """Spec: LAND-37, LAND-83, REL-16."""
+    arrange_lane_landing(monkeypatch, github_clone, bare_remote, trailers=(classification,))
 
     result = release_merged(capsys)
 

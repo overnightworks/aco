@@ -11,7 +11,7 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
-from . import body, process, protocol, workboard
+from . import body, process, protocol, trunk_message, workboard
 from .protocol import (
     AGENT_MAX_LENGTH,
     ClaimError,
@@ -88,12 +88,16 @@ def _git_run(
 
 
 def git_output(
-    arguments: list[str], *, directory: Path | None = None, literal_pathspecs: bool = False
+    arguments: list[str],
+    *,
+    directory: Path | None = None,
+    literal_pathspecs: bool = False,
+    lossy: bool = False,
 ) -> str:
     """`git arguments`'s stdout, in `directory` when given via `-C` or the calling process's own
-    cwd otherwise; a nonzero exit fails
-    closed as a `GitExitError`. `literal_pathspecs` reads every path
-    argument literally (see `process.run_git`)."""
+    cwd otherwise; a nonzero exit fails closed as a `GitExitError`. `literal_pathspecs`
+    reads every path argument literally (see `process.run_git`); `lossy` replaces
+    undecodable bytes instead of failing."""
     if literal_pathspecs:
         result = _git_run(arguments, directory=directory, literal_pathspecs=True)
     else:
@@ -105,7 +109,7 @@ def git_output(
     # significant in its *leading* column (` M path` names a modified file by
     # a leading space before the path) -- a leading strip silently turned that
     # into `M path` and `_dirty_paths` then sliced into the filename itself.
-    return result.stdout.decode().rstrip("\n")
+    return result.stdout.decode(errors="replace" if lossy else "strict").rstrip("\n")
 
 
 def current_branch(*, directory: Path | None = None) -> str:
@@ -1136,53 +1140,49 @@ def _has_remote_tracking_branch(remote: str, *, directory: Path) -> bool:
 def _git_hex_placeholder(character: str) -> str:
     """`character`, as the git `--format=`/`%(trailers:...)` `%xHH` escape
     that makes git itself emit the raw byte at run time -- the one owner for
-    every separator `_TRUNK_LANDING_LOG_FORMAT` embeds, so each byte is
-    spelled once in Python and turned into git's own placeholder text here,
-    never typed a second time as a literal `%x..` string. (The raw byte
-    itself can never sit directly in the `--format=` argument: an argv
-    string is a C string, so a literal NUL there is illegal.)"""
+    every separator `_TRUNK_LANDING_LOG_FORMAT` embeds. (A raw NUL can never
+    sit in the `--format=` argument: an argv string is a C string.)"""
     return f"%x{ord(character):02x}"
 
 
 # Field separator between a trunk-landing record's `sha`/`committed_at`/
-# `Work-Item` trailer values/`No-Item` trailer values. NUL is also `git log
-# -z`'s own record terminator, so splitting the whole raw stream on it
-# (`trunk_landings`, below) reads every record's four fields *and* the
-# boundary between records through the one byte git forbids inside a commit
-# message -- unlike a `\x1f` separator, which git
-# never escapes inside a trailer *value* (a
-# probed value `#12\x1f#13` survived verbatim and silently split into two
-# fabricated work items).
+# `Work-Item` trailer values/`No-Item` trailer values/raw message. NUL is also
+# `git log -z`'s own record terminator, so splitting the whole raw stream on it
+# (`trunk_landings`, below) reads every field *and* the boundary between
+# records through the one byte git forbids inside a commit message -- unlike a
+# `\x1f` separator, which git never escapes inside a trailer *value* (a probed
+# value `#12\x1f#13` survived verbatim and split into two fabricated work items).
 #
 # Repeated trailer values within one field join on a real newline instead:
-# git's own `unfold` guarantees one physical line per logical trailer value
-# (a folded/wrapped continuation line is joined back into it) before that
-# separator ever runs, so a value can never itself contain the byte the
-# split relies on.
+# git's own `unfold` guarantees one physical line per logical trailer value,
+# so a value can never itself contain the byte the split relies on.
 _TRUNK_LANDING_FIELD_SEPARATOR = "\x00"
 _TRUNK_LANDING_TRAILER_VALUE_SEPARATOR = "\n"
+_TRUNK_LANDING_FIELD_COUNT = 5
+_WORK_ITEM_TRAILER = "Work-Item"
+_NO_ITEM_TRAILER = "No-Item"
 _TRUNK_LANDING_LOG_FORMAT = (
     "%H"
     f"{_git_hex_placeholder(_TRUNK_LANDING_FIELD_SEPARATOR)}%cI"
     f"{_git_hex_placeholder(_TRUNK_LANDING_FIELD_SEPARATOR)}"
-    "%(trailers:key=Work-Item,valueonly,"
+    f"%(trailers:key={_WORK_ITEM_TRAILER},valueonly,"
     f"separator={_git_hex_placeholder(_TRUNK_LANDING_TRAILER_VALUE_SEPARATOR)},unfold)"
     f"{_git_hex_placeholder(_TRUNK_LANDING_FIELD_SEPARATOR)}"
-    "%(trailers:key=No-Item,valueonly,"
+    f"%(trailers:key={_NO_ITEM_TRAILER},valueonly,"
     f"separator={_git_hex_placeholder(_TRUNK_LANDING_TRAILER_VALUE_SEPARATOR)},unfold)"
+    f"{_git_hex_placeholder(_TRUNK_LANDING_FIELD_SEPARATOR)}%B"
 )
 
 
 @dataclass(frozen=True)
 class TrunkLanding:
-    """One first-parent commit on the trunk: its identity, when
-    it landed, and -- when its own trailer block names one -- what it
-    landed. `classification` is read solely from the trailer block git's own
-    parsing recognizes; a `Work-Item:`/`No-Item:` line anywhere else in the
-    body is prose, not evidence, so most trunk commits (not every landing is
-    a dispatched slice's own merge or squash) carry `None`.
-    `work_item_values` keeps the trailer's own `Work-Item:` values verbatim,
-    so a refusal can quote what landed even when the grammar rejects it."""
+    """One first-parent commit on the trunk: its identity, when it landed,
+    and -- when its own trailer block names one -- what it landed.
+    `classification` is read solely from the trailer block git's own parsing
+    recognizes (past the merge queue's appended `Co-authored-by:` block,
+    `trunk_message`); a `Work-Item:`/`No-Item:` line anywhere else is prose,
+    so most trunk commits carry `None`. `work_item_values` keeps the
+    `Work-Item:` values verbatim, so a refusal can quote what landed."""
 
     sha: str
     committed_at: datetime
@@ -1194,8 +1194,8 @@ def _trailer_values(field: str) -> tuple[str, ...]:
     return tuple(field.split(_TRUNK_LANDING_TRAILER_VALUE_SEPARATOR)) if field else ()
 
 
-def _parsed_trunk_landing(fields: tuple[str, str, str, str]) -> TrunkLanding:
-    sha, raw_committed_at, work_item_field, no_item_field = fields
+def _parsed_trunk_landing(fields: tuple[str, ...]) -> TrunkLanding:
+    sha, raw_committed_at, work_item_field, no_item_field, message = fields
     try:
         committed_at = datetime.fromisoformat(raw_committed_at)
     except ValueError as error:
@@ -1203,9 +1203,13 @@ def _parsed_trunk_landing(fields: tuple[str, str, str, str]) -> TrunkLanding:
     if committed_at.tzinfo is None:
         raise ClaimError("git returned a malformed trunk landing timestamp")
     work_item_values = _trailer_values(work_item_field)
-    classification = workboard.trunk_commit_classification(
-        work_item_values, _trailer_values(no_item_field)
-    )
+    no_item_values = _trailer_values(no_item_field)
+    unappended = trunk_message.without_appended_coauthors(message)
+    if unappended and not (work_item_values or no_item_values):
+        trailers = message_trailers(unappended)
+        work_item_values = trunk_message.trailer_values(trailers, _WORK_ITEM_TRAILER)
+        no_item_values = trunk_message.trailer_values(trailers, _NO_ITEM_TRAILER)
+    classification = workboard.trunk_commit_classification(work_item_values, no_item_values)
     return TrunkLanding(sha, committed_at.astimezone(UTC), classification, work_item_values)
 
 
@@ -1217,10 +1221,8 @@ def trunk_landings(trunk: str, depth: int, *, directory: Path) -> tuple[TrunkLan
     A merge counts once. Reading the trunk — never the work branch — is the
     contract: a ruling ages with trunk, not with local commits, and `trunk`
     is the caller's own canonical remote's (its `RunContext`'s), never a
-    hardcoded `origin`'s, so a repository configured with a different
-    canonical remote ages rulings against the trunk it actually lands on.
-    A caller that must see a commit the forge just reported merged passes
-    the trunk its context fetched first.
+    hardcoded `origin`'s. A caller that must see a commit the forge just
+    reported merged passes the trunk its context fetched first.
     """
     raw = git_output(
         [
@@ -1234,22 +1236,20 @@ def trunk_landings(trunk: str, depth: int, *, directory: Path) -> tuple[TrunkLan
             trunk,
         ],
         directory=directory,
+        lossy=True,
     )
     if not raw:
         return ()
-    # `-z` terminates every record -- including the last -- with the same
-    # byte that separates that record's own four fields, so splitting the
-    # whole stream on it leaves exactly one trailing empty token; `sha` and
-    # `committed_at` are never empty, so any other shape is git misbehaving.
+    # `-z` terminates every record, the last too, with the byte that separates its
+    # fields, so splitting the stream on it leaves exactly one trailing empty token;
+    # `sha` is never empty, so any other shape is git misbehaving.
     fields = raw.split(_TRUNK_LANDING_FIELD_SEPARATOR)
-    if fields[-1] != "" or len(fields) % 4 != 1:
+    width = _TRUNK_LANDING_FIELD_COUNT
+    if fields[-1] != "" or len(fields) % width != 1:
         raise ClaimError("git returned a malformed trunk landing log")
-    fields = fields[:-1]
     return tuple(
-        _parsed_trunk_landing(
-            (fields[index], fields[index + 1], fields[index + 2], fields[index + 3])
-        )
-        for index in range(0, len(fields), 4)
+        _parsed_trunk_landing(tuple(fields[index : index + width]))
+        for index in range(0, len(fields) - 1, width)
     )
 
 
@@ -1263,7 +1263,7 @@ def message_trailers(message: str) -> tuple[str, ...]:
         message_path = Path(scratch) / "message"
         message_path.write_text(message, encoding="utf-8")
         parsed = git_output(["interpret-trailers", "--parse", "--no-divider", str(message_path)])
-    return tuple(parsed.splitlines())
+    return tuple(parsed.split("\n")) if parsed else ()
 
 
 def fast_forward_default_branch(trunk: str, *, directory: Path) -> None:
