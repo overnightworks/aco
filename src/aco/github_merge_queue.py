@@ -125,7 +125,7 @@ def _removal_reason(pull_request: Mapping[str, object]) -> str | None:
     return reason
 
 
-def _queue_state(pull_request: object, number: int) -> forge.MergeQueueState:
+def _queue_state(pull_request: object) -> forge.MergeQueueState:
     values = _object(pull_request, _QUEUE_STATE_SUBJECT)
     try:
         state = _PullRequestState(values.get("state"))
@@ -135,7 +135,7 @@ def _queue_state(pull_request: object, number: int) -> forge.MergeQueueState:
         merge_commit = _object(values.get("mergeCommit"), "merge commit").get("oid")
         return forge.MergedPullRequest(_commit(merge_commit, "merge commit"))
     if state is _PullRequestState.CLOSED:
-        raise forge.ForgeError(f"pull request #{number} is closed without a merge")
+        return forge.ClosedPullRequest(_removal_reason(values))
     entry = values.get("mergeQueueEntry")
     if entry is None:
         return forge.UnqueuedPullRequest(_removal_reason(values))
@@ -173,8 +173,8 @@ class MergeQueue:
         return pull_request
 
     def state(self, number: int) -> forge.MergeQueueState:
-        """Whether pull request `number` is merged, queued or open and not queued."""
-        return _queue_state(self._pull_request(_STATE_QUERY, number, _QUEUE_STATE_SUBJECT), number)
+        """Whether pull request `number` is merged, queued, open and not queued, or closed."""
+        return _queue_state(self._pull_request(_STATE_QUERY, number, _QUEUE_STATE_SUBJECT))
 
     def _lookup(self, number: int) -> tuple[str, str]:
         """The pull request's node identifier and current head."""

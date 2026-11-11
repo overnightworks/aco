@@ -138,6 +138,12 @@ def test_a_merge_queue_rule_leaves_the_merge_method_read_unchanged() -> None:
         pytest.param(
             removal_is([{"reason": None}]), forge.UnqueuedPullRequest(None), id="removal-no-reason"
         ),
+        pytest.param(CLOSED, forge.ClosedPullRequest("failed_checks"), id="closed-after-removal"),
+        pytest.param(
+            {**CLOSED, "timelineItems": {"nodes": []}},
+            forge.ClosedPullRequest(None),
+            id="closed-no-removal-recorded",
+        ),
     ],
 )
 def test_merge_queue_state_names_exactly_one_state(
@@ -154,13 +160,6 @@ def test_merge_queue_state_asks_for_the_pull_request_by_number() -> None:
     client.merge_queue_state(NUMBER)
 
     assert f"pullRequest(number: {NUMBER})" in "\n".join(observed[0])
-
-
-def test_merge_queue_state_refuses_a_closed_pull_request() -> None:
-    client = adapter_answering_once(CLOSED)
-
-    with pytest.raises(forge.ForgeError, match="closed without a merge"):
-        client.merge_queue_state(NUMBER)
 
 
 def test_merge_queue_state_of_a_missing_pull_request_is_not_found() -> None:
@@ -295,6 +294,7 @@ def test_enqueue_refuses_a_mutation_answer_with_no_entry(mutation_answer: object
         pytest.param(forge.QueuedPullRequest(), id="queued"),
         pytest.param(forge.UnqueuedPullRequest("failed_checks"), id="removed"),
         pytest.param(forge.UnqueuedPullRequest(None), id="no-removal-recorded"),
+        pytest.param(forge.ClosedPullRequest("failed_checks"), id="closed"),
     ],
 )
 def test_the_fake_forge_answers_each_queue_state(state: forge.MergeQueueState) -> None:

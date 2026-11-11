@@ -192,10 +192,9 @@ class FakeForge:
             self.requests += 1
 
     def create_issue(self, *, title: str, body: str, kind: body.ItemKind) -> int:
-        """This fake's mirror of `GitHubForge.create_issue`: a fresh issue with no
-        recorded parent, the orphan shape a failed `link_child` leaves behind.
-        `drop_created_issue_type` simulates GitHub dropping the type: the issue
-        exists untyped and the create raises."""
+        """This fake's mirror of `GitHubForge.create_issue`: a fresh issue with no recorded
+        parent, the orphan shape a failed `link_child` leaves behind. `drop_created_issue_type`
+        simulates GitHub dropping the type: the issue exists untyped and the create raises."""
         number = self.next_created_child_number
         self.next_created_child_number += 1
         self.created_issues.append((title, body, kind))
@@ -310,6 +309,9 @@ class FakeForge:
         self._run()
         return self.branch_rules.get(branch, ())
 
+    def requires_merge_queue(self, branch: str) -> bool:
+        return False
+
     def merge_landing(
         self,
         number: int,
@@ -352,11 +354,10 @@ class FakeForge:
         self.deleted_branches.append(branch)
 
     def file_at_commit(self, path: Path, sha: str) -> str | None:
-        """This fake's mirror of `GitHubForge.file_at_commit`:
-        every pull request head carries `head_board_config` as its board
-        configuration -- by default an empty one, which pins exactly what an
-        unconfigured checkout does -- and `None` removes it. Each read's
-        path and commit land in `file_reads`."""
+        """This fake's mirror of `GitHubForge.file_at_commit`: every pull request head
+        carries `head_board_config` as its board configuration -- by default an empty one,
+        which pins exactly what an unconfigured checkout does -- and `None` removes it.
+        Each read's path and commit land in `file_reads`."""
         self._run()
         if path == cmd_land._LAND_QUALITY_CONFIG_PATH:
             self.quality_config_reads.append(sha)
@@ -466,10 +467,9 @@ class FakeForge:
 
 
 class ReaderOnlyForge(FakeForge):
-    """A `FakeForge` whose write operations fail the test instead of quietly
-    succeeding -- the enforcement that a read-only command never writes,
-    independent of the `ForgeReader`/`ForgeWriter` annotations (documentation
-    only; nothing type-checks in CI)."""
+    """A `FakeForge` whose write operations fail the test instead of quietly succeeding --
+    the enforcement that a read-only command never writes, independent of the
+    `ForgeReader`/`ForgeWriter` annotations (documentation only)."""
 
     def create_issue(self, *, title: str, body: str, kind: body.ItemKind) -> int:
         pytest.fail("a read-only command must never create an issue")

@@ -309,7 +309,14 @@ class UnqueuedPullRequest:
     removal_reason: str | None
 
 
-MergeQueueState = MergedPullRequest | QueuedPullRequest | UnqueuedPullRequest
+@dataclass(frozen=True)
+class ClosedPullRequest:
+    """A pull request closed without a merge, `removal_reason` as for `UnqueuedPullRequest`."""
+
+    removal_reason: str | None
+
+
+MergeQueueState = MergedPullRequest | QueuedPullRequest | UnqueuedPullRequest | ClosedPullRequest
 
 
 # GitHub's own open vocabularies for a pull request's `mergeable_state` and a
