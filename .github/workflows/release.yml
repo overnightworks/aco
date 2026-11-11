@@ -1,27 +1,100 @@
 name: Release
 
+# The tag is immutable, so quality's gate reads and refuses before any tag exists.
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, X.Y.Z
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  gate:
     permissions:
-      contents: write
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    uses: overnightworks/quality/.github/workflows/release-gate.yml@f7723bafb716c987013d40b5e0eaba18e58f311c # v0.11.0
+    with:
+      version: ${{ inputs.version }}
+
+  build:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ inputs.version }}
+      COMMIT: ${{ needs.gate.outputs.commit }}
     steps:
+      # The checkout takes github.sha, the dispatch's commit; the gate refuses unless main's head is still that commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with:
           persist-credentials: false
+
+      - name: Refuse unless the checkout is the commit the gate judged
+        run: |
+          head=$(git rev-parse HEAD)
+          if [ "$head" != "$COMMIT" ]; then
+            echo "Refused: the checkout is $head, not the gated commit $COMMIT." >&2
+            exit 1
+          fi
+
+      # A release build reads no cache, so no earlier run can change what it ships.
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           python-version: '3.14'
+          enable-cache: false
       # setup-uv only sets UV_PYTHON; the script's `uv python find` needs the interpreter present.
       - run: uv python install
+
       # Builds into dist/ and proves the distributions before they are uploaded.
-      - run: bash scripts/package_smoke.sh dist
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/*.whl dist/*.tar.gz --generate-notes
+      - name: Build and prove the distributions
+        run: bash scripts/package_smoke.sh dist
+
+      # The package version is read from src/aco/__init__.py, so the file names carry it.
+      # uv build leaves a .gitignore in dist, which ls leaves out and the upload below never names.
+      - name: Refuse unless dist holds exactly the wheel and the sdist at the version
+        run: |
+          expected=$(printf '%s\n' \
+            "overnightworks_aco-$VERSION-py3-none-any.whl" \
+            "overnightworks_aco-$VERSION.tar.gz")
+          found=$(LC_ALL=C ls dist)
+          if [ "$found" != "$expected" ]; then
+            echo "Refused: dist holds" >&2
+            echo "$found" >&2
+            echo "but only these belong in it:" >&2
+            echo "$expected" >&2
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release-files
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  tag:
+    needs: [gate, build]
+    permissions:
+      contents: write
+    uses: overnightworks/quality/.github/workflows/release-tag.yml@f7723bafb716c987013d40b5e0eaba18e58f311c # v0.11.0
+    with:
+      version: ${{ inputs.version }}
+      commit: ${{ needs.gate.outputs.commit }}
+      artifact: release-files
