@@ -3,6 +3,6 @@ agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
 role = "builder"
 base = "ec5a03404287807cd7099d56df41a4ca53a3ff10"
 branch = "claude/issue-787-merge-queue-adapter"
-scope = ["quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_merge_queue.py", "tests/support/github_fixtures.py", "tests/support/queue_forge.py", "tests/test_github_merge_queue.py"]
+scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_merge_queue.py", "tests/support/github_fixtures.py", "tests/support/queue_forge.py", "tests/test_github_merge_queue.py"]
 opened_commit = "00ab84f14d5e9951042e774b59b8b0fc221a36d6"
 whole_reason = "The adapter module, its delegation, its value types, its tests and the fake that expresses them change together; the baseline and the whitelist follow mechanically."
