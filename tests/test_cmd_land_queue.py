@@ -2,7 +2,7 @@
 into the pull request, one enqueue pinned to the preflight head, the wait for the queue's
 verdict and the re-run that picks it up again, against a fake forge that expresses the queue."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -10,10 +10,11 @@ from cli_fixtures import CliRun, run_cli
 from github_fixtures import LandedWorld, landed_world, landing_readiness, serve_forge
 from queue_forge import LANDS, QueueForge, QueueRead
 
-from aco import cmd_land, cmd_land_queue, forge, protocol, store
+from aco import cmd_land, cmd_land_queue, forge, github, protocol, store
 
 NUMBER = 12
 MINUTE = 60.0
+FOREIGN_REPOSITORY = "fork/agent-providers"
 CLASSIFIED = "Work-Item: #72\n\nCloses #72"
 COMPOSED = "Closes #72\n\nWork-Item: #72\n"
 TRAILERS = "Closes #72\n\nCo-Authored-By: A <a@x>\n\nWork-Item: #72"
@@ -52,6 +53,7 @@ class QueueCase:
     queue_rule: bool = True
     mergeable_state: str = "clean"
     untracked_file: bool = False
+    head_repository: str | None = None
     head_moved: bool = False
     enqueue_error: forge.ForgeError | None = None
     rules_error: forge.ForgeError | None = None
@@ -94,6 +96,10 @@ def world(
     queue.enqueue_error = case.enqueue_error
     queue.rules_error = case.rules_error
     queue.update_item_body_error = case.body_error
+    if case.head_repository is not None:
+        queue.landings[NUMBER] = replace(
+            queue.landings[NUMBER], source_repository=github.repository_id(case.head_repository)
+        )
     if case.head_moved:
         queue.heads[NUMBER] = "f" * 40
     if case.untracked_file:
@@ -113,6 +119,7 @@ def observations(world: QueueWorld, result: CliRun) -> tuple[dict[str, object], 
         "released": result.stdout.startswith(RELEASED),
         "merged line": merged_line in result.stdout,
         "claim kept": bool(claims),
+        "branch deleted": bool(queue.deleted_branches),
         "written": tuple(body for _, body in queue.body_writes),
         "enqueued with": queue.enqueue_attempts,
         "direct merges": len(queue.merge_calls),
@@ -125,6 +132,7 @@ def observations(world: QueueWorld, result: CliRun) -> tuple[dict[str, object], 
         "released": case.status == 0,
         "merged line": case.status == 0,
         "claim kept": case.status != 0,
+        "branch deleted": case.status == 0,
         "written": case.written,
         "enqueued with": [(NUMBER, landing.head)] * case.enqueues,
         "direct merges": case.direct_merges,
@@ -176,6 +184,22 @@ class TestLandThroughTheMergeQueue:
             pytest.param(
                 QueueCase(reads=(LANDS,), body=COMPOSED, written=(), enqueues=0, pauses=0),
                 id="a-re-run-finds-it-merged-and-releases",
+            ),
+            pytest.param(
+                QueueCase(
+                    reads=(QUEUED, LANDS),
+                    body=COMPOSED,
+                    head_repository=FOREIGN_REPOSITORY,
+                    status=2,
+                    stderr=(
+                        f"ERROR: pull request #{NUMBER} proposes a branch of "
+                        f"{FOREIGN_REPOSITORY}; cross-repository pull requests are not classified\n"
+                    ),
+                    written=(),
+                    enqueues=0,
+                    pauses=0,
+                ),
+                id="a-queued-pull-request-of-another-repository-refuses-and-deletes-nothing",
             ),
             pytest.param(
                 QueueCase(queue_rule=False, written=(), enqueues=0, pauses=0, direct_merges=1),

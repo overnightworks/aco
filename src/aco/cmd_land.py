@@ -457,16 +457,23 @@ def _land_read_head_checked(
     """The pull request, read once and refused before anything else runs when
     its head is a branch `land` must not act on (LANDCMD-50): an unsafe name on
     either path, a merged pull request of another repository on a rerun -- the
-    first run's own preflight refuses that one before the merge."""
+    first run's own preflight refuses that one before the merge, and
+    `_land_merge_unmerged` one the merge queue holds."""
     detail = _land_read(number, "the pull request", lambda: client.landing(number))
     defect = policy.unsafe_head_branch_defect(detail)
     if defect is None and detail.merged:
         defect = policy.cross_repository_defect(repository, detail)
     if defect is not None:
-        raise protocol.ClaimUnavailableError(
-            report.bounded_refusal(f"pull request #{number} {defect.message}")
-        )
+        raise _land_head_refusal(number, defect)
     return detail
+
+
+def _land_head_refusal(
+    number: int, defect: workboard.ClassificationDefect
+) -> protocol.ClaimUnavailableError:
+    return protocol.ClaimUnavailableError(
+        report.bounded_refusal(f"pull request #{number} {defect.message}")
+    )
 
 
 def _land_read[LandStepResult](
@@ -700,6 +707,9 @@ def _land_merge_unmerged(
     standing = _land_queue_standing(client, detail)
     pause = cmd_land_queue.pause_between_queue_reads
     if isinstance(standing, forge.MergedPullRequest | forge.QueuedPullRequest):
+        defect = policy.cross_repository_defect(client.repository.path, detail)
+        if defect is not None:
+            raise _land_head_refusal(number, defect)
         checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
         return detail, None, cmd_land_queue.await_merge(client, number, standing, pause)
     check_context = policy.LandingCheckContext(

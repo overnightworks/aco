@@ -75,7 +75,7 @@ order `merge`, `squash`, `rebase`.
 | this repository's own pull request | LANDCMD-17 |
 | a RELEASED ending | LANDCMD-57, LANDCMD-54, LANDCMD-55, LANDCMD-58 |
 | a pull request already merged (rerun) | LANDCMD-18 |
-| the head branch is no safe name, or a merged pull request comes from another repository | LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53 |
+| the head branch is no safe name, or a merged or queued pull request comes from another repository | LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53 |
 | a rerun whose release already succeeded | LANDCMD-38 |
 | a `merge_queue` rule applies to the target branch | LANDCMD-59, LANDCMD-60 |
 | the queue path writes the landing message | LANDCMD-61, LANDCMD-62 |
@@ -92,7 +92,7 @@ this worktree's own fetch anchor and lineage stamp stay untouched by a
 preflight, refused or not, exactly as `reset`'s own read does.
 
 - [ ] [LANDCMD-50] On a first run and a rerun alike, a head branch that is no safe branch name refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2` (E-LANDCMD-50).
-- [ ] [LANDCMD-51] A merged pull request proposing a branch of another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
+- [ ] [LANDCMD-51] A merged or queued pull request proposing a branch of another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
 - [ ] [LANDCMD-52] The head-branch check (LANDCMD-50) and the cross-repository check LANDCMD-51 refuse right after the first read, before LANDCMD-02; LANDCMD-50 shows `<branch>` escaped, cut to 200 characters.
 - [ ] [LANDCMD-53] LANDCMD-51 comes before LANDCMD-11 and after LANDCMD-50; a first run meets the same sentence at LANDCMD-07 (LAND-12).
 - [ ] [LANDCMD-33] A `--head` that is not 7 to 40 hex digits refuses `--head must be 7 to 40 hex digits`, exit `2`, at the argument parse: before any read, PIN-32, or LANDCMD-01, on a rerun too (E-LANDCMD-33).
@@ -154,7 +154,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-66] An open pull request with a recorded removal, or without a queue entry in two reads in a row, refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n>`, exit `2`.
 - [ ] [LANDCMD-67] A pull request closed after its removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's own or `no reason recorded`.
 - [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n>`, exit `2`, claim kept.
-- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits again (LANDCMD-65), writing and enqueueing nothing; merged, it releases (LANDCMD-18); else it starts at the preflight.
+- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits again (LANDCMD-65) after LANDCMD-50 and LANDCMD-51, writing and enqueueing nothing; merged, it releases (LANDCMD-18); else it starts at the preflight.
 - [ ] [LANDCMD-70] A read of the rules or of the queue state before the preflight that fails refuses as LANDCMD-46, with `<what>` `its merge rules` or `its merge queue state`.
 
 ## After the merge
