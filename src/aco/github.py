@@ -806,7 +806,7 @@ class GitHubForge:
         return github_merge_queue.has_merge_queue_rule(self._branch_rules(branch))
 
     def merge_queue_state(self, number: int) -> forge.MergeQueueState:
-        """Pull request `number` as merged, queued, or open and not queued."""
+        """Pull request `number` as merged, queued, open and not queued, or closed."""
         return self._merge_queue.state(number)
 
     def enqueue_pull_request(self, number: int, *, expected_head: str) -> None:
