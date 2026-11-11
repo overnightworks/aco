@@ -84,7 +84,7 @@ layers = [
     "checkout | store",
     "github | state_board",
     "github_body_check",
-    "github_graphql | github_actions | github_issue_payload | github_body_write",
+    "github_graphql | github_actions | github_issue_payload | github_body_write | github_merge_queue",
     "forge | rulings",
     "workboard",
     "items | expectations",
@@ -180,6 +180,7 @@ forbidden_modules = [
     "aco.github_graphql",
     "aco.github_actions",
     "aco.github_issue_payload",
+    "aco.github_merge_queue",
     "aco.report",
 ]
 allow_indirect_imports = true
