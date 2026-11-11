@@ -639,9 +639,10 @@ def _land_print_released_notes(client: github.GitHubForge, merge_sha: str, tople
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`aco land <pr>`: preflight every ruled precondition
     read-only, merge with a pinned head sha and a commit message this tool
-    composes itself, delete the merged branch, fast-forward this checkout's
-    own default branch, then run the existing `release --merged` path
-    unchanged. A pull request `landing` already finds merged -- a resumed
+    composes itself (or, where the target branch requires the merge queue, queue the pull
+    request pinned to that head and wait for the queue to merge it), delete the merged
+    branch, fast-forward this checkout's own default branch, then run the existing
+    `release --merged` path unchanged. A pull request `landing` already finds merged -- a resumed
     run after an earlier step failed -- skips preflight and the merge
     itself entirely: `merge_landing` never runs twice for the same pull
     request. `--coordinator-override`'s own role is validated here, at
@@ -689,7 +690,7 @@ def _land_merge_unmerged(
 ) -> tuple[forge.Landing, workboard.Classification | None, str]:
     """The pull request `run` found open, merged: through the merge queue where a rule
     requires one, directly otherwise. The queue state is read before the preflight, so a
-    pull request already queued or merged by it waits or releases without one (LANDCMD-62);
+    pull request already queued or merged by it waits or releases without one (LANDCMD-69);
     the classification is `None` there, which `_land_release_routing` reads from the
     merge commit's own trailer. Returns the pull request, that classification and the
     merge commit."""
