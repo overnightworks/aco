@@ -18,6 +18,7 @@ from . import (
     github_actions,
     github_graphql,
     github_issue_payload,
+    github_merge_queue,
     process,
     protocol,
     workboard,
@@ -60,7 +61,6 @@ ISSUES_PER_PAGE = 100
 MALFORMED_PULL_REQUEST = "GitHub returned a malformed pull request"
 MALFORMED_FILE_CONTENTS = "GitHub returned malformed file contents"
 MALFORMED_MERGE_SETTINGS = "GitHub returned malformed repository merge settings"
-MALFORMED_BRANCH_RULES = "GitHub returned a malformed branch merge rule"
 MALFORMED_CLOSED_ISSUE = "GitHub returned a malformed closed issue"
 # The combined-status endpoint's own aggregate `state` can be `pending`,
 # `failure`, or `error` with a `statuses` page that, this instant, names no
@@ -289,6 +289,7 @@ class GitHubForge:
     ) -> None:
         self.repository = repository
         self._perform = run if run is not None else self._gh
+        self._merge_queue = github_merge_queue.MergeQueue(repository, self._run, self._json_lines)
         self.requests = 0
         self._requests_lock = threading.Lock()
         self._current_name: str | None = None
@@ -797,6 +798,24 @@ class GitHubForge:
         `required_linear_history` rule everything but a merge commit. A
         branch without such a rule, or on a plan without rulesets, answers an
         empty tuple."""
+        allowed_per_rule = map(github_merge_queue.rule_merge_methods, self._branch_rules(branch))
+        return tuple(allowed for allowed in allowed_per_rule if allowed is not None)
+
+    def requires_merge_queue(self, branch: str) -> bool:
+        """Whether a `merge_queue` rule applies to `branch`."""
+        return github_merge_queue.has_merge_queue_rule(self._branch_rules(branch))
+
+    def merge_queue_state(self, number: int) -> forge.MergeQueueState:
+        """Pull request `number` as merged, queued, or open and not queued."""
+        return self._merge_queue.state(number)
+
+    def enqueue_pull_request(self, number: int, *, expected_head: str) -> None:
+        """Enqueue pull request `number` pinned to `expected_head`; a moved head is
+        `ForgeEnqueueHeadMovedError`."""
+        self._merge_queue.enqueue(number, expected_head)
+
+    def _branch_rules(self, branch: str) -> tuple[object, ...]:
+        """Every rule of every ruleset applying to `branch`, none on a plan without rulesets."""
         try:
             raw = self._run(
                 [
@@ -812,34 +831,7 @@ class GitHubForge:
             if _RULESETS_UNAVAILABLE_STATUS in refusal and _RULESETS_UNAVAILABLE_ON_PLAN in refusal:
                 return ()
             raise
-        allowed_per_rule = (
-            self._rule_merge_methods(rule) for rule in self._json_lines(raw, "branch rules")
-        )
-        return tuple(allowed for allowed in allowed_per_rule if allowed is not None)
-
-    @staticmethod
-    def _rule_merge_methods(rule: object) -> frozenset[workboard.MergeMethod] | None:
-        """The methods one branch rule allows, or None where it restricts none."""
-        if not isinstance(rule, dict):
-            raise forge.ForgeMalformedResponseError(MALFORMED_BRANCH_RULES)
-        if rule.get("type") == "required_linear_history":
-            return frozenset(workboard.MergeMethod) - {workboard.MergeMethod.MERGE}
-        if rule.get("type") != "pull_request":
-            return None
-        parameters = rule.get("parameters")
-        if parameters is None:
-            return None
-        if not isinstance(parameters, dict):
-            raise forge.ForgeMalformedResponseError(MALFORMED_BRANCH_RULES)
-        methods = parameters.get("allowed_merge_methods")
-        if methods is None:
-            return None
-        known = {method.value for method in workboard.MergeMethod}
-        if not isinstance(methods, list) or not all(
-            isinstance(method, str) and method in known for method in methods
-        ):
-            raise forge.ForgeMalformedResponseError(MALFORMED_BRANCH_RULES)
-        return frozenset(workboard.MergeMethod(method) for method in methods)
+        return self._json_lines(raw, "branch rules")
 
     def merge_landing(
         self,
