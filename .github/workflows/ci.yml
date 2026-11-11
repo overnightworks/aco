@@ -4,6 +4,13 @@ on:
   pull_request:
     branches:
       - main
+  # A merge queue asks for these checks on its merge group commit, so the queue
+  # reports the same checks a pull request does.
+  merge_group:
+    types:
+      - checks_requested
+    branches:
+      - main
   push:
     branches:
       - main
