@@ -5,7 +5,7 @@
 		NO_STEP_TEXT,
 		noStepText,
 		NOT_READ_LABEL,
-		STEPS_HEADING,
+		STEPS_LABEL,
 		stepGroups,
 		type ShownRepo
 	} from '../app/model/boardSummary';
@@ -14,11 +14,10 @@
 	let { repos }: { repos: ShownRepo[] } = $props();
 
 	const groups = $derived(stepGroups(repos));
-	const count = $derived(groups.reduce((total, group) => total + group.steps.length, 0));
 </script>
 
 <section aria-labelledby="steps-heading">
-	<h2 id="steps-heading" class="heading"><span>{STEPS_HEADING}</span> <span>{count}</span></h2>
+	<h2 id="steps-heading" class="heading">{STEPS_LABEL}</h2>
 	{#each groups as group (group.repo)}
 		<h3 class="group" class:bad={group.error !== null}>{group.repo}</h3>
 		{#if group.error !== null}

@@ -641,13 +641,13 @@ describe('tabCounts', () => {
 			})
 		];
 
-		expect(tabCounts(repos)).toEqual({ open: 2, decided: 1 });
+		expect(tabCounts(repos)).toEqual({ open: 2, decided: 1, steps: 0 });
 	});
 
 	test('[ABRD-51] a failed repository without cards adds to neither count', () => {
 		const repos = [repo({ name: 'broken', error: 'down', items: [] })];
 
-		expect(tabCounts(repos)).toEqual({ open: 0, decided: 0 });
+		expect(tabCounts(repos)).toEqual({ open: 0, decided: 0, steps: 0 });
 	});
 
 	test('[ABRD-101] a failed repository counts the cards it kept', () => {
@@ -655,11 +655,21 @@ describe('tabCounts', () => {
 			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
 		];
 
-		expect(tabCounts(repos)).toEqual({ open: 1, decided: 0 });
+		expect(tabCounts(repos)).toEqual({ open: 1, decided: 0, steps: 0 });
+	});
+
+	test('[ABRD-117] counts every step the board shows, a failed repository’s kept steps too', () => {
+		const step = (number: number) => ({ number, title: 'Rotate the key', step: 'Rotate it.' });
+		const repos = [
+			repo({ name: 'a', items: [], steps: [step(9), step(3)] }),
+			repo({ name: 'broken', error: 'down', items: [], steps: [step(4)] })
+		];
+
+		expect(tabCounts(repos)).toEqual({ open: 0, decided: 0, steps: 3 });
 	});
 
 	test('[ABRD-51] an empty board counts nothing', () => {
-		expect(tabCounts([])).toEqual({ open: 0, decided: 0 });
+		expect(tabCounts([])).toEqual({ open: 0, decided: 0, steps: 0 });
 	});
 });
 

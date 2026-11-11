@@ -159,10 +159,7 @@ for (const viewport of [
 			});
 			await page.goto(`${appUrl}#t=${token}`);
 
-			await expect(page.locator('.tracks h2:not(#steps-heading)')).toHaveText([
-				/^newer\s+1$/,
-				/^older\s+1$/
-			]);
+			await expect(page.locator('.tracks h2')).toHaveText([/^newer\s+1$/, /^older\s+1$/]);
 			const first = page.locator('.tracks').getByRole('button').first();
 			await expect(first).toHaveAccessibleName(/^Open Neuer \d{2}\.\d{2}\.$/);
 			await expect(first).toHaveAttribute('aria-current', 'true');

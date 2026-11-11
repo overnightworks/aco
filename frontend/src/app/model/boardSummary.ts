@@ -29,7 +29,7 @@ export const EMPTY_DECIDED_TEXT = 'Your decisions show here with their answer an
 export const NO_SELECTION_MESSAGE = 'Keine Frage ausgewählt.';
 export const NOT_READ_LABEL = 'Not read';
 export const LAST_READ_LABEL = 'last read';
-export const STEPS_HEADING = 'Steps';
+export const STEPS_LABEL = 'Steps';
 export const NO_STEP_TEXT = 'This item names no step.';
 export const NO_STEP_WAITING_TEXT = 'No step waits for you.';
 export const NO_STEP_READ_TEXT = 'No step in the projects read.';
@@ -136,8 +136,8 @@ type OpenRowState = 'open' | 'back';
 /** The states a row is ordered by: what the list holds, never the shown `saving`. */
 type OrderedRowState = OpenRowState | 'done';
 
-/** The two tabs that list rows. */
-export type ListView = 'open' | 'decided';
+/** The header's views: the two tabs that list rows and the steps, which stand alone. */
+export type ListView = 'open' | 'decided' | 'steps';
 
 /** How a waiting decision's strip reads: `done` for a ruling, `back` for a card
  * on its way to its head. */
@@ -346,10 +346,15 @@ export function stageAfterReturned(repos: Readings, key: string): string {
 	return listedRows(repos).find((row) => row.key !== key && row.state === 'open')?.key ?? key;
 }
 
-/** What the header's two tabs count: the rows the open list shows and the
- * ruled lines the Decided view lists. */
-export function tabCounts(repos: Readings): { open: number; decided: number } {
-	return { open: listedRows(repos).length, decided: rowsOf(decidedList(repos)).length };
+/** What the header's three tabs count: the rows the open list shows, the steps
+ * the board shows (kept ones of a repository not read too) and the ruled lines
+ * the Decided view lists. */
+export function tabCounts(repos: Readings): { open: number; decided: number; steps: number } {
+	return {
+		open: listedRows(repos).length,
+		steps: repos.reduce((total, { steps }) => total + steps.length, 0),
+		decided: rowsOf(decidedList(repos)).length
+	};
 }
 
 /** The steps one repository lists; `error` and `readAt` say when they are the

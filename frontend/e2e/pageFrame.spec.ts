@@ -108,7 +108,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px page frame`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-51] the header holds the brand, the Open and Decided tabs and Refresh', async ({
+		test('[ABRD-51] the header holds the brand, the Open, Steps and Decided tabs and Refresh', async ({
 			page
 		}, testInfo) => {
 			await openBoard(page);
@@ -125,7 +125,7 @@ for (const viewport of [
 				expect(box?.width).toBeLessThanOrEqual(1);
 				expect(box?.height).toBeLessThanOrEqual(1);
 			} else await expect(brand).toBeVisible();
-			await expect(views.getByRole('button')).toHaveCount(2);
+			await expect(views.getByRole('button')).toHaveCount(3);
 			await expect(open).toHaveAttribute('aria-current', 'page');
 			await expect(open).toHaveCSS('background-color', 'rgb(24, 21, 31)');
 			await expect(page.getByRole('button', { name: /^(Agent|Mitsprache)/ })).toHaveCount(0);
@@ -200,7 +200,7 @@ for (const viewport of [
 			}
 
 			await expect(back).toHaveCount(0);
-			await expect(views.getByRole('button')).toHaveCount(2);
+			await expect(views.getByRole('button')).toHaveCount(3);
 			const row = page.locator('.tracks').getByRole('button').first();
 			await row.click();
 			await expect(page.getByRole('button', { name: '‹ Open', exact: true })).toBeVisible();

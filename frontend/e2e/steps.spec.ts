@@ -47,7 +47,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px steps`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-114] [ABRD-117] [ABRD-118] the steps stand in their own section above the questions, in full and within the first screen', async ({
+		test('[ABRD-117] [ABRD-123] the board opens on the open question, no step shown and the header tabs fit', async ({
 			page
 		}, testInfo) => {
 			await arrange([
@@ -57,7 +57,67 @@ for (const viewport of [
 			]);
 			await show(page);
 
-			const region = page.getByRole('region', { name: 'Steps 2' });
+			const views = page.getByRole('navigation', { name: 'Views' });
+			await expect(views.getByRole('button', { name: 'Open 1' })).toHaveAttribute(
+				'aria-current',
+				'page'
+			);
+			await expect(views.getByRole('button', { name: 'Steps 2' })).toBeVisible();
+			await expect(page.getByRole('region', { name: 'Steps' })).toHaveCount(0);
+			await expect(page.getByText(LONG_STEP)).toHaveCount(0);
+			const firstQuestion = page
+				.locator('.tracks')
+				.getByRole('button', { name: /Sprung/ })
+				.first();
+			await expect(firstQuestion).toBeInViewport();
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+			);
+			expect(overflow).toBe(0);
+			await shoot(page, (name) => testInfo.outputPath(name), `open-${viewport.width}`);
+		});
+
+		test('[ABRD-117] [ABRD-123] the header stays inside the page with wider glyphs and clips no tab label', async ({
+			page
+		}) => {
+			await arrange([card(), stepItem(9, 'Rotate the key', LONG_STEP)]);
+			await show(page);
+			await page.evaluate(() => {
+				const wider = new CSSStyleSheet();
+				wider.replaceSync('* { letter-spacing: 0.12em !important; }');
+				document.adoptedStyleSheets = [...document.adoptedStyleSheets, wider];
+			});
+
+			const views = page.getByRole('navigation', { name: 'Views' });
+			await expect(views.getByRole('button', { name: 'Steps 1' })).toBeVisible();
+			const geometry = await page.evaluate(() => ({
+				overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+				clipped: [...document.querySelectorAll('nav button')].filter(
+					(tab) =>
+						tab.scrollWidth > tab.clientWidth || tab.getBoundingClientRect().right > innerWidth
+				).length
+			}));
+			expect(geometry).toEqual({ overflow: 0, clipped: 0 });
+		});
+
+		test('[ABRD-117] [ABRD-118] the Steps tab shows the steps in full under its count, and no question row', async ({
+			page
+		}, testInfo) => {
+			await arrange([
+				card(),
+				stepItem(9, 'Rotate the key', LONG_STEP),
+				stepItem(3, 'Pay the invoice', 'Pay it.')
+			]);
+			await show(page);
+
+			const views = page.getByRole('navigation', { name: 'Views' });
+			await views.getByRole('button', { name: 'Steps 2' }).click();
+
+			await expect(views.getByRole('button', { name: 'Steps 2' })).toHaveAttribute(
+				'aria-current',
+				'page'
+			);
+			const region = page.getByRole('region', { name: 'Steps' });
 			await expect(region).toBeVisible();
 			const rows = region.getByRole('listitem');
 			await expect(rows).toHaveCount(2);
@@ -65,16 +125,7 @@ for (const viewport of [
 			await expect(rows.nth(0)).toContainText('Rotate the key');
 			await expect(rows.nth(0)).toContainText(LONG_STEP);
 			await expect(rows.nth(1)).toContainText('#3');
-			const firstQuestion = page
-				.locator('.tracks')
-				.getByRole('button', { name: /Sprung/ })
-				.first();
-			await expect(firstQuestion).toBeInViewport();
-			const stepsBox = await region.boundingBox();
-			const questionBox = await firstQuestion.boundingBox();
-			expect((stepsBox?.y ?? 0) + (stepsBox?.height ?? 0)).toBeLessThanOrEqual(
-				questionBox?.y ?? -1
-			);
+			await expect(page.locator('.tracks')).toBeHidden();
 			const overflow = await page.evaluate(() => ({
 				page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
 				region: [...document.querySelectorAll('[aria-labelledby="steps-heading"] .step')].map(
@@ -85,59 +136,71 @@ for (const viewport of [
 			await shoot(page, (name) => testInfo.outputPath(name), `steps-${viewport.width}`);
 		});
 
-		test('[ABRD-114] the steps heading starts at the same x as the question list heading', async ({
+		test('[ABRD-119] a step row holds no control and the Steps view sends no request', async ({
 			page
 		}) => {
 			await arrange([card(), stepItem(9, 'Rotate the key', 'Rotate it.')]);
 			await show(page);
-
-			const stepsHeading = page.locator('#steps-heading > span').first();
-			const questionHeading = page.locator('.tracks h2.group > span').first();
-			await expect(stepsHeading).toBeVisible();
-			await expect(questionHeading).toBeVisible();
-			const stepsBox = await stepsHeading.boundingBox();
-			const questionBox = await questionHeading.boundingBox();
-			expect(stepsBox?.x).toBe(questionBox?.x);
-		});
-
-		test('[ABRD-119] a step row holds no control and the section sends no request', async ({
-			page
-		}) => {
-			await arrange([card(), stepItem(9, 'Rotate the key', 'Rotate it.')]);
+			await page
+				.getByRole('navigation', { name: 'Views' })
+				.getByRole('button', { name: 'Steps 1' })
+				.click();
+			const region = page.getByRole('region', { name: 'Steps' });
+			await expect(region).toBeVisible();
 			const requests: string[] = [];
-			await show(page);
-			await expect(page.getByRole('region', { name: 'Steps 1' })).toBeVisible();
 			page.on('request', (request) => requests.push(request.url()));
 
-			const region = page.getByRole('region', { name: 'Steps 1' });
 			await region.getByRole('listitem').click();
 
 			await expect(region.locator('a, button, input, [tabindex]')).toHaveCount(0);
 			expect(requests).toEqual([]);
 		});
 
-		test('[ABRD-117] the steps never count among the questions and show only in the Open view', async ({
+		test('[ABRD-117] the steps are no question and no part of the Open count, and Decided shows no steps', async ({
 			page
 		}) => {
 			await arrange([card(), stepItem(9, 'Rotate the key', 'Rotate it.')]);
 			await show(page);
-			await expect(page.getByRole('region', { name: 'Steps 1' })).toBeVisible();
+			const views = page.getByRole('navigation', { name: 'Views' });
+			await expect(views.getByRole('button', { name: 'Open 1' })).toBeVisible();
 
 			await expect(page.locator('.tracks').getByRole('heading', { name: 'repo 1' })).toBeVisible();
-			await page.getByRole('button', { name: /^Decided/ }).click();
+			await views.getByRole('button', { name: /^Decided/ }).click();
 
 			await expect(page.getByRole('region', { name: /^Steps/ })).toHaveCount(0);
 		});
 
-		test('[ABRD-120] with no step the section stays and says no step waits', async ({
+		test('[ABRD-120] with no step the Steps view stays and says no step waits', async ({
 			page
 		}, testInfo) => {
 			await arrange([card()]);
 			await show(page);
 
-			const region = page.getByRole('region', { name: 'Steps 0' });
+			await page
+				.getByRole('navigation', { name: 'Views' })
+				.getByRole('button', { name: 'Steps 0' })
+				.click();
+			const region = page.getByRole('region', { name: 'Steps' });
 			await expect(region).toContainText('No step waits for you.');
 			await shoot(page, (name) => testInfo.outputPath(name), `no-steps-${viewport.width}`);
+		});
+
+		test('[ABRD-123] a reload returns the board to its Open view, the Steps view is not kept', async ({
+			page
+		}) => {
+			await arrange([card(), stepItem(9, 'Rotate the key', 'Rotate it.')]);
+			await show(page);
+			const views = page.getByRole('navigation', { name: 'Views' });
+			await views.getByRole('button', { name: 'Steps 1' }).click();
+			await expect(page.getByRole('region', { name: 'Steps' })).toBeVisible();
+
+			await page.reload();
+
+			await expect(views.getByRole('button', { name: 'Open 1' })).toHaveAttribute(
+				'aria-current',
+				'page'
+			);
+			await expect(page.getByRole('region', { name: 'Steps' })).toHaveCount(0);
 		});
 	});
 }
