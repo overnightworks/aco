@@ -21,7 +21,7 @@ class BodyWriteOutcome(StrEnum):
 def body_write_outcome(error: ClaimError) -> BodyWriteOutcome:
     """The outcome of a body write that raised `error`: the forge's own
     refusal of the call (authorization, no such item), and a `gh` that never
-    ran (a plain `ClaimError` -- `_bounded_command` raises only typed forge
+    ran (a plain `ClaimError` -- `bounded_command` raises only typed forge
     errors once the process has started) wrote nothing; any other forge
     failure may have come after the write."""
     refused = isinstance(

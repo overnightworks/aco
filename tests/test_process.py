@@ -3,7 +3,7 @@
 launcher (`run_git`/`git_command`/`git_failure_detail`/
 `git_failure_detail_from_stderr`) `checkout` and `store` each call
 rather than re-typing. The GitHub adapter's own thin
-wrapper over that boundary (`github._bounded_command`) is covered in
+wrapper over that boundary (`github.bounded_command`) is covered in
 `tests/test_github.py`; `checkout`'s and `store`'s own `ClaimError`
 translations of a failed git launch are covered in their own test modules."""
 
