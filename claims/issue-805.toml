@@ -1,8 +1,0 @@
-claim_id = "289569c0024948bb8b5b2f19a6678ee0"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "9e1603d91e80841704fb6afae8e7306b13a52ce4"
-branch = "claude/issue-805-the-board-s-four-small-defects-are-gone"
-scope = ["frontend", "src/aco/board/static"]
-opened_commit = "2a8857efa3029c214178894267ba5df561bf1d28"
-whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
