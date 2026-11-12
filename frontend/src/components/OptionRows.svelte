@@ -124,6 +124,7 @@
 		color: var(--fg-2);
 	}
 	.letter {
+		flex: none;
 		display: grid;
 		place-items: center;
 		width: 24px;

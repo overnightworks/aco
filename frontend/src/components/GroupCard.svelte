@@ -192,5 +192,8 @@
 		.point {
 			grid-template-columns: minmax(0, 1fr);
 		}
+		.point button.pick {
+			height: 44px;
+		}
 	}
 </style>

@@ -329,6 +329,11 @@
 		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
+	/* A pane takes focus by script (tabindex -1) so keyboard flow and screen readers
+	   continue there; a ring around the whole pane marks nothing to act on. */
+	:global([tabindex='-1']:focus-visible) {
+		outline: none;
+	}
 	main {
 		height: 100dvh;
 		display: flex;

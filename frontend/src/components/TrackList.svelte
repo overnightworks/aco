@@ -178,5 +178,8 @@
 			padding-left: 16px;
 			padding-right: 16px;
 		}
+		.row {
+			min-height: 44px;
+		}
 	}
 </style>

@@ -110,7 +110,14 @@ for (const viewport of [
 			await expect(page.getByText('Nothing open: webauth')).toBeVisible();
 
 			const longRow = rows.nth(2);
-			expect((await longRow.boundingBox())?.height).toBeLessThanOrEqual(40);
+			const rowHeights = await rows.evaluateAll((buttons) =>
+				buttons.map((button) => button.getBoundingClientRect().height)
+			);
+			if (viewport.width < 760)
+				for (const height of rowHeights) expect(height).toBeGreaterThanOrEqual(44);
+			expect((await longRow.boundingBox())?.height).toBeLessThanOrEqual(
+				viewport.width < 760 ? 48 : 40
+			);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 				viewport.width
 			);
@@ -134,6 +141,25 @@ for (const viewport of [
 				await first.click();
 				await expect(page.locator('.option-card')).toBeVisible();
 			}
+		});
+
+		test('[ABRD-29] the pane that took focus on load shows no frame, and the next control keeps its ring', async ({
+			page
+		}) => {
+			const { appUrl, token } = readBoardRuntime();
+			await serveThreeRepositories(page);
+			await page.goto(`${appUrl}#t=${token}`);
+
+			const pane = page.locator('[tabindex="-1"]:focus');
+			await expect(pane).toHaveCount(1);
+			expect(await pane.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+			await expect(pane).toHaveCSS('outline-style', 'none');
+
+			await page.keyboard.press('Tab');
+
+			const control = page.locator(':focus');
+			await expect(control).not.toHaveAttribute('tabindex', '-1');
+			await expect(control).toHaveCSS('outline-style', 'solid');
 		});
 
 		test('[ABRD-107] the repository with the newest card leads and first load selects its first row', async ({
