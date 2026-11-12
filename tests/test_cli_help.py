@@ -8,7 +8,7 @@ from cli_fixtures import run_cli
 from aco import cli
 
 # A command's own row in argparse's listing: four spaces, then its name.
-_COMMAND_ROW = re.compile(r"^ {4}([a-z]+)\b")
+_COMMAND_ROW = re.compile(r"^ {4}([a-z-]+)\b")
 
 
 def test_help_lists_commands_in_their_stable_registration_order(
