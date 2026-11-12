@@ -258,7 +258,7 @@ def _nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge
     return forge.ForgeError(decoded or f"{purpose} failed with exit {return_code}")
 
 
-def _bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
+def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
     try:
         result = process.run_bounded(
             command,
@@ -321,7 +321,7 @@ class GitHubForge:
         return head
 
     def _gh(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
-        return _bounded_command(
+        return bounded_command(
             ["gh", *arguments],
             purpose="GitHub issue coordination",
             input_data=input_data,

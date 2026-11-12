@@ -18,14 +18,15 @@ from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
 
-from aco import body, expectation_grammar, forge, session, workboard
+from aco import body, expectation_grammar, forge, repositories, session, workboard
 from aco.body import ItemKind
 
 _STATE_FILE = "board-forge.json"
+_SEARCH_INDEX = "board-forge-search.json"
 _REQUEST_LOG = "board-forge-requests.jsonl"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
@@ -201,6 +202,15 @@ class BoardForge:
 
     def stored_item(self, number: int) -> StoredItem:
         return self._state().items[number]
+
+    def ruling_items(self) -> tuple[forge.RulingItem, ...]:
+        """Every item the forge holds, closed ones included, as a search finds it."""
+        return tuple(
+            forge.RulingItem(
+                str(self.repository), number, item.title, item.body, item.author_is_member
+            )
+            for number, item in self._state().items.items()
+        )
 
     def stored_entries(self, number: int) -> list[dict[str, object]]:
         """Item `number`'s `[[expectation]]` entries as its stored body holds them."""
@@ -394,10 +404,64 @@ def _forge_of(context: session.RunContext) -> forge.ForgeWriter:
     return BoardForge(context.toplevel)
 
 
+@dataclass(frozen=True)
+class SearchIndex:
+    """The forge's search index, a file beside aco's config file: it finds every
+    item, closed ones included, of the board forges a test `include`s, whatever
+    the query, and can be made to fail or to answer an incomplete result."""
+
+    path: Path
+
+    def include(self, *forges: BoardForge) -> None:
+        state = self._state()
+        state["directories"] = [*state["directories"], *(str(each.directory) for each in forges)]
+        self._replace_state(state)
+
+    def fail(self, message: str) -> None:
+        """Every later search raises a forge failure carrying `message`."""
+        state = self._state()
+        state["failure"] = message
+        self._replace_state(state)
+
+    def mark_incomplete(self) -> None:
+        """Every later search answers an incomplete result."""
+        state = self._state()
+        state["incomplete"] = True
+        self._replace_state(state)
+
+    def search(self, query: str) -> forge.RulingSearchResult:
+        state = self._state()
+        if state["failure"] is not None:
+            raise forge.ForgeError(state["failure"])
+        items = tuple(
+            item
+            for directory in state["directories"]
+            for item in BoardForge(Path(directory)).ruling_items()
+        )
+        return forge.RulingSearchResult(items, complete=not state["incomplete"])
+
+    def _state(self) -> dict[str, Any]:
+        if not self.path.exists():
+            return {"directories": [], "failure": None, "incomplete": False}
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
+    def _replace_state(self, state: dict[str, Any]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(state), encoding="utf-8")
+
+
+def search_index() -> SearchIndex:
+    """The search index of the config home the run sees."""
+    config_file = repositories.config_path(os.environ, Path.home())
+    return SearchIndex(config_file.with_name(_SEARCH_INDEX))
+
+
 def run_context(repo: forge.RepositoryId | None) -> session.RunContext:
     """`session.run_context` over the checkout's own `BoardForge`, ruling on
-    `RULING_DAY`."""
-    return session.RunContext(repo, build_forge=_forge_of, today=lambda: RULING_DAY)
+    `RULING_DAY`, searching rulings in `search_index`."""
+    return session.RunContext(
+        repo, build_forge=_forge_of, today=lambda: RULING_DAY, ruling_search=search_index()
+    )
 
 
 def item_body(*entries: Mapping[str, object], next_step: str | None = None) -> str:

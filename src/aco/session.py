@@ -29,7 +29,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import cast
 
-from . import body, checkout, forge, github, protocol, state_board, store, workboard
+from . import body, checkout, forge, github, github_search, protocol, state_board, store, workboard
 
 ForgeBuilder = Callable[["RunContext"], forge.ForgeReader]
 
@@ -371,10 +371,16 @@ class RunContext:
         build_forge: ForgeBuilder,
         directory: Path | None = None,
         today: Callable[[], date] = utc_today,
+        ruling_search: forge.RulingSearch | None = None,
     ) -> None:
         self.repo = repo
         self.directory = directory
         self.today = today
+        self.ruling_search = (
+            github_search.GitHubRulingSearch(github.bounded_command)
+            if ruling_search is None
+            else ruling_search
+        )
         self._build_forge = build_forge
         self._fetched_trunk_remote: str | None = None
 
@@ -385,7 +391,11 @@ class RunContext:
         resolved `directory` as its checkout's toplevel (`rescope`), so the
         child holds it as read instead of asking git a second time."""
         child = RunContext(
-            self.repo, build_forge=self._build_forge, directory=directory, today=self.today
+            self.repo,
+            build_forge=self._build_forge,
+            directory=directory,
+            today=self.today,
+            ruling_search=self.ruling_search,
         )
         if is_toplevel:
             child.toplevel = directory
@@ -403,6 +413,7 @@ class RunContext:
             build_forge=self._build_forge,
             directory=self.directory,
             today=self.today,
+            ruling_search=self.ruling_search,
         )
         child._fetched_trunk_remote = self._fetched_trunk_remote
         return child

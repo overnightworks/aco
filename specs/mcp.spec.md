@@ -1,7 +1,7 @@
 # `aco mcp`
 
 `aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions and the steps waiting on the operator across every
-repository under the configured root; its tool `ask` puts one decision card on an item there; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask`, `record_answer` and `step`: the CLI stays complete without it.
+repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask`, `record_answer` and `step`: the CLI stays complete without it.
 It speaks the protocol of the `initialize` era, revisions `2025-11-25` and `2025-06-18`. The items and lines it returns are the ones `specs/rulings.spec.md` owns (RUL-10),
 so an agent holds the line index and the `card_hash` that `aco rule` takes. Which repositories exist and how the root is found is `specs/serve.spec.md`'s (ABRD-14, ABRD-108..ABRD-111).
 
@@ -30,7 +30,10 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a call after another call, or after a refusal | — | — | MCP-19 |
 | a `record_answer` written | — | — | MCP-56 |
 | a card on an open item a member wrote | — | — | MCP-21 |
-| the same card asked again | — | — | MCP-22 |
+| the same card asked again | — | — | MCP-22, MCP-61 |
+| a card asked, and rulings of its area elsewhere or on closed items | — | — | MCP-57, MCP-58, MCP-59, MCP-60 |
+| a card asked and the search for earlier rulings cannot answer completely | — | — | MCP-62 |
+| a ruling of the last minutes, a word form, a synonym | — | — | MCP-63, MCP-64 |
 | a card asked after its line was withdrawn | — | — | MCP-23 |
 | a repository not found, or an item missing, a pull request, malformed, closed or a non-member's | — | — | MCP-24 |
 | a card value the grammar refuses, a card rule broken, or an item with an incomplete body | — | — | MCP-25 |
@@ -100,6 +103,19 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - [ ] [MCP-27] An unknown argument, a state key (`asked_on`, `ruling`, `card_hash`, ...), a `repository` that is no string or an `item` that is no integer is a tool error naming each; nothing is written.
 - [ ] [MCP-28] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; asking the same card again then answers the line if it stands, else writes it.
 
+## Earlier rulings
+
+A head that asks a card is shown what the operator already ruled in the card's area.
+
+- [ ] [MCP-57] `ask` also answers `earlier`: the ruled option lines of the card's area from every repository found, closed items included, each `{repository, item, title, question, answer, ruled_on, via}` (see E-MCP-18).
+- [ ] [MCP-58] `answer` is the ruled option's name, or the operator's own words when he ruled `other`; `via` is `board`, `chat` or `default`; lines come newest `ruled_on` first, ties by repository, item descending, line.
+- [ ] [MCP-59] `earlier` holds at most five lines and `earlier_more` counts the lines beyond them; for an area without a ruling `earlier` is an empty list and `earlier_more` is 0 (see E-MCP-04).
+- [ ] [MCP-60] A line counts when it is a ruled option line whose area equals the card's without regard to case, on an item a member of a found repository wrote; open, returned and withdrawn lines and the asked line are left out.
+- [ ] [MCP-61] The same card asked again, nothing written, answers `earlier` as the first call did; the lines are shown, never applied, and the card is written whatever they hold.
+- [ ] [MCP-62] A search that cannot answer (a forge error, an incomplete or too large result, an area without a letter or digit word) gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
+- [ ] [MCP-63] `earlier` is what the forge's search index finds when the card is asked, so a ruling of the last minutes can be missing; the search runs after the item's lock is released.
+- [ ] [MCP-64] The area is matched as written: `Sicherung` and `Backup` are two areas. A body that no longer parses, a repository under `state-ref` storage and a second forge host are not searched.
+
 ## Recording an answer
 
 - [ ] [MCP-29] `record_answer` rules `line` as `aco rule --via chat` does, from `option` or `other` and the shown `card_hash`; it answers `repository`, `item`, the line as RUL-10 prints it and `open` (see E-MCP-08).
@@ -145,6 +161,7 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 - It never prints anything but protocol messages on standard output (MCP-20).
 - It never answers a notification (MCP-05).
 - `read_inbox` never lists a line that is with its head or already decided (MCP-12); `ask` answers a line that stands whatever its state (MCP-22).
+- `ask` never applies an earlier ruling and never fails for its search (MCP-61, MCP-62); `earlier` is no proof that no ruling exists (MCP-63, MCP-64).
 
 ## Examples
 
@@ -188,17 +205,17 @@ Setup: `owner/a` holds the open item `#7`, written by a member, with no option l
 
 ```text
 > {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ask","arguments":{"repository":"owner/a","item":7,"text":"<text>","question":"<question>","options":["<2 to 4 option objects>"],"...":"the other line keys"}}}
-< {"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":true,"line":{"index":1,"form":"options","asked_on":"2026-11-08"}},"isError":false}}
+< {"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":true,"line":{"index":1,"form":"options","asked_on":"2026-11-08"},"earlier":[],"earlier_more":0},"isError":false}}
 ```
 
-The line carries every key `aco rulings --json` prints (RUL-10); only the keys shown are repeated here. `aco rulings 7` and `read_inbox` list it as open.
+The line carries every key `aco rulings --json` prints (RUL-10); only the keys shown are repeated here. `aco rulings 7` and `read_inbox` list it as open. No ruling of the area stands anywhere, so `earlier` is empty.
 
 ### E-MCP-05 -- the same card again
 
 Setup: as E-MCP-04, after its call; the same arguments are sent again
 
 ```text
-< {"jsonrpc":"2.0","id":6,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":false,"line":{"index":1,"form":"options","ruling":null}},"isError":false}}
+< {"jsonrpc":"2.0","id":6,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":false,"line":{"index":1,"form":"options","ruling":null},"earlier":[],"earlier_more":0},"isError":false}}
 ```
 
 The item's body is unchanged. Once the operator has ruled the line, the same answer carries its `ruling`.
@@ -326,3 +343,23 @@ Setup: as E-MCP-12, with both `item` and `title` given and `step` blank
 ```
 
 Nothing is read or written.
+
+### E-MCP-18 -- a card whose area was ruled elsewhere
+
+Setup: as E-MCP-04, the card's `area` is `Song-Seite`; the closed item `#3` of `owner/b` holds a line of that area, ruled `A` on `2026-10-29` through the board
+
+```text
+< {"jsonrpc":"2.0","id":18,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":true,"line":{"index":1,"form":"options"},"earlier":[{"repository":"owner/b","item":3,"title":"<the item's title>","question":"<the line's question>","answer":"<name of option A>","ruled_on":"2026-10-29","via":"board"}],"earlier_more":0},"isError":false}}
+```
+
+The card is written all the same; the head decides whether the question is already answered.
+
+### E-MCP-19 -- the search cannot answer
+
+Setup: as E-MCP-04; the forge fails the search with `HTTP 502`
+
+```text
+< {"jsonrpc":"2.0","id":19,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":true,"line":{"index":1,"form":"options"},"earlier_unavailable":"the earlier rulings could not be searched: HTTP 502"},"isError":false}}
+```
+
+`earlier` and `earlier_more` are absent; the card stands, and the same card sent again searches again.
