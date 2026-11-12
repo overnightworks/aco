@@ -9,7 +9,6 @@
 		OPEN_TAB_LABEL,
 		SERVER_SILENT_SENTENCE,
 		DECIDED_TAB_LABEL,
-		STEPS_LABEL,
 		SELF_REFRESH_MINUTES,
 		isStale,
 		lastReadAt,
@@ -20,7 +19,6 @@
 	import { DecisionStore } from './app/state/decision.svelte';
 	import RefreshButton from './components/RefreshButton.svelte';
 	import Stage from './components/Stage.svelte';
-	import StepsList from './components/StepsList.svelte';
 	import TrackList from './components/TrackList.svelte';
 	import UndoStrip from './components/UndoStrip.svelte';
 
@@ -200,12 +198,6 @@
 				>
 				<button
 					type="button"
-					aria-current={view === 'steps' ? 'page' : undefined}
-					onclick={() => (view = 'steps')}
-					>{STEPS_LABEL} <span class="n">{counts.steps}</span></button
-				>
-				<button
-					type="button"
 					aria-current={view === 'decided' ? 'page' : undefined}
 					onclick={openDecided}>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
 				>
@@ -273,11 +265,6 @@
 						<Stage repos={board.repos} selectedKey={decidedKey} {decisions} />
 					</div>
 				</div>
-			</div>
-		{/if}
-		{#if view === 'steps'}
-			<div class="steps-view">
-				<StepsList repos={board.repos} />
 			</div>
 		{/if}
 	{/if}
@@ -398,13 +385,6 @@
 		grid-template-rows: auto minmax(0, 1fr);
 		flex: 1;
 		min-height: 0;
-	}
-	.steps-view {
-		flex: 1;
-		min-height: 0;
-		overflow: auto;
-		background: var(--surface);
-		padding: 8px 0 24px;
 	}
 	.tracks,
 	.question-pane {

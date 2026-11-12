@@ -131,7 +131,6 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 		name: 'repo',
 		error: null,
 		items: [item()],
-		steps: [],
 		...overrides
 	};
 }

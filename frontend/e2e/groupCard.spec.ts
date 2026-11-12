@@ -250,17 +250,20 @@ for (const viewport of [
 			await fits(page, viewport.width);
 		});
 
-		test('[ABRD-83] every point’s picks stand at least 44 px high on a phone', async ({ page }) => {
-			await arrangeCards();
-			await open(page, phone);
+		if (phone)
+			test('[ABRD-83] every point’s picks stand at least 44 px high on a phone', async ({
+				page
+			}) => {
+				await arrangeCards();
+				await open(page, phone);
 
-			const heights = await card(page)
-				.locator('.point button.pick')
-				.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
+				const heights = await card(page)
+					.locator('.point button.pick')
+					.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
 
-			expect(heights).toHaveLength(6);
-			if (phone) for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
-		});
+				expect(heights).toHaveLength(6);
+				for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+			});
 
 		test('[ABRD-85] one point is open at a time, with its rows and a Today that enlarges, and a phone keeps the Decide row in view', async ({
 			page

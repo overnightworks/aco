@@ -81,11 +81,7 @@ def _dated(entry: Mapping[str, object]) -> dict[str, object]:
 def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     entries = arranged["entries"]
     assert isinstance(entries, list)
-    next_step = arranged.get("next")
-    raw_body = board_forge.item_body(
-        *(_dated(entry) for entry in entries),
-        next_step=None if next_step is None else str(next_step),
-    )
+    raw_body = board_forge.item_body(*(_dated(entry) for entry in entries))
     parsed = body.parse_body(raw_body)
     if parsed.read_state is body.BodyReadState.MALFORMED:
         raise ArrangementRefusedError(
@@ -94,9 +90,7 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
                 for defect in parsed.contract.defects
             ]
         )
-    labels = arranged.get("labels", [])
-    assert isinstance(labels, list)
-    return StoredItem(str(arranged["title"]), raw_body, labels=[str(label) for label in labels])
+    return StoredItem(str(arranged["title"]), raw_body)
 
 
 def arrange_board(repository: BoardForge, arrangement: Mapping[str, object]) -> None:

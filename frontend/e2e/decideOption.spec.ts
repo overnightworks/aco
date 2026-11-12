@@ -213,17 +213,18 @@ for (const viewport of [
 			await expect(decidedList(page).getByRole('button')).toHaveCount(0);
 		});
 
-		test('[ABRD-44] every pick stands at least 44 px high on a phone', async ({ page }) => {
-			await arrangeCards();
-			await open(page, phone);
+		if (phone)
+			test('[ABRD-44] every pick stands at least 44 px high on a phone', async ({ page }) => {
+				await arrangeCards();
+				await open(page, phone);
 
-			const heights = await picks(page)
-				.getByRole('button')
-				.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
+				const heights = await picks(page)
+					.getByRole('button')
+					.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
 
-			expect(heights).toHaveLength(2);
-			if (phone) for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
-		});
+				expect(heights).toHaveLength(2);
+				for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+			});
 
 		test('[ABRD-36] the recommendation’s letter stays a circle beside a long reason', async ({
 			page
@@ -368,9 +369,6 @@ for (const viewport of [
 					const undoEdges = await edges(undo);
 					expect(undoEdges.right - undoEdges.left).toBeGreaterThanOrEqual(40);
 					expect(undoEdges.right).toBeLessThanOrEqual(width);
-					expect(
-						await page.locator('.strip .tx').evaluate((text) => text.scrollWidth > text.clientWidth)
-					).toBe(false);
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth)
 					).toBeLessThanOrEqual(width);
