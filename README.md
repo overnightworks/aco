@@ -87,8 +87,7 @@ expectation lines of every checkout under the `root` in `~/.config/aco/config.to
 (`root = "<absolute path>"`; `$XDG_CONFIG_HOME` when absolute) that tracks
 `.aco/board.toml`, one per forge repository and rescanned on every read, as decision cards on 127.0.0.1
 (an item's open option lines are one card, decided by a letter per line, Accept all,
-Other… or Unclear, stored all or none); beside the questions it lists, read-only, the
-steps only the operator can take (items labelled `needs-operator`); the
+Other… or Unclear, stored all or none), and lists the decided ones; the
 access token travels only in the printed URL's `#` fragment and survives
 restarts in a user-only file (deleting it rotates the token)
 (`specs/serve.spec.md`). The browser app lives in `frontend/`; its build

@@ -238,7 +238,7 @@ for (const viewport of [
 			}
 
 			await expect(back).toHaveCount(0);
-			await expect(views.getByRole('button')).toHaveCount(3);
+			await expect(views.getByRole('button')).toHaveCount(2);
 			const row = page.locator('.tracks').getByRole('button').first();
 			await row.click();
 			await expect(page.getByRole('button', { name: '‹ Open', exact: true })).toBeVisible();
