@@ -19,6 +19,7 @@ from . import (
     cmd_check,
     cmd_claim,
     cmd_cut,
+    cmd_fleet_plans,
     cmd_item,
     cmd_land,
     cmd_mcp,
@@ -148,6 +149,18 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
     board = commands.add_parser(name, help="project the open work board, read-only")
     report.add_json_flag(board, "JSON only")
+
+
+def _add_fleet_plans_parser(commands: usage.Subcommands, name: str) -> None:
+    cmd_fleet_plans.add_arguments(
+        commands.add_parser(
+            name,
+            help=(
+                f"list the open items labelled {workboard.FLEET_PLAN_LABEL} of every repository "
+                "on this machine, read-only"
+            ),
+        )
+    )
 
 
 def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
@@ -650,6 +663,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "serve": _RepositoryCommand(cmd_serve.add_parser, cmd_serve.run),
     "mcp": _RepositoryCommand(cmd_mcp.add_parser, cmd_mcp.run),
     "rulings": _RepositoryCommand(_add_rulings_parser, cmd_rulings.run),
+    "fleet-plans": _RepositoryCommand(_add_fleet_plans_parser, cmd_fleet_plans.run),
     "next": _RepositoryCommand(_add_next_parser, cmd_next.run),
     "start": _RepositoryCommand(_add_start_parser, cmd_start.run),
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),

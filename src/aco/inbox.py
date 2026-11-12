@@ -6,10 +6,11 @@ open an item that carries a card, and a card reaches the operator's decision
 surface only from a writer of the repository.
 
 The steps only the operator can take come from the same items: those a member
-wrote that carry the `needs-operator` label, each with its block's `next`.
+wrote that carry the `needs-operator` label, each with its block's `next`. The
+fleet-wide plans are those a member wrote that carry the `fleet-plan` label.
 
 The read across repositories: of those rows, the option lines still waiting on
-the operator, and the steps, for every repository discovery found.
+the operator, the steps and the plans, for every repository discovery found.
 """
 
 from collections.abc import Callable, Iterable
@@ -17,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import body, expectations, protocol, repositories, rulings, session, workboard
+from . import body, expectations, forge, protocol, repositories, rulings, session, workboard
 
 
 def rows(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[rulings.Row, ...]:
@@ -66,11 +67,48 @@ def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[
 
 
 @dataclass(frozen=True)
+class Plan:
+    number: int
+    title: str
+    url: str | None
+    """The item's page; `None` under `storage = "state-ref"`, whose items are no
+    forge pages."""
+    updated_on: str
+    """The day the item last changed, `YYYY-MM-DD`."""
+
+
+_DAY_LENGTH = len("YYYY-MM-DD")
+
+
+def plans(
+    issues: Iterable[workboard.Issue], *, repository: forge.RepositoryId, storage: body.Storage
+) -> tuple[Plan, ...]:
+    """The members' readable items among `issues` that carry the `fleet-plan`
+    label, by ascending number."""
+    found = [
+        Plan(
+            issue.number,
+            issue.title,
+            None
+            if storage is body.Storage.STATE_REF
+            else f"https://{repository.host}/{repository.path}/issues/{issue.number}",
+            issue.updated_at[:_DAY_LENGTH],
+        )
+        for issue in issues
+        if issue.author_is_member
+        and issue.unreadable is None
+        and workboard.has_label(issue.labels, workboard.FLEET_PLAN_LABEL)
+    ]
+    return tuple(sorted(found, key=lambda plan: plan.number))
+
+
+@dataclass(frozen=True)
 class Reading:
     """What one listing of a repository's open items holds for the operator."""
 
     rows: tuple[rulings.Row, ...]
     steps: tuple[Step, ...]
+    plans: tuple[Plan, ...] = ()
 
 
 def read_issues(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> Reading:
@@ -80,9 +118,21 @@ def read_issues(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> 
 
 
 def read_context(context: session.RunContext) -> Reading:
-    """The rows and the steps of the checkout `context` is bound to, from one
-    listing of its open items."""
-    return read_issues(context.forge.list_open_board_issues(), storage=context.config.storage)
+    """The rows, the steps and the plans of the checkout `context` is bound to,
+    from one listing of its open items."""
+    listed = tuple(context.forge.list_open_board_issues())
+    storage = context.config.storage
+    return replace(
+        read_issues(listed, storage=storage),
+        plans=plans(listed, repository=context.forge.repository, storage=storage),
+    )
+
+
+def read_repository(repository: repositories.Repository) -> Reading:
+    """`read_context` of the checkout `repository` names."""
+    # Looked up on the module at every call, so a replaced `run_context` (the
+    # board's test forge) reaches every read.
+    return read_context(session.run_context(None).for_directory(repository.directory))
 
 
 type IssueReader = Callable[[repositories.Repository], Reading]
@@ -95,6 +145,7 @@ class Waiting:
     repository: str
     rows: tuple[rulings.Row, ...]
     steps: tuple[Step, ...]
+    plans: tuple[Plan, ...]
 
 
 @dataclass(frozen=True)
@@ -119,7 +170,9 @@ def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbo
     def read_one(repository: repositories.Repository) -> Waiting | Unavailable:
         try:
             reading = read_issues_of(repository)
-            return Waiting(repository.label, waiting_rows(reading.rows), reading.steps)
+            return Waiting(
+                repository.label, waiting_rows(reading.rows), reading.steps, reading.plans
+            )
         except (protocol.ClaimError, OSError) as error:
             return Unavailable(repository.label, str(error))
 

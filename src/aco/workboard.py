@@ -51,6 +51,10 @@ IDEA_REASON = "idea"
 # no agent can pull it, so `next` names it apart and `claim`'s
 # precedence check never stops on it. A label, so both storages carry it.
 NEEDS_OPERATOR_LABEL = "needs-operator"
+# The one typed marker that an open item binds repositories other than its own
+# (a rename, a publication order, a migration every repository joins), as a
+# label so both storages carry it; `aco fleet-plans` lists the items with it.
+FLEET_PLAN_LABEL = "fleet-plan"
 WAITING_ON_OPERATOR = "waiting on operator"
 RULING_OLD_AFTER_LANDINGS = 10
 STALE_IDLE_DAYS = 7
