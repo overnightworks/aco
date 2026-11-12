@@ -17,6 +17,7 @@
 		type ShownRepo
 	} from '../app/model/boardSummary';
 	import { displayDay } from '../app/model/optionCard';
+	import QuietSign from './QuietSign.svelte';
 	import StateShape from './StateShape.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -76,7 +77,10 @@
 		</ul>
 	{/each}
 	{#if list.groups.length === 0}
-		<div class="empty"><b>{emptyTitle}</b>{emptyText}</div>
+		<div class="empty">
+			<QuietSign kind="good" />
+			<div class="words"><b>{emptyTitle}</b>{emptyText}</div>
+		</div>
 	{:else if list.quiet.length > 0}
 		<p class="quiet">{QUIET_PREFIX}{list.quiet.join(' · ')}</p>
 	{/if}
@@ -84,14 +88,20 @@
 
 <style>
 	.bad-line {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 8px;
-		margin: 0;
-		padding: 0 24px 8px;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 2px 8px;
+		margin: 2px 16px 6px;
+		padding: 10px 12px;
+		border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+		border-radius: 10px;
+		background: var(--warn-soft);
 		font-size: 13px;
+		line-height: 19px;
 		color: var(--fg-2);
+	}
+	.bad-line > span:not(.mark) {
+		grid-column: 2;
 	}
 	.bad-line b,
 	.mark {
@@ -101,7 +111,6 @@
 	}
 	.read-at {
 		color: var(--fg-3);
-		white-space: nowrap;
 	}
 	.group {
 		display: flex;
@@ -173,19 +182,28 @@
 		color: var(--fg-3);
 	}
 	.empty {
-		padding: 32px 24px;
-		color: var(--fg-2);
+		display: grid;
+		justify-items: center;
+		gap: 14px;
+		padding: 0 24px 12vh;
+		text-align: center;
+		font-size: 15px;
+		color: var(--fg-3);
+	}
+	.words {
+		display: grid;
+		gap: 6px;
 	}
 	.empty b {
-		display: block;
-		margin-bottom: 4px;
+		font-family: var(--font-display);
+		font-size: 26px;
+		font-weight: 400;
+		line-height: 32px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--fg);
 	}
 	@media (max-width: 760px) {
-		.bad-line {
-			padding-left: 16px;
-			padding-right: 16px;
-		}
 		.group {
 			padding: 20px 18px 6px;
 		}
