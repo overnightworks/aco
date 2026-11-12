@@ -76,12 +76,16 @@ def test_a_ruled_line_of_the_same_area_from_another_repository_and_a_closed_item
     elsewhere.put_item(3, board_forge.item_body(ruled_there), title="Dort")
     here.put_item(4, board_forge.item_body(_ruled_entry()), title="Zu")
     here.close_item(4)
-    board_forge.search_index().include(here, elsewhere)
+    index = board_forge.search_index()
+    index.include(here, elsewhere)
 
     [answer] = _serve(monkeypatch, _ask_line(1))
 
     structured = answer["result"]["structuredContent"]
     assert (answer["result"]["isError"], structured["written"]) == (False, True)
+    [query] = index.queries()
+    assert '"area song seite"' in query
+    assert query.count("user:board-forge") == 1
     assert _earlier(answer) == [
         ("board-forge/elsewhere", 3, "Song bleibt offen", "2026-10-29", "chat"),
         ("board-forge/here", 4, "Song bleibt offen", "2026-10-28", "board"),

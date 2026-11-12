@@ -27,6 +27,7 @@ from board_fixtures import (
     MINIMAL_BLOCK_TOML,
     block_body,
     projected_board,
+    searchless,
     unfilled_block_body,
     write_repository_config,
 )
@@ -82,7 +83,6 @@ from aco.body import (
     render_block,
 )
 from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
-from aco.session import RunContext
 from aco.state_board import ItemWriter, StateRefBoard
 from aco.workboard import BlockerState, IssueDependency, IssueReference, board_payload
 
@@ -687,11 +687,11 @@ def _store_item_writer(remote: Path, worktree_path: Path) -> ItemWriter:
     over `remote` -- configured there as its canonical remote -- through a
     run context that stands for that checkout."""
 
-    def no_forge(_context: RunContext) -> forge.ForgeReader:
+    def no_forge(_context: session.RunContext) -> forge.ForgeReader:
         raise AssertionError("an item write never builds a forge")
 
     real_git(worktree_path, "config", "remote.canonical.url", str(remote))
-    context = RunContext(None, build_forge=no_forge).for_directory(worktree_path, is_toplevel=True)
+    context = searchless(None, build_forge=no_forge).for_directory(worktree_path, is_toplevel=True)
     context.config = workboard.BoardConfig(canonical_remote="canonical", storage=Storage.STATE_REF)
     return session._StoreItemWriter(context)
 

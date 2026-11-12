@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body, searchless
 from cli_fixtures import (
     FROZEN_CLI_NOW,
     freeze_cli_now,
@@ -354,9 +354,7 @@ def test_context_refusal(
         monkeypatch.setattr(
             session,
             "run_context",
-            lambda repo: session.RunContext(
-                repo, build_forge=session._build_forge, directory=directory
-            ),
+            lambda repo: searchless(repo, build_forge=session._build_forge, directory=directory),
         )
 
     def forbidden(*args, **kwargs):

@@ -125,6 +125,16 @@ def test_a_result_above_the_forges_cap_is_answered_incomplete_without_paging_on(
     assert (_numbers(result), result.complete, len(runner.commands)) == ([1], False, 1)
 
 
+def test_a_later_page_the_forge_marks_incomplete_is_answered_incomplete() -> None:
+    first = [_hit(number) for number in range(1, 101)]
+    second = [_hit(number) for number in range(101, 151)]
+    runner = _Runner(_page(first, total=150), _page(second, total=150, incomplete=True))
+
+    result = _search(runner)
+
+    assert (len(result.items), result.complete) == (150, False)
+
+
 def test_a_page_that_ends_short_of_the_total_is_answered_incomplete() -> None:
     runner = _Runner(_page([_hit(1)], total=3), _page([], total=3))
 

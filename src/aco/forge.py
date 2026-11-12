@@ -2,7 +2,9 @@
 
 `ForgeReader`/`ForgeWriter` are the contract that `github.GitHubForge` and
 `state_board.StateRefBoard` both implement. An adapter that cannot perform an
-operation raises `ForgeUnsupportedError`. `cmd_land` depends on `GitHubForge`
+operation raises `ForgeUnsupportedError`. `RulingSearch` is a port apart from
+them: it searches ruling items across the owners a query names, where they are
+bound to one repository. `cmd_land` depends on `GitHubForge`
 directly, `cmd_item` on `StateRefBoard`, and `cmd_release` on both, so a
 further forge needs its own contract for them first.
 """

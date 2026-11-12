@@ -8,10 +8,11 @@ tests/ on sys.path, so import board_fixtures resolves here.
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from functools import partial
 from pathlib import Path
 from types import MappingProxyType
 
-from aco import protocol, workboard
+from aco import forge, protocol, workboard
 from aco.body import (
     BLOCK_FENCE_INFO,
     ItemKind,
@@ -19,6 +20,7 @@ from aco.body import (
     render_block,
 )
 from aco.protocol import ClaimRequest
+from aco.session import RunContext
 
 # Display controls a slice title refuses beside the Cc set --
 # the bidi override and isolate and the zero-width space -- with the code
@@ -31,6 +33,15 @@ BIDI_AND_ZERO_WIDTH_CONTROLS = (
 
 
 BASE = "a" * 40
+
+
+class _NoRulingSearch:
+    def search(self, query: str) -> forge.RulingSearchResult:
+        raise AssertionError(f"this test searches no rulings, yet {query!r} was searched")
+
+
+searchless = partial(RunContext, ruling_search=_NoRulingSearch())
+"""A `RunContext` whose test never searches rulings: any search fails the test."""
 REPOSITORY = "example/agent-coordination"
 
 

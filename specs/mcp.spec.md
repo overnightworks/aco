@@ -112,9 +112,9 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-59] `earlier` holds at most five lines and `earlier_more` counts the lines beyond them; for an area without a ruling `earlier` is an empty list and `earlier_more` is 0 (see E-MCP-04).
 - [ ] [MCP-60] A line counts when it is a ruled option line whose area equals the card's without regard to case, on an item a member of a found repository wrote; open, returned and withdrawn lines and the asked line are left out.
 - [ ] [MCP-61] The same card asked again, nothing written, answers `earlier` as the first call did; the lines are shown, never applied, and the card is written whatever they hold.
-- [ ] [MCP-62] A search that cannot answer (a forge error, an incomplete or too large result, an area without a letter or digit word) gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
+- [ ] [MCP-62] A search that cannot answer (a forge error, an incomplete or too large result, an area without a letter or digit word, no tracked owner to search, a query over the forge's length limit) gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
 - [ ] [MCP-63] `earlier` is what the forge's search index finds when the card is asked, so a ruling of the last minutes can be missing; the search runs after the item's lock is released.
-- [ ] [MCP-64] The area is matched as written: `Sicherung` and `Backup` are two areas. A body that no longer parses, a repository under `state-ref` storage and a second forge host are not searched.
+- [ ] [MCP-64] The area is matched as written: `Sicherung` and `Backup` are two areas. A body that no longer parses, a repository under `state-ref` storage, a second forge host and a tracked repository whose remote still carries a former name are not searched.
 
 ## Recording an answer
 

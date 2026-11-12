@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body, searchless
 from board_forge import item_signals
 from cli_fixtures import run_context_over, track_board_config
 from github_fixtures import FakeForge
@@ -300,7 +300,7 @@ class TestTurn:
         """Spec: RULE-41, WITHDRAW-16 -- no lock, so nothing is read or written."""
         _, client = world(body.Storage.GITHUB, item_with(card()), github_clone)
         forges_built: list[RunContext] = []
-        context = RunContext(None, build_forge=lambda built: forges_built.append(built) or client)
+        context = searchless(None, build_forge=lambda built: forges_built.append(built) or client)
         blocker = tmp_path / "blocker"
         blocker.write_text("a file, not a directory", encoding="utf-8")
         environment = {"XDG_STATE_HOME": str(blocker)}

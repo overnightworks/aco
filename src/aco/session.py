@@ -144,7 +144,11 @@ def utc_today() -> date:
 def run_context(repo: forge.RepositoryId | None) -> RunContext:
     """This run's root context, built once the command is known to need a
     repository at all."""
-    return RunContext(repo, build_forge=_build_forge)
+    return RunContext(
+        repo,
+        build_forge=_build_forge,
+        ruling_search=github_search.GitHubRulingSearch(github.bounded_command),
+    )
 
 
 class RepoMeaninglessUnderStateRefError(protocol.ClaimUnavailableError):
@@ -362,6 +366,7 @@ class RunContext:
     the calling process's own cwd. `build_forge` turns this context's facts
     into the storage pin's forge adapter; the context holds what it builds.
     `today` is the run's clock; `rule` reads its one date from it.
+    `ruling_search` is the forge's search for rulings, which `ask` reads.
     """
 
     def __init__(
@@ -369,18 +374,14 @@ class RunContext:
         repo: forge.RepositoryId | None,
         *,
         build_forge: ForgeBuilder,
+        ruling_search: forge.RulingSearch,
         directory: Path | None = None,
         today: Callable[[], date] = utc_today,
-        ruling_search: forge.RulingSearch | None = None,
     ) -> None:
         self.repo = repo
         self.directory = directory
         self.today = today
-        self.ruling_search = (
-            github_search.GitHubRulingSearch(github.bounded_command)
-            if ruling_search is None
-            else ruling_search
-        )
+        self.ruling_search = ruling_search
         self._build_forge = build_forge
         self._fetched_trunk_remote: str | None = None
 

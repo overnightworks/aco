@@ -276,7 +276,10 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
         session,
         "run_context",
         lambda repo: session.RunContext(
-            repo, build_forge=build_forge, today=lambda: board_forge.RULING_DAY
+            repo,
+            build_forge=build_forge,
+            ruling_search=board_forge.search_index(),
+            today=lambda: board_forge.RULING_DAY,
         ),
     )
     monkeypatch.setattr(sys, "stdin", Script(call_line(1)))

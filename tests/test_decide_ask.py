@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body, searchless
 from cli_fixtures import track_board_config
 from github_fixtures import FakeForge
 from option_cards import SECOND_CARD, ask_card, card, other_card, returned_card, ruled_card
@@ -39,7 +39,7 @@ def world(
     reference = forge.ItemReference(state, "Titel", item_body, author_is_member=author_is_member)
     served = client or FakeForge()
     served.issue_references[NUMBER] = reference
-    return RunContext(None, build_forge=lambda _context: served, today=lambda: TODAY), served
+    return searchless(None, build_forge=lambda _context: served, today=lambda: TODAY), served
 
 
 def ask(context: RunContext, card_to_ask: dict[str, object] | None = None) -> decide.Asked:
@@ -233,7 +233,7 @@ def test_the_body_write_checks_answer_passes_through_and_a_repeat_after_it_write
             )
         }
     )
-    asked_again = ask(RunContext(None, build_forge=lambda _context: after, today=lambda: TODAY))
+    asked_again = ask(searchless(None, build_forge=lambda _context: after, today=lambda: TODAY))
 
     assert refused.value is answer
     assert (asked_again.written, asked_again.line.index, after.body_writes) == (False, 2, [])

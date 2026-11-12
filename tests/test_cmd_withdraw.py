@@ -8,6 +8,7 @@ from functools import partial
 from pathlib import Path
 
 import pytest
+from board_fixtures import searchless
 from cli_fixtures import FROZEN_CLI_NOW, run_cli, track_board_config
 from github_fixtures import FakeForge, serve_forge
 from option_cards import (
@@ -69,9 +70,7 @@ def frozen_today(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         session,
         "run_context",
-        lambda repo: session.RunContext(
-            repo, build_forge=session._build_forge, today=FROZEN_CLI_NOW.date
-        ),
+        lambda repo: searchless(repo, build_forge=session._build_forge, today=FROZEN_CLI_NOW.date),
     )
 
 

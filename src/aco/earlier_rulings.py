@@ -11,7 +11,7 @@ from . import expectations, forge, protocol
 
 LINE_LIMIT = 5
 QUERY_LIMIT = 256
-"""The forge's limit on the length of a query, in characters."""
+"""The whole query, qualifiers included, is held to the forge's 256-character limit."""
 _WORD = re.compile(r"[^\W_]+")
 
 

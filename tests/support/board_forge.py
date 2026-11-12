@@ -14,11 +14,11 @@ import os
 import threading
 import tomllib
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import NoReturn
 
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
 
@@ -405,49 +405,65 @@ def _forge_of(context: session.RunContext) -> forge.ForgeWriter:
 
 
 @dataclass(frozen=True)
+class _SearchState:
+    directories: tuple[str, ...] = ()
+    failure: str | None = None
+    incomplete: bool = False
+    queries: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SearchIndex:
     """The forge's search index, a file beside aco's config file: it finds every
     item, closed ones included, of the board forges a test `include`s, whatever
-    the query, and can be made to fail or to answer an incomplete result."""
+    the query, records the queries it receives, and can be made to fail or to
+    answer an incomplete result."""
 
     path: Path
 
     def include(self, *forges: BoardForge) -> None:
         state = self._state()
-        state["directories"] = [*state["directories"], *(str(each.directory) for each in forges)]
-        self._replace_state(state)
+        directories = (*state.directories, *(str(each.directory) for each in forges))
+        self._replace_state(replace(state, directories=directories))
 
     def fail(self, message: str) -> None:
         """Every later search raises a forge failure carrying `message`."""
-        state = self._state()
-        state["failure"] = message
-        self._replace_state(state)
+        self._replace_state(replace(self._state(), failure=message))
 
     def mark_incomplete(self) -> None:
         """Every later search answers an incomplete result."""
-        state = self._state()
-        state["incomplete"] = True
-        self._replace_state(state)
+        self._replace_state(replace(self._state(), incomplete=True))
+
+    def queries(self) -> tuple[str, ...]:
+        """Every query searched so far, in order."""
+        return self._state().queries
 
     def search(self, query: str) -> forge.RulingSearchResult:
         state = self._state()
-        if state["failure"] is not None:
-            raise forge.ForgeError(state["failure"])
+        self._replace_state(replace(state, queries=(*state.queries, query)))
+        if state.failure is not None:
+            raise forge.ForgeError(state.failure)
         items = tuple(
             item
-            for directory in state["directories"]
+            for directory in state.directories
             for item in BoardForge(Path(directory)).ruling_items()
         )
-        return forge.RulingSearchResult(items, complete=not state["incomplete"])
+        return forge.RulingSearchResult(items, complete=not state.incomplete)
 
-    def _state(self) -> dict[str, Any]:
+    def _state(self) -> _SearchState:
         if not self.path.exists():
-            return {"directories": [], "failure": None, "incomplete": False}
-        return json.loads(self.path.read_text(encoding="utf-8"))
+            return _SearchState()
+        stored = json.loads(self.path.read_text(encoding="utf-8"))
+        return _SearchState(
+            directories=tuple(stored["directories"]),
+            failure=stored["failure"],
+            incomplete=stored["incomplete"],
+            queries=tuple(stored["queries"]),
+        )
 
-    def _replace_state(self, state: dict[str, Any]) -> None:
+    def _replace_state(self, state: _SearchState) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(state), encoding="utf-8")
+        self.path.write_text(json.dumps(asdict(state)), encoding="utf-8")
 
 
 def search_index() -> SearchIndex:

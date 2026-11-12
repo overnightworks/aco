@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TextIO
 
 import pytest
-from board_fixtures import REPOSITORY, complete_contract, write_repository_config
+from board_fixtures import REPOSITORY, complete_contract, searchless, write_repository_config
 
 from aco import (
     board_read,
@@ -680,7 +680,7 @@ def run_context_over(client: forge.ForgeReader) -> RunContext:
     """A cwd-rooted `RunContext` whose forge is `client`: a test driving a
     helper that takes a context reads the same toplevel and tracked
     `board.toml` a command would, with its own fake forge behind them."""
-    return RunContext(None, build_forge=lambda _context: client)
+    return searchless(None, build_forge=lambda _context: client)
 
 
 @dataclass(frozen=True)

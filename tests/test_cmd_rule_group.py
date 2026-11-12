@@ -5,6 +5,7 @@ import json
 from datetime import date, timedelta
 
 import pytest
+from board_fixtures import searchless
 from cli_fixtures import FROZEN_CLI_NOW, CliRun, freeze_cli_now, run_cli
 from github_fixtures import FakeForge
 from option_cards import (
@@ -246,9 +247,7 @@ class TestSeveralLinesInOneWrite:
         monkeypatch.setattr(
             session,
             "run_context",
-            lambda repo: session.RunContext(
-                repo, build_forge=lambda _: client, today=stepping_today
-            ),
+            lambda repo: searchless(repo, build_forge=lambda _: client, today=stepping_today),
         )
         arguments = lines_of("option", (2, "A", HASH_2), (3, "B", HASH_3))
         result = run_cli(["rule", "7", *arguments, "--json"], capsys)
