@@ -461,3 +461,20 @@ def test_a_repo_lists_only_its_name_error_and_items(
         {"name", "error", "items"},
         [42],
     )
+
+
+def test_a_labelled_item_lists_its_decided_cards_and_one_without_a_card_is_not_listed(
+    repository: BoardForge, board: BoardClient, listed_items: Lister
+) -> None:
+    """The label for the operator hides no card; an item without a card is on no list."""
+    labels = [workboard.NEEDS_OPERATOR_LABEL]
+    decided = item_body(_ruled_yes_no("Decided before?", "yes"))
+    repository.put_item(8, decided, title="Labelled and decided", labels=labels)
+    repository.put_item(9, item_body(), title="Labelled, no card", labels=labels)
+
+    listed = listed_items(board)
+
+    assert listed == [
+        {"number": 8, "title": "Labelled and decided", "lines": rulings_lines(repository, 8)},
+    ]
+    assert len(listed[0]["lines"]) == 1
