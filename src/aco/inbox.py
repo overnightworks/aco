@@ -112,10 +112,15 @@ class Reading:
     plans: tuple[Plan, ...] = ()
 
 
-def read_issues(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> Reading:
-    """The rows and the steps among `issues`, which are listed once."""
+def read_issues(
+    issues: Iterable[workboard.Issue],
+    *,
+    storage: body.Storage,
+    plans: tuple[Plan, ...] = (),
+) -> Reading:
+    """The rows and the steps among `issues`, which are listed once, with `plans`."""
     listed = tuple(issues)
-    return Reading(rows(listed, storage=storage), steps(listed, storage=storage))
+    return Reading(rows(listed, storage=storage), steps(listed, storage=storage), plans)
 
 
 def read_context(context: session.RunContext) -> Reading:
@@ -123,8 +128,9 @@ def read_context(context: session.RunContext) -> Reading:
     from one listing of its open items."""
     listed = tuple(context.forge.list_open_board_issues())
     storage = context.config.storage
-    return replace(
-        read_issues(listed, storage=storage),
+    return read_issues(
+        listed,
+        storage=storage,
         plans=plans(listed, repository=context.forge.repository, storage=storage),
     )
 
