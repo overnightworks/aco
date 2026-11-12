@@ -1,8 +1,0 @@
-claim_id = "291249d1e3ea47dd81f913e185869500"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "56889c7e0fe5ecdfe440f7fce0b7033ca0f87ce9"
-branch = "claude/issue-809-the-board-s-head-and-list-read-at-a-glan"
-scope = ["frontend", "specs/serve.spec.md", "src/aco/board/static"]
-opened_commit = "fcb761aa676d2f995a3f730318c662352d4ce46a"
-whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
