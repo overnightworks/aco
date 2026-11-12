@@ -38,6 +38,7 @@ flowchart LR
     CLI --> Port["forge port<br/>forge.py"]
     Port --> GitHub["GitHub adapter<br/>github.py"]
     Port --> StateBoard["state-ref item store<br/>state_board.py"]
+    Mcp -->|"ask: earlier rulings"| Search["ruling search port<br/>forge.py, github_search.py"]
     Board["board (aco serve)<br/>board/, frontend/"]
     Mcp["aco mcp<br/>cmd_mcp.py, mcp_server.py"]
     Mcp --> Repos
@@ -84,6 +85,13 @@ flowchart LR
   `cmd_item` on `StateRefBoard` and `cmd_release` on both, so another forge
   needs its own contract for them before it can attach (the module docstring
   of `forge.py`).
+- The **ruling search** (`forge.RulingSearch`) is a port of its own, because it
+  spans owners where the reader is bound to one repository: one query in, every
+  page of the forge's hits and whether the result is complete out. Its GitHub
+  adapter (`github_search.py`) takes the command runner of `github.py`. The
+  `ask` tool of `aco mcp` builds the query and keeps the ruled lines from the
+  hits with the pure `earlier_rulings.py`; the search runs once the item's turn
+  has ended.
 
 ## Runtime View
 
@@ -146,6 +154,11 @@ non-member's: the card's hash binds the answer to what the agent read. Its
 `step` tool writes one item's `next` in that turn, refusing a closed item and a
 non-member's, or opens one item, and sets the label `needs-operator` through the
 forge port's `add_label`; it never removes the label (`specs/mcp.spec.md`).
+Its `ask` tool also reads, through the forge's search across the owners of the
+repositories discovery finds, the lines the operator ruled in the card's area,
+and keeps only those on items a member of a found repository wrote. It shows
+them and applies none; a line from a private repository can reach a head
+working in a public one, as the inbox already allows.
 
 `aco fleet-plans` reads that same listing for the open items of members labelled `fleet-plan`, across every repository discovery finds, and keeps no state of its own (`specs/fleet-plans.spec.md`).
 

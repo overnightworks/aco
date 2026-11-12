@@ -16,7 +16,7 @@ from typing import IO, Any, cast
 
 import board_forge
 import pytest
-from board_fixtures import board_issue, complete_contract
+from board_fixtures import board_issue, complete_contract, searchless
 from cli_fixtures import run_cli
 from discovery_fixtures import (
     configure_root,
@@ -275,7 +275,7 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
     monkeypatch.setattr(
         session,
         "run_context",
-        lambda repo: session.RunContext(
+        lambda repo: searchless(
             repo, build_forge=build_forge, today=lambda: board_forge.RULING_DAY
         ),
     )

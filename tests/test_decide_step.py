@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body, searchless
 from cli_fixtures import track_board_config
 from github_fixtures import FakeForge
 from option_cards import card, ruled_card
@@ -46,7 +46,7 @@ def _world(
     served.issue_references[NUMBER] = forge.ItemReference(
         state, "Titel", item_body, author_is_member=author_is_member
     )
-    context = RunContext(None, build_forge=lambda _context: served, today=lambda: date(2026, 11, 8))
+    context = searchless(None, build_forge=lambda _context: served, today=lambda: date(2026, 11, 8))
     return context, served
 
 

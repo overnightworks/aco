@@ -11,6 +11,7 @@ from typing import TextIO
 from . import (
     body,
     decide,
+    earlier_rulings,
     expectation_grammar,
     expectations,
     inbox,
@@ -32,29 +33,57 @@ def read_inbox() -> dict[str, object]:
     return inbox.inbox_json(inbox.read(inbox.discovered(), inbox.read_repository))
 
 
-def _context_of(label: str) -> RunContext:
-    """The run context of the discovered repository `label`; refused when no
-    repository found has that label."""
-    found = {repository.label: repository for repository in inbox.discovered().repositories}
+def _context_in(discovery: repositories.Discovery, label: str) -> RunContext:
+    """The run context of the repository `label` of `discovery`; refused when
+    it has none of that label."""
+    found = {repository.label: repository for repository in discovery.repositories}
     if label not in found:
         raise protocol.ClaimError(f"no repository {label} found; read_inbox lists them")
     return session.run_context(None).for_directory(found[label].directory)
 
 
+def _context_of(label: str) -> RunContext:
+    """The run context of the discovered repository `label`; refused when no
+    repository found has that label."""
+    return _context_in(inbox.discovered(), label)
+
+
+def _earlier(
+    context: RunContext, asked: earlier_rulings.LineKey, area: str, tracked: tuple[str, ...]
+) -> dict[str, object]:
+    """The earlier rulings of `area` in the `tracked` repositories, `asked` left
+    out, as the keys `ask` answers; when the search cannot answer completely,
+    `earlier_unavailable` and one sentence naming why."""
+    try:
+        query = earlier_rulings.search_query(area, earlier_rulings.owners_of(tracked))
+        found = earlier_rulings.recall(
+            context.ruling_search.search(query), area=area, tracked=tracked, asked=asked
+        )
+    except (protocol.ClaimError, OSError) as error:
+        reason = " ".join(str(error).split())
+        return {"earlier_unavailable": f"the earlier rulings could not be searched: {reason}"}
+    return earlier_rulings.earlier_json(found)
+
+
 def ask(label: str, number: int, card: Mapping[str, object]) -> dict[str, object]:
     """Puts `card` on item `number` of the discovered repository `label` in the
-    item's turn, and answers its line as `aco rulings --json` gives it; refused
-    when no repository found has that label."""
-    context = _context_of(label)
+    item's turn, and answers its line as `aco rulings --json` gives it and, once
+    the turn has ended, the earlier rulings of the card's area in every
+    repository found; refused when no repository found has that label."""
+    discovery = inbox.discovered()
+    context = _context_in(discovery, label)
     with decide.turn(
         context, number, command="ask", environment=os.environ, home=Path.home()
     ) as fresh:
         asked = decide.ask(context, fresh, card)
+    tracked = tuple(repository.label for repository in discovery.repositories)
+    key = earlier_rulings.LineKey(label, number, asked.line.index)
     return {
         "repository": label,
         "item": number,
         "written": asked.written,
         "line": rulings.line_json(asked.line),
+        **_earlier(context, key, asked.line.area, tracked),
     }
 
 

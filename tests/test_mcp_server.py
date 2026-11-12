@@ -134,6 +134,13 @@ def test_tools_list_offers_ask_as_a_repeatable_write_that_destroys_nothing() -> 
     assert tool["description"]
 
 
+def test_the_ask_description_tells_a_head_about_the_earlier_rulings_it_answers() -> None:
+    description = _tools()["ask"]["description"]
+
+    for key in ("earlier", "earlier_more", "earlier_unavailable"):
+        assert key in description
+
+
 def test_tools_list_offers_record_answer_as_a_repeatable_write_that_replaces_a_note() -> None:
     tool = _tools()["record_answer"]
 

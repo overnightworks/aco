@@ -2,7 +2,9 @@
 
 `ForgeReader`/`ForgeWriter` are the contract that `github.GitHubForge` and
 `state_board.StateRefBoard` both implement. An adapter that cannot perform an
-operation raises `ForgeUnsupportedError`. `cmd_land` depends on `GitHubForge`
+operation raises `ForgeUnsupportedError`. `RulingSearch` is a port apart from
+them: it searches ruling items across the owners a query names, where they are
+bound to one repository. `cmd_land` depends on `GitHubForge`
 directly, `cmd_item` on `StateRefBoard`, and `cmd_release` on both, so a
 further forge needs its own contract for them first.
 """
@@ -240,6 +242,38 @@ class ClosedIssue:
 
     number: int
     title: str
+
+
+@dataclass(frozen=True)
+class RulingItem:
+    """One issue, open or closed, that a search for rulings found, with the
+    body as the forge's index holds it; `repository` is `OWNER/REPO`."""
+
+    repository: str
+    number: int
+    title: str
+    body: str
+    author_is_member: bool
+
+
+@dataclass(frozen=True)
+class RulingSearchResult:
+    """What a search for rulings found. `complete` is False when the forge
+    marked the result incomplete or holds more hits than it hands out; `items`
+    then holds only what was read."""
+
+    items: tuple[RulingItem, ...]
+    complete: bool
+
+
+class RulingSearch(Protocol):
+    """A search for ruling items across the owners a query names, apart from
+    `ForgeReader`, which is bound to one repository."""
+
+    def search(self, query: str) -> RulingSearchResult:
+        """Every page of the forge's answer to `query`. Raises `ForgeError`
+        when the forge cannot answer."""
+        ...
 
 
 @dataclass(frozen=True)

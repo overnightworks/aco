@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from board_fixtures import write_repository_config
+from board_fixtures import searchless, write_repository_config
 from cli_fixtures import (
     fetched_once_then_read,
     init_bare_repository,
@@ -45,7 +45,7 @@ def _forge_never_built(_context: RunContext) -> forge.ForgeReader:
 
 
 def _context() -> RunContext:
-    return RunContext(None, build_forge=_forge_never_built)
+    return searchless(None, build_forge=_forge_never_built)
 
 
 def _checkout_configuring(tmp_path: Path, remote: str, board_config: str) -> Path:
@@ -206,7 +206,7 @@ def test_repository_id_is_discovered_from_the_canonical_remotes_url(
     never read."""
     repository = _hub_canonical_repository(tmp_path, origin_url=origin_url)
 
-    context = RunContext(None, build_forge=_forge_never_built, directory=repository)
+    context = searchless(None, build_forge=_forge_never_built, directory=repository)
 
     assert context.repository_id == forge.RepositoryId(github.GITHUB_HOST, ("owner",), "repo")
 
@@ -218,7 +218,7 @@ def test_repository_id_refuses_a_repo_naming_the_fork_beside_the_canonical_remot
     while `hub` is canonical, refuses loudly rather than reading the fork."""
     repository = _hub_canonical_repository(tmp_path, origin_url="git@github.com:fork/repo.git")
     fork = forge.RepositoryId(github.GITHUB_HOST, ("fork",), "repo")
-    context = RunContext(fork, build_forge=_forge_never_built, directory=repository)
+    context = searchless(fork, build_forge=_forge_never_built, directory=repository)
 
     with pytest.raises(ClaimUnavailableError, match="does not match canonical remote owner/repo"):
         _ = context.repository_id
@@ -712,7 +712,7 @@ def test_the_width_gate_refuses_when_the_first_toplevel_read_never_answered(
         return real_run_git(arguments, directory=directory, **options)
 
     monkeypatch.setattr(process, "run_git", failing_first_toplevel_read)
-    context = RunContext(None, build_forge=_forge_never_built, directory=repository)
+    context = searchless(None, build_forge=_forge_never_built, directory=repository)
 
     with pytest.raises(ClaimError) as refusal:
         cmd_claim.scope_versioning(("scratch",), None, context=context)
