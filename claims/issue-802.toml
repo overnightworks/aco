@@ -1,0 +1,8 @@
+claim_id = "7be495aa3451475ba00c32ad003c68f0"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "d95c8e0bd136bcfef5c4bdf80a8b5e67b5206d79"
+branch = "claude/issue-802-a-head-that-writes-a-card-sees-the-earli"
+scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/mcp.spec.md", "src/aco/cmd_mcp.py", "src/aco/earlier_rulings.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_search.py", "src/aco/mcp_server.py", "src/aco/session.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/test_cmd_mcp.py", "tests/test_earlier_rulings.py", "tests/test_github_search.py", "tests/test_mcp_server.py"]
+opened_commit = "3714610757b5c9ad8f0abb84874232e95551fb1b"
+whole_reason = "One recall in the ask answer with its forge search, spec, fakes and tests; no part of it is useful alone."
