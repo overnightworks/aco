@@ -231,3 +231,12 @@ def test_a_state_ref_plan_carries_no_link(root: Path, capsys: pytest.CaptureFixt
     plans = answer["plans"]
     assert isinstance(plans, list)
     assert plans[0]["url"] is None
+
+
+def test_help_names_the_mark_the_command_reads(capsys: pytest.CaptureFixture[str]) -> None:
+    command = ["fleet-plans", "--help"]
+
+    run = run_cli(command, capsys)
+
+    assert run.status == 0
+    assert _MARK in run.stdout

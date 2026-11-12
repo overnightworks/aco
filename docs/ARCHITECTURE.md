@@ -42,6 +42,9 @@ flowchart LR
     Mcp["aco mcp<br/>cmd_mcp.py, mcp_server.py"]
     Mcp --> Repos
     Mcp --> Inbox
+    Plans["aco fleet-plans<br/>cmd_fleet_plans.py"]
+    Plans --> Repos
+    Plans --> Inbox
     Mcp -->|"ask, record_answer, step: one write per call"| Dec
     Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
@@ -143,6 +146,8 @@ non-member's: the card's hash binds the answer to what the agent read. Its
 `step` tool writes one item's `next` in that turn, refusing a closed item and a
 non-member's, or opens one item, and sets the label `needs-operator` through the
 forge port's `add_label`; it never removes the label (`specs/mcp.spec.md`).
+
+`aco fleet-plans` reads that same listing for the open items of members labelled `fleet-plan`, across every repository discovery finds, and keeps no state of its own (`specs/fleet-plans.spec.md`).
 
 ### The per-item turn
 

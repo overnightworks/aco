@@ -81,7 +81,6 @@ OUT_OF_ORDER_HELP = (
     "an open blocker remains; the reason is never stored, only downgrading the check"
 )
 
-
 LANE_ISSUE_HELP = "omit for lane mode, derived from a docs/ or fix/ checkout branch"
 LANE_LOOKUP_HELP = "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim"
 LANE_RELEASE_HELP = (
@@ -149,18 +148,6 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
     board = commands.add_parser(name, help="project the open work board, read-only")
     report.add_json_flag(board, "JSON only")
-
-
-def _add_fleet_plans_parser(commands: usage.Subcommands, name: str) -> None:
-    cmd_fleet_plans.add_arguments(
-        commands.add_parser(
-            name,
-            help=(
-                f"list the open items labelled {workboard.FLEET_PLAN_LABEL} of every repository "
-                "on this machine, read-only"
-            ),
-        )
-    )
 
 
 def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:
@@ -620,7 +607,6 @@ BODY_TEMPLATE_KINDS = ("task", "feature", "container")
 ITEM_EDIT_KINDS = (body.ItemKind.TASK.value, body.ItemKind.CONTAINER.value)
 DEFAULT_BODY_TEMPLATE_KIND = "task"
 
-
 STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + workboard.NAMES_NO_ITEM
 
 
@@ -663,7 +649,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "serve": _RepositoryCommand(cmd_serve.add_parser, cmd_serve.run),
     "mcp": _RepositoryCommand(cmd_mcp.add_parser, cmd_mcp.run),
     "rulings": _RepositoryCommand(_add_rulings_parser, cmd_rulings.run),
-    "fleet-plans": _RepositoryCommand(_add_fleet_plans_parser, cmd_fleet_plans.run),
+    "fleet-plans": _RepositoryCommand(cmd_fleet_plans.add_parser, cmd_fleet_plans.run),
     "next": _RepositoryCommand(_add_next_parser, cmd_next.run),
     "start": _RepositoryCommand(_add_start_parser, cmd_start.run),
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),

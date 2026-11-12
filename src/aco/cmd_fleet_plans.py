@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from . import inbox, protocol, report, repositories
+from . import inbox, protocol, report, repositories, usage, workboard
 from .session import RunContext
 
 _GLOBAL_REPO_MESSAGE = "aco fleet-plans finds its repositories itself; --repo does not apply to it"
@@ -68,8 +68,16 @@ def _unavailable_text(entry: inbox.Unavailable) -> str:
     return f"unavailable {entry.repository}: {protocol.terminal_text(entry.reason)}"
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
-    report.add_json_flag(parser)
+def add_parser(commands: usage.Subcommands, name: str) -> None:
+    report.add_json_flag(
+        commands.add_parser(
+            name,
+            help=(
+                f"list the open items labelled {workboard.FLEET_PLAN_LABEL} of every repository "
+                "on this machine, read-only"
+            ),
+        )
+    )
 
 
 def _no_repository_read(read: inbox.Inbox) -> str:
