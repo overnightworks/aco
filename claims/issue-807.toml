@@ -1,8 +1,0 @@
-claim_id = "f8755fb6a14b49fb967bd4e4e693e1b5"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "4080bf15798fe72f22a6f29709448eb634dc07a1"
-branch = "claude/issue-807-the-board-follows-the-device-into-dark"
-scope = ["frontend", "src/aco/board/static"]
-opened_commit = "6dc2de456cf228fc883bfaff2c4c7302e8a65e91"
-whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
