@@ -113,7 +113,7 @@
 		color: inherit;
 	}
 	dialog::backdrop {
-		background: rgba(10, 8, 14, 0.45);
+		background: var(--scrim);
 	}
 	.big {
 		max-height: 70vh;

@@ -288,8 +288,29 @@
 		--good: #1c7350;
 		--good-soft: #e4f2ea;
 		--warn: #99570c;
+		--scrim: rgba(10, 8, 14, 0.45);
+		--shade: rgba(0, 0, 0, 0.28);
 		--frame-width: 880px;
-		color-scheme: light;
+		color-scheme: light dark;
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root) {
+			--bg: #0d0d0d;
+			--surface: #161618;
+			--surface-2: #212125;
+			--line: #2b2b30;
+			--line-strong: #4a4a52;
+			--fg: #e8e8ea;
+			--fg-2: #babac0;
+			--fg-3: #8e8e96;
+			--accent: #e892c4;
+			--accent-fg: #1c0b15;
+			--good: #5cc05c;
+			--good-soft: #17301a;
+			--warn: #f0a030;
+			--scrim: rgba(0, 0, 0, 0.65);
+			--shade: rgba(0, 0, 0, 0.6);
+		}
 	}
 	:global(body) {
 		margin: 0;
@@ -437,15 +458,15 @@
 		max-width: 100%;
 		min-height: 100px;
 		padding: 12px;
-		border: 1px solid #c9c4d4;
+		border: 1px solid var(--line-strong);
 		border-radius: 12px;
 		resize: vertical;
 	}
 	.question-pane :global(button) {
 		padding: 10px 18px;
-		border: 1px solid #c9c4d4;
+		border: 1px solid var(--line-strong);
 		border-radius: 12px;
-		background: white;
+		background: var(--surface);
 	}
 	.question-pane :global(button:disabled:not(.chosen)) {
 		opacity: 0.55;
@@ -453,9 +474,9 @@
 	}
 	.question-pane :global(.banner) {
 		padding: 16px;
-		border: 1px dashed #c9c4d4;
+		border: 1px dashed var(--line-strong);
 		border-radius: 12px;
-		background: #eceaf1;
+		background: var(--surface-2);
 	}
 	.top > :global(.refresh) {
 		flex-shrink: 0;

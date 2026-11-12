@@ -221,7 +221,7 @@
 		background: var(--surface);
 	}
 	.decide-row.stuck {
-		box-shadow: 0 -12px 14px -14px rgba(0, 0, 0, 0.28);
+		box-shadow: 0 -12px 14px -14px var(--shade);
 	}
 	dt {
 		font-size: 11px;
@@ -296,7 +296,7 @@
 		color: var(--fg);
 	}
 	dialog::backdrop {
-		background: rgba(10, 8, 14, 0.45);
+		background: var(--scrim);
 	}
 	dialog h2 {
 		margin: 0 0 8px;
