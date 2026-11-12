@@ -19,6 +19,7 @@ from . import (
     cmd_check,
     cmd_claim,
     cmd_cut,
+    cmd_fleet_plans,
     cmd_item,
     cmd_land,
     cmd_mcp,
@@ -79,7 +80,6 @@ OUT_OF_ORDER_HELP = (
     "refuses a claim without a reason when a higher-priority actionable item is free or "
     "an open blocker remains; the reason is never stored, only downgrading the check"
 )
-
 
 LANE_ISSUE_HELP = "omit for lane mode, derived from a docs/ or fix/ checkout branch"
 LANE_LOOKUP_HELP = "omit for lane mode: a docs/ or fix/ branch, or one holding a live lane claim"
@@ -607,7 +607,6 @@ BODY_TEMPLATE_KINDS = ("task", "feature", "container")
 ITEM_EDIT_KINDS = (body.ItemKind.TASK.value, body.ItemKind.CONTAINER.value)
 DEFAULT_BODY_TEMPLATE_KIND = "task"
 
-
 STATE_REF_ITEM_PAST_THE_ID_SPACE = "{number} " + workboard.NAMES_NO_ITEM
 
 
@@ -650,6 +649,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "serve": _RepositoryCommand(cmd_serve.add_parser, cmd_serve.run),
     "mcp": _RepositoryCommand(cmd_mcp.add_parser, cmd_mcp.run),
     "rulings": _RepositoryCommand(_add_rulings_parser, cmd_rulings.run),
+    "fleet-plans": _RepositoryCommand(cmd_fleet_plans.add_parser, cmd_fleet_plans.run),
     "next": _RepositoryCommand(_add_next_parser, cmd_next.run),
     "start": _RepositoryCommand(_add_start_parser, cmd_start.run),
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),
