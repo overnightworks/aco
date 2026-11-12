@@ -78,7 +78,6 @@ function shownRepos(answered: RepoReading[], current: ShownRepo[], arrived: Date
 		return {
 			...reading,
 			items: kept?.items ?? [],
-			steps: kept?.steps ?? [],
 			readAt: kept?.readAt ?? null
 		};
 	});

@@ -2,8 +2,8 @@
 
 `aco serve` shows the open expectation lines of every repository under the
 configured root in a browser SPA and writes each decision in process, through
-aco's own library: it lists the rows `aco rulings` lists, and beside them the steps only the operator can
-take, read-only, and writes through the writer `aco rule` uses; it takes no `--repo`.
+aco's own library: it lists the rows `aco rulings` lists and writes through the
+writer `aco rule` uses; it takes no `--repo`.
 This file owns the board's decision rules: which answers it writes,
 when it refuses a decision, how writes are ordered and stopped, and the note
 it may carry -- across every repository found, since one write turn and
@@ -114,7 +114,8 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-106] A card's meta ends in `Asked DD.MM.YYYY` when its line carries `asked_on`, a card of points its newest point's day; its row shows that day as `DD.MM.`, a Decided row its decision day.
 - [ ] [ABRD-107] On the Open and Decided tabs groups stand by their first row: open before with head, then the newest day, then the higher item; a failed repository with kept cards too, one without cards last.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
-- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n`, `Steps n`, `Decided n` and Refresh (ABRD-104); n counts the open rows, the steps shown and the ruled lines.
+- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n`, `Decided n` and Refresh (ABRD-104); n counts the open rows and the ruled lines.
+- [ ] [ABRD-123] The board opens on Open at every width; a reload returns to Open, as Decided is not kept across a reload.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
 - [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.
 - [ ] [ABRD-64] A card post's `other` (ABRD-78) is the trimmed answer within ABRD-05, written once for every posted line with `via board` (E-ABRD-13).
@@ -150,13 +151,13 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
 `frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`,
-`frontend/e2e/refresh.spec.ts`, `frontend/e2e/steps.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
-`frontend/src/app/model/boardSummary.test.ts`, and the steps section by `frontend/src/components/StepsList.test.ts`.
+`frontend/e2e/refresh.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
+`frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
 
 - [ ] [ABRD-14] `aco serve` serves each checkout under the config file's `root` tracking `.aco/board.toml`, labelled `owner/repo`, one per forge repository (first sorted path); it takes no `--repo`.
-- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence, no items or steps (E-ABRD-06); the page shows it per ABRD-101.
+- [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence and no items (E-ABRD-06); the page shows it per ABRD-101.
 - [ ] [ABRD-16] A decision naming a `repo` that the scan made for that decision does not find is refused `bad request: decision` before any forge request (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running write in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
@@ -169,7 +170,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 ## The JSON API
 
-- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items", "steps"}]}`; `items`: RUL-03's rows (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06); `steps`: ABRD-114.
+- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items"}]}`; `items`: RUL-03's rows (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06).
 - [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"`, the written item as ABRD-08 lists it, once stored; else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
@@ -186,22 +187,11 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
 - [ ] [ABRD-60] A withdrawn line (BODY-104) is not listed: no list shows it, its repo stays readable, the item's other lines keep their `index`, and an item of only such lines is not listed.
+- [ ] [ABRD-122] A decision that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44), so a session waiting with `aco wait` learns it.
+- ABRD-114, ABRD-115, ABRD-116, ABRD-117, ABRD-118, ABRD-119, ABRD-120, ABRD-121 (retired).
 
 Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 `fingerprint` last, a yes/no line has none; pictures are SVG text as stored.
-
-## Steps
-
-- [ ] [ABRD-114] Each repo lists `steps`: `{"number", "title", "step"}` per member-written open item labelled `needs-operator`, by descending number, from the one listing of ABRD-06 (E-ABRD-20).
-- [ ] [ABRD-115] A step's `step` is the `next` of its item's block, `null` when the body has no readable block (E-ABRD-20).
-- [ ] [ABRD-116] A repo whose read failed lists `"steps": []` beside `"items": []` (E-ABRD-20).
-- [ ] [ABRD-117] Open shows no step; the Steps view shows the steps alone, as a region headed `Steps`. A step is no question row and no part of the Open or Decided count.
-- [ ] [ABRD-118] A step row shows its repo, `#<number>`, its title and its step in full, wrapping and never cut off; a `null` step reads `This item names no step.`
-- [ ] [ABRD-119] A step row holds no control and takes no focus, and the region sends no request; its text is shown as text, never as markup.
-- [ ] [ABRD-120] With no row the heading stays and reads `No step waits for you.`, or `No step in the projects read.` while any repo could not be read.
-- [ ] [ABRD-121] A repo not read keeps its last steps, shown under `Not read` with its `last read` time, so an older step is never shown as current.
-- [ ] [ABRD-122] A decision that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44), so a session waiting with `aco wait` learns it.
-- [ ] [ABRD-123] The board opens on Open at every width; a reload returns to Open, as Steps and Decided are not kept across a reload.
 
 ## The SPA shell
 
@@ -252,7 +242,7 @@ request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing
 answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"},
-  {"index": 2, "text": "Hosts?", "ruling": "no", "ruled_on": "2026-10-01"}]}], "steps": []}]}
+  {"index": 2, "text": "Hosts?", "ruling": "no", "ruled_on": "2026-10-01"}]}]}]}
 ```
 
 ### E-ABRD-04 -- a post naming an outcome is refused
@@ -285,11 +275,11 @@ request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing in owner/a, the open-item listing in owner/b
 answer 200: {"root": "<root>", "repos": [
   {"name": "owner/a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
-    {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}], "steps": []},
-  {"name": "owner/b", "error": "no forge adapter for host", "items": [], "steps": []}]}
+    {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}]},
+  {"name": "owner/b", "error": "no forge adapter for host", "items": []}]}
 ```
 
-Had `owner/b`'s test-forge listed only an item whose block aco's grammar refuses instead, its entry would read `{"name": "owner/b", "error": null, "items": [], "steps": []}` (ABRD-07).
+Had `owner/b`'s test-forge listed only an item whose block aco's grammar refuses instead, its entry would read `{"name": "owner/b", "error": null, "items": []}` (ABRD-07).
 
 Had `owner/a`'s test-forge failed too, the answer would be 502 with the same two-entry `repos[]` envelope (ABRD-20).
 
@@ -378,7 +368,7 @@ answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "item
      "undo_how": "Nothing is built.", "contract": "The link stays a link."}],
    "fingerprint": "<hex>"}]},
   {"number": 42, "title": "Share page", "lines": [
-  {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}], "steps": []}]}
+  {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}]}]}
 ```
 
 ### E-ABRD-12 -- deciding an option line
@@ -474,22 +464,6 @@ Setup: the root holds a checkout of `owner/a` listing item `#42`, and `<root>/br
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
 answer 200: {"root": "<root>", "repos": [
-  {"name": "owner/a", "error": null, "items": [{"number": 42, ...}], "steps": []},
-  {"name": "<root>/broken", "error": "<git's refusal>", "items": [], "steps": []}]}
+  {"name": "owner/a", "error": null, "items": [{"number": 42, ...}]},
+  {"name": "<root>/broken", "error": "<git's refusal>", "items": []}]}
 ```
-
-### E-ABRD-20 -- steps beside a repo that is down
-
-Setup: the root holds checkouts of `owner/a` and `owner/b`; repo `owner/a`'s test-forge lists item `#9` `Rotate the key`, written by a member, labelled `needs-operator`, whose block's `next` is `Rotate the key.`, and item `#3` `Pay the invoice`, so labelled, whose body holds no block; repo `owner/b`'s test-forge fails its listing with `no forge adapter for host`
-
-```text
-request: GET /api/board, header X-Board-Token: <board token>
-forge requests: the open-item listing in owner/a, the open-item listing in owner/b
-answer 200: {"root": "<root>", "repos": [
-  {"name": "owner/a", "error": null, "items": [], "steps": [
-    {"number": 9, "title": "Rotate the key", "step": "Rotate the key."},
-    {"number": 3, "title": "Pay the invoice", "step": null}]},
-  {"name": "owner/b", "error": "no forge adapter for host", "items": [], "steps": []}]}
-```
-
-Had the page last read `owner/b` with a step, it would list that step under `Not read` and `last read <time>` (ABRD-121).

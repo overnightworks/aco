@@ -1,13 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 import App from './App.svelte';
-import { STEPS_LABEL, NOT_READ_LABEL } from './app/model/boardSummary';
+import { NOT_READ_LABEL } from './app/model/boardSummary';
 import { item, line, optionLine, repo } from './test-support/board';
-
-/** A question row's name ends with its day, `DD.MM.`; no other button in the open view does. */
-const QUESTION_ROW_NAME = /\d{2}\.\d{2}\.$/;
-
-const rotate = { number: 9, title: 'Rotate the key', step: 'Rotate it.' };
 
 function fakeFetch(status: number, body: unknown) {
 	return vi.fn(async () => ({
@@ -27,7 +22,7 @@ test('the shell names the board in its heading, whatever the state', () => {
 	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Entscheidungs-Board');
 });
 
-test('[ABRD-51] a ready board offers the Open, Steps and Decided tabs in that order with their counts, the current one marked', async () => {
+test('[ABRD-51] a ready board offers the Open and Decided tabs in that order with their counts, the current one marked', async () => {
 	const repos = [
 		repo({
 			items: [
@@ -39,8 +34,7 @@ test('[ABRD-51] a ready board offers the Open, Steps and Decided tabs in that or
 					]
 				}),
 				item({ number: 43, lines: [optionLine({ topic: 'Zweiter' })] })
-			],
-			steps: [rotate]
+			]
 		})
 	];
 	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
@@ -48,41 +42,20 @@ test('[ABRD-51] a ready board offers the Open, Steps and Decided tabs in that or
 	render(App, { token: 'a-token' });
 	const views = await screen.findByRole('navigation', { name: 'Views' });
 	const open = within(views).getByRole('button', { name: 'Open 2' });
-	const steps = within(views).getByRole('button', { name: 'Steps 1' });
 	const decided = within(views).getByRole('button', { name: 'Decided 1' });
 
 	expect(
 		within(views)
 			.getAllByRole('button')
 			.map((tab) => tab.textContent)
-	).toEqual(['Open 2', 'Steps 1', 'Decided 1']);
+	).toEqual(['Open 2', 'Decided 1']);
 	expect(open).toHaveAttribute('aria-current', 'page');
-	expect(steps).not.toHaveAttribute('aria-current');
 	expect(decided).not.toHaveAttribute('aria-current');
 
 	await fireEvent.click(decided);
 
 	expect(decided).toHaveAttribute('aria-current', 'page');
 	expect(open).not.toHaveAttribute('aria-current');
-});
-
-test('[ABRD-117] the Steps tab shows its steps and no question row; the Open view shows no step', async () => {
-	const repos = [repo({ items: [item({ number: 42, lines: [optionLine()] })], steps: [rotate] })];
-	vi.stubGlobal('fetch', fakeFetch(200, { repos }));
-
-	render(App, { token: 'a-token' });
-	const views = await screen.findByRole('navigation', { name: 'Views' });
-	expect(screen.getAllByRole('button', { name: QUESTION_ROW_NAME })).toHaveLength(1);
-	expect(screen.queryByText('Rotate the key')).toBeNull();
-
-	await fireEvent.click(within(views).getByRole('button', { name: 'Steps 1' }));
-
-	expect(within(views).getByRole('button', { name: 'Steps 1' })).toHaveAttribute(
-		'aria-current',
-		'page'
-	);
-	expect(screen.getByRole('region', { name: STEPS_LABEL })).toHaveTextContent('Rotate the key');
-	expect(screen.queryAllByRole('button', { name: QUESTION_ROW_NAME })).toHaveLength(0);
 });
 
 test('without a token in this tab, the shell shows access is missing and makes no request', () => {

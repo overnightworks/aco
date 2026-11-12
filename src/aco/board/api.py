@@ -1,6 +1,6 @@
 """The board's JSON wire form, free of any socket.
 
-Turns each repo's rows and steps into the answer of `GET /api/board`, a request
+Turns each repo's rows into the answer of `GET /api/board`, a request
 body into a `CardRequest` for a whole option card, and a decision's result or a
 refusal into its JSON answer. Every line is `aco rulings --json`'s own
 rendering of it; this module only adds an option line's fingerprint and
@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .. import expectation_grammar, expectations, inbox, rulings
+from .. import expectation_grammar, expectations, rulings
 from .board import BoardReading, RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
@@ -50,19 +50,18 @@ _KEYS_OF_ONE_LINE = ("line", "fingerprint", "option", "outcome")
 
 def board_json(reading: BoardReading) -> str:
     """The root the repos were looked for under, and every repo found with its
-    items, its steps or its error."""
+    items or its error."""
     return json.dumps({"root": reading.root, "repos": [_repo_json(repo) for repo in reading.repos]})
 
 
 def _repo_json(reading: RepoReading) -> dict[str, object]:
     if isinstance(reading, RepoUnavailable):
-        return {"name": reading.name, "error": reading.reason, "items": [], "steps": []}
+        return {"name": reading.name, "error": reading.reason, "items": []}
     items = (_item_json(row, reading.name) for row in reading.rows)
     return {
         "name": reading.name,
         "error": None,
         "items": [item for item in items if item is not None],
-        "steps": [inbox.step_json(step) for step in reading.steps],
     }
 
 

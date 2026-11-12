@@ -1,8 +1,7 @@
 """`DecisionPort` over aco's own library, in process.
 
 A read lists the members' open items once through `inbox.read_context`: the rows
-`aco rulings` prints on the items a member wrote, and the steps only the operator
-can take. A decision reads its one item inside
+`aco rulings` prints on the items a member wrote. A decision reads its one item inside
 `decide.turn` (the item's lock, then the fresh read), runs the board's check on
 aco's own lines of that read, and writes the whole card through `decide.rule`, the
 writer `aco rule` uses. Every read and every write builds its own context bound

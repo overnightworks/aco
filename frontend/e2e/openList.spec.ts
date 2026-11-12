@@ -66,7 +66,7 @@ async function serveThreeRepositories(page: Page): Promise<void> {
 				repos: [
 					{ ...source, name: 'songmaker' },
 					{ ...source, name: 'quality', items: longTopicItems },
-					{ ...source, name: 'webauth', items: [], steps: [] }
+					{ ...source, name: 'webauth', items: [] }
 				]
 			}
 		});
@@ -208,8 +208,8 @@ for (const viewport of [
 				route.fulfill({
 					json: {
 						repos: [
-							{ name: 'quiet', error: null, items: [], steps: [] },
-							{ name: 'broken', error: sentence, items: [], steps: [] }
+							{ name: 'quiet', error: null, items: [] },
+							{ name: 'broken', error: sentence, items: [] }
 						]
 					}
 				})
