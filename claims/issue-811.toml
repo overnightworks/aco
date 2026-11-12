@@ -1,0 +1,8 @@
+claim_id = "671f6f4564c64b998da8e8874e0d252b"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "f846bb9b4e1139721865d5785b187a3541a09ab1"
+branch = "claude/issue-811-the-decision-card-and-its-answer"
+scope = ["frontend", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "b7d917842467a36fd39bd8267e59a6f3a2bd1320"
+whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
