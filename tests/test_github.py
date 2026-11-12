@@ -27,14 +27,16 @@ from aco.protocol import ClaimError
 GitHubForge = github.GitHubForge
 
 
-def test_only_the_github_adapter_speaks_gh_argv() -> None:
+def test_only_the_github_adapters_speak_gh_argv() -> None:
     """Source check, not a runtime guarantee: import-linter's module contract
-    cannot see an argv string, so "only the adapter speaks `gh`" is proven by
+    cannot see an argv string, so "only the adapters speak `gh`" is proven by
     grepping every other module for the literal command name instead. Every
     module in the package is enumerated, not a fixed list, so a new module
     is covered the day it is added."""
     package = Path(__file__).parent.parent / "src" / "aco"
-    other_modules = sorted(p for p in package.glob("*.py") if p.name != "github.py")
+    other_modules = sorted(
+        p for p in package.glob("*.py") if p.name not in {"github.py", "github_search.py"}
+    )
     assert len(other_modules) >= 7
     for module in other_modules:
         assert '"gh"' not in module.read_text(), f"{module.name} must not construct a gh argv"
@@ -1463,7 +1465,7 @@ def test_recent_merged_pull_requests_refuses_a_window_that_ends_before_it_starts
 
 def test_github_adapter_runs_gh_when_no_fake_run_is_given(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every other adapter test injects `run=` to avoid a real subprocess;
-    this proves the adapter's own default (`_gh`, via `_bounded_command`)
+    this proves the adapter's own default (`_gh`, via `bounded_command`)
     actually builds a `gh` command and runs it through the real bounded-I/O
     machinery -- substituting the child process itself so the test needs no
     real `gh` executable."""
@@ -1655,7 +1657,7 @@ def test_github_board_dependency_fails_loud_on_an_uncalendared_closed_timestamp(
 
 
 def test_bounded_command_sets_github_quiet_environment() -> None:
-    observed = github._bounded_command(
+    observed = github.bounded_command(
         [
             sys.executable,
             "-c",
@@ -1917,14 +1919,14 @@ def test_bounded_command_stops_before_unbounded_output(
     monkeypatch.setattr(process, "MAX_COMMAND_OUTPUT_BYTES", 32)
 
     with pytest.raises(ClaimError, match="output limit"):
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "print('x' * 1000)"],
             purpose="test command",
         )
 
 
 def test_bounded_command_disables_github_update_notifications() -> None:
-    observed = github._bounded_command(
+    observed = github.bounded_command(
         [
             sys.executable,
             "-c",
@@ -1937,7 +1939,7 @@ def test_bounded_command_disables_github_update_notifications() -> None:
 
 
 def test_bounded_command_streams_stdin_without_putting_it_in_argv() -> None:
-    observed = github._bounded_command(
+    observed = github.bounded_command(
         [sys.executable, "-c", "import sys; print(sys.stdin.buffer.read().decode())"],
         purpose="stdin probe",
         input_data=b"bounded body",
@@ -1955,7 +1957,7 @@ def test_bounded_command_wraps_process_argument_errors(
     monkeypatch.setattr(subprocess, "Popen", cannot_start)
 
     with pytest.raises(ClaimError, match="cannot start test command"):
-        github._bounded_command(["gh", "issue"], purpose="test command")
+        github.bounded_command(["gh", "issue"], purpose="test command")
 
 
 def test_bounded_command_wraps_stdin_write_errors(
@@ -1967,7 +1969,7 @@ def test_bounded_command_wraps_stdin_write_errors(
     monkeypatch.setattr(github.os, "write", cannot_write)
 
     with pytest.raises(ClaimError, match="failed while sending bounded input"):
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "import sys; sys.stdin.buffer.read()"],
             purpose="stdin write probe",
             input_data=b"body",
@@ -2003,7 +2005,7 @@ def test_bounded_command_reaps_child_when_selector_setup_fails(
     monkeypatch.setattr(process.selectors, "DefaultSelector", cannot_select)
 
     with pytest.raises(ClaimError, match="failed while coordinating I/O"):
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "import time; time.sleep(30)"],
             purpose="selector setup probe",
         )
@@ -2036,7 +2038,7 @@ def test_bounded_command_reaps_child_when_select_fails(
     monkeypatch.setattr(process.selectors, "DefaultSelector", FailingSelector)
 
     with pytest.raises(ClaimError, match="failed while waiting for I/O"):
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "import time; time.sleep(30)"],
             purpose="select probe",
         )
@@ -2060,7 +2062,7 @@ def test_bounded_command_reaps_child_when_output_read_fails(
     monkeypatch.setattr(github.os, "read", cannot_read)
 
     with pytest.raises(ClaimError, match="failed while reading output"):
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-u", "-c", "import time; print('ready'); time.sleep(30)"],
             purpose="read probe",
         )
@@ -2090,7 +2092,7 @@ def test_bounded_command_reaps_child_on_cancellation(
     monkeypatch.setattr(process.selectors, "DefaultSelector", CancellingSelector)
 
     with pytest.raises(CancellationSentinel):
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "import time; time.sleep(30)"],
             purpose="cancellation probe",
         )
@@ -2100,7 +2102,7 @@ def test_bounded_command_reaps_child_on_cancellation(
 
 def test_bounded_command_requires_the_named_executable() -> None:
     with pytest.raises(ClaimError) as excinfo:
-        github._bounded_command(
+        github.bounded_command(
             ["missing-claim-command"],
             purpose="missing executable probe",
         )
@@ -2112,7 +2114,7 @@ def test_bounded_command_times_out(
 ) -> None:
     monkeypatch.setattr(github, "GH_TIMEOUT_SECONDS", 0.05)
     with pytest.raises(ClaimError) as excinfo:
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "import time; time.sleep(30)"],
             purpose="timeout probe",
         )
@@ -2124,7 +2126,7 @@ def test_bounded_command_stops_a_child_that_hangs_after_closing_output(
     launched_children: list[subprocess.Popen[Any]],
 ) -> None:
     with pytest.raises(ClaimError) as excinfo:
-        github._bounded_command(
+        github.bounded_command(
             [
                 sys.executable,
                 "-c",
@@ -2171,7 +2173,7 @@ def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
     monkeypatch.setattr(github, "GH_TIMEOUT_SECONDS", 0.05)
     try:
         with pytest.raises(ClaimError) as excinfo:
-            github._bounded_command(
+            github.bounded_command(
                 [sys.executable, "-c", "import time; time.sleep(30)"], purpose="hang probe"
             )
     finally:
@@ -2181,7 +2183,7 @@ def test_bounded_command_reports_a_child_that_cannot_be_stopped_as_not_exiting(
 
 def test_bounded_command_uses_combined_output_as_nonzero_exit_message() -> None:
     with pytest.raises(ClaimError) as excinfo:
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "raise SystemExit('boom')"],
             purpose="exit probe",
         )
@@ -2190,7 +2192,7 @@ def test_bounded_command_uses_combined_output_as_nonzero_exit_message() -> None:
 
 def test_bounded_command_names_the_exit_code_when_nonzero_output_is_empty() -> None:
     with pytest.raises(ClaimError) as excinfo:
-        github._bounded_command(
+        github.bounded_command(
             [sys.executable, "-c", "raise SystemExit(7)"],
             purpose="empty exit probe",
         )
@@ -2199,7 +2201,7 @@ def test_bounded_command_names_the_exit_code_when_nonzero_output_is_empty() -> N
 
 def test_bounded_command_rejects_non_utf8_output() -> None:
     with pytest.raises(ClaimError) as excinfo:
-        github._bounded_command(
+        github.bounded_command(
             [
                 sys.executable,
                 "-c",
@@ -2318,7 +2320,7 @@ def test_bounded_command_classifies_every_forge_failure_signal(
     expected_message: str,
 ) -> None:
     """Adapter-boundary proof, driven through `GitHubForge.default_branch`
-    (the real caller of `_gh` -> `_bounded_command`) with `process.run_bounded`
+    (the real caller of `_gh` -> `bounded_command`) with `process.run_bounded`
     faked: every nonzero-exit signal and every process failure that
     reaches no forge response becomes the exact typed `ForgeError`
     subclass with the exact message -- not just some `ClaimError`."""
