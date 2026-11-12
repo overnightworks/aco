@@ -218,10 +218,11 @@ for (const viewport of [
 				DONE_COLOUR
 			);
 			if (!phone) {
-				expect((await rows.first().boundingBox())?.height).toBe(36);
-				expect((await list.getByRole('heading', { level: 2 }).first().boundingBox())?.height).toBe(
-					42
-				);
+				for (const part of [rows.first(), list.getByRole('heading', { level: 2 }).first()]) {
+					expect(
+						await part.evaluate((element) => element.scrollHeight - element.clientHeight)
+					).toBe(0);
+				}
 			}
 			await shootWithShapes(page, testInfo.outputPath.bind(testInfo), 'decided');
 			await expect
