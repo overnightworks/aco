@@ -32,7 +32,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a card on an open item a member wrote | — | — | MCP-21 |
 | the same card asked again | — | — | MCP-22, MCP-61 |
 | a card asked, and rulings of its area elsewhere or on closed items | — | — | MCP-57, MCP-58, MCP-59, MCP-60 |
-| a card asked and the search for earlier rulings cannot answer completely | — | — | MCP-62 |
+| a card asked and the search for earlier rulings cannot answer completely | — | — | MCP-62, MCP-65 |
 | a ruling of the last minutes, a word form, a synonym | — | — | MCP-63, MCP-64 |
 | a card asked after its line was withdrawn | — | — | MCP-23 |
 | a repository not found, or an item missing, a pull request, malformed, closed or a non-member's | — | — | MCP-24 |
@@ -107,14 +107,15 @@ The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): 
 
 A head that asks a card is shown what the operator already ruled in the card's area.
 
-- [ ] [MCP-57] `ask` also answers `earlier`: the ruled option lines of the card's area from every repository found, closed items included, each `{repository, item, title, question, answer, ruled_on, via}` (see E-MCP-18).
-- [ ] [MCP-58] `answer` is the ruled option's name, or the operator's own words when he ruled `other`; `via` is `board`, `chat` or `default`; lines come newest `ruled_on` first, ties by repository, item descending, line.
+- [ ] [MCP-57] `ask` also answers `earlier`: the ruled option lines of the card's area in every repository found, closed items too, each `{repository, item, title, question, answer, ruled_on, via}` (see E-MCP-18).
+- [ ] [MCP-58] `answer` is the ruled option's name, or the operator's own words for `other`; `via` is `board`, `chat` or `default`; lines come newest `ruled_on` first, ties by repository, item descending, line.
 - [ ] [MCP-59] `earlier` holds at most five lines and `earlier_more` counts the lines beyond them; for an area without a ruling `earlier` is an empty list and `earlier_more` is 0 (see E-MCP-04).
-- [ ] [MCP-60] A line counts when it is a ruled option line whose area equals the card's without regard to case, on an item a member of a found repository wrote; open, returned and withdrawn lines and the asked line are left out.
+- [ ] [MCP-60] A ruled option line counts when its area equals the card's ignoring case and a member of a found repository wrote its item; open, returned and withdrawn lines and the asked line are left out.
 - [ ] [MCP-61] The same card asked again, nothing written, answers `earlier` as the first call did; the lines are shown, never applied, and the card is written whatever they hold.
-- [ ] [MCP-62] A search that cannot answer (a forge error, an incomplete or too large result, an area without a letter or digit word, no tracked owner to search, a query over the forge's length limit) gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
+- [ ] [MCP-62] A search that cannot answer gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
 - [ ] [MCP-63] `earlier` is what the forge's search index finds when the card is asked, so a ruling of the last minutes can be missing; the search runs after the item's lock is released.
-- [ ] [MCP-64] The area is matched as written: `Sicherung` and `Backup` are two areas. A body that no longer parses, a repository under `state-ref` storage, a second forge host and a tracked repository whose remote still carries a former name are not searched.
+- [ ] [MCP-64] The area is matched as written (`Sicherung` and `Backup` differ); a body that no longer parses, a `state-ref` repository, a second forge host, a repository with a former remote name are not searched.
+- [ ] [MCP-65] The search cannot answer on a forge error, an incomplete or too large result, an area without a letter or digit word, no tracked owner, or a query over the forge's length limit (see MCP-62).
 
 ## Recording an answer
 

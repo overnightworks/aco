@@ -1,4 +1,4 @@
-"""The earlier rulings of a card's area (`specs/mcp.spec.md`, MCP-57..MCP-64), free
+"""The earlier rulings of a card's area (`specs/mcp.spec.md`, MCP-57..MCP-65), free
 of any search: the query a card's area becomes, and the lines kept from what the
 forge found."""
 

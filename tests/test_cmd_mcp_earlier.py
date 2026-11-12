@@ -201,7 +201,7 @@ def test_a_search_that_cannot_answer_leaves_the_card_written_and_says_why(
     here: board_forge.BoardForge,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec: MCP-62."""
+    """Spec: MCP-62, MCP-65."""
     index = board_forge.search_index()
     index.include(here)
     arrange(index)
