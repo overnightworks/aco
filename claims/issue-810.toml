@@ -1,8 +1,0 @@
-claim_id = "9c36f2b285fa4c1989911f48be8c4a5d"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "c28166e630a204c188d73696675e85c69a602dda"
-branch = "claude/issue-810-the-board-s-quiet-states-are-designed"
-scope = ["frontend", "specs/serve.spec.md", "src/aco/board/static"]
-opened_commit = "6e3152e1e8b3f9a9cefbba7551dba3f9846e32bd"
-whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
