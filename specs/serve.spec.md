@@ -187,7 +187,6 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-62] An option line lists `returned_on` and `returned_note` after `other` as RUL-17 names them: ISO date, note, else `null`.
 - [ ] [ABRD-56] An option line lists `other` right after `via`: the answer verbatim as `aco rulings --json` names it (RUL-16) when its `ruling` is `other`, else `null`. A yes/no line lists none.
 - [ ] [ABRD-60] A withdrawn line (BODY-104) is not listed: no list shows it, its repo stays readable, the item's other lines keep their `index`, and an item of only such lines is not listed.
-- [ ] [ABRD-124] An item labelled `needs-operator` is listed only while it holds an open option line; with none, it is in no list.
 - [ ] [ABRD-122] A decision that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44), so a session waiting with `aco wait` learns it.
 - ABRD-114, ABRD-115, ABRD-116, ABRD-117, ABRD-118, ABRD-119, ABRD-120, ABRD-121 (retired).
 

@@ -461,31 +461,3 @@ def test_a_repo_lists_only_its_name_error_and_items(
         {"name", "error", "items"},
         [42],
     )
-
-
-@pytest.mark.parametrize(
-    ("entries", "listed"),
-    [
-        pytest.param([open_option_entry()], True, id="open"),
-        pytest.param([_ruled_yes_no("Decided before?", "yes")], False, id="ruled"),
-        pytest.param(
-            [_ruled_yes_no("Decided before?", "yes"), open_option_entry()],
-            True,
-            id="ruled-and-open",
-        ),
-    ],
-)
-def test_a_labelled_item_is_listed_only_while_it_holds_an_open_card(
-    repository: BoardForge,
-    board: BoardClient,
-    entries: list[dict[str, object]],
-    listed: bool,
-) -> None:
-    """ABRD-124."""
-    repository.put_item(
-        8, item_body(*entries), title="Labelled", labels=[workboard.NEEDS_OPERATOR_LABEL]
-    )
-
-    [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
-
-    assert [item["number"] for item in repo["items"]] == ([8] if listed else [])

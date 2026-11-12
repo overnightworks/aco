@@ -10,7 +10,7 @@ and one write's read, check and write share that one context.
 """
 
 import os
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -36,7 +36,7 @@ class AcoSource:
     def reading(self) -> inbox.Reading:
         context = self._context()
         try:
-            return _without_labelled_items_holding_no_open_card(inbox.read_context(context))
+            return inbox.read_context(context)
         except protocol.ClaimError as error:
             raise DecisionSourceUnavailableError(str(error)) from error
 
@@ -55,19 +55,6 @@ class AcoSource:
         # Looked up on the module at every call, so a replaced `run_context`
         # (the board's test forge) reaches every read and write.
         return session.run_context(None).for_directory(self.directory)
-
-
-def _without_labelled_items_holding_no_open_card(reading: inbox.Reading) -> inbox.Reading:
-    """The reading less each item labelled for the operator (a step of the
-    reading) that holds no open option line: the board shows such an item only
-    through its open card (ABRD-124)."""
-    labelled = {step.number for step in reading.steps}
-    rows = tuple(
-        row
-        for row in reading.rows
-        if row.number not in labelled or any(expectations.is_open(line) for line in row.lines)
-    )
-    return replace(reading, rows=rows)
 
 
 def _checked_and_written(
