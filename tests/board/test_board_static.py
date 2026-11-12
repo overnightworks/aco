@@ -314,11 +314,11 @@ def test_the_board_serves_every_font_its_stylesheet_names(repository: BoardForge
 
 def test_each_font_family_the_board_names_ships_with_its_licence() -> None:
     families = set(_FONT_FAMILY.findall(_FONT_STYLESHEET.read_text(encoding="utf-8")))
-    shipped_licences = {path.name.lower() for path in _FONT_STYLESHEET.parent.glob("*-LICENSE")}
+    shipped_licences = {path.name.lower() for path in _FONT_STYLESHEET.parent.glob("*-LICENSE.txt")}
 
     assert families == {"Open Sans", "Oswald"}
     assert {
-        family.lower().replace(" ", "-") + "-license" for family in families
+        family.lower().replace(" ", "-") + "-license.txt" for family in families
     } == shipped_licences
 
 

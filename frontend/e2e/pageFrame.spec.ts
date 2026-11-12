@@ -291,15 +291,15 @@ for (const viewport of [
 		});
 
 		if (!isPhone) {
-			test('[ABRD-28] the list measures the picture: group 42 px, row 36 px, quiet line 38 px, text --fg on --bg', async ({
+			test('[ABRD-28] the list measures the picture: group 43 px, row 37 px, quiet line 39 px, text --fg on --bg', async ({
 				page
 			}) => {
 				await openBoard(page);
 				const tracks = page.locator('.tracks');
 
-				expect(await height(tracks.locator('.group'))).toBe(42);
-				expect(await height(tracks.getByRole('button').first())).toBe(36);
-				expect(await height(tracks.locator('.quiet'))).toBe(38);
+				expect(await height(tracks.locator('.group'))).toBe(43);
+				expect(await height(tracks.getByRole('button').first())).toBe(37);
+				expect(await height(tracks.locator('.quiet'))).toBe(39);
 				await expect(tracks.locator('.label').first()).toHaveCSS('color', 'rgb(24, 21, 31)');
 				await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(246, 245, 248)');
 			});

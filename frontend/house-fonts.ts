@@ -5,9 +5,11 @@ import type { Plugin } from 'vite';
 
 // The house fonts have one owner, the design package. This plugin lays its font
 // files, their licences and its `@font-face` rules into the build under
-// `assets/fonts/`, so the committed board serves them from its own origin and a
+// `assets/fonts/` (a licence gains `.txt`: the repository tracks no file without a
+// suffix), so the committed board serves them from its own origin and a
 // Python-only install needs neither Node nor the package.
 const FONTS_DIRECTORY = 'assets/fonts';
+const LICENCE_FILE = /-LICENSE$/;
 const FONT_FACE_RULES = /@font-face\s*\{[^}]*\}/g;
 
 function designStaticDirectory(): string {
@@ -30,7 +32,7 @@ export function houseFonts(): Plugin {
 			for (const name of readdirSync(fontsDirectory)) {
 				this.emitFile({
 					type: 'asset',
-					fileName: `${FONTS_DIRECTORY}/${name}`,
+					fileName: `${FONTS_DIRECTORY}/${name.replace(LICENCE_FILE, '-LICENSE.txt')}`,
 					source: readFileSync(join(fontsDirectory, name))
 				});
 			}
