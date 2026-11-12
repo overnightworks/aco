@@ -341,6 +341,9 @@
 			grid-template-columns: minmax(0, 1fr);
 			padding-top: 12px;
 		}
+		.decide-row button.pick {
+			height: 44px;
+		}
 		dt {
 			line-height: 16px;
 			padding-bottom: 4px;

@@ -213,6 +213,48 @@ for (const viewport of [
 			await expect(decidedList(page).getByRole('button')).toHaveCount(0);
 		});
 
+		test('[ABRD-44] every pick stands at least 44 px high on a phone', async ({ page }) => {
+			await arrangeCards();
+			await open(page, phone);
+
+			const heights = await picks(page)
+				.getByRole('button')
+				.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
+
+			expect(heights).toHaveLength(2);
+			if (phone) for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+		});
+
+		test('[ABRD-36] the recommendation’s letter stays a circle beside a long reason', async ({
+			page
+		}) => {
+			await arrangeCards({ reason: 'Weil der Song so offen bleibt. '.repeat(12) });
+			await open(page, phone);
+
+			const box = await page.locator('.recommendation .letter').boundingBox();
+
+			expect(box?.width).toBe(box?.height);
+		});
+
+		test('[ABRD-58] the strip shows its whole text beside Undo', async ({ page }) => {
+			await arrangeCards({ topic: 'Sehr langes Thema '.repeat(8).trim() });
+			await open(page, phone);
+
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.click();
+
+			const text = page.locator('.strip .tx');
+			await expect(text).toContainText('Sehr langes Thema');
+			const clipped = await text.evaluate((element) => {
+				const written = document.createRange();
+				written.selectNodeContents(element);
+				const { width, bottom } = written.getBoundingClientRect();
+				return width > element.clientWidth || bottom > element.getBoundingClientRect().bottom + 1;
+			});
+			expect(clipped).toBe(false);
+		});
+
 		test('[ABRD-58] a pick shows the strip with the Decided shape and Undo above the card, in view while the card scrolls and over a phone list', async ({
 			page
 		}, testInfo) => {
@@ -328,7 +370,7 @@ for (const viewport of [
 					expect(undoEdges.right).toBeLessThanOrEqual(width);
 					expect(
 						await page.locator('.strip .tx').evaluate((text) => text.scrollWidth > text.clientWidth)
-					).toBe(true);
+					).toBe(false);
 					expect(
 						await page.evaluate(() => document.documentElement.scrollWidth)
 					).toBeLessThanOrEqual(width);
