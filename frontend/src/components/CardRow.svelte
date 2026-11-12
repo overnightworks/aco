@@ -17,10 +17,11 @@
 		align-items: start;
 	}
 	dt {
-		font-size: 11px;
-		line-height: 22px;
-		font-weight: 650;
-		letter-spacing: 0.08em;
+		font-family: var(--font-display);
+		font-size: 12.5px;
+		line-height: 23px;
+		font-weight: 400;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--fg-3);
 	}

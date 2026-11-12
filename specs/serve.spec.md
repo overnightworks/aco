@@ -150,7 +150,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
-`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`,
+`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`,
 `frontend/e2e/refresh.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
@@ -197,10 +197,11 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 
 - [ ] [ABRD-22] `GET /` answers the committed shell and `GET /assets/**` its committed built files, no token needed; each refuses a method other than `GET` with 405 and `Allow: GET` (see E-ABRD-08).
 - [ ] [ABRD-23] `GET /assets/**` answers only a regular file under the committed `static/` directory: a `..` segment, encoded or not, or an in-between symlink answers `not found`, like a missing file.
-- [ ] [ABRD-24] Shell/assets CSP adds `script-src 'self'`, `style-src 'self'`, `img-src data:` to ABRD-12, no nonce/inline/external styles; built CSS is `text/css; charset=utf-8` (E-ABRD-08).
+- [ ] [ABRD-24] Shell/assets CSP adds `script-src 'self'`, `style-src 'self'`, `font-src 'self'`, `img-src data:` to ABRD-12, no nonce, inline or external source; built CSS is `text/css; charset=utf-8` (E-ABRD-08).
 - [ ] [ABRD-25] `aco serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
 - [ ] [ABRD-26] `aco serve --json` is refused by the argument parser as plain text, never in the envelope: `aco: error: unrecognized arguments: --json`, exit `2` (see E-ABRD-09).
 - [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve finds its repositories itself; --repo does not apply to it`, exit `2` (see E-ABRD-10).
+- [ ] [ABRD-124] `GET /assets/**` answers a built `.woff2` file as `font/woff2`; the shell's stylesheets load Open Sans and Oswald from there and the board makes no request to another host (see E-ABRD-08).
 
 ## Never
 
@@ -314,6 +315,10 @@ answer 200: the committed `static/assets/index.js`, Content-Type text/javascript
 request: GET /assets/index.css
 forge requests: none
 answer 200: the committed stylesheet, Content-Type text/css; charset=utf-8
+
+request: GET /assets/fonts/oswald-latin-400-normal.woff2
+forge requests: none
+answer 200: the committed font file, Content-Type font/woff2
 
 request: GET /assets/../server.py (a traversal attempt, literal or percent-encoded)
 forge requests: none

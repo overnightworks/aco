@@ -1,6 +1,7 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
+import { houseFonts } from './house-fonts';
 
 // The Python package serves these committed files, so every name is fixed:
 // a content hash would turn each rebuild into a rename the "assets fresh"
@@ -13,7 +14,7 @@ const STATIC_DIRECTORY = '../src/aco/board/static';
 const DEFAULT_BOARD_API_TARGET = 'http://127.0.0.1:8765';
 
 export default defineConfig({
-	plugins: [svelte({ configFile: false }), svelteTesting()],
+	plugins: [svelte({ configFile: false }), svelteTesting(), houseFonts()],
 	base: './',
 	server: {
 		proxy: {

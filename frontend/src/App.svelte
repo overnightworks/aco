@@ -290,6 +290,9 @@
 		--warn: #99570c;
 		--scrim: rgba(10, 8, 14, 0.45);
 		--shade: rgba(0, 0, 0, 0.28);
+		--shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 6px 20px rgba(20, 20, 30, 0.05);
+		--font-display: 'Oswald', Impact, sans-serif;
+		--font-body: 'Open Sans', Arial, sans-serif;
 		--frame-width: 880px;
 		color-scheme: light dark;
 	}
@@ -310,19 +313,15 @@
 			--warn: #f0a030;
 			--scrim: rgba(0, 0, 0, 0.65);
 			--shade: rgba(0, 0, 0, 0.6);
+			--shadow: none;
 		}
 	}
 	:global(body) {
 		margin: 0;
 		background: var(--bg);
 		color: var(--fg);
-		font:
-			400 15px/22px ui-sans-serif,
-			system-ui,
-			-apple-system,
-			'Segoe UI',
-			'Noto Sans',
-			sans-serif;
+		font: 400 15px/23px var(--font-body);
+		-webkit-font-smoothing: antialiased;
 		font-variant-numeric: tabular-nums;
 	}
 	:global(button),
@@ -361,7 +360,11 @@
 	.brand {
 		margin: 0;
 		font: inherit;
-		font-weight: 650;
+		font-family: var(--font-display);
+		font-size: 19px;
+		font-weight: 400;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
 		white-space: nowrap;
 	}
 	main > p {
@@ -384,12 +387,19 @@
 		border: 0;
 		border-radius: 8px;
 		background: none;
-		font-weight: 550;
+		font-family: var(--font-display);
+		font-size: 15px;
+		font-weight: 400;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--fg-2);
 		white-space: nowrap;
 	}
 	nav button .n {
+		font-family: var(--font-body);
 		font-size: 13px;
+		letter-spacing: 0;
+		text-transform: none;
 		color: var(--fg-3);
 	}
 	nav button[aria-current='page'] {

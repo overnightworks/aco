@@ -155,9 +155,19 @@ with urllib.request.urlopen(url, timeout=5) as response:
     ok = response.status == 200 and response.headers.get('Content-Type', '').startswith('text/html')
     sys.exit(0 if ok and b'<div id=\"app\">' in body else 1)
 "
+echo "aco serve answers / over HTTP"
+
+# A clean install serves the house fonts: the installed server hands one
+# out from its own origin as font/woff2.
+uv run --isolated --no-project python -c "
+import sys, urllib.parse, urllib.request
+url = urllib.parse.urljoin('$served_url'.split('#', 1)[0], '/assets/fonts/oswald-latin-400-normal.woff2')
+with urllib.request.urlopen(url, timeout=5) as response:
+    sys.exit(0 if response.status == 200 and response.headers.get('Content-Type') == 'font/woff2' else 1)
+"
 kill "$serve_pid" 2>/dev/null || true
 serve_pid=""
-echo "aco serve answers / over HTTP"
+echo "aco serve answers a house font as font/woff2 over HTTP"
 
 # The installed tool answers the MCP handshake and lists its tool over stdio;
 # end of input ends the process, so nothing here is killed.

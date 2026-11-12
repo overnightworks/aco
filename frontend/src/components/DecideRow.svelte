@@ -224,10 +224,11 @@
 		box-shadow: 0 -12px 14px -14px var(--shade);
 	}
 	dt {
-		font-size: 11px;
+		font-family: var(--font-display);
+		font-size: 12.5px;
 		line-height: 40px;
-		font-weight: 650;
-		letter-spacing: 0.08em;
+		font-weight: 400;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--fg-3);
 	}
@@ -253,6 +254,8 @@
 		border: 1.5px solid var(--line-strong);
 		border-radius: 8px;
 		background: var(--surface);
+		font-family: var(--font-display);
+		font-size: 18px;
 		font-weight: 700;
 	}
 	.decide-row button.pick:not(.recommended):hover:enabled {
@@ -279,7 +282,10 @@
 	}
 	.decide-row button.pick.wide {
 		padding: 0 20px;
-		font-weight: 600;
+		font-size: 15px;
+		font-weight: 400;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 	}
 	.count {
 		align-self: center;
@@ -289,19 +295,21 @@
 	}
 	dialog {
 		max-width: min(420px, calc(100vw - 32px));
-		padding: 24px;
+		padding: 26px 26px 22px;
 		border: 1px solid var(--line);
-		border-radius: 12px;
+		border-radius: 16px;
 		background: var(--surface);
+		box-shadow: 0 20px 60px var(--shade);
 		color: var(--fg);
 	}
 	dialog::backdrop {
 		background: var(--scrim);
 	}
 	dialog h2 {
-		margin: 0 0 8px;
-		font-size: 15px;
-		line-height: 22px;
+		margin: 0 0 12px;
+		font-size: 19px;
+		line-height: 26px;
+		font-weight: 600;
 	}
 	.cline {
 		display: flex;

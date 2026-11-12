@@ -55,11 +55,13 @@ under a method the board serves at all, so it advertises every method
 (`_DEFAULT_ALLOW`)."""
 _TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
 CONTENT_SECURITY_POLICY = (
-    "default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; connect-src 'self'; "
-    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "
+    "img-src data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 """The shell's one script loads from `/assets/index.js`, never inline, and a
-line's picture is only ever an `<img>` data URI -- neither needs a nonce."""
+line's picture is only ever an `<img>` data URI -- neither needs a nonce. The
+house fonts load from the board's own origin (`/assets/fonts/`), never from
+another host."""
 
 
 def _allowed_methods(path: str) -> str:

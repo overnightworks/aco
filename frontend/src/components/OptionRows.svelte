@@ -132,7 +132,8 @@
 		margin-top: -1px;
 		border: 1.5px solid var(--line-strong);
 		border-radius: 50%;
-		font-size: 13px;
+		font-family: var(--font-display);
+		font-size: 14px;
 		font-weight: 700;
 		line-height: 1;
 		color: var(--fg-2);
