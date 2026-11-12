@@ -27,33 +27,15 @@ from .session import RunContext
 _GLOBAL_REPO_MESSAGE = "aco mcp finds its repositories itself; --repo does not apply to it"
 
 
-def _repository_reading(repository: repositories.Repository) -> inbox.Reading:
-    # Looked up on the module at every call, so a replaced `run_context` (the
-    # board's test forge) reaches every read.
-    context = session.run_context(None).for_directory(repository.directory)
-    return inbox.read_context(context)
-
-
-def _discovered() -> repositories.Discovery:
-    """One fresh scan of the configured root; refused, naming the file or the
-    root, when there is no repository to read."""
-    root = repositories.configured_root(repositories.config_path(os.environ, Path.home()))
-    discovery = repositories.discover(root)
-    if not discovery.repositories:
-        reasons = "; ".join(f"{entry.directory}: {entry.reason}" for entry in discovery.unavailable)
-        raise protocol.ClaimError(f"no repository could be read under {root} ({reasons})")
-    return discovery
-
-
 def read_inbox() -> dict[str, object]:
     """The read of every repository the scan found."""
-    return inbox.inbox_json(inbox.read(_discovered(), _repository_reading))
+    return inbox.inbox_json(inbox.read(inbox.discovered(), inbox.read_repository))
 
 
 def _context_of(label: str) -> RunContext:
     """The run context of the discovered repository `label`; refused when no
     repository found has that label."""
-    found = {repository.label: repository for repository in _discovered().repositories}
+    found = {repository.label: repository for repository in inbox.discovered().repositories}
     if label not in found:
         raise protocol.ClaimError(f"no repository {label} found; read_inbox lists them")
     return session.run_context(None).for_directory(found[label].directory)
