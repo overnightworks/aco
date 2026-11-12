@@ -53,8 +53,8 @@
 
 <style>
 	.frame {
-		--oc-label-width: 136px;
-		--oc-column-gap: 24px;
+		--oc-label-width: 128px;
+		--oc-column-gap: 28px;
 		max-width: var(--frame-width);
 		margin-inline: auto;
 	}
@@ -63,7 +63,7 @@
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 0 8px;
-		margin: 0 0 8px 2px;
+		margin: 0 0 8px 4px;
 		font-size: 13px;
 		line-height: 18px;
 		color: var(--fg-3);
@@ -83,15 +83,16 @@
 	article {
 		background: var(--surface);
 		border: 1px solid var(--line);
-		border-radius: 12px;
-		padding: 24px 32px 32px;
+		border-radius: 16px;
+		box-shadow: var(--shadow);
+		padding: 26px 36px 28px;
 	}
 	h2 {
-		margin: 0 0 24px;
-		font-size: 22px;
-		line-height: 28px;
-		font-weight: 650;
-		letter-spacing: -0.01em;
+		margin: 0 0 22px;
+		font-size: 24px;
+		line-height: 30px;
+		font-weight: 600;
+		letter-spacing: -0.012em;
 	}
 	dl {
 		display: grid;
@@ -114,12 +115,13 @@
 			padding: 0;
 			border: 0;
 			border-radius: 0;
+			box-shadow: none;
 			background: none;
 		}
 		h2 {
-			font-size: 20px;
-			line-height: 26px;
-			margin-bottom: 16px;
+			font-size: 21px;
+			line-height: 28px;
+			margin-bottom: 18px;
 		}
 		dl {
 			row-gap: 12px;

@@ -52,6 +52,9 @@ importers:
       knip:
         specifier: 6.44.2
         version: 6.44.2
+      overnightworks-design:
+        specifier: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz
+        version: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz(svelte@5.57.3(@typescript-eslint/types@8.72.1))
       prettier:
         specifier: 3.9.10
         version: 3.9.10
@@ -1270,6 +1273,12 @@ packages:
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
+
+  overnightworks-design@https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz:
+    resolution: {integrity: sha512-N1F6Mf0DIv92ufRHhtLgTXJ7M5vutFByKUV/DCHYli1CpMicIUa4BZD5GoKkFKv49jt27meSEiw8EI7ryHlSWg==, tarball: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz}
+    version: 0.27.0
+    peerDependencies:
+      svelte: ^5.20.0
 
   oxc-parser@0.156.0:
     resolution: {integrity: sha512-7JhjgOfZjrIFJH5TlHrpRua864Si5GvwrPr5+eIRCY2sszhKXo6pyhP0HQKOGTtfO4UowwZ72XTGba0+lZphOQ==}
@@ -2735,6 +2744,10 @@ snapshots:
       prelude-ls: 1.2.1
       type-check: 0.4.0
       word-wrap: 1.2.5
+
+  overnightworks-design@https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz(svelte@5.57.3(@typescript-eslint/types@8.72.1)):
+    dependencies:
+      svelte: 5.57.3(@typescript-eslint/types@8.72.1)
 
   oxc-parser@0.156.0:
     dependencies:

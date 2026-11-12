@@ -133,6 +133,8 @@
 		cursor: pointer;
 	}
 	.number {
+		font-family: var(--font-display);
+		font-size: 16px;
 		font-weight: 700;
 		color: var(--fg-3);
 	}
@@ -174,6 +176,8 @@
 		border: 1.5px solid var(--line-strong);
 		border-radius: 8px;
 		background: var(--surface);
+		font-family: var(--font-display);
+		font-size: 16px;
 		font-weight: 700;
 	}
 	.point button.pick.recommended {

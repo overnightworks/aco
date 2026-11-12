@@ -64,10 +64,11 @@
 	}
 	dt {
 		padding-left: 12px;
-		font-size: 11px;
+		font-family: var(--font-display);
+		font-size: 12px;
 		line-height: 22px;
-		font-weight: 550;
-		letter-spacing: 0.08em;
+		font-weight: 400;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--fg-3);
 	}

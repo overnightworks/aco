@@ -7,12 +7,14 @@ tests drive the real server, token-free, the way a browser loading the
 shell does (`specs/serve.spec.md` ABRD-12).
 """
 
+import http.client
+import re
 import secrets
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from aco_board_fixtures import decision_port, fixed_boards, serving
+from aco_board_fixtures import BoardClient, decision_port, fixed_boards, serving
 from board_forge import BoardForge
 
 from aco.board import static
@@ -238,7 +240,9 @@ def test_posting_to_an_unknown_path_answers_404(repository: BoardForge) -> None:
     assert response.status == 404
 
 
-@pytest.mark.parametrize("path", ["/", "/assets/index.js", "/assets/index.css"])
+@pytest.mark.parametrize(
+    "path", ["/", "/assets/index.js", "/assets/index.css", "/assets/fonts/fonts.css"]
+)
 @pytest.mark.parametrize("method", ["PUT", "POST", "HEAD"])
 def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
     repository: BoardForge, method: str, path: str
@@ -250,7 +254,9 @@ def test_a_method_the_shell_or_an_asset_does_not_serve_is_refused(
     assert response.headers["Allow"] == "GET"
 
 
-@pytest.mark.parametrize("path", ["/", "/assets/index.js", "/assets/index.css"])
+@pytest.mark.parametrize(
+    "path", ["/", "/assets/index.js", "/assets/index.css", "/assets/fonts/fonts.css"]
+)
 def test_every_shell_and_asset_answer_carries_the_guard_headers(
     repository: BoardForge, path: str
 ) -> None:
@@ -266,5 +272,65 @@ def test_every_shell_and_asset_answer_carries_the_guard_headers(
     assert "unsafe-inline" not in policy
     assert "https:" not in policy
     assert "img-src data:" in policy
+    assert _directives(policy)["font-src"] == "'self'"
     assert "'nonce-" not in policy
     assert not any(name.lower().startswith("access-control-") for name in response.headers)
+
+
+def _directives(policy: str) -> dict[str, str]:
+    """A content policy as directive name -> its sources."""
+    names_and_sources = (directive.partition(" ") for directive in policy.split("; "))
+    return {name: sources for name, _, sources in names_and_sources}
+
+
+_FONT_STYLESHEET = static.STATIC_ROOT / "assets" / "fonts" / "fonts.css"
+_FONT_URL = re.compile(r"url\('([^']+)'\)")
+_FONT_FAMILY = re.compile(r"font-family:\s*'([^']+)'")
+
+
+def _get_bytes(board: BoardClient, path: str) -> tuple[int, str, bytes]:
+    """`path` read as raw bytes: the board client decodes every body as text."""
+    connection = http.client.HTTPConnection(board.host, board.port, timeout=30)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        return response.status, response.headers["Content-Type"], response.read()
+    finally:
+        connection.close()
+
+
+def test_the_board_serves_every_font_its_stylesheet_names(repository: BoardForge) -> None:
+    names = _FONT_URL.findall(_FONT_STYLESHEET.read_text(encoding="utf-8"))
+    assert names
+
+    with serving(decision_port(repository)) as board:
+        answers = [_get_bytes(board, f"/assets/fonts/{name}") for name in names]
+
+    assert [(status, content_type) for status, content_type, _ in answers] == [
+        (200, "font/woff2")
+    ] * len(names)
+    assert all(content.startswith(b"wOF2") for _, _, content in answers)
+
+
+def test_each_font_family_the_board_names_ships_with_its_licence() -> None:
+    families = set(_FONT_FAMILY.findall(_FONT_STYLESHEET.read_text(encoding="utf-8")))
+    shipped_licences = {path.name.lower() for path in _FONT_STYLESHEET.parent.glob("*-LICENSE")}
+
+    assert families == {"Open Sans", "Oswald"}
+    assert {
+        family.lower().replace(" ", "-") + "-license" for family in families
+    } == shipped_licences
+
+
+@pytest.mark.parametrize("stylesheet", ["index.css", "fonts/fonts.css"])
+def test_a_built_stylesheet_loads_nothing_from_another_host(stylesheet: str) -> None:
+    css = (static.STATIC_ROOT / "assets" / stylesheet).read_text(encoding="utf-8")
+
+    targets = re.findall(r"url\(\s*[\"']?([^\"')]+)", css)
+
+    assert "@import" not in css
+    assert [
+        t
+        for t in targets
+        if re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", t) and not t.startswith("data:")
+    ] == []

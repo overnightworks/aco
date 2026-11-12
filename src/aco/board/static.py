@@ -24,10 +24,11 @@ _SHELL_CONTENT_TYPE = "text/html; charset=utf-8"
 _ASSET_CONTENT_TYPES = {
     ".js": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
+    ".woff2": "font/woff2",
 }
-"""Every extension `frontend/vite.config.ts` actually emits into `static/assets/`
-(fixed filenames, no content hash -- see that file's own docstring); a request
-for any other extension is refused rather than guessed."""
+"""Every extension `frontend/vite.config.ts` and `frontend/house-fonts.ts` actually
+emit into `static/assets/` (fixed filenames, no content hash -- see the config's
+own comment); a request for any other extension is refused rather than guessed."""
 
 
 class StaticAssetsMissingError(Exception):
