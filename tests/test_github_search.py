@@ -1,5 +1,5 @@
 """The GitHub adapter of the search for ruling items (`specs/mcp.spec.md`,
-MCP-57..MCP-64), driven with a fake command runner."""
+MCP-57..MCP-65), driven with a fake command runner."""
 
 import json
 from collections.abc import Sequence
@@ -109,12 +109,25 @@ def test_every_page_is_read_until_all_hits_are_in() -> None:
     assert [runner.fields(call)["page"] for call in range(3)] == ["1", "2", "3"]
 
 
-def test_a_result_the_forge_marks_incomplete_is_answered_incomplete() -> None:
-    runner = _Runner(_page([_hit(1)], incomplete=True))
+@pytest.mark.parametrize(
+    ("pages", "items"),
+    [
+        pytest.param((_page([_hit(1)], incomplete=True),), 1, id="first page marked incomplete"),
+        pytest.param(
+            (
+                _page([_hit(number) for number in range(1, 101)], total=150),
+                _page([_hit(number) for number in range(101, 151)], total=150, incomplete=True),
+            ),
+            150,
+            id="later page marked incomplete",
+        ),
+        pytest.param((_page([_hit(1)], total=3), _page([], total=3)), 1, id="short of the total"),
+    ],
+)
+def test_an_incomplete_answer_is_answered_incomplete(pages: tuple[str, ...], items: int) -> None:
+    result = _search(_Runner(*pages))
 
-    result = _search(runner)
-
-    assert (_numbers(result), result.complete) == ([1], False)
+    assert (len(result.items), result.complete) == (items, False)
 
 
 def test_a_result_above_the_forges_cap_is_answered_incomplete_without_paging_on() -> None:
@@ -123,24 +136,6 @@ def test_a_result_above_the_forges_cap_is_answered_incomplete_without_paging_on(
     result = _search(runner)
 
     assert (_numbers(result), result.complete, len(runner.commands)) == ([1], False, 1)
-
-
-def test_a_later_page_the_forge_marks_incomplete_is_answered_incomplete() -> None:
-    first = [_hit(number) for number in range(1, 101)]
-    second = [_hit(number) for number in range(101, 151)]
-    runner = _Runner(_page(first, total=150), _page(second, total=150, incomplete=True))
-
-    result = _search(runner)
-
-    assert (len(result.items), result.complete) == (150, False)
-
-
-def test_a_page_that_ends_short_of_the_total_is_answered_incomplete() -> None:
-    runner = _Runner(_page([_hit(1)], total=3), _page([], total=3))
-
-    result = _search(runner)
-
-    assert (_numbers(result), result.complete) == ([1], False)
 
 
 def test_a_failing_runner_fails_the_search_with_its_error() -> None:
