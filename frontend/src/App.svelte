@@ -17,6 +17,7 @@
 	import { BoardStore } from './app/state/board.svelte';
 	import { cardKey } from './app/model/decision';
 	import { DecisionStore } from './app/state/decision.svelte';
+	import QuietSign from './components/QuietSign.svelte';
 	import RefreshButton from './components/RefreshButton.svelte';
 	import Stage from './components/Stage.svelte';
 	import TrackList from './components/TrackList.svelte';
@@ -215,11 +216,14 @@
 		{/if}
 	</header>
 	{#if board.status === 'no-access'}
-		<p role="alert">Zugang fehlt. Starte das Board im Repo und öffne den Link, den es ausgibt.</p>
+		<p role="alert">
+			<QuietSign kind="warn" />Zugang fehlt. Starte das Board im Repo und öffne den Link, den es
+			ausgibt.
+		</p>
 	{:else if board.status === 'loading'}
 		<p role="status">Lädt…</p>
 	{:else if board.status === 'unavailable'}
-		<p role="alert">{SERVER_SILENT_SENTENCE} {board.error}</p>
+		<p role="alert"><QuietSign kind="warn" />{SERVER_SILENT_SENTENCE} {board.error}</p>
 	{:else if decisions !== null}
 		{@const store = decisions}
 		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>
@@ -291,6 +295,7 @@
 		--good: #1c7350;
 		--good-soft: #e4f2ea;
 		--warn: #99570c;
+		--warn-soft: #fdf3e2;
 		--scrim: rgba(10, 8, 14, 0.45);
 		--shade: rgba(0, 0, 0, 0.28);
 		--shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 6px 20px rgba(20, 20, 30, 0.05);
@@ -315,6 +320,7 @@
 			--good: #5cc05c;
 			--good-soft: #17301a;
 			--warn: #f0a030;
+			--warn-soft: #2a1f10;
 			--scrim: rgba(0, 0, 0, 0.65);
 			--shade: rgba(0, 0, 0, 0.6);
 			--shadow: none;
@@ -372,7 +378,43 @@
 		white-space: nowrap;
 	}
 	main > p {
-		padding: 20px;
+		align-self: center;
+		display: grid;
+		justify-items: center;
+		gap: 14px;
+		max-width: 420px;
+		margin: 18vh 16px 0;
+		padding: 0;
+		text-align: center;
+		color: var(--fg-2);
+	}
+	main > p[role='status']::before {
+		content: '';
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		border: 3px solid var(--line);
+		border-top-color: var(--accent);
+		animation: turn 0.9s linear infinite;
+	}
+	main > p[role='alert'] {
+		padding: 28px 28px 24px;
+		border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--line));
+		border-radius: 16px;
+		background: var(--surface);
+		box-shadow: var(--shadow);
+		font-size: 15px;
+		color: var(--fg);
+	}
+	@keyframes turn {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		main > p[role='status']::before {
+			animation: none;
+		}
 	}
 	[hidden] {
 		display: none !important;
@@ -457,6 +499,25 @@
 		background: var(--surface);
 		border-right: 1px solid var(--line);
 		padding: 6px 0 32px;
+	}
+	/* Nothing to show: the list's calm state fills the page instead of a column
+	   beside an empty stage. */
+	.split:has(:global(.empty)) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.split:has(:global(.empty)) .question-pane {
+		display: none;
+	}
+	.split:has(:global(.empty)) .tracks {
+		grid-column: 1;
+		grid-row: 2;
+		display: grid;
+		place-items: center;
+		border-right: 0;
+		background: var(--bg);
+	}
+	.split:has(:global(.empty)) .strips {
+		grid-column: 1;
 	}
 	.strips {
 		grid-column: 2;

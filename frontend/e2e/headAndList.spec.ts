@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { readBoardRuntime } from './runtime';
+import { tokenColor } from './tokens';
 import { item, line, optionLine, repo } from '../src/test-support/board';
 
 const REPOSITORY = 'Songmaker-App';
@@ -54,18 +55,6 @@ async function openBoard(page: Page, board: object) {
 	await page.route('**/api/board', (route) => route.fulfill({ json: board }));
 	await page.goto(`${appUrl}#t=${token}`);
 	await expect(page.getByRole('navigation', { name: 'Views' })).toBeVisible();
-}
-
-/** The computed colour a custom property resolves to, as the browser prints it. */
-async function tokenColor(page: Page, token: string) {
-	return page.evaluate((name) => {
-		const probe = document.createElement('i');
-		probe.style.color = `var(${name})`;
-		document.body.append(probe);
-		const resolved = getComputedStyle(probe).color;
-		probe.remove();
-		return resolved;
-	}, token);
 }
 
 async function height(locator: Locator) {

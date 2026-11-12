@@ -384,9 +384,9 @@ for (const viewport of [
 			await pick(page, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			await expect(page.getByText('Keine Frage ausgewählt.')).toBeVisible();
-			await expect(page.locator('.stage')).toBeFocused();
-			await page.screenshot({ path: testInfo.outputPath('unselected.png') });
+			await expect(page.getByText('All decided')).toBeVisible();
+			await expect(page.locator('.question-pane')).toBeHidden();
+			await page.screenshot({ path: testInfo.outputPath('all-decided.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openDecidedLine(page, 'Hosts allowed?');
 			await expectDecidedAnswer(page, 'B — Zweiter Weg', BOARD_PICK_HOW);
