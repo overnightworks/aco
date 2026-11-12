@@ -3,6 +3,6 @@ agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
 role = "builder"
 base = "0f9f0a95a2fd277ba8b3bc669703263132c08ac2"
 branch = "claude/issue-808-the-board-speaks-in-the-house-fonts"
-scope = ["frontend", "pyproject.toml", "quality/baseline.toml", "specs/serve.spec.md", "src/aco/board", "src/aco/board/static", "tests/board", "uv.lock"]
+scope = ["frontend", "pyproject.toml", "quality/baseline.toml", "scripts/package_smoke.sh", "specs/serve.spec.md", "src/aco/board", "src/aco/board/static", "tests/board", "uv.lock"]
 opened_commit = "c149fabc965686d57651ea62c721cc20e063bbe8"
 whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
