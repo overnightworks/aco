@@ -239,4 +239,4 @@ def test_help_names_the_mark_the_command_reads(capsys: pytest.CaptureFixture[str
     run = run_cli(command, capsys)
 
     assert run.status == 0
-    assert _MARK in run.stdout
+    assert f"labelled {_MARK} " in run.stdout

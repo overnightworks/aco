@@ -10,6 +10,10 @@ from pathlib import Path
 from . import inbox, protocol, report, repositories, usage, workboard
 from .session import RunContext
 
+_DESCRIPTION = (
+    f"List the open items labelled {workboard.FLEET_PLAN_LABEL} of every repository on this "
+    "machine, read-only."
+)
 _GLOBAL_REPO_MESSAGE = "aco fleet-plans finds its repositories itself; --repo does not apply to it"
 
 
@@ -69,15 +73,7 @@ def _unavailable_text(entry: inbox.Unavailable) -> str:
 
 
 def add_parser(commands: usage.Subcommands, name: str) -> None:
-    report.add_json_flag(
-        commands.add_parser(
-            name,
-            help=(
-                f"list the open items labelled {workboard.FLEET_PLAN_LABEL} of every repository "
-                "on this machine, read-only"
-            ),
-        )
-    )
+    report.add_json_flag(commands.add_parser(name, help=_DESCRIPTION, description=_DESCRIPTION))
 
 
 def _no_repository_read(read: inbox.Inbox) -> str:
