@@ -232,7 +232,7 @@ async function edgeBands(button: Locator): Promise<{ ring: Buffer; cue: Buffer }
 	const box = await button.boundingBox();
 	if (!box) throw new Error('Refresh button has no box');
 	const page = button.page();
-	const stretch = { x: box.x + 12, width: 12, height: 2 };
+	const stretch = { x: box.x + box.width / 2 - 6, width: 12, height: 2 };
 	return {
 		ring: await page.screenshot({ clip: { ...stretch, y: box.y } }),
 		cue: await page.screenshot({ clip: { ...stretch, y: box.y + 2 } })

@@ -115,6 +115,8 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-107] On the Open and Decided tabs groups stand by their first row: open before with head, then the newest day, then the higher item; a failed repository with kept cards too, one without cards last.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
 - [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n`, `Decided n` and Refresh (ABRD-104); n counts the open rows and the ruled lines.
+- [ ] [ABRD-125] The tabs are pills; the count of `Open` is an accent badge, quiet at 0. On phones the tabs start at the left and the brand shows whenever the tabs do not (loading, no access, failure).
+- [ ] [ABRD-126] The selected row carries an accent bar on a light accent ground without hover; every row has one height; a repository's heading keeps the case it is typed in.
 - [ ] [ABRD-123] The board opens on Open at every width; a reload returns to Open, as Decided is not kept across a reload.
 - [ ] [ABRD-55] On phones a tapped row's card fills the pane without its card frame, under a header whose `‹ Open` or `‹ Decided` returns to that list with the row focused; the tabs hide meanwhile.
 - [ ] [ABRD-63] An open option card's Decide row ends in `Other…`, beside the picks or `Accept all`; it opens a panel with a textarea (`Your answer`, up to 280 characters, focused) and `Send`, disabled while blank.

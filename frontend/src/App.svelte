@@ -34,6 +34,7 @@
 	let showDecidedCard = $state(false);
 	let view: ListView = $state('open');
 	const counts = $derived(tabCounts(board.repos));
+	const hasViews = $derived(board.status === 'ready' && decisions !== null);
 	const cardView = $derived(view === 'open' ? showQuestion : view === 'decided' && showDecidedCard);
 	let initialized = $state(false);
 	let tracks: HTMLDivElement | undefined = $state();
@@ -181,9 +182,9 @@
 <svelte:window onresize={keepFocusVisible} />
 
 <main>
-	<header class="top" class:card-view={cardView}>
+	<header class="top" class:card-view={cardView} class:bare={!hasViews}>
 		<h1 class="brand">Entscheidungs-Board</h1>
-		{#if board.status === 'ready' && decisions !== null}
+		{#if hasViews}
 			{#if cardView}
 				<button type="button" class="back" onclick={leaveCard}
 					>‹ {view === 'open' ? OPEN_TAB_LABEL : DECIDED_TAB_LABEL}</button
@@ -194,7 +195,8 @@
 					type="button"
 					aria-current={view === 'open' ? 'page' : undefined}
 					onclick={() => (view = 'open')}
-					>{OPEN_TAB_LABEL} <span class="n">{counts.open}</span></button
+					>{OPEN_TAB_LABEL}
+					<span class="n waiting" class:zero={counts.open === 0}>{counts.open}</span></button
 				>
 				<button
 					type="button"
@@ -284,6 +286,7 @@
 		--fg-2: #4d4758;
 		--fg-3: #6e6779;
 		--accent: #7d2459;
+		--accent-soft: #f7ecf2;
 		--accent-fg: #ffffff;
 		--good: #1c7350;
 		--good-soft: #e4f2ea;
@@ -307,6 +310,7 @@
 			--fg-2: #babac0;
 			--fg-3: #8e8e96;
 			--accent: #e892c4;
+			--accent-soft: #33192a;
 			--accent-fg: #1c0b15;
 			--good: #5cc05c;
 			--good-soft: #17301a;
@@ -352,7 +356,7 @@
 		height: 56px;
 		display: flex;
 		align-items: center;
-		gap: 16px;
+		gap: 20px;
 		padding: 0 24px;
 		background: var(--surface);
 		border-bottom: 1px solid var(--line);
@@ -377,15 +381,16 @@
 		margin-left: auto;
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 6px;
 	}
 	nav button {
 		display: flex;
-		align-items: baseline;
-		gap: 6px;
-		padding: 6px 12px;
+		align-items: center;
+		gap: 8px;
+		height: 38px;
+		padding: 0 8px 0 14px;
 		border: 0;
-		border-radius: 8px;
+		border-radius: 999px;
 		background: none;
 		font-family: var(--font-display);
 		font-size: 15px;
@@ -394,21 +399,45 @@
 		text-transform: uppercase;
 		color: var(--fg-2);
 		white-space: nowrap;
+		transition:
+			background-color 0.15s,
+			color 0.15s;
 	}
-	nav button .n {
-		font-family: var(--font-body);
-		font-size: 13px;
-		letter-spacing: 0;
-		text-transform: none;
-		color: var(--fg-3);
+	nav button:hover {
+		background: var(--surface-2);
+		color: var(--fg);
 	}
 	nav button[aria-current='page'] {
 		background: var(--fg);
 		color: var(--surface);
 	}
+	nav button .n {
+		min-width: 24px;
+		height: 24px;
+		padding: 0 7px;
+		border-radius: 999px;
+		background: var(--surface-2);
+		font-family: var(--font-body);
+		font-size: 12.5px;
+		font-weight: 600;
+		line-height: 24px;
+		letter-spacing: 0;
+		text-align: center;
+		text-transform: none;
+		color: var(--fg-2);
+	}
 	nav button[aria-current='page'] .n {
-		color: inherit;
-		opacity: 0.75;
+		background: color-mix(in srgb, var(--surface) 18%, transparent);
+		color: var(--surface);
+	}
+	nav button .n.waiting:not(.zero) {
+		background: var(--accent);
+		color: var(--accent-fg);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		nav button {
+			transition: none;
+		}
 	}
 	.split {
 		display: grid;
@@ -427,7 +456,7 @@
 		grid-row: 1 / span 2;
 		background: var(--surface);
 		border-right: 1px solid var(--line);
-		padding: 8px 0 24px;
+		padding: 6px 0 32px;
 	}
 	.strips {
 		grid-column: 2;
@@ -500,7 +529,7 @@
 			min-height: 52px;
 			flex-wrap: wrap;
 			align-content: center;
-			padding: 0 16px;
+			padding: 0 12px;
 			gap: 0 8px;
 		}
 		.brand {
@@ -514,31 +543,44 @@
 			clip-path: inset(50%);
 			white-space: nowrap;
 		}
+		.bare .brand {
+			position: static;
+			width: auto;
+			height: auto;
+			margin: 0 0 0 4px;
+			overflow: visible;
+			clip-path: none;
+			font-size: 17px;
+		}
 		.card-view .back {
 			display: inline-flex;
 			padding: 6px 8px 6px 0;
 			border: 0;
 			background: none;
 			color: var(--fg);
-			font-weight: 600;
+			font-family: var(--font-display);
+			font-weight: 400;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
 			white-space: nowrap;
 		}
 		.card-view nav {
 			display: none;
 		}
-		.card-view > :global(.refresh) {
+		.top > :global(.refresh) {
 			margin-left: auto;
 		}
 		nav {
+			margin-left: 0;
 			flex-wrap: wrap;
-			gap: 2px;
+			gap: 4px;
 		}
 		.tracks {
 			grid-row: 2;
 			border-right: 0;
 		}
 		nav button {
-			padding: 6px 8px;
+			padding: 0 6px 0 12px;
 		}
 		.split {
 			grid-template-columns: minmax(0, 1fr);

@@ -109,15 +109,12 @@ for (const viewport of [
 			await expect(rows.nth(0).getByRole('img', { name: 'Open' })).toBeVisible();
 			await expect(page.getByText('Nothing open: webauth')).toBeVisible();
 
-			const longRow = rows.nth(2);
 			const rowHeights = await rows.evaluateAll((buttons) =>
 				buttons.map((button) => button.getBoundingClientRect().height)
 			);
 			if (viewport.width < 760)
 				for (const height of rowHeights) expect(height).toBeGreaterThanOrEqual(44);
-			expect((await longRow.boundingBox())?.height).toBeLessThanOrEqual(
-				viewport.width < 760 ? 48 : 40
-			);
+			expect(new Set(rowHeights).size, '[ABRD-126] one row height').toBe(1);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 				viewport.width
 			);

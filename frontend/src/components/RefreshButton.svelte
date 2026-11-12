@@ -47,10 +47,10 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		height: 32px;
-		padding: 0 8px;
+		height: 38px;
+		padding: 0 12px;
 		border: 0;
-		border-radius: 8px;
+		border-radius: 999px;
 		background: none;
 		color: var(--fg-2);
 		font-size: 13px;
