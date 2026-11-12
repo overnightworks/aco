@@ -157,8 +157,8 @@ with urllib.request.urlopen(url, timeout=5) as response:
 "
 echo "aco serve answers / over HTTP"
 
-# The house fonts ship inside the wheel and the same installed server must
-# hand one out as a font, so the board never reaches for a third-party origin.
+# A clean install serves the house fonts: the installed server hands one
+# out from its own origin as font/woff2.
 uv run --isolated --no-project python -c "
 import sys, urllib.parse, urllib.request
 url = urllib.parse.urljoin('$served_url'.split('#', 1)[0], '/assets/fonts/oswald-latin-400-normal.woff2')
