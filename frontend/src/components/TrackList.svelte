@@ -108,11 +108,13 @@
 		justify-content: space-between;
 		align-items: baseline;
 		margin: 0;
-		padding: 16px 24px 4px;
-		font-size: 11px;
-		font-weight: 650;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
+		padding: 22px 24px 6px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--fg-2);
+	}
+	.group > span:last-child:not(:first-child) {
+		font-weight: 400;
 		color: var(--fg-3);
 	}
 	.group.bad {
@@ -121,25 +123,33 @@
 	ul {
 		list-style: none;
 		margin: 0;
-		padding: 0;
+		padding: 0 8px;
 	}
 	.row {
 		display: flex;
 		align-items: center;
 		gap: 12px;
 		width: 100%;
-		min-height: 36px;
-		padding: 7px 24px;
+		min-height: 42px;
+		padding: 9px 16px;
 		border: 0;
+		border-radius: 10px;
 		background: none;
 		text-align: left;
+		transition: background-color 0.12s;
 	}
-	.row:hover,
-	.row[aria-current='true'] {
+	.row:hover {
 		background: var(--surface-2);
 	}
 	.row[aria-current='true'] {
+		background: var(--accent-soft);
+		box-shadow: inset 3px 0 0 var(--accent);
 		font-weight: 600;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.row {
+			transition: none;
+		}
 	}
 	.label {
 		flex: 1;
@@ -150,7 +160,7 @@
 	}
 	.day {
 		flex: none;
-		font-size: 13px;
+		font-size: 12.5px;
 		color: var(--fg-3);
 	}
 	.muted {
@@ -172,14 +182,19 @@
 		color: var(--fg);
 	}
 	@media (max-width: 760px) {
-		.group,
-		.bad-line,
-		.row {
+		.bad-line {
 			padding-left: 16px;
 			padding-right: 16px;
 		}
+		.group {
+			padding: 20px 18px 6px;
+		}
+		ul {
+			padding: 0 6px;
+		}
 		.row {
-			min-height: 44px;
+			min-height: 48px;
+			padding: 10px 12px;
 		}
 	}
 </style>
