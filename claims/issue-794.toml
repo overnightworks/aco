@@ -1,0 +1,8 @@
+claim_id = "e5c2883a873243ed81959fb854806bf9"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "56889c7e0fe5ecdfe440f7fce0b7033ca0f87ce9"
+branch = "claude/issue-794-quality-v0-12-0"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", ".github/workflows/release.yml", "quality/baseline.toml"]
+opened_commit = "94cb5ce12949e9bff9057a79017a4b0a26b7a5c3"
+whole_reason = "One pin move of the gate: the three workflows and the job limits the new rule records in the baseline are proven green only together."
