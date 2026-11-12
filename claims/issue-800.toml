@@ -1,8 +1,0 @@
-claim_id = "187cb5109b324ccdbfd4d826d90d534d"
-agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
-role = "builder"
-base = "4e77b9bf6ea0121f03eaddf3b813ea7a6de13f5f"
-branch = "claude/issue-800-a-head-can-ask-which-open-fleet-wide-pla"
-scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/fleet-plans.spec.md", "specs/output.spec.md", "src/aco/cli.py", "src/aco/cmd_fleet_plans.py", "src/aco/cmd_mcp.py", "src/aco/inbox.py", "src/aco/workboard.py", "tests/test_cli.py", "tests/test_cli_help.py", "tests/test_cmd_fleet_plans.py", "tests/test_cmd_mcp.py"]
-opened_commit = "a25e0c3d6d7fd7b2f17becaf4d2edba4bdd3694a"
-whole_reason = "One new read-only command with its spec, tests and registrations; no part of it is useful alone."
