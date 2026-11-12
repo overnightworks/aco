@@ -330,7 +330,7 @@ def test_a_built_stylesheet_loads_nothing_from_another_host(stylesheet: str) -> 
 
     assert "@import" not in css
     assert [
-        t
-        for t in targets
-        if re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", t) and not t.startswith("data:")
+        target
+        for target in targets
+        if re.match(r"(?:[a-z][a-z0-9+.-]*:|//)", target) and not target.startswith("data:")
     ] == []
