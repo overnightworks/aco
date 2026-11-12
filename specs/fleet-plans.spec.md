@@ -32,11 +32,11 @@ wrote are listed, the boundary `specs/mcp.spec.md` draws for the inbox; under `s
 ## `--json`
 
 - [ ] [FLP-04] A plan is `{"repository", "number", "title", "url", "updated_on"}`; `url` is the item's forge page, `null` under `storage = "state-ref"`; `updated_on` is `YYYY-MM-DD` (see E-FLP-01).
-- [ ] [FLP-11] Success is `{"ok": true, "reason": "listed", "plans", "unavailable"}`, exit `0`; an `unavailable` entry is `{"repository", "reason"}`, in discovery order (see E-FLP-04).
+- [ ] [FLP-11] Success is `{"ok": true, "reason": "listed", "plans", "unavailable"}`, exit `0`; an `unavailable` entry is `{"repository", "reason"}`, in discovery order, the repositories first and the unreadable checkouts after them (see E-FLP-04).
 
 ## Unavailable repositories and refusals
 
-- [ ] [FLP-07] An unreadable repository prints `unavailable <repository>: <reason>` after the plans, and is under `unavailable` in `--json`; the others answer, exit `0` (see E-FLP-04).
+- [ ] [FLP-07] An unreadable repository, or a checkout discovery cannot read (named by its directory), prints `unavailable <repository>: <reason>` after the plans, and is under `unavailable` in `--json`; the others answer, exit `0` (see E-FLP-04).
 - [ ] [FLP-08] With no readable repository or no usable root: `ERROR: <sentence>` on stderr, exit `2`; `--json` has `reason` `unavailable` (see E-FLP-05).
 - [ ] [FLP-09] The global `--repo` refuses `aco fleet-plans finds its repositories itself; --repo does not apply to it`, exit `2`; `--json` has `reason` `invalid_usage` (see E-FLP-06).
 

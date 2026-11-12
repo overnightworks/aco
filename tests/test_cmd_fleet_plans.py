@@ -179,6 +179,29 @@ def test_an_unreadable_repository_is_listed_while_the_others_answer(
     assert as_text.stdout.splitlines()[-1] == "unavailable board-forge/broken: rate limited"
 
 
+def test_a_checkout_discovery_cannot_read_is_listed_beside_a_readable_repository(
+    root: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    elsewhere = _fleet(root)
+    (root / "broken" / ".git").mkdir(parents=True)
+    json_command = ["fleet-plans", "--json"]
+    text_command = ["fleet-plans"]
+
+    as_json = run_cli(json_command, capsys)
+    as_text = run_cli(text_command, capsys)
+
+    assert as_json.status == 0
+    answer = _answer(as_json)
+    plans = answer["plans"]
+    assert isinstance(plans, list)
+    assert [plan["repository"] for plan in plans] == [str(elsewhere.repository)]
+    unavailable = answer["unavailable"]
+    assert isinstance(unavailable, list)
+    assert [entry["repository"] for entry in unavailable] == [str(root / "broken")]
+    assert as_text.status == 0
+    assert as_text.stdout.splitlines()[-1].startswith(f"unavailable {root / 'broken'}: ")
+
+
 def test_no_readable_repository_refuses(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
     board_checkout(root / "broken").fail_listing("rate limited")
     json_command = ["fleet-plans", "--json"]

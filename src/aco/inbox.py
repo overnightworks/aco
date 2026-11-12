@@ -13,6 +13,7 @@ The read across repositories: of those rows, the option lines still waiting on
 the operator, the steps and the plans, for every repository discovery found.
 """
 
+import os
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
@@ -160,6 +161,25 @@ class Inbox:
     entries: tuple[Waiting | Unavailable, ...]
     """One per discovered repository, in discovery's order."""
     unreadable: tuple[repositories.UnavailableCheckout, ...]
+
+
+def no_repository_read(root: Path, reasons: Iterable[str]) -> str:
+    """The refusal sentence for a root none of whose repositories could be read."""
+    return f"no repository could be read under {root} ({'; '.join(reasons)})"
+
+
+def discovered() -> repositories.Discovery:
+    """One fresh scan of the configured root; refused, naming the file or the
+    root, when there is no repository to read."""
+    root = repositories.configured_root(repositories.config_path(os.environ, Path.home()))
+    discovery = repositories.discover(root)
+    if not discovery.repositories:
+        raise protocol.ClaimError(
+            no_repository_read(
+                root, (f"{entry.directory}: {entry.reason}" for entry in discovery.unavailable)
+            )
+        )
+    return discovery
 
 
 def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbox:

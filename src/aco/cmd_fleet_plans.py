@@ -2,12 +2,10 @@
 # ruff: noqa: T201 - the fleet-plans command writes its result lines to stdout
 
 import argparse
-import os
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 
-from . import inbox, protocol, report, repositories, usage, workboard
+from . import inbox, protocol, report, usage, workboard
 from .session import RunContext
 
 _DESCRIPTION = (
@@ -45,8 +43,16 @@ def _listed(entries: tuple[inbox.Waiting | inbox.Unavailable, ...]) -> list[_Lis
     )
 
 
-def _unavailable(entries: tuple[inbox.Waiting | inbox.Unavailable, ...]) -> list[inbox.Unavailable]:
-    return [entry for entry in entries if isinstance(entry, inbox.Unavailable)]
+def _unavailable(read: inbox.Inbox) -> list[inbox.Unavailable]:
+    """The repositories whose read failed, then the checkouts discovery could
+    not read, named by their directory."""
+    return [
+        *(entry for entry in read.entries if isinstance(entry, inbox.Unavailable)),
+        *(
+            inbox.Unavailable(str(checkout.directory), checkout.reason)
+            for checkout in read.unreadable
+        ),
+    ]
 
 
 def _plan_json(listed: _Listed) -> dict[str, object]:
@@ -76,29 +82,21 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
     report.add_json_flag(commands.add_parser(name, help=_DESCRIPTION, description=_DESCRIPTION))
 
 
-def _no_repository_read(read: inbox.Inbox) -> str:
-    reasons = [
-        *(f"{entry.repository}: {entry.reason}" for entry in _unavailable(read.entries)),
-        *(f"{checkout.directory}: {checkout.reason}" for checkout in read.unreadable),
-    ]
-    return f"no repository could be read under {read.root} ({'; '.join(reasons)})"
-
-
 def run(parsed: argparse.Namespace, _context: RunContext) -> int:
     as_json = parsed.json
     if parsed.repo is not None:
         return report.refuse(_FleetPlansReason.INVALID_USAGE, _GLOBAL_REPO_MESSAGE, as_json=as_json)
     try:
-        root = repositories.configured_root(repositories.config_path(os.environ, Path.home()))
-        read = inbox.read(repositories.discover(root), inbox.read_repository)
+        read = inbox.read(inbox.discovered(), inbox.read_repository)
     except protocol.ClaimError as error:
         return report.refuse(_FleetPlansReason.UNAVAILABLE, error, as_json=as_json)
     plans = _listed(read.entries)
-    unavailable = _unavailable(read.entries)
-    if len(unavailable) == len(read.entries):
+    unavailable = _unavailable(read)
+    if all(isinstance(entry, inbox.Unavailable) for entry in read.entries):
+        reasons = (f"{entry.repository}: {entry.reason}" for entry in unavailable)
         return report.refuse(
             _FleetPlansReason.UNAVAILABLE,
-            report.bounded_refusal(_no_repository_read(read)),
+            report.bounded_refusal(inbox.no_repository_read(read.root, reasons)),
             as_json=as_json,
         )
     if as_json:
