@@ -34,11 +34,9 @@ def test_only_the_github_adapters_speak_gh_argv() -> None:
     module in the package is enumerated, not a fixed list, so a new module
     is covered the day it is added."""
     package = Path(__file__).parent.parent / "src" / "aco"
-    other_modules = sorted(
-        p for p in package.glob("*.py") if p.name not in {"github.py", "github_search.py"}
-    )
-    assert len(other_modules) >= 7
-    for module in other_modules:
+    others = sorted(p for p in package.glob("*.py") if p.stem not in {"github", "github_search"})
+    assert len(others) >= 7
+    for module in others:
         assert '"gh"' not in module.read_text(), f"{module.name} must not construct a gh argv"
 
 
