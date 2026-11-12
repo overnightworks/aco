@@ -1,0 +1,8 @@
+claim_id = "b853715ed45c462c9abcd6219518c8cc"
+agent = "Claude f0f93976-3575-4ba8-ab7c-4907c85ae738"
+role = "builder"
+base = "efb3f0834bca8b0e358440883029a3b8b58f63f9"
+branch = "claude/issue-806-the-steps-view-leaves-the-board"
+scope = ["README.md", "docs/ARCHITECTURE.md", "frontend", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/serve.spec.md", "src/aco/board", "src/aco/board/static", "tests/board", "tests/support"]
+opened_commit = "7e9a1685cf88956a68ec492f99693bff37f4c837"
+whole_reason = "One visible change of the board with its components, tests and rebuilt static files; the parts are not useful alone."
