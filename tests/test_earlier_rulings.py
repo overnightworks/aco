@@ -202,8 +202,10 @@ def test_the_lines_of_an_area_without_a_ruling_are_none() -> None:
 
 
 def test_a_result_the_forge_marks_incomplete_is_unavailable() -> None:
+    item = _item("owner/b", 4, _ruled_entry())
+
     with pytest.raises(earlier_rulings.RecallUnavailableError):
-        _recall(_item("owner/b", 4, _ruled_entry()), complete=False)
+        _recall(item, complete=False)
 
 
 def test_the_recall_is_answered_as_the_keys_earlier_and_earlier_more() -> None:
