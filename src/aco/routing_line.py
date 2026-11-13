@@ -27,10 +27,10 @@ _STAGES_THAT_MAY_BE_ABSENT = frozenset({RoutingStage.FIX, RoutingStage.TEST, Rou
 
 _LINE = re.compile(r"^Routing: (.*)$", re.MULTILINE)
 _MODEL_AND_EFFORT = re.compile(r"[a-z0-9][a-z0-9.-]*/[a-z0-9-]+")
-_FIX_ROUNDS = re.compile(r"\bFix rounds: (\d{1,3})(?=[,.\s]|$)")
-_EXPERIMENT = re.compile(r"(?:^|\. )Experiment: ([a-z0-9-]{1,40})(?=\.|\s|$)")
+_FIX_ROUNDS = re.compile(r"\bFix rounds: (\d{1,3})(?=\.(?:\s|$)|, hard:|$)")
+_EXPERIMENT = re.compile(r"(?:^|\. )Experiment: ([a-z0-9-]{1,40})(?=\.(?:\s|$)|$)")
 _BLOCKING = re.compile(r"(?:^|\. )Blocking: (.*)$")
-_NO_BLOCKING = re.compile(r"none(?:\.|$)")
+_NO_BLOCKING = re.compile(r"none(?:\.(?:\s|$)|$)")
 _ARROW = "→"
 _STAGE_AFTER_ARROW = re.compile(_ARROW + r"\s*[A-Za-z][A-Za-z0-9-]*")
 

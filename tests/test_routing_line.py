@@ -84,6 +84,9 @@ def test_a_message_without_exactly_one_routing_line_has_no_routing(message: str)
             "Routing: build a/b. Fix rounds: 1234. Blocking: none", None, id="four-digits"
         ),
         pytest.param("Routing: build a/b. Fix rounds: many. Blocking: none", None, id="word"),
+        pytest.param("Routing: build a/b. Fix rounds: 1.5. Blocking: none", None, id="decimal"),
+        pytest.param("Routing: build a/b. Fix rounds: 2x. Blocking: none", None, id="suffixed"),
+        pytest.param("Routing: build a/b. Fix rounds: 2", 2, id="at-the-end-of-the-line"),
         pytest.param("Routing: build a/b. Blocking: none", None, id="absent"),
     ],
 )
@@ -126,6 +129,8 @@ def test_the_blocking_count_is_one_per_arrow_or_unknown_when_ambiguous(
         pytest.param("Experiment: a" + "b" * 40 + ".", None, id="forty-one-characters"),
         pytest.param("Experiment: Builder.", None, id="uppercase"),
         pytest.param("Experiment: a_b.", None, id="underscore"),
+        pytest.param("Experiment: trial two.", None, id="two-words"),
+        pytest.param("Experiment: trial.two.", None, id="a-dot-inside-the-tag"),
         pytest.param("", None, id="absent"),
     ],
 )
