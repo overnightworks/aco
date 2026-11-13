@@ -50,8 +50,8 @@ importers:
         specifier: 31.0.0
         version: 31.0.0
       knip:
-        specifier: 6.44.2
-        version: 6.44.2
+        specifier: 6.45.0
+        version: 6.45.0
       overnightworks-design:
         specifier: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz
         version: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz(svelte@5.57.3(@typescript-eslint/types@8.72.1))
@@ -1125,8 +1125,8 @@ packages:
   keyv@5.6.0:
     resolution: {integrity: sha512-CYDD3SOtsHtyXeEORYRx2qBtpDJFjRTGXUtmNEMGyzYOKj1TE3tycdlho7kA1Ufx9OYWZzg52QFBGALTirzDSw==}
 
-  knip@6.44.2:
-    resolution: {integrity: sha512-6URO7pnqtOnyvSsXfW6+8C9j1lfcicxUCysXO0RgMtHTZ96HqCXh29op8iabeQW5JeIc8dJWwzSdJVWDokeScQ==}
+  knip@6.45.0:
+    resolution: {integrity: sha512-ywPAhxiJGPWD/1V5dVYawA6el74q4vgX8omkeyl0MbA1CCkdjxrvWXXVqM20a5wQWcl1NbC9ImLHYsbFEbD0Xg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -1275,7 +1275,7 @@ packages:
     engines: {node: '>= 0.8.0'}
 
   overnightworks-design@https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz:
-    resolution: {integrity: sha512-N1F6Mf0DIv92ufRHhtLgTXJ7M5vutFByKUV/DCHYli1CpMicIUa4BZD5GoKkFKv49jt27meSEiw8EI7ryHlSWg==, tarball: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz}
+    resolution: {tarball: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz}
     version: 0.27.0
     peerDependencies:
       svelte: ^5.20.0
@@ -1499,6 +1499,7 @@ packages:
 
   tldts-core@7.4.20:
     resolution: {integrity: sha512-C630TWXZCZmLq0F2bW4QqwnaaxCQ/svpAqvJwnC4JvgEM5ohhBnGsEzTLSOXcN+xjz+kEaHS5uoWIw2klnqd0A==}
+    deprecated: Partial release, see https://github.com/remusao/tldts/issues/2735. Use >=7.4.22.
 
   tldts@7.4.19:
     resolution: {integrity: sha512-48dH6aSpQnpbzDUc4vIQZ1VjB8tkK+e8c1yx05/SZK+rkssgjEOlxDd/yU8/a4vGYQ9vRgJr9dwMq9TJ0b3X2Q==}
@@ -1702,9 +1703,6 @@ packages:
 
   zimmerframe@1.1.5:
     resolution: {integrity: sha512-msJxIvYDYcoNL+PJsu+7qmpDWsYmAxTY+2TNYXXF0hzBzBk0BMecOqDOG/EckUoKCuKwObfbugIl8QpqHDXeFA==}
-
-  zod@4.6.6:
-    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
 snapshots:
 
@@ -2618,7 +2616,7 @@ snapshots:
     dependencies:
       '@keyv/serialize': 1.1.1
 
-  knip@6.44.2:
+  knip@6.45.0:
     dependencies:
       formatly: 0.11.4
       get-tsconfig: 4.14.3
@@ -2631,7 +2629,6 @@ snapshots:
       tinyglobby: 0.2.17
       unbash: 6.0.4
       yaml: 2.9.1
-      zod: 4.6.6
 
   known-css-properties@0.37.0: {}
 
@@ -3136,5 +3133,3 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   zimmerframe@1.1.5: {}
-
-  zod@4.6.6: {}
