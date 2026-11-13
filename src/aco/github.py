@@ -72,6 +72,10 @@ EXTERNAL_STATUS_FALLBACK_NAME = "external status checks"
 # code but never its class, so any 5xx is matched by digit rather than by an
 # enumerated list of codes that would need to grow with the API.
 _HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
+# A forge gh never reached: gh prints `error connecting to <host>` for a DNS
+# failure and Go's raw `dial tcp ...: connect: <cause>` for any other connect
+# failure.
+_UNREACHABLE_SIGNALS = ("error connecting to", "dial tcp")
 # `merge_landing`'s own signals, none a 4xx `_nonzero_exit_failure` classifies.
 # GitHub's REST reference for the merge endpoint: 409 "if sha was provided and
 # pull request head did not match", 405 "if merge cannot be performed" -- a
@@ -240,6 +244,7 @@ def _is_transient_signal(decoded: str) -> bool:
         _HTTP_SERVER_ERROR_PATTERN.search(decoded) is not None
         or "connection reset" in decoded
         or "timeout" in decoded
+        or any(signal in decoded for signal in _UNREACHABLE_SIGNALS)
     )
 
 

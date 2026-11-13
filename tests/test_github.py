@@ -2223,6 +2223,25 @@ def test_bounded_command_rejects_non_utf8_output() -> None:
             id="decoded-timeout-signal",
         ),
         pytest.param(
+            process.BoundedResult(
+                1, b"error connecting to api.github.com\ncheck your internet connection"
+            ),
+            forge.ForgeTransientError,
+            "error connecting to api.github.com\ncheck your internet connection",
+            id="dns-failure",
+        ),
+        pytest.param(
+            process.BoundedResult(
+                1,
+                b'Get "https://api.github.com/repos/o/r": dial tcp 140.82.121.6:443: '
+                b"connect: connection refused",
+            ),
+            forge.ForgeTransientError,
+            'Get "https://api.github.com/repos/o/r": dial tcp 140.82.121.6:443: '
+            "connect: connection refused",
+            id="connect-failure",
+        ),
+        pytest.param(
             process.BoundedResult(1, b""),
             forge.ForgeError,
             "GitHub issue coordination failed with exit 1",
