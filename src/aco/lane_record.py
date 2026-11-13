@@ -85,12 +85,14 @@ class LaneRecord:
 @dataclass(frozen=True)
 class ReleasedLane:
     """The release being recorded: `released_at` is Unix seconds, `merge_commit` the sha the
-    forge or the trunk walk named for a landed lane."""
+    forge or the trunk walk named for a landed lane, `state_tip` the state-ref tip the claim
+    was read from."""
 
     claim: protocol.ActiveClaim
     outcome: protocol.ReleaseOutcome
     merge_commit: str | None
     released_at: int
+    state_tip: str | None
 
 
 def release_subject(
@@ -103,7 +105,11 @@ def release_subject(
     is the merge commit the forge's landing was verified to have: a github `--merged` release
     reads it nowhere else."""
     released = ReleasedLane(
-        claim, outcome, _merge_commit(outcome, verified_merge), int(datetime.now(UTC).timestamp())
+        claim,
+        outcome,
+        _merge_commit(outcome, verified_merge),
+        int(datetime.now(UTC).timestamp()),
+        context.observation.tip,
     )
     record = compute_record(context.toplevel, context.config, released)
     subject = store.transition_subject("release", claim.identity, claim.branch)
@@ -118,7 +124,7 @@ def compute_record(
     toplevel: Path, config: workboard.BoardConfig, released: ReleasedLane
 ) -> LaneRecord:
     """The record of `released`, every figure read from the repository at `toplevel`."""
-    opened = _unknown_if_unreadable(lambda: _read_commit(toplevel, released.claim.opened_commit))
+    opened = _unknown_if_unreadable(lambda: _claim_commit(toplevel, released))
     outcome, merge_commit = released.outcome, released.merge_commit
     if isinstance(outcome, protocol.AbandonedRelease):
         return LaneRecord(
@@ -158,6 +164,25 @@ def _read_commit(toplevel: Path, sha: str) -> _Commit:
     )
     timestamp, _, message = raw.partition("\n")
     return _Commit(int(timestamp), message)
+
+
+def _claim_commit(toplevel: Path, released: ReleasedLane) -> _Commit | None:
+    """The state-ref commit that added the claim: the first one after its `opened_commit`, which
+    is the tip that preceded it, so the idle time before the claim never counts."""
+    if released.state_tip is None:
+        return None
+    since_opened = checkout.git_output(
+        [
+            "rev-list",
+            "--first-parent",
+            "--reverse",
+            released.state_tip,
+            f"^{released.claim.opened_commit}",
+        ],
+        directory=toplevel,
+    )
+    claim_commit = since_opened.partition("\n")[0]
+    return _read_commit(toplevel, claim_commit) if claim_commit else None
 
 
 def _seconds_between(start: _Commit | None, end: int) -> int | None:

@@ -54,6 +54,7 @@ ROUTING_TRAILERS = (
 )
 MERGE_SHA = "a" * 40
 CLAIMED_AT = 1_700_000_000
+IDLE_SECONDS = 3600
 MERGED_AT = CLAIMED_AT + 600
 RELEASED_AT = CLAIMED_AT + 90
 
@@ -94,7 +95,8 @@ def test_a_record_with_nothing_measured_is_only_its_outcome() -> None:
 
 
 class LaneHistory:
-    """A repository whose `main` holds a claim commit and then a landing commit, each dated."""
+    """A repository whose `main` holds the commit before a claim, the claim commit and then a
+    landing commit, each dated; the claim was opened on the first of them."""
 
     def __init__(self, path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.path = path
@@ -104,7 +106,12 @@ class LaneHistory:
         (path / "tests").mkdir()
         (path / "src" / "a.py").write_text("one\ntwo\n")
         (path / "src" / "gen" / "x.py").write_text("x\n")
+        self.opened_commit = self.commit("before the claim", CLAIMED_AT - IDLE_SECONDS)
         self.claim_commit = self.commit("claim", CLAIMED_AT)
+
+    @property
+    def tip(self) -> str:
+        return real_git(self.path, "rev-parse", "HEAD").stdout.strip()
 
     def commit(self, message: str, moment: int) -> str:
         self.monkeypatch.setenv("GIT_COMMITTER_DATE", f"@{moment} +0000")
@@ -152,9 +159,9 @@ def compute_for(
     opened_commit: str | None = None,
 ) -> tuple[str, ...]:
     claim = standing_active_claim(
-        lane=True, opened_commit=opened_commit or history.claim_commit, base=history.claim_commit
+        lane=True, opened_commit=opened_commit or history.opened_commit, base=history.claim_commit
     )
-    released = ReleasedLane(claim, outcome, merge_commit, RELEASED_AT)
+    released = ReleasedLane(claim, outcome, merge_commit, RELEASED_AT, history.tip)
     return compute_record(history.path, config, released).trailers()
 
 
@@ -269,8 +276,9 @@ def release_trailers(
 ) -> tuple[str, ...]:
     """The trailers `release_subject` puts on the release of a lane claimed in `history`; its
     context holds no forge, so a read of one fails the test."""
-    context = SimpleNamespace(toplevel=history.path, config=CONFIG)
-    claim = standing_active_claim(lane=True, opened_commit=history.claim_commit)
+    observation = SimpleNamespace(tip=history.tip)
+    context = SimpleNamespace(toplevel=history.path, config=CONFIG, observation=observation)
+    claim = standing_active_claim(lane=True, opened_commit=history.opened_commit)
 
     return release_subject(cast(RunContext, context), claim, outcome, verified_merge).trailers
 
