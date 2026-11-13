@@ -42,7 +42,7 @@ reason (an abandoned one).
 ## The routing line
 
 The routing line is the form below; `<model>` and `<effort>` name a stage's model and effort,
-and the bracketed part stays out from the third fix round on. The line `Experiment: <tag>.`
+and the bracketed part comes from the third fix round on. The line `Experiment: <tag>.`
 may stand anywhere after the stages.
 
 ```text
