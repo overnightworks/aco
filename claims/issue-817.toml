@@ -1,0 +1,8 @@
+claim_id = "420e35cc82374089bc2b1427a03c9052"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "e5c69ea976f0e0e878fe88a949028e8a7704f826"
+branch = "claude/issue-817-next-notes-overlaps"
+scope = ["specs/next.spec.md", "src/aco/board_read.py", "src/aco/cmd_next.py", "src/aco/workboard.py", "tests/test_cli.py", "tests/test_cmd_next_live_claims.py"]
+opened_commit = "4deb4ca100f5c38c88a7f9a6d19fe60d48a5e4c0"
+whole_reason = "One changed walk with its output, spec and the tests that pinned the old blocking; a part alone leaves spec, output and tests disagreeing."
