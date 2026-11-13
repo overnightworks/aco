@@ -46,7 +46,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
 | one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
-| every found repo's read fails or times out | ABRD-20, ABRD-102 | ABRD-20 |
+| every found repo's read fails or times out | ABRD-20, ABRD-102, ABRD-128 | ABRD-20 |
 | an `/api/` request without the right token | ABRD-10 | ABRD-10 |
 | a decision naming a repo the scan does not find | — | ABRD-16 |
 | a card's fingerprint submitted against a different configured repo | — | ABRD-21 |
@@ -107,7 +107,8 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once, in configured order, under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
 - [ ] [ABRD-101] A repository whose read failed is a group under its name above one warning box with the warn mark, `Not read`, its sentence and `last read HH:MM` once read; it keeps its last rows, decidable.
-- [ ] [ABRD-102] A read that fails whole keeps every repository's rows as ABRD-101 with `aco antwortet nicht.` once the page has read; a first load that fails shows `aco antwortet nicht.` and the failure.
+- [ ] [ABRD-102] A read with no answer, or with neither `repos[]` nor `error` keeps every repository's rows as ABRD-101 with `aco antwortet nicht.` once read; a first load shows it and the status line.
+- [ ] [ABRD-128] A refused read shows what its answer carries: `repos[]` (ABRD-20) as any reading, an `error` sentence in place of the status line of ABRD-102; with neither, ABRD-102 applies.
 - [ ] [ABRD-103] The page reads on load, on Refresh, on return to the tab when its last read is over 10 s old, and every 30 minutes while visible; a read asked for during one runs once after it.
 - [ ] [ABRD-104] Refresh shows a turning arrow, `Refresh` (`Reading…` and `aria-busy` while a read runs, still clickable) and the last read's `HH:MM`, named `<label> · read HH:MM`; phones hide the label.
 - [ ] [ABRD-105] A read leaves the item of a card that waits (ABRD-99) as shown, kept when the read omits it; a read that answers once the card no longer waits applies as ABRD-98 allows.
@@ -153,7 +154,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
-`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`, `frontend/e2e/quietStates.spec.ts` (ABRD-127),
+`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`, `frontend/e2e/quietStates.spec.ts` (ABRD-127, ABRD-128),
 `frontend/e2e/refresh.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
@@ -181,7 +182,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
 - [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
 - [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
-- [ ] [ABRD-20] Once every found repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-102.
+- [ ] [ABRD-20] Once every found repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-128.
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
 - [ ] [ABRD-34] A line with `"form": "options"` is listed as an option line (E-ABRD-11); a line without `form` is a ruled yes/no line, with no `default` and no fingerprint (E-ABRD-03). No line offers an outcome.

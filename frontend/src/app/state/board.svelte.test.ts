@@ -55,7 +55,7 @@ test('a failed first load reaches the unavailable state with the failure message
 
 	expect(store.status).toBe('unavailable');
 	expect(store.repos).toEqual([]);
-	expect(store.error).toContain('502');
+	expect(store.error).toBe('aco rulings failed');
 });
 
 test('setNoAccess resets a previously loaded board', async () => {
