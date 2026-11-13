@@ -95,10 +95,10 @@
 		margin-left: auto;
 	}
 	.escapes button.quiet {
-		height: 40px;
+		height: 44px;
 		padding: 0 12px;
 		border: 1.5px solid transparent;
-		border-radius: 8px;
+		border-radius: 10px;
 		background: none;
 		color: var(--fg-2);
 		font-weight: 600;

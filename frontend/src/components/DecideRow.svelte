@@ -216,7 +216,7 @@
 		bottom: 0;
 		z-index: 2;
 		margin-top: 4px;
-		padding: 16px 0 8px;
+		padding: 16px 0 10px;
 		border-top: 1px solid var(--line);
 		background: var(--surface);
 	}
@@ -226,7 +226,7 @@
 	dt {
 		font-family: var(--font-display);
 		font-size: 12.5px;
-		line-height: 40px;
+		line-height: 44px;
 		font-weight: 400;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
@@ -248,21 +248,32 @@
 		gap: 8px;
 	}
 	.decide-row button.pick {
-		min-width: 48px;
-		height: 40px;
+		min-width: 52px;
+		height: 44px;
 		padding: 0 12px;
 		border: 1.5px solid var(--line-strong);
-		border-radius: 8px;
+		border-radius: 10px;
 		background: var(--surface);
 		font-family: var(--font-display);
 		font-size: 18px;
 		font-weight: 700;
+		transition:
+			background-color 0.12s,
+			border-color 0.12s,
+			color 0.12s;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.decide-row button.pick {
+			transition: none;
+		}
 	}
 	.decide-row button.pick:not(.recommended):hover:enabled {
 		border-color: var(--fg-2);
 	}
 	.decide-row button.pick.recommended {
+		border-width: 2px;
 		border-color: var(--accent);
+		background: var(--accent-soft);
 		color: var(--accent);
 	}
 	.decide-row button.pick.chosen {
@@ -274,7 +285,7 @@
 		display: inline-flex;
 		gap: 6px;
 		align-items: center;
-		height: 40px;
+		height: 44px;
 		margin-left: auto;
 		padding: 0 12px;
 		color: var(--good);
@@ -299,11 +310,12 @@
 		border: 1px solid var(--line);
 		border-radius: 16px;
 		background: var(--surface);
-		box-shadow: 0 20px 60px var(--shade);
+		box-shadow: var(--dialog-shadow);
 		color: var(--fg);
 	}
 	dialog::backdrop {
 		background: var(--scrim);
+		backdrop-filter: blur(3px);
 	}
 	dialog h2 {
 		margin: 0 0 12px;
@@ -328,10 +340,10 @@
 		justify-content: flex-end;
 	}
 	.decide-row button.confirm {
-		height: 40px;
-		padding: 0 16px;
+		height: 44px;
+		padding: 0 20px;
 		border: 1.5px solid var(--fg);
-		border-radius: 8px;
+		border-radius: 10px;
 		background: var(--fg);
 		color: var(--surface);
 		font-weight: 600;
@@ -349,12 +361,9 @@
 			grid-template-columns: minmax(0, 1fr);
 			padding-top: 12px;
 		}
-		.decide-row button.pick {
-			height: 44px;
-		}
 		dt {
-			line-height: 16px;
-			padding-bottom: 4px;
+			line-height: 18px;
+			padding-bottom: 8px;
 		}
 	}
 </style>

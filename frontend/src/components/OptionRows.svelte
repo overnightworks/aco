@@ -79,7 +79,7 @@
 	}
 	:global(.option-card) button.disclosure {
 		display: grid;
-		grid-template-columns: 24px minmax(0, 1fr) 16px;
+		grid-template-columns: 26px minmax(0, 1fr) 16px;
 		column-gap: 12px;
 		align-items: start;
 		width: 100%;
@@ -127,8 +127,8 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 24px;
-		height: 24px;
+		width: 26px;
+		height: 26px;
 		margin-top: -1px;
 		border: 1.5px solid var(--line-strong);
 		border-radius: 50%;
@@ -140,11 +140,15 @@
 	}
 	.letter.recommended {
 		border-color: var(--accent);
-		color: var(--accent);
+		background: var(--accent);
+		color: var(--accent-fg);
 	}
 	.recommendation {
 		display: flex;
-		align-items: start;
+		align-items: center;
 		gap: 12px;
+		padding: 8px 12px;
+		border-radius: 12px;
+		background: var(--accent-soft);
 	}
 </style>
