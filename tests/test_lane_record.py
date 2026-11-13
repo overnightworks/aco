@@ -3,7 +3,6 @@
 The figures come from real git history in a temporary repository; releases run through the
 real CLI against the real state ref, with the forge as the only fake."""
 
-import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -453,20 +452,27 @@ def test_an_abandoned_release_leaves_a_record_from_its_reason(
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: LANREC-01, LANREC-15, REL-64."""
+    """Spec: LANREC-01, LANREC-08, LANREC-15, REL-64."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
+    monkeypatch.setenv("GIT_COMMITTER_DATE", f"@{CLAIMED_AT} +0000")
 
     result = run_cli(
         ["--repo", REPOSITORY, "release", "--agent", "Ada", "--abandoned", ROUTING], capsys
     )
 
+    release_date, claim_date = (
+        int(moment)
+        for moment in real_git(
+            bare_remote, "log", "-2", "--first-parent", "--format=%ct", store.STATE_REF
+        ).stdout.split()
+    )
     lines = lane_trailers(release_commit_message(bare_remote))
     assert (result.status, result.stderr) == (0, "")
-    assert [re.sub(r"\d+$", "N", line) for line in lines[:2]] == [
+    assert lines[:2] == (
         "lane_outcome: abandoned",
-        "lane_wall_seconds: N",
-    ]
+        f"lane_wall_seconds: {release_date - claim_date}",
+    )
     assert lines[2:] == ROUTING_TRAILERS
 
 

@@ -113,7 +113,9 @@ def release_subject(
     )
     record = compute_record(context.toplevel, context.config, released)
     subject = store.transition_subject("release", claim.identity, claim.branch)
-    return dataclasses.replace(subject, trailers=record.trailers())
+    return dataclasses.replace(
+        subject, trailers=record.trailers(), committed_at=released.released_at
+    )
 
 
 def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:

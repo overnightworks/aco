@@ -33,7 +33,7 @@ reason (an abandoned one).
 - [ ] [LANREC-05] A value is a validated token: an outcome, a sha, a model or effort name, a whole number or a tag (LANREC-17..LANREC-20). A finding, a reason or any other free text never reaches a trailer.
 - [ ] [LANREC-06] `lane_outcome` is `landed` for `--merged` and `abandoned` for `--abandoned`; every record carries it.
 - [ ] [LANREC-07] `lane_merge` is the 40-character sha of the merge commit the lane landed as: the forge's recorded one under `github` storage, the resolved trunk commit under `state-ref`. An abandoned lane has none.
-- [ ] [LANREC-08] `lane_wall_seconds` is the whole seconds from the state-ref commit that added the claim, not the one before it (an adopted lane: its adoption) to the merge commit's committer date, or for an abandoned lane to the release.
+- [ ] [LANREC-08] `lane_wall_seconds` is the whole seconds from the state-ref commit that added the claim, not the one before it (an adopted lane: its adoption) to the merge commit's committer date, or for an abandoned lane to the committer date of the release commit, which is dated by the clock reading the record was computed from.
 - [ ] [LANREC-09] `lane_files`, `lane_added` and `lane_deleted` count the files and the added and deleted lines the merge commit changes against its first parent under `production_paths` and outside `dependency_paths`.
 - [ ] [LANREC-10] A binary file counts as one file and no lines. Without `production_paths`, or when that diff cannot be read, the three have no line, and an abandoned lane has none.
 - [ ] [LANREC-11] `lane_build`, `lane_fix`, `lane_review`, `lane_test`, `lane_gate` and `lane_land` hold the `<model>/<effort>` or `none` that stage names in the routing line, one trailer for each stage that parses.
