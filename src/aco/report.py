@@ -132,6 +132,14 @@ class BodyCheckReason(StrEnum):
     NOT_VERIFIED = "not_verified"
 
 
+class ForgeReachReason(StrEnum):
+    """The `--json` `reason` of a refusal whose cause is a forge aco could not
+    reach (`specs/output.spec.md`): shared by every command that tells it from
+    a forge that refused."""
+
+    UNREACHABLE = "unreachable"
+
+
 def refuse_checked_write(
     answer: forge.ForgeBodyWrittenError,
     *,
