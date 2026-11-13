@@ -1206,11 +1206,12 @@ def _write_incremental_state_tree(
 
 @dataclass(frozen=True)
 class TransitionSubject:
-    """One transition's own commit-message identity: `text` is the
-    human-facing subject line (`"claim issue 42"`, `"write item aco-xxxxxx"`).
-    """
+    """One transition's own commit-message identity: `text` is the human-facing subject
+    line (`"claim issue 42"`, `"write item aco-xxxxxx"`), `trailers` the further
+    `key: value` lines its message ends with (`specs/lane-record.spec.md`)."""
 
     text: str
+    trailers: tuple[str, ...] = ()
 
 
 def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> TransitionSubject:
@@ -1226,8 +1227,7 @@ def _transition_message(subject: TransitionSubject, intent: ClaimTransitionInten
     every intent carries `operation_id`, the one field `_find_operation_id`'s
     replay search reads back; a claim-shaped intent also names its `claim_id`,
     an item write its `item_id` instead, and a landing -- the one intent that
-    is both -- names `item_id` and `claim_id` together.
-    """
+    is both -- names `item_id` and `claim_id` together; the subject's own `trailers` follow."""
     label = _TRANSITION_LABELS[type(intent)]
     if isinstance(intent, LandingIntent):
         subject_field = f"item_id: {intent.item_id}\nclaim_id: {intent.claim_id}"
@@ -1235,9 +1235,9 @@ def _transition_message(subject: TransitionSubject, intent: ClaimTransitionInten
         subject_field = f"item_id: {intent.item_id}"
     else:
         subject_field = f"claim_id: {intent.claim_id}"
-    return (
-        f"{subject.text}\n\noperation_id: {intent.operation_id}\n{subject_field}\nintent: {label}\n"
-    )
+    trailers = "".join(f"{line}\n" for line in subject.trailers)
+    body = f"operation_id: {intent.operation_id}\n{subject_field}\nintent: {label}\n"
+    return f"{subject.text}\n\n{body}{trailers}"
 
 
 @dataclass(frozen=True)

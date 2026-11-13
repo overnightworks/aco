@@ -15,6 +15,7 @@ from . import (
     checkout,
     forge,
     github,
+    lane_record,
     protocol,
     report,
     state_board,
@@ -27,12 +28,11 @@ KEEP_WORKTREE_FLAG = "--keep-worktree"
 
 
 class _ReleaseReason(StrEnum):
-    """`aco release`'s own `--json` `reason` vocabulary (
-    `specs/release.spec.md`): `merged`/`abandoned` name which outcome flag
-    the caller gave -- a state-ref `--merged` landing (`LandedRelease`)
-    reports `merged` too, since it is the same `--merged` outcome as a
-    github pull request landing, only verified against the trunk walk
-    instead of a pull request. `outcome`, this release's own prose sentence
+    """`aco release`'s own `--json` `reason` vocabulary (`specs/release.spec.md`):
+    `merged`/`abandoned` name which outcome flag the caller gave -- a state-ref
+    `--merged` landing (`LandedRelease`) reports `merged` too, since it is the
+    same `--merged` outcome as a github pull request landing, only verified
+    against the trunk walk instead of a pull request. `outcome`, this release's own prose sentence
     (`"merged #<n>"`, `"abandoned: <explanation>"`, or `"landed <sha>"`),
     stays a payload sibling rather than a second enum. Every refusal past
     the parser (REL-01's usage errors excepted, which argparse itself
@@ -471,7 +471,7 @@ def release_transition(
         coordinator_override=parsed.coordinator_override,
     )
     new_state = context.transition(
-        store.transition_subject("release", resolved.selected.identity, resolved.selected.branch),
+        lane_record.release_subject(context, resolved.selected, outcome),
         intent,
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
@@ -805,7 +805,7 @@ def _cmd_release_landed(
         coordinator_override=parsed.coordinator_override,
     )
     new_state = context.transition(
-        store.transition_subject("release", resolved.selected.identity, resolved.selected.branch),
+        lane_record.release_subject(context, resolved.selected, outcome),
         intent,
     )
     client.mark_landed(write, new_oid)
