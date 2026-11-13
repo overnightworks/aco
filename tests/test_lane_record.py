@@ -193,6 +193,7 @@ def test_a_renamed_production_file_is_one_file_with_only_its_changed_lines(
     history: LaneHistory, renamed_content: str, line_trailers: list[str]
 ) -> None:
     """Spec: LANREC-09."""
+    real_git(history.path, "config", "diff.renames", "false")
     real_git(history.path, "mv", "src/a.py", "src/b.py")
     (history.path / "src" / "b.py").write_text(renamed_content)
     merge = history.commit("Renaming", MERGED_AT)

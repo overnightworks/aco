@@ -199,7 +199,9 @@ def _production_size(
     if not config.production_paths:
         return None
     raw = checkout.git_output(
-        ["diff", "--numstat", "-z", f"{merge}^1", merge, "--"], directory=toplevel, lossy=True
+        ["diff", "--numstat", "--find-renames", "-z", f"{merge}^1", merge, "--"],
+        directory=toplevel,
+        lossy=True,
     )
     counted = [
         (added, deleted)
