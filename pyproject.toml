@@ -78,7 +78,7 @@ layers = [
     "board | mcp_server",
     "decide",
     "inbox",
-    "board_read | policy | report",
+    "board_read | policy | report | lane_record",
     "repositories",
     "session",
     "ahead_of_caller",
@@ -95,7 +95,7 @@ layers = [
     "usage",
     "lineage_stamp",
     "file_lock",
-    "protocol | process",
+    "protocol | process | routing_line",
 ]
 # `items` may import `body`, never the reverse.
 # The five cmd_* -> cmd_* edges: land.spec cites the release rules;

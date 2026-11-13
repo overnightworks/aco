@@ -73,6 +73,7 @@ other key is refused by name (`specs/storage-pin.spec.md`).
 | `merge_method` | `"merge"` or `"squash"` for `aco land`; absent, a squash where the forge allows one, else a merge commit; where a merge queue applies, the queue's own method (`specs/land.spec.md`) |
 | `lane_shared` | paths a lane may change beyond its scope; a trailing `/` covers a directory |
 | `dependency_paths` | paths a `No-Item: deps` pull request may change; a trailing `/` covers a directory |
+| `production_paths` | paths whose changes count toward a lane record's production size; a trailing `/` covers a directory; paths also listed in `dependency_paths` do not count |
 
 Code built ahead of its caller is listed in a tracked
 `.aco/ahead-of-caller.toml` as `[[code]]` entries (`path`, `item`, `reason`);

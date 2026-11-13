@@ -17,6 +17,7 @@ from typing import TextIO
 
 import pytest
 from board_fixtures import REPOSITORY, complete_contract, searchless, write_repository_config
+from lane_record_fixtures import stub_lane_record
 
 from aco import (
     board_read,
@@ -403,8 +404,7 @@ def worktree(tmp_path: Path) -> Path:
 
     Independent of `bare_remote`: store operations reach the remote by path,
     never by a configured `origin`, so this repo's own history is unrelated
-    to the state ref it reads and writes.
-    """
+    to the state ref it reads and writes."""
     checkout = tmp_path / "worktree"
     checkout.mkdir()
     real_git(checkout, "init", "-b", "main")
@@ -545,10 +545,11 @@ def stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def stub_every_remote_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     """An in-memory store's checkout configures whichever canonical remote
-    its board names, the way its faked URL stands for that remote. A test
-    proving a remote with no URL configured restores
-    `checkout.unconfigured_remote_refusal`, so real git answers it."""
+    its board names, the way its faked URL stands for that remote, and its
+    releases carry no lane record. A test proving a remote with no URL configured
+    restores `checkout.unconfigured_remote_refusal`, so real git answers it."""
     monkeypatch.setattr(checkout, "unconfigured_remote_refusal", lambda _remote, **_kwargs: None)
+    stub_lane_record(monkeypatch)
 
 
 AGENT_IDENTITY_ENV_NAMES = (
@@ -710,8 +711,7 @@ def run_cli(
     argparse exits with it, and drain everything printed since the last run.
 
     Strings are encoded as UTF-8; bytes are piped unchanged. None inherits stdin.
-    The previous stdin is restored and the pipe closed even when main raises.
-    """
+    The previous stdin is restored and the pipe closed even when main raises."""
     previous_stdin = sys.stdin
     pipe = read_end_of_a_pipe_carrying(stdin) if stdin is not None else None
     if pipe is not None:

@@ -257,8 +257,13 @@ class GitPushTransport:
             raise PushRejectedError(process.git_failure_detail(result))
 
 
-def _run_git(worktree: Path, arguments: list[str]) -> process.CapturedResult:
+def _run_git(
+    worktree: Path, arguments: list[str], environment: dict[str, str] | None = None
+) -> process.CapturedResult:
     try:
+        if environment is not None:
+            command = process.git_command(arguments, directory=worktree)
+            return process.run_captured(command, env=environment)
         return process.run_git(arguments, directory=worktree)
     except process.ExecutableMissingError as error:
         raise ClaimError("git is required for the claim state store") from error
@@ -799,36 +804,30 @@ def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
 
 
 def peek_state(*, worktree: Path, remote: str) -> ClaimState:
-    """Read `STATE_REF` on `remote` for a caller that must not write (`land`'s
-    read-only preflight): one of the two peeks in this module, with
-    `peek_state_for_reset`, that read through `_peek_tip` and so skip
-    `fetch_state`'s own lineage guard, anchor, and stamp.
+    """Read `STATE_REF` on `remote` for a caller that must not write (`land`'s read-only
+    preflight): one of the two peeks in this module, with `peek_state_for_reset`, that read
+    through `_peek_tip` and so skip `fetch_state`'s own lineage guard, anchor, and stamp.
 
-    The tip is `_ls_remote_state`'s own answer: the
-    fetch that follows (`_fetch_ref_objects`) only brings the objects into
-    this worktree's local store so `_parse_state_tree` can read them -- it
-    writes no destination ref, and `--no-write-fetch-head` keeps it from
-    even landing the tip in `FETCH_HEAD`, so a concurrent `git fetch`
-    anywhere else in this same worktree can race it however it likes: this
-    read never looks at `FETCH_HEAD`, and `fetch_state`'s own fetch keeps
-    out of it the same way, reading its anchor instead. `--no-tags` keeps a
-    reachable tag on `STATE_REF`'s own history from auto-following into the
-    shared local `refs/tags/*` namespace during this read.
+    The tip is `_ls_remote_state`'s own answer: the fetch that follows (`_fetch_ref_objects`)
+    only brings the objects into this worktree's local store so `_parse_state_tree` can read
+    them -- it writes no destination ref, and `--no-write-fetch-head` keeps it from even landing
+    the tip in `FETCH_HEAD`, so a concurrent `git fetch` anywhere else in this same worktree can
+    race it however it likes: this read never looks at `FETCH_HEAD`, and `fetch_state`'s own
+    fetch keeps out of it the same way, reading its anchor instead. `--no-tags` keeps a
+    reachable tag on `STATE_REF`'s own history from auto-following into the shared local
+    `refs/tags/*` namespace during this read.
 
-    `reset` reads this way, through `peek_state_for_reset`, to recover from
-    exactly what `fetch_state`'s lineage check refuses -- a rewritten or deleted ref this
-    worktree's own stamp disagrees with -- so it reads and acts on whatever
-    tip is on `remote` right now, never against this worktree's history.
-    `land`'s preflight uses it to observe a live claim before its first
-    write: a pull request this preflight goes on to refuse must never have
-    anchored a ref or stamped a lineage when the merge never happens. Both
-    callers share the same requirement -- a dry run, a live-claim refusal, a
-    failed export, or a refused merge must change nothing durable -- so this
-    performs no per-worktree write at all: no anchor write, no
-    `lineage_stamp` write, no local tag, no `FETCH_HEAD`. `fetch_state`
-    stays the write-capable read every live transition (`claim`, `release`,
-    ...) still needs, since those callers go on to write and must keep this
-    worktree's own lineage current.
+    `reset` reads this way, through `peek_state_for_reset`, to recover from exactly what
+    `fetch_state`'s lineage check refuses -- a rewritten or deleted ref this worktree's own stamp
+    disagrees with -- so it reads and acts on whatever tip is on `remote` right now, never
+    against this worktree's history. `land`'s preflight uses it to observe a live claim before
+    its first write: a pull request this preflight goes on to refuse must never have anchored a
+    ref or stamped a lineage when the merge never happens. Both callers share the same
+    requirement -- a dry run, a live-claim refusal, a failed export, or a refused merge must
+    change nothing durable -- so this performs no per-worktree write at all: no anchor write, no
+    `lineage_stamp` write, no local tag, no `FETCH_HEAD`. `fetch_state` stays the write-capable
+    read every live transition (`claim`, `release`, ...) still needs, since those callers go on
+    to write and must keep this worktree's own lineage current.
     """
     probed = _peek_tip(worktree, remote)
     if probed is None:
@@ -878,12 +877,21 @@ def _read_tip_schema_toml(worktree: Path, tip: ObjectId) -> str:
 
 
 def _commit_tree(
-    worktree: Path, *, tree_oid: ObjectId, parent: ObjectId | None, message: str
+    worktree: Path,
+    *,
+    tree_oid: ObjectId,
+    parent: ObjectId | None,
+    message: str,
+    committed_at: int | None = None,
 ) -> ObjectId:
     arguments = ["commit-tree", str(tree_oid), "-m", message]
     if parent is not None:
         arguments += ["-p", str(parent)]
-    result = _run_git(worktree, arguments)
+    environment = None
+    if committed_at is not None:
+        moment = f"@{committed_at} +0000"
+        environment = {**os.environ, "GIT_AUTHOR_DATE": moment, "GIT_COMMITTER_DATE": moment}
+    result = _run_git(worktree, arguments, environment)
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     return ObjectId(result.stdout.decode().strip())
@@ -894,19 +902,17 @@ def _find_operation_id(
 ) -> ObjectId | None:
     """Search new commits on `refs/aco/state` for one carrying `operation_id`.
 
-    One `git log -1` per candidate commit rather than a single delimited
-    dump: the range this ever searches is a handful of commits contending
-    over one push, not a hot path, so the simplest correct parse wins.
+    One `git log -1` per candidate commit rather than a single delimited dump: the range this
+    ever searches is a handful of commits contending over one push, not a hot path, so the
+    simplest correct parse wins.
 
-    Both ends of the range are already-resolved commits by the time the
-    retry loop calls this (its own just-built commit, and a tip
-    `fetch_state` just parsed), so a failing walk is a broken invariant, not
-    an absent id: reading it as "not found" would let a lost response whose
-    commit already landed be pushed a second time. The per-candidate read
-    below holds that same contract: a nonzero exit
-    reading one candidate's own message fails loud with git's detail, never
-    silently treated as "this commit does not carry the id" -- that reading
-    is reserved for a candidate whose message was actually read.
+    Both ends of the range are already-resolved commits by the time the retry loop calls this
+    (its own just-built commit, and a tip `fetch_state` just parsed), so a failing walk is a
+    broken invariant, not an absent id: reading it as "not found" would let a lost response
+    whose commit already landed be pushed a second time. The per-candidate read below holds that
+    same contract: a nonzero exit reading one candidate's own message fails loud with git's
+    detail, never silently treated as "this commit does not carry the id" -- that reading is
+    reserved for a candidate whose message was actually read.
     """
     range_argument = f"{since}..{until}" if since is not None else str(until)
     listing = _run_git(worktree, ["log", "--format=%H", range_argument])
@@ -1206,11 +1212,14 @@ def _write_incremental_state_tree(
 
 @dataclass(frozen=True)
 class TransitionSubject:
-    """One transition's own commit-message identity: `text` is the
-    human-facing subject line (`"claim issue 42"`, `"write item aco-xxxxxx"`).
-    """
+    """One transition's own commit-message identity: `text` is the human-facing subject
+    line (`"claim issue 42"`, `"write item aco-xxxxxx"`), `trailers` the further
+    `key: value` lines its message ends with (`specs/lane-record.spec.md`), `committed_at`
+    the Unix second its commit is dated when a trailer states a figure measured to it."""
 
     text: str
+    trailers: tuple[str, ...] = ()
+    committed_at: int | None = None
 
 
 def transition_subject(action: str, identity: ClaimIdentity, branch: str) -> TransitionSubject:
@@ -1226,8 +1235,7 @@ def _transition_message(subject: TransitionSubject, intent: ClaimTransitionInten
     every intent carries `operation_id`, the one field `_find_operation_id`'s
     replay search reads back; a claim-shaped intent also names its `claim_id`,
     an item write its `item_id` instead, and a landing -- the one intent that
-    is both -- names `item_id` and `claim_id` together.
-    """
+    is both -- names `item_id` and `claim_id` together; the subject's own `trailers` follow."""
     label = _TRANSITION_LABELS[type(intent)]
     if isinstance(intent, LandingIntent):
         subject_field = f"item_id: {intent.item_id}\nclaim_id: {intent.claim_id}"
@@ -1235,9 +1243,9 @@ def _transition_message(subject: TransitionSubject, intent: ClaimTransitionInten
         subject_field = f"item_id: {intent.item_id}"
     else:
         subject_field = f"claim_id: {intent.claim_id}"
-    return (
-        f"{subject.text}\n\noperation_id: {intent.operation_id}\n{subject_field}\nintent: {label}\n"
-    )
+    trailers = "".join(f"{line}\n" for line in subject.trailers)
+    body = f"operation_id: {intent.operation_id}\n{subject_field}\nintent: {label}\n"
+    return f"{subject.text}\n\n{body}{trailers}"
 
 
 @dataclass(frozen=True)
@@ -1307,19 +1315,16 @@ def commit_transition(
     intent: ClaimTransitionIntent,
     transport: PushTransport | None = None,
 ) -> ClaimState:
-    """Apply and push one claim/rescope/release/item-write/landing
-    transition: the production caller of `protocol.apply`.
+    """Apply and push one claim/rescope/release/item-write/landing transition: the production
+    caller of `protocol.apply`.
 
-    The first attempt applies `intent` to the command's own `observed`
-    state and reads nothing itself. Unlike `bootstrap`'s fixed
-    tree, a transition's result depends on the state it is applied to, so a
-    rejected push re-fetches, looks for its own `operation_id`, and
-    re-applies `intent` to the fresh state instead of reusing a stale tree
-    (CAS-13). A
-    failure after a push was sent whose outcome the store cannot tell is an
-    `UncertainWriteError` (CAS-56); a refusal or an exhausted retry after a
-    re-read found nothing of this write, so it stays the plain refusal
-    (CAS-57).
+    The first attempt applies `intent` to the command's own `observed` state and reads nothing
+    itself. Unlike `bootstrap`'s fixed tree, a transition's result depends on the state it is
+    applied to, so a rejected push re-fetches, looks for its own `operation_id`, and re-applies
+    `intent` to the fresh state instead of reusing a stale tree (CAS-13). A failure after a push
+    was sent whose outcome the store cannot tell is an `UncertainWriteError` (CAS-56); a refusal
+    or an exhausted retry after a re-read found nothing of this write, so it stays the plain
+    refusal (CAS-57).
     """
     transport = transport or GitPushTransport()
     if observed.state.tip is None:
@@ -1337,6 +1342,7 @@ def commit_transition(
             tree_oid=new_tree,
             parent=state.tip,
             message=_transition_message(subject, intent),
+            committed_at=subject.committed_at,
         )
         rejection = _pushed(observed, transport, new_commit, intent.operation_id)
         if rejection is None:
@@ -1587,34 +1593,28 @@ def _export_cleanup_failure(
 
 
 def export_state_bundle(*, worktree: Path, tip: ObjectId, destination: Path) -> Path:
-    """Bundle `tip` into `destination` (reset, step 1 of 5): the
-    sole mandatory-unless-`--no-export` write a reset performs before
-    anything is deleted.
+    """Bundle `tip` into `destination` (reset, step 1 of 5): the sole
+    mandatory-unless-`--no-export` write a reset performs before anything is deleted.
 
-    Bundles the private `EXPORT_BUNDLE_REF` (`_write_bundle_to_descriptor`'s
-    own docstring has the full rationale), never the shared `STATE_REF`:
-    nothing this function does is ever visible to another linked worktree's
-    concurrent reset, and the bundled tip is always exactly the `tip` the
-    caller leased -- never whatever a shared ref happens to hold when the
-    subprocess actually runs. Restoring the bundle therefore reads
-    `EXPORT_BUNDLE_REF`'s name on the bundle side of the fetch, not
-    `STATE_REF`'s (`git bundle list-heads` names it,
+    Bundles the private `EXPORT_BUNDLE_REF` (`_write_bundle_to_descriptor`'s own docstring has the
+    full rationale), never the shared `STATE_REF`: nothing this function does is ever visible to
+    another linked worktree's concurrent reset, and the bundled tip is always exactly the `tip`
+    the caller leased -- never whatever a shared ref happens to hold when the subprocess actually
+    runs. Restoring the bundle therefore reads `EXPORT_BUNDLE_REF`'s name on the bundle side of
+    the fetch, not `STATE_REF`'s (`git bundle list-heads` names it,
     `cmd_reset._reset_restore_command` builds the command).
 
-    Cleanup of the temporary export ref and the temporary file is
-    unconditional and the two are independent of each other: whatever happened while writing or
-    publishing the bundle -- success, or a failure raised at any point --
-    both cleanups are always attempted, via `_clear_export_artifacts`, and a
-    failure in one never skips the other. The previous version ran the ref
-    cleanup as a plain statement ahead of the temporary file's own cleanup,
-    so an exception from that one git invocation (not just a nonzero exit)
-    skipped the temporary file's removal entirely, and both cleanups
-    suppressed their own `OSError`/nonzero-exit without naming what was left
-    behind. When a cleanup failure happens, the artifact it could not remove
-    is named in the raised error, together with the write/publish failure
-    that preceded it when there was one, carried as that error's cause
-    (`raise ... from`); when cleanup succeeds but the write or publish
-    itself failed, that original error is re-raised unchanged.
+    Cleanup of the temporary export ref and the temporary file is unconditional and the two are
+    independent of each other: whatever happened while writing or publishing the bundle --
+    success, or a failure raised at any point -- both cleanups are always attempted, via
+    `_clear_export_artifacts`, and a failure in one never skips the other. The previous version
+    ran the ref cleanup as a plain statement ahead of the temporary file's own cleanup, so an
+    exception from that one git invocation (not just a nonzero exit) skipped the temporary file's
+    removal entirely, and both cleanups suppressed their own `OSError`/nonzero-exit without
+    naming what was left behind. When a cleanup failure happens, the artifact it could not remove
+    is named in the raised error, together with the write/publish failure that preceded it when
+    there was one, carried as that error's cause (`raise ... from`); when cleanup succeeds but
+    the write or publish itself failed, that original error is re-raised unchanged.
     """
     try:
         descriptor, temp_name = tempfile.mkstemp(

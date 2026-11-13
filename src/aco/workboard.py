@@ -471,8 +471,7 @@ class LandingRow:
 
 
 class MergeMethod(StrEnum):
-    """How GitHub merges a pull request, in its own
-    `merge_method` vocabulary."""
+    """How GitHub merges a pull request, in its own `merge_method` vocabulary."""
 
     MERGE = "merge"
     SQUASH = "squash"
@@ -495,8 +494,7 @@ class BoardConfig:
     canonical_remote: str = DEFAULT_CANONICAL_REMOTE
     # Which adapter owns this repository's board and item data:
     # `RunContext.repository_id` resolves the one the pin names, never
-    # guessed from the remote's own host. `github` is the default -- every
-    # repository pinned today lives there.
+    # guessed from the remote's own host; `github` is the default.
     storage: Storage = Storage.GITHUB
     # Repository files, and directories (an entry ending `/`), a lane may
     # change beyond its scope: registries that follow every code change
@@ -509,6 +507,7 @@ class BoardConfig:
     # a pin here beats the forge's allowed methods; `None` asks the forge.
     merge_method: MergeMethod | None = None
     dependency_paths: tuple[str, ...] = ()
+    production_paths: tuple[str, ...] = ()
 
     def covers_dependency_path(self, path: str) -> bool:
         return any(repository_path_entry_covers(entry, path) for entry in self.dependency_paths)
@@ -764,6 +763,7 @@ def parse_config(text: str, path: Path) -> BoardConfig:
         merge_method=_validated_merge_method(raw, path),
         lane_shared=_validated_repository_paths(raw, path, "lane_shared"),
         dependency_paths=_validated_repository_paths(raw, path, "dependency_paths"),
+        production_paths=_validated_repository_paths(raw, path, "production_paths"),
     )
 
 

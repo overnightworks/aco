@@ -39,6 +39,8 @@ steps only he can take.
 - Not a standing service: nothing has to run between sessions. Agents
   coordinate through the repository itself; a session that wants the
   operator's inbox starts its own reader for its own length.
-- Not a project-management tool. A piece of work has a rough size and
-  nothing more: no time tracking, statistics or reports.
+- Not a project-management tool. A piece of work has a rough size, and every
+  lane leaves one record of its duration, rounds, size and models for agents
+  to read when they compare how work was done: no time sheets, and no
+  statistics or reports for the operator.
 - Not a decider. It records the operator's word and never rules in his place.

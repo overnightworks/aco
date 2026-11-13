@@ -51,8 +51,7 @@ def landing_pull_request(
     merge_commit: str | None = None,
     title: str = "feat: land the lane",
 ) -> forge.Landing:
-    """`merge_commit` defaults to a shared sha once `merged` is true and to
-    `None` otherwise."""
+    """`merge_commit` defaults to a shared sha once `merged` is true and to `None` otherwise."""
     return forge.Landing(
         number,
         author,
@@ -92,10 +91,9 @@ def merge_on_the_forge(
     message: str,
     method: MergeMethod,
 ) -> str:
-    """The commit a forge's own merge of `source_branch` into
-    `default_branch` with `method` pushes to the bare `remote` -- a merge
-    commit, or one squashed single-parent commit -- built in a clone of it
-    beside `remote` so no landing checkout moves with it."""
+    """The commit a forge's own merge of `source_branch` into `default_branch` with `method`
+    pushes to the bare `remote` -- a merge commit, or one squashed single-parent commit -- built
+    in a clone of it beside `remote` so no landing checkout moves with it."""
     clone = remote.parent / "forge-merge"
     real_git(remote.parent, "clone", "-q", "-b", default_branch, str(remote), str(clone))
     # `merge` and `commit` start detached maintenance that may still write
@@ -126,6 +124,7 @@ class FakeForge:
     default_branch_name: str = "main"
     default_branch_error: forge.ForgeError | None = None
     landings: dict[int, forge.Landing] = field(default_factory=dict)
+    landing_reads: list[int] = field(default_factory=list)
     changes_by_number: dict[int, forge.PullRequestChanges | forge.ForgeError] = field(
         default_factory=dict
     )
@@ -225,8 +224,8 @@ class FakeForge:
         )
 
     def create_child(self, *, parent: int, title: str, body: str, kind: body.ItemKind) -> int:
-        """This fake's mirror of `GitHubForge.create_child`: composed from
-        `create_issue` and `link_child` as the real adapter is."""
+        """This fake's mirror of `GitHubForge.create_child`: composed from `create_issue` and
+        `link_child` as the real adapter is."""
         self.created_children.append((parent, title, body, kind))
         number = self.create_issue(title=title, body=body, kind=kind)
         try:
@@ -375,6 +374,7 @@ class FakeForge:
 
     def landing(self, number: int) -> forge.Landing:
         self._run()
+        self.landing_reads.append(number)
         detail = self.landings.get(number)
         if detail is None:
             raise protocol.ClaimError(f"GitHub has no pull request #{number}")

@@ -23,6 +23,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | a key the configuration does not define | PIN-33 | PIN-33 | PIN-33 | PIN-33 | — |
 | `lane_shared` is no list of unique paths inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
 | dependency paths configured or invalid | PIN-44..48 | PIN-44..48 | PIN-44..48 | PIN-44..48 | — |
+| production paths configured or invalid | PIN-54..56 | PIN-54..56 | PIN-54..56 | PIN-54..56 | — |
 | `idea_label` absent or invalid | PIN-49 | PIN-49 | PIN-49 | PIN-49 | — |
 | `canonical_remote` absent or invalid | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | — |
 | `storage = "github"`, the canonical remote still names a repository GitHub has renamed | PIN-52 | PIN-52 | PIN-52 | PIN-52 | — |
@@ -100,6 +101,9 @@ them.
 - [ ] [PIN-51] A blank, padded or non-string `canonical_remote`, or one starting with `-`, refuses `board configuration <path> canonical_remote must be a non-empty remote name not starting with '-'`.
 - [ ] [PIN-52] A parent, child, blocker or pull request head naming another repository refuses `GitHub renamed <old> to <new>; point the canonical remote at <new>` (after a write: LAND-38; see E-PIN-42).
 - [ ] [PIN-53] Under `github` storage a forge target other than the canonical remote's refuses `forge target <t> does not match canonical remote <c>; run aco from that repository's checkout`, exit `2`.
+- [ ] [PIN-54] A tracked `<path>` may name `production_paths = ["<entry>", ...]`, in `dependency_paths`'s form (PIN-44, PIN-48): a path is production when an entry covers it and no `dependency_paths` entry does.
+- [ ] [PIN-55] A `production_paths` value that is no list of unique strings refuses `board configuration <path> production_paths must be a list of unique repository paths`.
+- [ ] [PIN-56] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> production_paths entry '<entry>' is not a canonical path inside the repository`.
 
 ## `storage = "state-ref"` is forge-free
 
