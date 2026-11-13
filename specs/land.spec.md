@@ -71,6 +71,7 @@ order `merge`, `squash`, `rebase`.
 | every precondition holds | LANDCMD-12, LANDCMD-13, LANDCMD-27, LANDCMD-39, LANDCMD-42, LANDCMD-29, LANDCMD-34, LANDCMD-35, LANDCMD-36 |
 | the pull request changed since it was read | LANDCMD-14 |
 | GitHub refuses the merge | LANDCMD-37 |
+| the merge call fails with a server error, or GitHub is still merging | LANDCMD-71, LANDCMD-72, LANDCMD-73 |
 | a step after the merge fails | LANDCMD-15, LANDCMD-16 |
 | this repository's own pull request | LANDCMD-17 |
 | a RELEASED ending | LANDCMD-57, LANDCMD-54, LANDCMD-55, LANDCMD-58 |
@@ -140,7 +141,10 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-36] Any other body takes a blank line, then the classification alone as its last paragraph.
 - [ ] [LANDCMD-35] Removing the classification line leaves no run of blank lines where it stood: a paragraph it alone made goes with it, and a whitespace-only line counts as blank.
 - [ ] [LANDCMD-14] A pull request whose head sha changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run land`, exit `2`; nothing merges.
-- [ ] [LANDCMD-37] A merge GitHub refuses to perform (HTTP 405) refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (see E-LANDCMD-37).
+- [ ] [LANDCMD-37] A merge GitHub refuses to perform (HTTP 405, but LANDCMD-71's) refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
+- [ ] [LANDCMD-71] A merge call failing with HTTP 5xx, or a 405 `Merge already in progress`, refuses `pull request #<n> may still be merging (<error>); re-run aco land <n>`, exit `2`, claim kept (E-LANDCMD-71).
+- [ ] [LANDCMD-72] After a 5xx, one read of the pull request comes first: merged at the pinned head, `aco land` goes on as after a merge (LANDCMD-15); open or unreadable, it refuses as LANDCMD-71; a 405 reads nothing.
+- [ ] [LANDCMD-73] LANDCMD-71's `<error>` is escaped and cut alone like LANDCMD-47's; a rerun of a pull request merged in between resumes without a second merge (LANDCMD-18).
 
 ## Merge, through the merge queue
 
@@ -448,6 +452,18 @@ $ aco land 57
 2> ERROR: GitHub refused the merge of pull request #57: gh: Repository rule violations found (HTTP 405)
 exit 2
 ```
+
+### E-LANDCMD-71 — a merge that may still be running says a re-run helps
+
+Setup: bare-remote, fake `gh`, pull request `#57` open and green during preflight, the pinned merge request answered `gh: Server Error (HTTP 502)`, the following read finding the pull request still open
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 may still be merging (gh: Server Error (HTTP 502)); re-run aco land 57
+exit 2
+```
+
+The claim stands and nothing else was written. Had the read found the pull request merged at the pinned head, the command would have gone on to the steps after the merge (LANDCMD-15) with no refusal; the answer `Merge already in progress (HTTP 405)` refuses the same way without that read.
 
 ### E-LANDCMD-15 — a failed post-merge step names its own recovery line
 

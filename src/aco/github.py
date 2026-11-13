@@ -72,13 +72,14 @@ EXTERNAL_STATUS_FALLBACK_NAME = "external status checks"
 # code but never its class, so any 5xx is matched by digit rather than by an
 # enumerated list of codes that would need to grow with the API.
 _HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
-# `merge_landing`'s own two refusal signals, neither a 4xx
-# `_nonzero_exit_failure` above already classifies. GitHub's REST reference
-# for the merge endpoint: 409 "if sha was provided and pull request head did
-# not match", 405 "if merge cannot be performed" -- a rule, a
-# required review, an unmergeable state, which no re-run repairs.
+# `merge_landing`'s own signals, none a 4xx `_nonzero_exit_failure` classifies.
+# GitHub's REST reference for the merge endpoint: 409 "if sha was provided and
+# pull request head did not match", 405 "if merge cannot be performed" -- a
+# rule, a required review, an unmergeable state: no re-run repairs it, but
+# "Merge already in progress" a re-run finishes.
 _MERGE_HEAD_MOVED_STATUS = "HTTP 409"
 _MERGE_REFUSED_STATUS = "HTTP 405"
+_MERGE_IN_PROGRESS_MESSAGE = "merge already in progress"
 # GitHub's own 403 message where the repository's plan offers no rulesets (a
 # private repository on the Free plan); such a branch carries no rules.
 _RULESETS_UNAVAILABLE_ON_PLAN = "Upgrade to GitHub Pro or make this repository public"
@@ -657,11 +658,7 @@ class GitHubForge:
             ]
         )
         values = self._json_lines(raw, "commit status summary")
-        if len(values) != 1 or not isinstance(values[0], dict):
-            raise forge.ForgeMalformedResponseError(
-                "GitHub returned a malformed commit status summary"
-            )
-        value = values[0]
+        value = values[0] if len(values) == 1 and isinstance(values[0], dict) else {}
         state = value.get("state")
         total = value.get("total")
         if (
@@ -847,10 +844,10 @@ class GitHubForge:
         request's current head itself rather than merging the exact commit
         `landing_readiness` already proved green. `title` and `body` are the
         landed commit's own message either way. A 409 means the pull request's
-        head moved since that read -- `ForgeMergeConflictError`, whose
-        recovery is a re-run; a 405 means GitHub will not perform the merge
-        at all -- `ForgeMergeRefusedError`, carrying the forge's own reason.
-        """
+        head moved since that read -- `ForgeMergeConflictError`; a 405 means
+        GitHub will not perform the merge -- `ForgeMergeRefusedError`, or is
+        still performing one -- `ForgeMergeInProgressError`; a 5xx leaves the
+        merge unknown -- `ForgeMergeUnansweredError`."""
         try:
             raw = self._run(
                 [
@@ -871,18 +868,21 @@ class GitHubForge:
                 ).encode("utf-8"),
             )
         except forge.ForgeError as error:
-            if _MERGE_HEAD_MOVED_STATUS in str(error):
-                raise forge.ForgeMergeConflictError(str(error)) from error
-            if _MERGE_REFUSED_STATUS in str(error):
-                raise forge.ForgeMergeRefusedError(str(error)) from error
+            text = str(error)
+            if _MERGE_HEAD_MOVED_STATUS in text:
+                raise forge.ForgeMergeConflictError(text) from error
+            if _MERGE_REFUSED_STATUS in text:
+                if _MERGE_IN_PROGRESS_MESSAGE in text.casefold():
+                    raise forge.ForgeMergeInProgressError(text) from error
+                raise forge.ForgeMergeRefusedError(text) from error
+            if _HTTP_SERVER_ERROR_PATTERN.search(text):
+                raise forge.ForgeMergeUnansweredError(text) from error
             raise
         values = self._json_lines(raw, "merge result")
-        if len(values) != 1 or not isinstance(values[0], dict):
-            raise forge.ForgeMalformedResponseError("GitHub returned a malformed merge result")
-        merged = values[0].get("merged")
-        sha = values[0].get("sha")
+        result = values[0] if len(values) == 1 and isinstance(values[0], dict) else {}
+        sha = result.get("sha")
         if (
-            merged is not True
+            result.get("merged") is not True
             or not isinstance(sha, str)
             or protocol.COMMIT_PATTERN.fullmatch(sha) is None
         ):

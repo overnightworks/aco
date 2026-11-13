@@ -12,6 +12,7 @@ from . import (
     board_read,
     body,
     checkout,
+    cmd_land_merge,
     cmd_land_queue,
     cmd_release,
     forge,
@@ -440,6 +441,12 @@ def _land_merge(
             f"GitHub refused the merge of pull request #{detail.number}: "
             f"{protocol.terminal_text(str(error))}"
         ) from error
+    except forge.ForgeMergeInProgressError as error:
+        raise cmd_land_merge.pending_refusal(detail.number, error) from error
+    except forge.ForgeMergeUnansweredError as error:
+        return cmd_land_merge.merge_commit_after_server_error(
+            client, detail.number, readiness.head_sha, error
+        )
 
 
 _LAND_READ_FAILURE_ERRORS = frozenset(

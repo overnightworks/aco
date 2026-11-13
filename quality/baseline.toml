@@ -36,7 +36,7 @@
 "tests/test_cmd_release_cleanup.py" = 802
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2796
+"tests/test_github.py" = 2763
 "tests/test_state_board.py" = 5933
 "tests/test_store.py" = 5103
 
@@ -90,7 +90,7 @@
 "separate_world" = 76
 
 [function_lines."tests/test_cmd_land_merge.py"]
-"world" = 103
+"world" = 100
 
 [function_lines."tests/test_cmd_land_merge_message.py"]
 "world" = 110
