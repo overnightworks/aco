@@ -50,9 +50,13 @@ def lane_claim_of(branch: str, scope: tuple[str, ...]) -> protocol.ClaimIntent:
 
 
 def overlap_json(
-    *, issue: int | None = None, lane: str | None = None, claim_id: str | None = None, path: str
+    *,
+    issue: int | None = None,
+    lane: str | None = None,
+    claim_id: str | None = None,
+    paths: tuple[str, ...],
 ) -> dict[str, object]:
-    return {"issue": issue, "lane": lane, "claim_id": claim_id, "paths": [path]}
+    return {"issue": issue, "lane": lane, "claim_id": claim_id, "paths": list(paths)}
 
 
 def parallel_items() -> tuple[workboard.Issue, ...]:
@@ -66,7 +70,16 @@ def parallel_items() -> tuple[workboard.Issue, ...]:
         board_issue(
             54,
             "Epsilon",
-            complete_contract("Ship Epsilon.", scope=["claimed/deep/file.py", "src/alpha1.py"]),
+            complete_contract(
+                "Ship Epsilon.",
+                scope=[
+                    "claimed/deep/file.py",
+                    "claimed/b.py",
+                    "claimed/c.py",
+                    "claimed/d.py",
+                    "src/alpha1.py",
+                ],
+            ),
         ),
     )
 
@@ -116,7 +129,8 @@ def test_next_places_every_free_item_with_a_scope_and_notes_each_overlap_it_meet
         "Run: aco start 50 --slug=alpha\n"
         "parallel: #51 (1 path; overlaps lane codex/lane-x on src/shared.py), "
         "#52 (1 path; overlaps lane codex/lane-x on src/shared.py, issue #51 on src/shared.py), "
-        "#54 (2 paths; overlaps issue #990 on claimed/deep/file.py, issue #50 on src/alpha1.py)\n"
+        "#54 (5 paths; overlaps issue #990 on claimed/b.py, claimed/c.py, claimed/d.py, "
+        "and 1 more, issue #50 on src/alpha1.py)\n"
         "scope unknown: #53\nclose: none\n",
     )
     parallel = json.loads(as_json.stdout)["parallel"]
@@ -124,19 +138,23 @@ def test_next_places_every_free_item_with_a_scope_and_notes_each_overlap_it_meet
     assert [
         (candidate["number"], candidate["overlaps"]) for candidate in parallel["candidates"]
     ] == [
-        (51, [overlap_json(lane="codex/lane-x", claim_id="claim-lane", path="src/shared.py")]),
+        (51, [overlap_json(lane="codex/lane-x", claim_id="claim-lane", paths=("src/shared.py",))]),
         (
             52,
             [
-                overlap_json(lane="codex/lane-x", claim_id="claim-lane", path="src/shared.py"),
-                overlap_json(issue=51, path="src/shared.py"),
+                overlap_json(lane="codex/lane-x", claim_id="claim-lane", paths=("src/shared.py",)),
+                overlap_json(issue=51, paths=("src/shared.py",)),
             ],
         ),
         (
             54,
             [
-                overlap_json(issue=990, claim_id="claim-990", path="claimed/deep/file.py"),
-                overlap_json(issue=50, path="src/alpha1.py"),
+                overlap_json(
+                    issue=990,
+                    claim_id="claim-990",
+                    paths=("claimed/b.py", "claimed/c.py", "claimed/d.py", "claimed/deep/file.py"),
+                ),
+                overlap_json(issue=50, paths=("src/alpha1.py",)),
             ],
         ),
     ]
