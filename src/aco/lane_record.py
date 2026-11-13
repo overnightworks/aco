@@ -296,13 +296,20 @@ def parse_record(message: str) -> LaneRecord | None:
 
 
 def _trailer_values(message: str) -> Mapping[LaneTrailerKey, str]:
-    """The value of each lane key that `message` states exactly once."""
-    stated: dict[LaneTrailerKey, list[str]] = {}
+    """The value of each lane key that `message` states exactly once and well formed: a repeat
+    makes the key ambiguous even when its separator or value is malformed."""
+    stated: dict[LaneTrailerKey, list[str | None]] = {}
     for line in message.splitlines():
-        key, separator, value = line.partition(": ")
-        if separator and key in LaneTrailerKey:
-            stated.setdefault(LaneTrailerKey(key), []).append(value)
-    return {key: values[0] for key, values in stated.items() if len(values) == 1}
+        key, colon, rest = line.partition(":")
+        if colon and key in LaneTrailerKey:
+            stated.setdefault(LaneTrailerKey(key), []).append(
+                rest.removeprefix(" ") if rest.startswith(" ") else None
+            )
+    return {
+        key: values[0]
+        for key, values in stated.items()
+        if len(values) == 1 and values[0] is not None
+    }
 
 
 def _whole_number(text: str | None) -> int | None:

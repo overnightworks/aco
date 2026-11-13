@@ -120,6 +120,16 @@ def test_a_record_read_back_from_its_message_renders_the_same_trailers() -> None
             id="a-repeated-line",
         ),
         pytest.param(
+            ("lane_wall_seconds: 5", "lane_wall_seconds:6"),
+            ("lane_outcome: landed",),
+            id="a-repeat-without-the-separator-space",
+        ),
+        pytest.param(
+            ("lane_wall_seconds: 5", "lane_wall_seconds:"),
+            ("lane_outcome: landed",),
+            id="a-repeat-without-a-value",
+        ),
+        pytest.param(
             ("lane_wall_seconds: five", "lane_fix_rounds: -1"),
             ("lane_outcome: landed",),
             id="a-value-that-is-no-whole-number",
@@ -159,6 +169,9 @@ def test_a_figure_whose_line_is_repeated_or_malformed_is_unknown(
         pytest.param("release lane", id="no-record"),
         pytest.param("lane_outcome: paused", id="an-outcome-that-is-none-of-the-two"),
         pytest.param("lane_outcome: landed\nlane_outcome: abandoned", id="a-repeated-outcome"),
+        pytest.param(
+            "lane_outcome: landed\nlane_outcome:abandoned", id="a-malformed-repeated-outcome"
+        ),
     ],
 )
 def test_a_message_without_exactly_one_valid_outcome_records_no_lane(message: str) -> None:
