@@ -1,8 +1,13 @@
 """The GitHub adapter types a forge `gh` could not reach as transient."""
 
+import os
+from pathlib import Path
+
 import pytest
 
-from aco import forge, github, process
+from aco import forge, github
+
+FAKE_GH_FAILING = '#!/bin/sh\nprintf "%s" "$FAKE_GH_OUTPUT" >&2\nexit 1\n'
 
 
 @pytest.mark.parametrize(
@@ -20,11 +25,15 @@ from aco import forge, github, process
     ],
 )
 def test_gh_failing_to_connect_is_a_transient_forge_error(
-    monkeypatch: pytest.MonkeyPatch, gh_output: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, gh_output: str
 ) -> None:
-    monkeypatch.setattr(
-        process, "run_bounded", lambda *args, **kwargs: process.BoundedResult(1, gh_output.encode())
-    )
+    shims = tmp_path / "gh-bin"
+    shims.mkdir()
+    fake_gh = shims / "gh"
+    fake_gh.write_text(FAKE_GH_FAILING)
+    fake_gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shims}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_GH_OUTPUT", gh_output)
     client = github.GitHubForge(github.repository_id("example/agent-coordination"))
 
     with pytest.raises(forge.ForgeTransientError) as excinfo:
