@@ -34,6 +34,7 @@ _EXPERIMENT_LABEL = re.compile(r"(?:^|\. )Experiment:")
 _EXPERIMENT = re.compile(r"(?:^|\. )Experiment: ([a-z0-9-]{1,40})(?=\.(?:\s|$)|$)")
 _BLOCKING_LABEL = re.compile(r"(?:^|\. )Blocking:")
 _BLOCKING = re.compile(r"(?:^|\. )Blocking: (.*)$")
+_NO_BLOCKING_LEAD = re.compile(r"none(?=\.|\s|$)")
 _NO_BLOCKING = re.compile(r"none\.?")
 _ARROW = "→"
 _STAGE_AFTER_ARROW = re.compile(_ARROW + r"\s*[A-Za-z][A-Za-z0-9-]*")
@@ -105,8 +106,8 @@ def stage_choice_fits(stage: RoutingStage, choice: str) -> bool:
 
 
 def _blocking_count(text: str) -> int | None:
-    if _NO_BLOCKING.fullmatch(text):
-        return 0
+    if _NO_BLOCKING_LEAD.match(text):
+        return 0 if _NO_BLOCKING.fullmatch(text) else None
     findings = [finding for finding in text.split(";") if finding.strip()]
     if findings and all(_is_one_finding(finding) for finding in findings):
         return len(findings)

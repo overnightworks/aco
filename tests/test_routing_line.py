@@ -109,6 +109,7 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
         pytest.param("none.", 0, id="none-with-a-full-stop"),
         pytest.param("none. Blocking: a → ci; b → ci", None, id="none-then-findings"),
         pytest.param("none. The gate ran on another model.", None, id="none-then-a-sentence"),
+        pytest.param("none. Another finding → ci", None, id="none-then-a-finding"),
         pytest.param("a → nowhere", 1, id="a-destination-that-is-no-stage"),
         pytest.param("one thing → ci", 1, id="one"),
         pytest.param("a → build; b, with a comma → review; c → head", 3, id="three"),
