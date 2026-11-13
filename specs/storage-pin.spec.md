@@ -21,7 +21,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | `storage` unset (default `github`) | PIN-02 | ITEM-26..ITEM-35 | PIN-10, PIN-11 | — | PIN-08 |
 | `storage` names an unrecognized value | PIN-03 | PIN-03 | PIN-03 | PIN-03 | — |
 | a key the configuration does not define | PIN-33 | PIN-33 | PIN-33 | PIN-33 | — |
-| `lane_shared` is no list of unique files inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
+| `lane_shared` is no list of unique paths inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
 | dependency paths configured or invalid | PIN-44..48 | PIN-44..48 | PIN-44..48 | PIN-44..48 | — |
 | `idea_label` absent or invalid | PIN-49 | PIN-49 | PIN-49 | PIN-49 | — |
 | `canonical_remote` absent or invalid | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | — |
@@ -74,17 +74,18 @@ parenthesis names that fetch, since no fetch runs here (see E-PIN-35).
 - [ ] [PIN-03] A tracked `.aco/board.toml` naming a `storage` value outside `github`/`state-ref` refuses `board configuration <path> storage must be 'github' or 'state-ref'` (see E-PIN-02).
 - [ ] [PIN-33] A tracked `.aco/board.toml` naming a key it does not define refuses `board configuration <path> has unknown top-level key <keys>`, each display control escaped (NEXT-37) (see E-PIN-11).
 
-## `lane_shared`, the registries a lane may change beyond its scope
+## `lane_shared`, the paths a lane may change beyond its scope
 
 `lane_shared` names repository files that follow every code change
-mechanically -- a dead-code whitelist -- so no lane can know in advance
-whether it needs one. `status` and `brief` list them.
+mechanically -- a dead-code whitelist -- and directories such as the tests, so
+no lane can know in advance whether it needs one. `status` and `brief` list
+them.
 
-- [ ] [PIN-37] A tracked `.aco/board.toml` may name `lane_shared = ["<file>", ...]`, each a repository-relative file path; absent, no file is lane-shared.
-- [ ] [PIN-38] A `lane_shared` value that is no list of unique strings refuses `board configuration <path> lane_shared must be a list of unique repository file paths` (see E-PIN-40).
+- [ ] [PIN-37] A tracked `.aco/board.toml` may name `lane_shared = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one file; absent, no path is lane-shared.
+- [ ] [PIN-38] A `lane_shared` value that is no list of unique strings refuses `board configuration <path> lane_shared must be a list of unique repository paths` (see E-PIN-40).
 - [ ] [PIN-39] An absolute, `..`-climbing, or non-canonical entry refuses `board configuration <path> lane_shared entry '<entry>' is not a canonical path inside the repository` (see E-PIN-41).
-- [ ] [PIN-40] Only the trunk's committed copy counts, as the last fetch left it, never a worktree's own; no trunk copy means no file is lane-shared, while a trunk copy git fails to read is a git failure.
-- [ ] [PIN-41] An entry matches exactly one file path the trunk tracks, never as a prefix: an entry naming a directory covers neither it nor any file below it; one naming an untracked file covers nothing.
+- [ ] [PIN-40] Only the trunk's committed copy counts, as the last fetch left it, never a worktree's own; no trunk copy means no path is lane-shared, while a trunk copy git fails to read is a git failure.
+- [ ] [PIN-41] An entry counts when the trunk tracks a path it names: the file itself, or at least one path below a directory entry; any other, a bare directory or a missing file included, covers nothing.
 - [ ] [PIN-42] A trunk copy that refuses costs only the lane-shared answer: `status` and `brief` name its defect (STAT-21).
 
 ## Dependency paths
@@ -273,7 +274,7 @@ Setup: bare-remote checkout at `/repo`, `.aco/board.toml` tracked with `lane_sha
 
 ```console
 $ aco status
-2> ERROR: board configuration /repo/.aco/board.toml lane_shared must be a list of unique repository file paths
+2> ERROR: board configuration /repo/.aco/board.toml lane_shared must be a list of unique repository paths
 exit 2
 ```
 

@@ -64,7 +64,7 @@ object. A refusal reaching the shared collection point prints
 ## `--json`
 
 - [ ] [BRIEF-06] `aco brief <item> --json` prints `specs/output.spec.md`'s envelope, `reason: "composed"`, `"body", "claim", "tip", "touched"` (as `TOUCHED`), `"claim"` `null` without a live claim (see E-BRIEF-14).
-- [ ] [BRIEF-27] `"outside_claim"`, after `"touched"`, lists, in `"touched"`'s order, each touched path the live claim's scope does not cover, `[]` when all are covered, `null` without a live claim (see E-BRIEF-04).
+- [ ] [BRIEF-27] `"outside_claim"`, after `"touched"`, lists each touched path, in order, that the claim scope and `lane_shared` (PIN-41) leave uncovered, `[]` when none, `null` without a live claim (see E-BRIEF-04).
 - [ ] [BRIEF-28] Text `aco brief` shows each display control in the `CLAIM` line's agent, role, branch and in its `whole:` line as NEXT-37 does; `--json`'s `claim` carries them as stored.
 - [ ] [BRIEF-10] A non-`null` `"claim"` object is `{"agent", "role", "branch", "base", "scope", "whole", "age"}` then STAT-22's keys, `"whole"` `null` without one (see E-BRIEF-04).
 

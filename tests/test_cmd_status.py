@@ -779,7 +779,7 @@ def test_overlapping_claims_name_each_other(
 def test_a_path_under_a_tracked_lane_shared_directory_is_lane_shared(
     case: StatusCase, flags: Flags, check_status: StatusCheck
 ) -> None:
-    """Spec: STAT-22, STAT-23"""
+    """Spec: STAT-22, STAT-23, PIN-41"""
     check_status(case, flags)
 
 

@@ -332,7 +332,7 @@ def test_brief_json_names_touched_paths_neither_the_claim_scope_nor_lane_shared_
     lane_shared: str,
     outside_claim: list[str] | None,
 ) -> None:
-    """Spec: BRIEF-27."""
+    """Spec: BRIEF-27, PIN-41."""
     commit_file(github_clone, "scripts/registry.txt", "")
     commit_file(github_clone, "tests/test_one.py", "")
     track_board_config(github_clone, lane_shared)
