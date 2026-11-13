@@ -1,8 +1,0 @@
-claim_id = "8621bb44242b460989f7add84f04349a"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "b78cef0d2355621fe730581471cee2fcfd4d6c12"
-branch = "claude/issue-839-board-shows-refused-read-sentence"
-scope = ["frontend", "specs/serve.spec.md", "src/aco/board/static", "tests/support/e2e_server.py"]
-opened_commit = "4a6ec01a6bea7c566e4223dfa51ae8725d0ba1f2"
-whole_reason = "The client reads the refusal, the board state routes it, the browser test proves it, and the rebuilt static files ship in the same change."
