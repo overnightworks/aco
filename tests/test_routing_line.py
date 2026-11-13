@@ -120,6 +120,13 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
         pytest.param("a → b → ci", None, id="two-arrows-in-one-finding"),
         pytest.param("a → ; b → ci", None, id="an-arrow-without-a-stage"),
         pytest.param("a (x; y) → ci", None, id="a-semicolon-inside-a-finding"),
+        pytest.param("30\u00d7 → review", 30, id="a-counted-finding"),
+        pytest.param(
+            "30\u00d7 tag grammar → review; x → gate", 31, id="a-counted-finding-and-another"
+        ),
+        pytest.param("\u00d7 → review", 1, id="a-multiplication-sign-without-a-number"),
+        pytest.param("0\u00d7 → review", None, id="a-zero-count"),
+        pytest.param("1000\u00d7 → review", 1, id="four-digits-are-no-counted-form"),
         pytest.param("", None, id="empty"),
     ],
 )
