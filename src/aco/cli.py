@@ -31,6 +31,7 @@ from . import (
     cmd_rulings,
     cmd_serve,
     cmd_start,
+    cmd_stats,
     cmd_status,
     cmd_wait,
     cmd_withdraw,
@@ -233,11 +234,7 @@ def _add_claim_parser(commands: usage.Subcommands, name: str) -> None:
         ),
     )
     claim.add_argument("--out-of-order", metavar="REASON", help=OUT_OF_ORDER_HELP)
-    claim.add_argument(
-        "--whole",
-        metavar="REASON",
-        help=WHOLE_HELP,
-    )
+    claim.add_argument("--whole", metavar="REASON", help=WHOLE_HELP)
     claim.add_argument(
         "--resource",
         metavar="NAME",
@@ -397,11 +394,7 @@ def _add_rescope_parser(commands: usage.Subcommands, name: str) -> None:
         ),
     )
     rescope.add_argument("--claim-id", help=EXPECTED_CLAIM_ID_HELP)
-    rescope.add_argument(
-        "--whole",
-        metavar="REASON",
-        help=WHOLE_HELP,
-    )
+    rescope.add_argument("--whole", metavar="REASON", help=WHOLE_HELP)
     report.add_json_flag(rescope)
 
 
@@ -650,6 +643,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "mcp": _RepositoryCommand(cmd_mcp.add_parser, cmd_mcp.run),
     "rulings": _RepositoryCommand(_add_rulings_parser, cmd_rulings.run),
     "fleet-plans": _RepositoryCommand(cmd_fleet_plans.add_parser, cmd_fleet_plans.run),
+    "stats": _RepositoryCommand(cmd_stats.add_parser, cmd_stats.run),
     "next": _RepositoryCommand(_add_next_parser, cmd_next.run),
     "start": _RepositoryCommand(_add_start_parser, cmd_start.run),
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),

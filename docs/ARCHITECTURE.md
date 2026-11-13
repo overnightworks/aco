@@ -46,6 +46,7 @@ flowchart LR
     Plans["aco fleet-plans<br/>cmd_fleet_plans.py"]
     Plans --> Repos
     Plans --> Inbox
+    Stats["aco stats<br/>cmd_stats.py, lane_measure.py"] --> Store
     Mcp -->|"ask, record_answer, step: one write per call"| Dec
     Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
@@ -161,6 +162,8 @@ them and applies none; a line from a private repository can reach a head
 working in a public one, as the inbox already allows.
 
 `aco fleet-plans` reads that same listing for the open items of members labelled `fleet-plan`, across every repository discovery finds, and keeps no state of its own (`specs/fleet-plans.spec.md`).
+
+`aco stats` compares two groups of lanes by the records on the state ref's release commits: `lane_record.py` owns the trailer keys and reads them back, the pure `lane_measure.py` computes the figures, and the command writes nothing and asks no forge (`specs/stats.spec.md`).
 
 ### The per-item turn
 
