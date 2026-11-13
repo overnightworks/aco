@@ -34,6 +34,9 @@ const WITH_KEPT_CARD = {
 	]
 };
 const NOT_READ = { repos: [repo({ name: 'Projekt B', error: NOT_READ_SENTENCE, items: [] })] };
+const NO_REPOSITORY_SENTENCE = 'no repository tracking .aco/board.toml under /work';
+const FIRST_FAILURE = 'Projekt A konnte nicht gelesen werden.';
+const SECOND_FAILURE = 'Projekt B: git lehnte das Lesen ab.';
 
 async function visit(page: Page, board: object | null = null) {
 	const { appUrl, token } = readBoardRuntime();
@@ -134,6 +137,55 @@ for (const viewport of [
 				await expect(card.locator('svg')).toBeVisible();
 				await expect(card).toHaveCSS('border-top-left-radius', '16px');
 				expect(Math.abs((await centreX(card)) - viewport.width / 2)).toBeLessThan(2);
+			});
+
+			test('[ABRD-128] a refused read shows the server sentence in the card, not the status line', async ({
+				page
+			}) => {
+				await page.route('**/api/board', (route) =>
+					route.fulfill({ status: 502, json: { error: NO_REPOSITORY_SENTENCE } })
+				);
+				await visit(page);
+
+				const card = page.getByRole('alert');
+				await expect(card).toContainText(NO_REPOSITORY_SENTENCE);
+				await expect(card).not.toContainText('answered');
+				await expect(card.locator('svg')).toBeVisible();
+				expect(Math.abs((await centreX(card)) - viewport.width / 2)).toBeLessThan(2);
+			});
+
+			test('[ABRD-128] a read where every repository failed shows each repository its own warning box', async ({
+				page
+			}) => {
+				await page.route('**/api/board', (route) =>
+					route.fulfill({
+						status: 502,
+						json: {
+							repos: [
+								repo({ name: 'Projekt A', error: FIRST_FAILURE, items: [] }),
+								repo({ name: 'Projekt B', error: SECOND_FAILURE, items: [] })
+							]
+						}
+					})
+				);
+				await visit(page);
+
+				const boxes = page.locator('.tracks').getByRole('alert');
+				await expect(boxes).toHaveCount(2);
+				await expect(boxes.nth(0)).toContainText(FIRST_FAILURE);
+				await expect(boxes.nth(1)).toContainText(SECOND_FAILURE);
+				await expect(page.getByText('answered')).toBeHidden();
+			});
+
+			test('[ABRD-128] a refused read whose body carries no sentence shows the status line', async ({
+				page
+			}) => {
+				await page.route('**/api/board', (route) =>
+					route.fulfill({ status: 502, body: 'Bad Gateway' })
+				);
+				await visit(page);
+
+				await expect(page.getByRole('alert')).toContainText('GET /api/board answered 502');
 			});
 
 			test('[ABRD-101] a repository not read is one warning box with the mark, its sentence and its last read, above the cards it kept', async ({
