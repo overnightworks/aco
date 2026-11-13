@@ -193,7 +193,7 @@ _PARALLEL_TEXT_LIMIT = 3
 def _parallel_overlap_note(overlap: workboard.ParallelOverlap, storage: body.Storage) -> str:
     """One overlap in CLAIM-31's grammar, its paths capped as CLAIM-34 caps them."""
     paths = protocol.named_with_overflow_count(overlap.paths)
-    return f"{overlap.subject(storage)} on {paths}"
+    return f"{workboard.holder_subject(overlap.holder, storage)} on {paths}"
 
 
 def _parallel_candidate_label(candidate: workboard.ParallelCandidate, storage: body.Storage) -> str:

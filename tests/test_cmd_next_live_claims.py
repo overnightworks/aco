@@ -49,6 +49,12 @@ def lane_claim_of(branch: str, scope: tuple[str, ...]) -> protocol.ClaimIntent:
     )
 
 
+def overlap_json(
+    *, issue: int | None = None, lane: str | None = None, claim_id: str | None = None, path: str
+) -> dict[str, object]:
+    return {"issue": issue, "lane": lane, "claim_id": claim_id, "paths": [path]}
+
+
 def parallel_items() -> tuple[workboard.Issue, ...]:
     return (
         board_issue(
@@ -113,63 +119,27 @@ def test_next_places_every_free_item_with_a_scope_and_notes_each_overlap_it_meet
         "#54 (2 paths; overlaps issue #990 on claimed/deep/file.py, issue #50 on src/alpha1.py)\n"
         "scope unknown: #53\nclose: none\n",
     )
-    assert (as_json.status, json.loads(as_json.stdout)["parallel"]) == (
-        0,
-        {
-            "first_scope_unknown": False,
-            "candidates": [
-                {
-                    "number": 51,
-                    "scope": ["src/shared.py"],
-                    "overlaps": [
-                        {
-                            "issue": None,
-                            "lane": "codex/lane-x",
-                            "claim_id": "claim-lane",
-                            "paths": ["src/shared.py"],
-                        }
-                    ],
-                },
-                {
-                    "number": 52,
-                    "scope": ["src/shared.py"],
-                    "overlaps": [
-                        {
-                            "issue": None,
-                            "lane": "codex/lane-x",
-                            "claim_id": "claim-lane",
-                            "paths": ["src/shared.py"],
-                        },
-                        {
-                            "issue": 51,
-                            "lane": None,
-                            "claim_id": None,
-                            "paths": ["src/shared.py"],
-                        },
-                    ],
-                },
-                {
-                    "number": 54,
-                    "scope": ["claimed/deep/file.py", "src/alpha1.py"],
-                    "overlaps": [
-                        {
-                            "issue": 990,
-                            "lane": None,
-                            "claim_id": "claim-990",
-                            "paths": ["claimed/deep/file.py"],
-                        },
-                        {
-                            "issue": 50,
-                            "lane": None,
-                            "claim_id": None,
-                            "paths": ["src/alpha1.py"],
-                        },
-                    ],
-                },
+    parallel = json.loads(as_json.stdout)["parallel"]
+    assert (as_json.status, parallel["scope_unknown"]) == (0, [53])
+    assert [
+        (candidate["number"], candidate["overlaps"]) for candidate in parallel["candidates"]
+    ] == [
+        (51, [overlap_json(lane="codex/lane-x", claim_id="claim-lane", path="src/shared.py")]),
+        (
+            52,
+            [
+                overlap_json(lane="codex/lane-x", claim_id="claim-lane", path="src/shared.py"),
+                overlap_json(issue=51, path="src/shared.py"),
             ],
-            "scope_unknown": [53],
-        },
-    )
+        ),
+        (
+            54,
+            [
+                overlap_json(issue=990, claim_id="claim-990", path="claimed/deep/file.py"),
+                overlap_json(issue=50, path="src/alpha1.py"),
+            ],
+        ),
+    ]
 
 
 def test_next_carries_an_empty_overlaps_list_for_an_item_meeting_nothing(

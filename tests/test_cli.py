@@ -5690,46 +5690,18 @@ def test_next_notes_a_cut_proposals_row_scope_overlap_with_the_first_action(
     rule. `#82`'s row repeats `#80`'s own path and is still placed, with a note
     naming `#80`; the scopeless-row collapse into `parallel: unknown` is
     `test_next_names_a_cuttable_container_slice`'s own proof."""
-    epic1 = Issue(
-        80,
-        "Epic1",
-        (),
-        complete_contract(
-            "Cut it.", slice=[{"index": 1, "title": "Slice A", "scope": ["epic/a.py"]}]
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
+    epics = tuple(
+        _childless_container(
+            number,
+            complete_contract("Cut it.", slice=[{"index": 1, "title": title, "scope": [path]}]),
+        )
+        for number, title, path in (
+            (80, "Slice A", "epic/a.py"),
+            (81, "Slice B", "epic/b.py"),
+            (82, "Slice C", "epic/a.py"),
+        )
     )
-    epic2 = Issue(
-        81,
-        "Epic2",
-        (),
-        complete_contract(
-            "Cut it.", slice=[{"index": 1, "title": "Slice B", "scope": ["epic/b.py"]}]
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    epic3 = Issue(
-        82,
-        "Epic3",
-        (),
-        complete_contract(
-            "Cut it.", slice=[{"index": 1, "title": "Slice C", "scope": ["epic/a.py"]}]
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(epic1, epic2, epic3))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=epics)
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
 
