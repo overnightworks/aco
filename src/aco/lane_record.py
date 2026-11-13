@@ -4,14 +4,16 @@ The record is computed once, before the release commit is pushed. A figure that 
 is unknown and has no trailer: no failure here refuses or delays a release."""
 
 import dataclasses
-from collections.abc import Callable, Iterator
+import re
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
+from types import MappingProxyType
 
 from . import checkout, protocol, store, workboard
-from .routing_line import RoutingLine, RoutingStage, parse_routing_line
+from .routing_line import RoutingLine, RoutingStage, parse_routing_line, stage_choice_fits
 from .session import RunContext
 
 
@@ -36,6 +38,10 @@ class LaneTrailerKey(StrEnum):
     FIX_ROUNDS = "lane_fix_rounds"
     BLOCKING = "lane_blocking"
     EXPERIMENT = "lane_experiment"
+
+
+def _stage_key(stage: RoutingStage) -> LaneTrailerKey:
+    return LaneTrailerKey(f"lane_{stage}")
 
 
 @dataclass(frozen=True)
@@ -70,7 +76,7 @@ class LaneRecord:
             ]
         if self.routing is not None:
             figures += [
-                (LaneTrailerKey(f"lane_{stage}"), self.routing.stages[stage])
+                (_stage_key(stage), self.routing.stages[stage])
                 for stage in RoutingStage
                 if stage in self.routing.stages
             ]
@@ -239,3 +245,89 @@ def _is_production(config: workboard.BoardConfig, path: str) -> bool:
 def _line_count(numstat_field: str) -> int:
     """A binary file counts `-` lines in `git diff --numstat`: no lines measured."""
     return 0 if numstat_field == "-" else int(numstat_field)
+
+
+@dataclass(frozen=True)
+class RecordedLane:
+    """One released lane as its release commit records it; `released_at` is the commit's
+    committer date in Unix seconds."""
+
+    released_at: int
+    record: LaneRecord
+
+
+_WHOLE_NUMBER = re.compile(r"[0-9]+")
+
+
+def recorded_lanes(toplevel: Path, state_tip: str | None) -> tuple[RecordedLane, ...]:
+    """Every lane recorded on the first-parent history of `state_tip`, newest first. The keys are
+    read by name from the commit messages: underscore keys are not git trailer tokens, so no
+    git trailer tooling reads them."""
+    if state_tip is None:
+        return ()
+    raw = checkout.git_output(
+        ["log", "--first-parent", "-z", "--format=%ct%n%B", state_tip, "--"],
+        directory=toplevel,
+        lossy=True,
+    )
+    lanes: list[RecordedLane] = []
+    for entry in filter(None, raw.split("\0")):
+        committed_at, _, message = entry.partition("\n")
+        record = parse_record(message)
+        if record is not None:
+            lanes.append(RecordedLane(int(committed_at), record))
+    return tuple(lanes)
+
+
+def parse_record(message: str) -> LaneRecord | None:
+    """The record `message` carries, or `None` when it carries no valid `lane_outcome`. A figure
+    whose line is missing, repeated or malformed is unknown."""
+    values = _trailer_values(message)
+    outcome = values.get(LaneTrailerKey.OUTCOME, "")
+    if outcome not in LaneOutcome:
+        return None
+    return LaneRecord(
+        outcome=LaneOutcome(outcome),
+        merge_commit=values.get(LaneTrailerKey.MERGE),
+        wall_seconds=_whole_number(values.get(LaneTrailerKey.WALL_SECONDS)),
+        size=_recorded_size(values),
+        routing=_recorded_routing(values),
+    )
+
+
+def _trailer_values(message: str) -> Mapping[LaneTrailerKey, str]:
+    """The value of each lane key that `message` states exactly once."""
+    stated: dict[LaneTrailerKey, list[str]] = {}
+    for line in message.splitlines():
+        key, separator, value = line.partition(": ")
+        if separator and key in LaneTrailerKey:
+            stated.setdefault(LaneTrailerKey(key), []).append(value)
+    return {key: values[0] for key, values in stated.items() if len(values) == 1}
+
+
+def _whole_number(text: str | None) -> int | None:
+    return int(text) if text is not None and _WHOLE_NUMBER.fullmatch(text) else None
+
+
+def _recorded_size(values: Mapping[LaneTrailerKey, str]) -> ProductionSize | None:
+    files, added, deleted = (
+        _whole_number(values.get(key))
+        for key in (LaneTrailerKey.FILES, LaneTrailerKey.ADDED, LaneTrailerKey.DELETED)
+    )
+    if files is None or added is None or deleted is None:
+        return None
+    return ProductionSize(files, added, deleted)
+
+
+def _recorded_routing(values: Mapping[LaneTrailerKey, str]) -> RoutingLine:
+    stages = {
+        stage: values[_stage_key(stage)]
+        for stage in RoutingStage
+        if stage_choice_fits(stage, values.get(_stage_key(stage), ""))
+    }
+    return RoutingLine(
+        stages=MappingProxyType(stages),
+        fix_rounds=_whole_number(values.get(LaneTrailerKey.FIX_ROUNDS)),
+        blocking=_whole_number(values.get(LaneTrailerKey.BLOCKING)),
+        experiment=values.get(LaneTrailerKey.EXPERIMENT),
+    )

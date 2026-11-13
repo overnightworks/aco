@@ -29,6 +29,7 @@ from aco.lane_record import (
     ProductionSize,
     ReleasedLane,
     compute_record,
+    parse_record,
     release_subject,
 )
 from aco.routing_line import parse_routing_line
@@ -91,6 +92,78 @@ def test_a_record_renders_its_known_figures_in_order_and_leaves_unknown_ones_out
 def test_a_record_with_nothing_measured_is_only_its_outcome() -> None:
     """Spec: LANREC-04, LANREC-06."""
     assert LaneRecord(outcome=LaneOutcome.ABANDONED).trailers() == ("lane_outcome: abandoned",)
+
+
+def test_a_record_read_back_from_its_message_renders_the_same_trailers() -> None:
+    """Spec: STATS-01, STATS-08."""
+    record = LaneRecord(
+        outcome=LaneOutcome.LANDED,
+        merge_commit=MERGE_SHA,
+        wall_seconds=0,
+        size=ProductionSize(files=2, added=0, deleted=7),
+        routing=parse_routing_line(ROUTING),
+    )
+    message = "\n".join(["release lane", "", *record.trailers()])
+
+    read_back = parse_record(message)
+
+    assert read_back is not None
+    assert read_back.trailers() == record.trailers()
+
+
+@pytest.mark.parametrize(
+    ("lines", "expected_trailers"),
+    [
+        pytest.param(
+            ("lane_wall_seconds: 5", "lane_wall_seconds: 6"),
+            ("lane_outcome: landed",),
+            id="a-repeated-line",
+        ),
+        pytest.param(
+            ("lane_wall_seconds: five", "lane_fix_rounds: -1"),
+            ("lane_outcome: landed",),
+            id="a-value-that-is-no-whole-number",
+        ),
+        pytest.param(
+            ("lane_files: 1", "lane_added: 2"),
+            ("lane_outcome: landed",),
+            id="a-size-missing-a-line",
+        ),
+        pytest.param(
+            ("lane_build: Sonnet/High", "lane_fix: none", "lane_build: x/y"),
+            ("lane_outcome: landed", "lane_fix: none"),
+            id="a-stage-that-does-not-fit-or-repeats",
+        ),
+        pytest.param(
+            ("lane_review: opus-5.5/medium", "lane_wall_seconds: 7"),
+            ("lane_outcome: landed", "lane_wall_seconds: 7", "lane_review: opus-5.5/medium"),
+            id="the-lines-that-stand",
+        ),
+    ],
+)
+def test_a_figure_whose_line_is_repeated_or_malformed_is_unknown(
+    lines: tuple[str, ...], expected_trailers: tuple[str, ...]
+) -> None:
+    """Spec: STATS-08."""
+    message = "\n".join(["release lane", "", "lane_outcome: landed", *lines])
+
+    record = parse_record(message)
+
+    assert record is not None
+    assert record.trailers() == expected_trailers
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        pytest.param("release lane", id="no-record"),
+        pytest.param("lane_outcome: paused", id="an-outcome-that-is-none-of-the-two"),
+        pytest.param("lane_outcome: landed\nlane_outcome: abandoned", id="a-repeated-outcome"),
+    ],
+)
+def test_a_message_without_exactly_one_valid_outcome_records_no_lane(message: str) -> None:
+    """Spec: STATS-12."""
+    assert parse_record(message) is None
 
 
 class LaneHistory:

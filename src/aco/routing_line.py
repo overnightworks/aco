@@ -90,12 +90,14 @@ def _stages(text: str) -> Mapping[RoutingStage, str]:
         {
             stage: choices[0]
             for stage, choices in named.items()
-            if len(choices) == 1 and _fits(stage, choices[0])
+            if len(choices) == 1 and stage_choice_fits(stage, choices[0])
         }
     )
 
 
-def _fits(stage: RoutingStage, choice: str) -> bool:
+def stage_choice_fits(stage: RoutingStage, choice: str) -> bool:
+    """Whether `choice` is what `stage` may name: `<model>/<effort>`, or `none` where a stage
+    may be absent."""
     if choice == NO_STAGE:
         return stage in _STAGES_THAT_MAY_BE_ABSENT
     return _MODEL_AND_EFFORT.fullmatch(choice) is not None
