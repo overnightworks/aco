@@ -39,6 +39,7 @@ _NO_BLOCKING_LEAD = re.compile(r"none(?=\.|\s|$)")
 _NO_BLOCKING = re.compile(r"none\.?")
 _ARROW = "→"
 _STAGE_AFTER_ARROW = re.compile(_ARROW + r"\s*[A-Za-z][A-Za-z0-9-]*")
+_COUNTED_FINDING = re.compile(r"\s*(\d{1,3})\u00d7")
 
 
 @dataclass(frozen=True)
@@ -110,9 +111,15 @@ def _blocking_count(text: str) -> int | None:
     if _NO_BLOCKING_LEAD.match(text):
         return 0 if _NO_BLOCKING.fullmatch(text) else None
     findings = [finding for finding in text.split(";") if finding.strip()]
-    if findings and all(_is_one_finding(finding) for finding in findings):
-        return len(findings)
-    return None
+    if not findings or not all(_is_one_finding(finding) for finding in findings):
+        return None
+    counts = [_finding_count(finding) for finding in findings]
+    return None if 0 in counts else sum(counts)
+
+
+def _finding_count(finding: str) -> int:
+    counted = _COUNTED_FINDING.match(finding)
+    return int(counted[1]) if counted else 1
 
 
 def _is_one_finding(finding: str) -> bool:
