@@ -4,7 +4,7 @@ The record is computed once, before the release commit is pushed. A figure that 
 is unknown and has no trailer: no failure here refuses or delays a release."""
 
 import dataclasses
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -199,17 +199,33 @@ def _production_size(
     if not config.production_paths:
         return None
     raw = checkout.git_output(
-        ["diff", "--numstat", "-z", "--no-renames", f"{merge}^1", merge, "--"],
-        directory=toplevel,
-        lossy=True,
+        ["diff", "--numstat", "-z", f"{merge}^1", merge, "--"], directory=toplevel, lossy=True
     )
-    changes = [record.split("\t", 2) for record in raw.split("\0") if record]
-    counted = [(added, deleted) for added, deleted, path in changes if _is_production(config, path)]
+    counted = [
+        (added, deleted)
+        for added, deleted, path in _numstat_changes(raw)
+        if _is_production(config, path)
+    ]
     return ProductionSize(
         files=len(counted),
         added=sum(_line_count(added) for added, _ in counted),
         deleted=sum(_line_count(deleted) for _, deleted in counted),
     )
+
+
+def _numstat_changes(raw: str) -> Iterator[tuple[str, str, str]]:
+    """`(added, deleted, path)` of each file in `git diff --numstat -z`. A renamed file is one
+    change, counted by its new path: git leaves its record's path empty and names the old and
+    the new path in the two records that follow."""
+    records = iter(raw.split("\0"))
+    for record in records:
+        if not record:
+            continue
+        added, deleted, path = record.split("\t", 2)
+        if not path:
+            next(records)
+            path = next(records)
+        yield added, deleted, path
 
 
 def _is_production(config: workboard.BoardConfig, path: str) -> bool:

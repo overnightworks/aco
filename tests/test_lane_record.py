@@ -183,6 +183,29 @@ def test_a_landed_lane_counts_production_files_and_lines_minus_dependency_paths(
 
 
 @pytest.mark.parametrize(
+    ("renamed_content", "line_trailers"),
+    [
+        pytest.param("one\ntwo\n", ["lane_added: 0", "lane_deleted: 0"], id="unchanged"),
+        pytest.param("one\ntwo\nthree\n", ["lane_added: 1", "lane_deleted: 0"], id="one-line-more"),
+    ],
+)
+def test_a_renamed_production_file_is_one_file_with_only_its_changed_lines(
+    history: LaneHistory, renamed_content: str, line_trailers: list[str]
+) -> None:
+    """Spec: LANREC-09."""
+    real_git(history.path, "mv", "src/a.py", "src/b.py")
+    (history.path / "src" / "b.py").write_text(renamed_content)
+    merge = history.commit("Renaming", MERGED_AT)
+
+    figures = compute_for(history, landed_outcome(merge), merge_commit=merge)
+
+    assert [line for line in figures if line.startswith("lane_files")] == ["lane_files: 1"]
+    assert [line for line in figures if line.startswith(("lane_added", "lane_deleted"))] == (
+        line_trailers
+    )
+
+
+@pytest.mark.parametrize(
     ("config", "size_trailers"),
     [
         pytest.param(workboard.BoardConfig(), [], id="no-production-paths"),
