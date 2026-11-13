@@ -5,7 +5,7 @@ import argparse
 import shlex
 import uuid
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
 
@@ -529,7 +529,7 @@ def _verify_and_close_merged_release(
     if _is_adopted_lane(selected.identity, selected.branch):
         tips += (selected.base,)
     lane = _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
-    return replace(lane, merge_commit=verified.merge_commit)
+    return lane.landed_as(verified.merge_commit)
 
 
 def _report_merged_pull_request_left_nothing(
@@ -620,18 +620,18 @@ def _cleanup_unless_claimed_again(
 
 @dataclass(frozen=True)
 class _LandedLane:
-    """The lane a `--merged` release cleans up after: its
-    identity and branch, `proven_tips` (the head the forge recorded as landed, none under
-    `storage = "state-ref"`, plus an adopted lane's `base`), and `rerun`, the
-    `release` line that repeats this cleanup in the checkout holding its
-    worktree (REL-52), and `merge_commit`, the one the forge verified for a github release.
-    """
+    """The lane a `--merged` release cleans up after: `proven_tips` (the head the forge recorded as
+    landed, none under `state-ref`, plus an adopted lane's `base`), `rerun` (the `release` line
+    repeating this cleanup where its worktree is, REL-52), `merge_commit` (the forge's)."""
 
     identity: protocol.ClaimIdentity
     branch: str
     proven_tips: frozenset[str]
     rerun: str
     merge_commit: str | None = None
+
+    def landed_as(self, merge_commit: str) -> _LandedLane:
+        return _LandedLane(self.identity, self.branch, self.proven_tips, self.rerun, merge_commit)
 
 
 def _landed_lane(
