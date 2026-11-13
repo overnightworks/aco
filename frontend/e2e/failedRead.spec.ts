@@ -119,11 +119,14 @@ for (const viewport of [
 			await expect.poll(posts.count).toBe(1);
 		});
 
-		test('[ABRD-102] a read that fails whole keeps every card under the page sentence and its read time, and a pick stores once', async ({
+		test('[ABRD-102] a read that answers with no reading keeps every card under the page sentence and its read time, and a pick stores once', async ({
 			page
 		}, testInfo) => {
 			await refuseFirstCard(page, phone);
-			await arrange(board(true), { listingFailure: 'aco unavailable' });
+			await arrange(board(true));
+			await page.route('**/api/board', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
 			await page.clock.setFixedTime(LATER_READ);
 
 			await page.getByRole('button', { name: 'Neu laden' }).click();
@@ -137,7 +140,7 @@ for (const viewport of [
 			).toBeVisible();
 			await page.screenshot({ path: testInfo.outputPath('failed-whole.png') });
 
-			await arrange(board(true));
+			await page.unroute('**/api/board');
 			await show(page, phone, NEIGHBOUR_QUESTION);
 			const posts = countPosts(page);
 			await pick(page, 'A').click();
@@ -146,7 +149,21 @@ for (const viewport of [
 			await expect.poll(posts.count).toBe(1);
 		});
 
-		test('[ABRD-102] a first load that fails shows aco antwortet nicht. and the failure, no list', async ({
+		test('[ABRD-102] a first load that answers with no reading shows aco antwortet nicht. and the status line, no list', async ({
+			page
+		}) => {
+			await page.route('**/api/board', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
+
+			const { appUrl, token } = readBoardRuntime();
+			await page.goto(`${appUrl}#t=${token}`);
+
+			await expect(page.getByRole('alert')).toContainText('aco antwortet nicht. GET /api/board');
+			await expect(page.getByRole('heading', { level: 2 })).toHaveCount(0);
+		});
+
+		test('[ABRD-128] a first load where every repository fails shows its warning box with its own sentence, not the status line', async ({
 			page
 		}) => {
 			await arrange(board(false), { listingFailure: 'aco unavailable' });
@@ -154,8 +171,10 @@ for (const viewport of [
 			const { appUrl, token } = readBoardRuntime();
 			await page.goto(`${appUrl}#t=${token}`);
 
-			await expect(page.getByRole('alert')).toContainText('aco antwortet nicht. GET /api/board');
-			await expect(page.getByRole('heading', { level: 2 })).toHaveCount(0);
+			const box = page.locator('.tracks').getByRole('alert');
+			await expect(box).toContainText('Not read');
+			await expect(box).toContainText('aco unavailable');
+			await expect(page.getByText('answered')).toBeHidden();
 		});
 	});
 }

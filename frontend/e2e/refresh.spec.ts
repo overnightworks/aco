@@ -121,12 +121,14 @@ for (const viewport of [
 		test('[ABRD-103] Refresh is the retry after a read that failed whole', async ({ page }) => {
 			await arrange([item(61, 'First', card('Erste?'))]);
 			await visit(page);
-			await arrange([item(61, 'First', card('Erste?'))], { listingFailure: 'aco unavailable' });
+			await page.route('**/api/board', (route) =>
+				route.fulfill({ status: 503, body: 'Unavailable' })
+			);
 			const notRead = page.getByRole('alert').filter({ hasText: 'Not read' });
 
 			await refreshButton(page).click();
 			await expect(notRead).toContainText('aco antwortet nicht.');
-			await arrange([item(61, 'First', card('Erste?'))]);
+			await page.unroute('**/api/board');
 			await refreshButton(page).click();
 
 			await expect(notRead).toHaveCount(0);

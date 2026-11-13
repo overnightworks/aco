@@ -34,13 +34,15 @@ test('the token bootstraps from the URL fragment, never reaches a request, and t
 	expect(apiRequest.headers()['x-board-token']).toBe(token);
 });
 
-test('aco being unreachable shows the unavailable state', async ({ page }) => {
+test('aco being unreachable shows the repository not read with its own sentence', async ({
+	page
+}) => {
 	const { appUrl, token } = readBoardRuntime();
 	await arrange([], { listingFailure: 'no forge adapter for host' });
 
 	try {
 		await page.goto(`${appUrl}#t=${token}`);
-		await expect(page.getByRole('alert')).toContainText('aco antwortet nicht');
+		await expect(page.getByRole('alert')).toContainText('no forge adapter for host');
 	} finally {
 		await arrange([]);
 	}
