@@ -1892,7 +1892,7 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
     config_path.write_text(
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
         'canonical_remote = "upstream"\n'
-        'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py"]\n'
+        'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py", "tests/"]\n'
         'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
     )
 
@@ -1901,38 +1901,34 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         "idea",
         "upstream",
         Storage.STATE_REF,
-        ("scripts/whitelist.py",),
+        ("scripts/whitelist.py", "tests/"),
         dependency_paths=("pyproject.toml", "uv.lock", ".github/workflows/"),
     )
+
+
+def unusable_entry(entry: str) -> str:
+    return f"lane_shared entry '{entry}' is not a canonical path inside the repository"
 
 
 @pytest.mark.parametrize(
     ("lane_shared", "refusal"),
     [
-        pytest.param(
-            '["/etc/passwd"]',
-            "lane_shared entry '/etc/passwd' is not a canonical path inside the repository",
-            id="absolute",
-        ),
+        pytest.param('["/etc/passwd"]', unusable_entry("/etc/passwd"), id="absolute"),
         pytest.param(
             '["../sibling/registry.txt"]',
-            "lane_shared entry '../sibling/registry.txt' is not a canonical path inside the "
-            "repository",
+            unusable_entry("../sibling/registry.txt"),
             id="climbs-out",
         ),
-        pytest.param(
-            '["scripts/"]',
-            "lane_shared entry 'scripts/' is not a canonical path inside the repository",
-            id="trailing-slash",
-        ),
+        pytest.param('["scripts//"]', unusable_entry("scripts//"), id="doubled-trailing-slash"),
+        pytest.param('["/"]', unusable_entry("/"), id="only-a-slash"),
         pytest.param(
             '"scripts/registry.txt"',
-            "lane_shared must be a list of unique repository file paths",
+            "lane_shared must be a list of unique repository paths",
             id="not-a-list",
         ),
         pytest.param(
             '["a.txt", "a.txt"]',
-            "lane_shared must be a list of unique repository file paths",
+            "lane_shared must be a list of unique repository paths",
             id="duplicate",
         ),
     ],

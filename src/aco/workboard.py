@@ -498,11 +498,11 @@ class BoardConfig:
     # guessed from the remote's own host. `github` is the default -- every
     # repository pinned today lives there.
     storage: Storage = Storage.GITHUB
-    # Repository files a lane may change beyond its scope:
-    # registries that follow every code change mechanically -- a dead-code
-    # whitelist -- so no lane can know in advance whether it will need
-    # one. Only the trunk's committed copy is read
-    # (`session.trunk_lane_shared_reading`).
+    # Repository files, and directories (an entry ending `/`), a lane may
+    # change beyond its scope: registries that follow every code change
+    # mechanically -- a dead-code whitelist -- and tests, so no lane can
+    # know in advance whether it will need one. Only the trunk's committed
+    # copy is read (`session.trunk_lane_shared_reading`).
     lane_shared: tuple[str, ...] = ()
     # The repository's own history convention for `aco land`:
     # a forge may allow several methods while the repository keeps one, so
@@ -511,14 +511,7 @@ class BoardConfig:
     dependency_paths: tuple[str, ...] = ()
 
     def covers_dependency_path(self, path: str) -> bool:
-        try:
-            protocol.valid_scope([path])
-        except protocol.InvalidClaimMarkerError:
-            return False
-        return any(
-            path.startswith(entry) if entry.endswith("/") else path == entry
-            for entry in self.dependency_paths
-        )
+        return any(repository_path_entry_covers(entry, path) for entry in self.dependency_paths)
 
 
 # Every key `.aco/board.toml` defines; anything else is a typo, and
@@ -685,32 +678,37 @@ def _validated_merge_method(raw: dict[str, object], path: Path) -> MergeMethod |
     )
 
 
-def _validated_repository_paths(
-    raw: dict[str, object],
-    path: Path,
-    key: str,
-    *,
-    directories: bool = False,
-) -> tuple[str, ...]:
+def repository_path_entry_covers(entry: str, path: str) -> bool:
+    """Whether a validated `lane_shared` or `dependency_paths` `entry` names
+    `path`: a directory entry (one ending `/`) every canonical path below it,
+    any other exactly one path. A path that is not a canonical
+    repository-relative path is named by no entry."""
+    try:
+        protocol.valid_scope([path])
+    except protocol.InvalidClaimMarkerError:
+        return False
+    return path.startswith(entry) if entry.endswith("/") else path == entry
+
+
+def _validated_repository_paths(raw: dict[str, object], path: Path, key: str) -> tuple[str, ...]:
     """Keep the canonical form that is compared as text. Judge syntax
-    only, without requiring files to exist; entries are foreign text, so
-    refusal messages escape them. Dependency directories retain their slash.
+    only, without requiring paths to exist; entries are foreign text, so
+    refusal messages escape them. A directory entry retains its slash.
     """
     entries = raw.get(key)
     if entries is None:
         return ()
-    path_kind = "paths" if directories else "file paths"
     if (
         not isinstance(entries, list)
         or not all(isinstance(entry, str) for entry in entries)
         or len(set(entries)) != len(entries)
     ):
         raise protocol.ClaimError(
-            f"board configuration {path} {key} must be a list of unique repository {path_kind}"
+            f"board configuration {path} {key} must be a list of unique repository paths"
         )
     for entry in entries:
         try:
-            protocol.valid_scope([entry.removesuffix("/") if directories else entry])
+            protocol.valid_scope([entry.removesuffix("/")])
         except protocol.InvalidClaimMarkerError as error:
             raise protocol.ClaimError(
                 f"board configuration {path} {key} entry '{protocol.terminal_text(entry)}' "
@@ -765,9 +763,7 @@ def parse_config(text: str, path: Path) -> BoardConfig:
         storage=_validated_storage(raw, path),
         merge_method=_validated_merge_method(raw, path),
         lane_shared=_validated_repository_paths(raw, path, "lane_shared"),
-        dependency_paths=_validated_repository_paths(
-            raw, path, "dependency_paths", directories=True
-        ),
+        dependency_paths=_validated_repository_paths(raw, path, "dependency_paths"),
     )
 
 

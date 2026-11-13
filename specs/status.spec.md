@@ -63,14 +63,14 @@ the peer and its claim id, never the meeting paths.
 - [ ] [STAT-08] `aco status --json`'s `claims[]` object carries an `"overlaps"` array of `{"issue", "lane", "claim_id", "agent"}` objects, one per peer STAT-06's own line names, `[]` when none.
 - [ ] [STAT-24] `aco status <n>` prints issue #<n>'s own claims and every claim that overlaps one of them or shares its identity, in text and under `--json`.
 
-## The lane-shared files
+## The lane-shared paths
 
-- [ ] [STAT-19] Text `aco status` over a claim ends with one line `lane-shared: <entry>, <entry>`, each entry the trunk's committed `lane_shared` names (PIN-37); none configured or no trunk (STAT-31), no such line.
-- [ ] [STAT-20] An entry naming no file the trunk tracks -- a directory, a missing file -- shows as `<entry> (names no file)`, never as a bare grant (see E-STAT-06).
+- [ ] [STAT-19] Text `aco status` over a claim ends with one line `lane-shared: <entry>, <entry>`, each trunk-committed `lane_shared` entry (PIN-37); none configured or no trunk (STAT-31), no such line.
+- [ ] [STAT-20] An entry naming no tracked path (PIN-41) shows as `<entry> (names no tracked path)`, never as a bare grant (see E-STAT-06).
 - [ ] [STAT-21] A trunk copy whose content refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
 - [ ] [STAT-33] The trunk's `.aco/board.toml` holding no file refuses `aco status` whole before any claim prints, with or without `--path`: `unavailable`, exit `2`, under `--json` `reason: "unavailable"`.
-- [ ] [STAT-22] `--json`, also with `--path`, ends with `"lane_shared": [{"path", "names_a_file"}, ...]` and `"lane_shared_unavailable": null`; on STAT-21's defect `null` and `"<sentence>"`.
-- [ ] [STAT-23] `aco status --path P` with no holder prints `LANE-SHARED P` when P is a file an entry names (STAT-20); STAT-21's line follows the answer (see E-STAT-06).
+- [ ] [STAT-22] `--json`, also with `--path`, ends with `"lane_shared": [{"path", "tracked"}, ...]` and `"lane_shared_unavailable": null`; on STAT-21's defect `null` and `"<sentence>"`.
+- [ ] [STAT-23] `aco status --path P` with no holder prints `LANE-SHARED P` when P is a tracked file entry or lies below a tracked directory entry (PIN-41); STAT-21's line follows the answer (see E-STAT-06).
 
 ## `--json`'s claim object, beside the fields `claim-record.spec.md` owns
 
@@ -204,20 +204,26 @@ overlap: issue <label> (<claim-id>), issue <label> (<claim-id>)
 exit 0
 ```
 
-### E-STAT-06 -- lane-shared files, an entry naming no file, and a defective trunk copy
+### E-STAT-06 -- lane-shared paths, an entry naming no tracked path, and a defective trunk copy
 
 Setup: bare-remote, bootstrapped, the trunk's committed `.aco/board.toml` naming
-`lane_shared = ["scripts/registry.txt", "src"]` beside a tracked `scripts/registry.txt`, a
-linked worktree on `ada/issue-42`, already `aco claim 42 --scope README.md`
+`lane_shared = ["scripts/registry.txt", "src", "tests/"]` beside a tracked
+`scripts/registry.txt` and a tracked `tests/test_one.py`, a linked worktree on `ada/issue-42`, already `aco claim 42 --scope README.md`
 
 ```console
 $ aco status
 CLAIMED issue #42: Ada (builder) base=<sha> branch=ada/issue-42 claim=<claim-id> 0h 0m
   README.md
-lane-shared: scripts/registry.txt, src (names no file)
+lane-shared: scripts/registry.txt, src (names no tracked path), tests/
 exit 0
 $ aco status --path scripts/registry.txt
 LANE-SHARED scripts/registry.txt
+exit 0
+$ aco status --path tests/test_new.py
+LANE-SHARED tests/test_new.py
+exit 0
+$ aco status --path src/x.py
+UNCLAIMED src/x.py
 exit 0
 ```
 

@@ -20,6 +20,7 @@ from .session import (
     LaneSharedReading,
     RepoMeaninglessUnderStateRefError,
     RunContext,
+    lane_shared_covers,
     trunk_lane_shared_reading,
 )
 
@@ -188,6 +189,7 @@ def _brief_json(composition: _BriefComposition) -> int:
             path
             for path in composition.touched
             if not protocol.scopes_overlap(live.claim.scope, (path,))
+            and not lane_shared_covers(composition.lane_shared, path)
         ],
     }
     step_rules = composition.step_rules
