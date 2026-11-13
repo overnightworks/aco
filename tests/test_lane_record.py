@@ -156,11 +156,13 @@ def compute_for(
     merge_commit: str | None,
     config: workboard.BoardConfig = CONFIG,
     opened_commit: str | None = None,
+    state_tip_known: bool = True,
 ) -> tuple[str, ...]:
     claim = standing_active_claim(
         lane=True, opened_commit=opened_commit or history.opened_commit, base=history.claim_commit
     )
-    released = ReleasedLane(claim, outcome, merge_commit, RELEASED_AT, history.tip)
+    state_tip = history.tip if state_tip_known else None
+    released = ReleasedLane(claim, outcome, merge_commit, RELEASED_AT, state_tip)
     return compute_record(history.path, config, released).trailers()
 
 
@@ -279,6 +281,15 @@ def test_a_claim_commit_the_checkout_does_not_hold_has_no_wall_time(history: Lan
     figures = compute_for(
         history, landed_outcome(merge), merge_commit=merge, opened_commit=MERGE_SHA
     )
+
+    assert [line for line in figures if line.startswith("lane_wall")] == []
+
+
+def test_a_release_read_from_no_state_tip_has_no_wall_time(history: LaneHistory) -> None:
+    """Spec: LANREC-08, LANREC-21."""
+    merge = history.land("Landing")
+
+    figures = compute_for(history, landed_outcome(merge), merge_commit=merge, state_tip_known=False)
 
     assert [line for line in figures if line.startswith("lane_wall")] == []
 
