@@ -142,6 +142,38 @@ def test_the_experiment_tag_is_a_short_lowercase_token_or_unknown(
 
 
 @pytest.mark.parametrize(
+    ("line", "expected_rounds", "expected_tag"),
+    [
+        pytest.param(
+            "Routing: build a/b. Fix rounds: 1. Blocking: a → ci; Fix rounds: 9. Experiment: x",
+            1,
+            None,
+            id="rounds-and-an-experiment-inside-a-finding",
+        ),
+        pytest.param(
+            "Routing: build a/b. Blocking: a. Fix rounds: 9 → ci. Experiment: x",
+            None,
+            None,
+            id="a-finding-that-looks-like-the-fields",
+        ),
+        pytest.param(
+            "Routing: build a/b. Experiment: y. Blocking: none",
+            None,
+            "y",
+            id="the-fields-before-blocking",
+        ),
+    ],
+)
+def test_the_rounds_and_the_experiment_are_never_read_from_a_finding(
+    line: str, expected_rounds: int | None, expected_tag: str | None
+) -> None:
+    """Spec: LANREC-18, LANREC-20."""
+    _, rounds, _, tag = read(line)
+
+    assert (rounds, tag) == (expected_rounds, expected_tag)
+
+
+@pytest.mark.parametrize(
     ("stages", "expected"),
     [
         pytest.param(

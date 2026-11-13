@@ -52,9 +52,10 @@ def parse_routing_line(message: str) -> RoutingLine | None:
     if len(lines) != 1:
         return None
     body = lines[0].strip()
-    rounds = _FIX_ROUNDS.search(body)
-    experiment = _EXPERIMENT.search(body)
     blocking = _BLOCKING.search(body)
+    before_blocking = body if blocking is None else body[: blocking.start()]
+    rounds = _FIX_ROUNDS.search(before_blocking)
+    experiment = _EXPERIMENT.search(before_blocking)
     return RoutingLine(
         stages=_stages(body.split(". ", 1)[0]),
         fix_rounds=None if rounds is None else int(rounds[1]),
