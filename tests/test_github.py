@@ -1332,17 +1332,19 @@ def test_github_adapter_reraises_a_failure_unrelated_to_its_own_classification(
 ) -> None:
     """Both `delete_branch`'s idempotent-absence handling and
     `merge_landing`'s conflict translation only ever intercept their own
-    named case; any other `ForgeError` -- a transient gateway timeout, say
-    -- passes through unchanged."""
+    named case; any other `ForgeError` -- a forbidden request, say -- passes
+    through unchanged."""
     client = GitHubForge(
         github.repository_id(REPOSITORY),
         run=lambda arguments, input_data=None: (_ for _ in ()).throw(
-            forge.ForgeError("HTTP 500 gateway timeout")
+            forge.ForgeError("HTTP 403 forbidden")
         ),
     )
 
-    with pytest.raises(forge.ForgeError, match="gateway timeout"):
+    with pytest.raises(forge.ForgeError, match="forbidden") as raised:
         action(client)
+
+    assert type(raised.value) is forge.ForgeError
 
 
 @pytest.mark.parametrize(

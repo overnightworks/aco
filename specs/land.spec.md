@@ -141,7 +141,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-36] Any other body takes a blank line, then the classification alone as its last paragraph.
 - [ ] [LANDCMD-35] Removing the classification line leaves no run of blank lines where it stood: a paragraph it alone made goes with it, and a whitespace-only line counts as blank.
 - [ ] [LANDCMD-14] A pull request whose head sha changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run land`, exit `2`; nothing merges.
-- [ ] [LANDCMD-37] A merge GitHub refuses to perform (HTTP 405, but LANDCMD-71's) refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
+- [ ] [LANDCMD-37] A merge GitHub refuses to perform (HTTP 405 other than LANDCMD-71's "Merge already in progress") refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
 - [ ] [LANDCMD-71] A merge call failing with HTTP 5xx, or a 405 `Merge already in progress`, refuses `pull request #<n> may still be merging (<error>); re-run aco land <n>`, exit `2`, claim kept (E-LANDCMD-71).
 - [ ] [LANDCMD-72] After a 5xx, one read of the pull request comes first: merged at the pinned head, `aco land` goes on as after a merge (LANDCMD-15); open or unreadable, it refuses as LANDCMD-71; a 405 reads nothing.
 - [ ] [LANDCMD-73] LANDCMD-71's `<error>` is escaped and cut alone like LANDCMD-47's; a rerun of a pull request merged in between resumes without a second merge (LANDCMD-18).
