@@ -122,7 +122,7 @@ claim and closes its reopened item.
 
 ## What a `--merged` release verifies and never checks
 
-- [ ] [REL-16] `release --merged <pr>`'s forge verification runs before any write; it is `specs/landing-grammar.spec.md`'s grammar (LAND-29..39, LAND-49/50, LAND-55, LAND-62..64, LAND-66/67), nothing added.
+- [ ] [REL-16] `release --merged <pr>`'s forge verification runs before any write; it is `specs/landing-grammar.spec.md`'s grammar (LAND-29..39, LAND-49/50, LAND-55, LAND-62..64, LAND-66/67/85), nothing added.
 - [ ] [REL-37] Under `storage = "github"`, that verification walks `<remote>/<branch>` for the forge's default branch `<branch>` once the canonical remote `<remote>` is fetched, as `aco land` does.
 - [ ] [REL-38] Under `storage = "github"`, the release's board report and its worktree cleanup (REL-25, REL-29) walk that same `<remote>/<branch>`.
 - [ ] [REL-39] A canonical `<remote>` with no URL configured refuses before any write: `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-REL-18).

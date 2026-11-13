@@ -15,7 +15,7 @@
 
 [file_lines]
 "src/aco/body.py" = 1205
-"src/aco/checkout.py" = 2020
+"src/aco/checkout.py" = 2019
 "src/aco/cli.py" = 823
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 916

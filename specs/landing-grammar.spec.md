@@ -75,7 +75,7 @@ through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 | other open children, `Next` names work | — | LAND-25 | — | — |
 | malformed/wrong-kind/foreign parent | — | LAND-26, LAND-27, LAND-28 | — | — |
 | pull request not merged | — | — | LAND-30 | — |
-| PR names a different item / kind mismatch | — | — | LAND-62, LAND-64, LAND-66, LAND-67 | — |
+| PR names a different item / kind mismatch | — | — | LAND-62, LAND-64, LAND-66, LAND-67, LAND-85 | — |
 | work item still open | — | — | LAND-55, LAND-63 | — |
 | forge unreachable right after the release commits | — | — | LAND-38, LAND-50 | — |
 | a state-ref store the board read refuses after the release commits | — | — | LAND-65, LAND-50 | — |
@@ -179,8 +179,9 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-62] A merge commit off the walked trunk, with no `Work-Item:` trailer, or naming another item refuses `merge commit <sha> of pull request #<n> <that LAND-52 defect sentence>`, exit `2`, before any write.
 - [ ] [LAND-80] LAND-62's no-trailer refusal ends `; release it with --abandoned "landed as PR #<n> without a Work-Item: trailer" and close #<item> by hand`; the other LAND-62 sentences gain nothing.
 - [ ] [LAND-64] For a lane release, a merge commit off the trunk, with no trailer, or with a malformed `No-Item:` trailer refuses `merge commit <sha> of pull request #<n> <that defect sentence>`, exit `2`.
-- [ ] [LAND-66] For a lane release, a merge commit whose trailer carries `Work-Item:`, valid or malformed, refuses `merge commit <sha> of pull request #<n> carries \`Work-Item: <value>\`; <LAND-67>`, exit `2`.
-- [ ] [LAND-67] LAND-66's rule and way out read `an issue-less lane needs a \`No-Item: <docs|fix|deps>\` trailer; release it with --abandoned "landed as PR #<n> with a malformed trailer"`.
+- [ ] [LAND-66] For a lane release, a merge commit whose trailer carries `Work-Item:` refuses `merge commit <sha> of pull request #<n> carries \`Work-Item: <value>\`; <way out>`, exit `2`: LAND-85, else LAND-67.
+- [ ] [LAND-67] A malformed or foreign `Work-Item:` value's way out reads `an issue-less lane needs a \`No-Item: <docs|fix|deps>\` trailer; release it with --abandoned "landed as PR #<n> with a malformed trailer"`.
+- [ ] [LAND-85] When every `Work-Item:` value is `#n`, `aco-xxxxxx` or `n`, the way out reads `release it with aco release <n> --merged <pr>` per item, joined by ` or `, never `--abandoned`.
 - [ ] [LAND-55] Unless REL-47 applies, a still-open work item whose landing pull request verifies is closed by this release: a comment `landed by PR #<n>`, then the close — never a refusal.
 - [ ] [LAND-63] A rerun of LAND-55's own close that finds its `landed by PR #<n>` comment already posted skips it and closes straight away, never posting it twice.
 - LAND-36 (retired).
@@ -338,6 +339,14 @@ Setup: bare-remote, fake `gh`, pull request `#57` merged into `main` from a `fix
 ```console
 $ aco release --merged 57
 2> ERROR: merge commit <sha> of pull request #57 carries `Work-Item: fix/x`; an issue-less lane needs a `No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #57 with a malformed trailer"
+exit 2
+```
+
+With its trailer naming `Work-Item: #42` instead:
+
+```console
+$ aco release --merged 57
+2> ERROR: merge commit <sha> of pull request #57 carries `Work-Item: #42`; release it with aco release 42 --merged 57
 exit 2
 ```
 

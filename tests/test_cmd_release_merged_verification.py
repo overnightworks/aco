@@ -251,37 +251,51 @@ def test_release_merged_closes_the_still_open_work_item(
     assert state_ref_claims(github_clone, bare_remote) == {}
 
 
+ABANDONED_WAY_OUT = (
+    "an issue-less lane needs a `No-Item: <docs|fix|deps>` trailer; "
+    'release it with --abandoned "landed as PR #12 with a malformed trailer"'
+)
+
+
 @pytest.mark.parametrize(
     "output",
     [pytest.param((), id="text"), pytest.param(("--json",), id="json")],
 )
 @pytest.mark.parametrize(
-    "work_item_value",
-    [pytest.param("#72", id="valid-reference"), pytest.param("fix/x", id="branch-name")],
+    ("work_item_values", "way_out"),
+    [
+        pytest.param(("#72",), "release it with aco release 72 --merged 12", id="valid-reference"),
+        pytest.param(
+            ("#72", "#73"),
+            "release it with aco release 72 --merged 12 or aco release 73 --merged 12",
+            id="two-valid-references",
+        ),
+        pytest.param(("fix/x",), ABANDONED_WAY_OUT, id="branch-name"),
+        pytest.param(("#72", "fix/x"), ABANDONED_WAY_OUT, id="valid-and-malformed"),
+    ],
 )
 def test_release_merged_refuses_a_lane_whose_merge_commit_names_a_work_item(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     github_clone: Path,
     bare_remote: Path,
-    work_item_value: str,
+    work_item_values: tuple[str, ...],
+    way_out: str,
     output: tuple[str, ...],
 ) -> None:
-    """Spec: LAND-66, LAND-67. One squash commit; the pull request's body declares
+    """Spec: LAND-66, LAND-67, LAND-85. One squash commit; the pull request's body declares
     `No-Item:` and is not the authority."""
     arrange_lane_landing(
         monkeypatch,
         github_clone,
         bare_remote,
-        trailers=(f"Work-Item: {work_item_value}",),
+        trailers=tuple(f"Work-Item: {value}" for value in work_item_values),
         method=MergeMethod.SQUASH,
     )
     landed = real_git(bare_remote, "rev-parse", "main").stdout.strip()
     refusal = (
         f"merge commit {landed} of pull request #12 carries "
-        f"`Work-Item: {work_item_value}`; an issue-less lane needs a "
-        '`No-Item: <docs|fix|deps>` trailer; release it with --abandoned "landed as PR #12 '
-        'with a malformed trailer"'
+        f"`Work-Item: {', '.join(work_item_values)}`; {way_out}"
     )
     printed = json.dumps({"ok": False, "reason": "precondition_failed", "message": refusal})
 

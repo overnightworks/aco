@@ -1861,17 +1861,17 @@ def branch_merged_into_default(branch: str, *, trunk: str, directory: Path) -> b
 def _trunk_no_item_landing_defect(
     landings: tuple[TrunkLanding, ...], sha: str, pull_request: int
 ) -> str | None:
-    """Why `sha` does not authorize an issue-less lane's own `--merged`
-    release: mirrors `_trunk_landing_defect`'s
-    own walk of the first-parent trunk, for the one classification shape
-    that names no work item at all -- read from the merge commit's own
-    trailer block, never the pull request's mutable `body`."""
+    """Why `sha`'s own trailer block does not authorize an issue-less lane's `--merged` release."""
     landing = next((entry for entry in landings if entry.sha == sha), None)
     if landing is None:
         return SHA_NOT_ON_TRUNK_DEFECT
+    classification = landing.classification
+    if isinstance(classification, workboard.TrunkWorkItemClassification):
+        releases = [f"aco release {n} --merged {pull_request}" for n in classification.numbers]
+        values = ", ".join(landing.work_item_values)
+        return f"carries `Work-Item: {values}`; release it with {' or '.join(releases)}"
     if landing.work_item_values:
         return _lane_work_item_trailer_defect(landing.work_item_values, pull_request)
-    classification = landing.classification
     if classification is None:
         return "carries no `Work-Item:` or `No-Item:` trailer"
     if isinstance(classification, workboard.ClassificationDefect):
@@ -1880,9 +1880,8 @@ def _trunk_no_item_landing_defect(
 
 
 def _lane_work_item_trailer_defect(work_item_values: tuple[str, ...], pull_request: int) -> str:
-    """The lane rule a `Work-Item:` trailer breaks, valid or malformed alike, ending in the only
-    way out: a landed trailer cannot
-    change, so the lane is released as abandoned with the landing named."""
+    """The lane rule a malformed or foreign `Work-Item:` trailer breaks; a landed trailer
+    cannot change, so the lane is released as abandoned with the landing named."""
     values = ", ".join(work_item_values)
     return (
         f"carries `Work-Item: {values}`; an issue-less lane needs a "
