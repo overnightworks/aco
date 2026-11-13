@@ -1336,12 +1336,10 @@ def test_github_adapter_reraises_a_failure_unrelated_to_its_own_classification(
     through unchanged."""
     client = GitHubForge(
         github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: (_ for _ in ()).throw(
-            forge.ForgeError("HTTP 403 forbidden")
-        ),
+        run=lambda arguments, input_data=None: (_ for _ in ()).throw(forge.ForgeError("HTTP 403")),
     )
 
-    with pytest.raises(forge.ForgeError, match="forbidden") as raised:
+    with pytest.raises(forge.ForgeError, match="403") as raised:
         action(client)
 
     assert type(raised.value) is forge.ForgeError
