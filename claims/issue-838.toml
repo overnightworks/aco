@@ -1,0 +1,8 @@
+claim_id = "511859ed85f640b7b278ce0a980cb6b6"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "2758e9bfd7c873dfc3f2f0d43abc4d1993ebac23"
+branch = "claude/issue-838-land-pending-merge-rerun"
+scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/forge.py", "src/aco/github.py", "tests"]
+opened_commit = "760c972cf06b4613814a1f9b964da516e4175619"
+whole_reason = "The merge call is classified in github.py, named in forge.py and answered in cmd_land.py; the spec, its fake-gh tests and the size baseline move with them."
