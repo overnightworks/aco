@@ -94,25 +94,24 @@ class ReleasedLane:
 
 
 def release_subject(
-    context: RunContext, claim: protocol.ActiveClaim, outcome: protocol.ReleaseOutcome
+    context: RunContext,
+    claim: protocol.ActiveClaim,
+    outcome: protocol.ReleaseOutcome,
+    verified_merge: str | None = None,
 ) -> store.TransitionSubject:
-    """The release transition's subject for `claim`, carrying its lane record."""
+    """The release transition's subject for `claim`, carrying its lane record. `verified_merge`
+    is the merge commit the forge's landing was verified to have: a github `--merged` release
+    reads it nowhere else."""
     released = ReleasedLane(
-        claim, outcome, _merge_commit(context, outcome), int(datetime.now(UTC).timestamp())
+        claim, outcome, _merge_commit(outcome, verified_merge), int(datetime.now(UTC).timestamp())
     )
     record = compute_record(context.toplevel, context.config, released)
     subject = store.transition_subject("release", claim.identity, claim.branch)
     return dataclasses.replace(subject, trailers=record.trailers())
 
 
-def _merge_commit(context: RunContext, outcome: protocol.ReleaseOutcome) -> str | None:
-    if isinstance(outcome, protocol.LandedRelease):
-        return outcome.commit
-    if isinstance(outcome, protocol.MergedRelease):
-        return _unknown_if_unreadable(
-            lambda: context.forge.landing(outcome.pull_request).merge_commit
-        )
-    return None
+def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:
+    return outcome.commit if isinstance(outcome, protocol.LandedRelease) else verified_merge
 
 
 def compute_record(

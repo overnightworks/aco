@@ -19,10 +19,11 @@ from cli_fixtures import (
     set_git_identity,
     track_board_config,
 )
+from github_fixtures import FakeForge
 from merged_release import arrange_merged_pull_request
 from store_fixtures import claim_intent
 
-from aco import forge, protocol, store, workboard
+from aco import protocol, store, workboard
 from aco.lane_record import (
     LaneOutcome,
     LaneRecord,
@@ -263,19 +264,15 @@ def test_an_abandoned_lane_counts_to_the_release_and_reads_its_routing_from_the_
     assert figures == ("lane_outcome: abandoned", "lane_wall_seconds: 90", *ROUTING_TRAILERS)
 
 
-class UnreachableForge:
-    def landing(self, number: int) -> forge.Landing:
-        raise forge.ForgeTransientError(f"cannot read pull request #{number}")
-
-
 def release_trailers(
-    history: LaneHistory, outcome: protocol.ReleaseOutcome, *, forge_reader: object = None
+    history: LaneHistory, outcome: protocol.ReleaseOutcome, verified_merge: str | None = None
 ) -> tuple[str, ...]:
-    """The trailers `release_subject` puts on the release of a lane claimed in `history`."""
-    context = SimpleNamespace(toplevel=history.path, config=CONFIG, forge=forge_reader)
+    """The trailers `release_subject` puts on the release of a lane claimed in `history`; its
+    context holds no forge, so a read of one fails the test."""
+    context = SimpleNamespace(toplevel=history.path, config=CONFIG)
     claim = standing_active_claim(lane=True, opened_commit=history.claim_commit)
 
-    return release_subject(cast(RunContext, context), claim, outcome).trailers
+    return release_subject(cast(RunContext, context), claim, outcome, verified_merge).trailers
 
 
 def test_a_trunk_landing_names_its_commit_as_the_merge_without_asking_a_forge(
@@ -289,17 +286,15 @@ def test_a_trunk_landing_names_its_commit_as_the_merge_without_asking_a_forge(
     assert trailers[:2] == ("lane_outcome: landed", f"lane_merge: {merge}")
 
 
-def test_a_merged_pull_request_the_forge_cannot_read_leaves_only_its_outcome(
+def test_a_merged_pull_request_names_the_merge_commit_its_release_verified(
     history: LaneHistory,
 ) -> None:
-    """Spec: LANREC-21."""
-    history.land("Landing")
+    """Spec: LANREC-07, LANREC-21."""
+    merge = history.land("Landing")
 
-    trailers = release_trailers(
-        history, protocol.MergedRelease(12), forge_reader=UnreachableForge()
-    )
+    trailers = release_trailers(history, protocol.MergedRelease(12), merge)
 
-    assert trailers == ("lane_outcome: landed",)
+    assert trailers[:2] == ("lane_outcome: landed", f"lane_merge: {merge}")
 
 
 @pytest.mark.parametrize(
@@ -357,11 +352,11 @@ def land_and_release(
     remote: Path,
     *,
     message_lines: tuple[str, ...],
-) -> str:
+) -> tuple[str, FakeForge]:
     """Release pull request #12, landed with `message_lines` on its merge commit, as its
-    lane; the release commit's message comes back."""
+    lane; the release commit's message comes back with the forge that served the pull request."""
     monkeypatch.setenv("GIT_COMMITTER_DATE", f"@{CLAIMED_AT} +0000")
-    arrange_merged_pull_request(
+    merged = arrange_merged_pull_request(
         monkeypatch,
         clone,
         remote,
@@ -375,7 +370,7 @@ def land_and_release(
     result = run_cli(["--repo", REPOSITORY, "release", "--merged", "12"], capsys)
 
     assert (result.status, result.stderr) == (0, "")
-    return release_commit_message(remote)
+    return release_commit_message(remote), merged.forge
 
 
 def test_a_merged_release_leaves_its_record_on_the_release_commit(
@@ -386,7 +381,7 @@ def test_a_merged_release_leaves_its_record_on_the_release_commit(
 ) -> None:
     """Spec: LANREC-01, LANREC-06, LANREC-07, LANREC-08, LANREC-09, LANREC-11, LANREC-12,
     LANREC-13, REL-64."""
-    message = land_and_release(
+    message, _forge = land_and_release(
         monkeypatch,
         capsys,
         pinned_clone,
@@ -407,6 +402,20 @@ def test_a_merged_release_leaves_its_record_on_the_release_commit(
     assert message.index("intent: release") < message.index("lane_outcome")
 
 
+def test_a_merged_release_reads_the_pull_request_from_the_forge_once(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    pinned_clone: Path,
+    bare_remote: Path,
+) -> None:
+    """Spec: LANREC-21."""
+    _message, forge = land_and_release(
+        monkeypatch, capsys, pinned_clone, bare_remote, message_lines=("No-Item: docs",)
+    )
+
+    assert forge.landing_reads == [12]
+
+
 def test_a_merged_release_whose_merge_lost_the_routing_line_still_releases_with_the_rest(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -414,7 +423,7 @@ def test_a_merged_release_whose_merge_lost_the_routing_line_still_releases_with_
     bare_remote: Path,
 ) -> None:
     """Spec: LANREC-14, LANREC-21, REL-64."""
-    message = land_and_release(
+    message, _forge = land_and_release(
         monkeypatch, capsys, pinned_clone, bare_remote, message_lines=("No-Item: docs",)
     )
 

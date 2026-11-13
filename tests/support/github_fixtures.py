@@ -126,6 +126,7 @@ class FakeForge:
     default_branch_name: str = "main"
     default_branch_error: forge.ForgeError | None = None
     landings: dict[int, forge.Landing] = field(default_factory=dict)
+    landing_reads: list[int] = field(default_factory=list)
     changes_by_number: dict[int, forge.PullRequestChanges | forge.ForgeError] = field(
         default_factory=dict
     )
@@ -375,6 +376,7 @@ class FakeForge:
 
     def landing(self, number: int) -> forge.Landing:
         self._run()
+        self.landing_reads.append(number)
         detail = self.landings.get(number)
         if detail is None:
             raise protocol.ClaimError(f"GitHub has no pull request #{number}")

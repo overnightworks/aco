@@ -10,7 +10,10 @@ def stub_lane_record(monkeypatch: pytest.MonkeyPatch) -> None:
     so its releases carry no lane record; `test_lane_record.py` drives the real one."""
 
     def plain_subject(
-        _context: object, claim: protocol.ActiveClaim, _outcome: protocol.ReleaseOutcome
+        _context: object,
+        claim: protocol.ActiveClaim,
+        _outcome: protocol.ReleaseOutcome,
+        _verified_merge: str | None = None,
     ) -> store.TransitionSubject:
         return store.transition_subject("release", claim.identity, claim.branch)
 

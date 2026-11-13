@@ -5,7 +5,7 @@ import argparse
 import shlex
 import uuid
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import cast
 
@@ -155,17 +155,17 @@ class _MergedLandingClose:
 
 @dataclass(frozen=True)
 class _VerifiedMerge:
-    """What `_verify_merged_release` proved about a merged pull request:
-    `landed_head`, the head the forge recorded as landed -- the one tip a
-    squashed lane's worktree and branch are removed by, on a first run or
-    a rerun alike -- the branch it was merged from, which the
-    released claim must sit on, the first-parent trunk commits
-    from its merge onward, none of which the released claim may be based on
-    (such a claim was opened after this landing)."""
+    """What `_verify_merged_release` proved about a merged pull request: `landed_head`, the head
+    the forge recorded as landed -- the one tip a squashed lane's worktree and branch are removed
+    by, on a first run or a rerun alike -- the branch it was merged from, which the released
+    claim must sit on, the first-parent trunk commits from its merge onward, none of which the
+    released claim may be based on (such a claim was opened after this landing), and
+    `merge_commit`, the merge commit it landed as."""
 
     landed_head: str
     source_branch: str
     trunk_since_landing: frozenset[str]
+    merge_commit: str
 
 
 def _verify_merged_release(
@@ -174,25 +174,20 @@ def _verify_merged_release(
     identity: protocol.ClaimIdentity,
     merged: protocol.MergedRelease,
 ) -> _VerifiedMerge:
-    """Refuse a `--merged` release the landing itself does not support, and
-    report the head the forge recorded as landed: `run`
-    calls this only after the claim is already resolved and the claimant
-    already authorized, so a defect or a transient forge failure there never
-    runs ahead of authorization -- except REL-47's release with no live
-    claim, which has no claimant to authorize and verifies
-    here. Whether the work item is still open to close is
-    `_pending_landing_close`'s read, which only a release of a claim makes,
-    so REL-47 never reads it. `state_board.py`'s own
-    `LandingIntent` path is `storage = state-ref`'s equivalent, so this only
-    ever runs under `storage = github` (see `run`).
+    """Refuse a `--merged` release the landing itself does not support, and report the head the
+    forge recorded as landed: `run` calls this only after the claim is already resolved and the
+    claimant already authorized, so a defect or a transient forge failure there never runs ahead
+    of authorization -- except REL-47's release with no live claim, which has no claimant to
+    authorize and verifies here. Whether the work item is still open to close is
+    `_pending_landing_close`'s read, which only a release of a claim makes, so REL-47 never reads
+    it. `state_board.py`'s own `LandingIntent` path is `storage = state-ref`'s equivalent, so this
+    only ever runs under `storage = github` (see `run`).
 
-    Every release's authority -- an issue's own closing reference and an
-    issue-less lane's own declaration alike -- is the merge commit's own
-    trailer block,
-    verified through the walked first-parent trunk exactly as `storage =
-    state-ref` already does -- never the pull request's own `body`, which
-    stays mutable long after the merge and once was edited to remove the
-    very `Work-Item:` line a release depended on.
+    Every release's authority -- an issue's own closing reference and an issue-less lane's own
+    declaration alike -- is the merge commit's own trailer block, verified through the walked
+    first-parent trunk exactly as `storage = state-ref` already does -- never the pull request's
+    own `body`, which stays mutable long after the merge and once was edited to remove the very
+    `Work-Item:` line a release depended on.
     """
     detail = client.landing(merged.pull_request)
     if not detail.merged:
@@ -216,6 +211,7 @@ def _verify_merged_release(
         landed_head=detail.head_sha,
         source_branch=detail.source_branch,
         trunk_since_landing=checkout.trunk_since(landings, detail.merge_commit),
+        merge_commit=detail.merge_commit,
     )
 
 
@@ -430,10 +426,9 @@ class ReleaseEnding(StrEnum):
 def release_transition(
     parsed: argparse.Namespace, context: RunContext, release_branch: str | None
 ) -> ReleaseEnding:
-    """A `--merged` release judges a squashed lane by the head the forge
-    recorded as landed, whether `aco land` merged it a moment
-    ago, a rerun resumes it, or a standalone release follows a merge made
-    elsewhere: a merged pull request's head no longer moves."""
+    """A `--merged` release judges a squashed lane by the head the forge recorded as landed,
+    whether `aco land` merged it a moment ago, a rerun resumes it, or a standalone release follows
+    a merge made elsewhere: a merged pull request's head no longer moves."""
     issue = protocol.optional_issue_number(parsed.issue)
     storage = context.config.storage
     identity = protocol.lookup_identity(
@@ -470,8 +465,9 @@ def release_transition(
         operation_id=uuid.uuid4().hex,
         coordinator_override=parsed.coordinator_override,
     )
+    merge_commit = None if lane is None else lane.merge_commit
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome),
+        lane_record.release_subject(context, resolved.selected, outcome, merge_commit),
         intent,
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
@@ -532,7 +528,8 @@ def _verify_and_close_merged_release(
     tips = (verified.landed_head,)
     if _is_adopted_lane(selected.identity, selected.branch):
         tips += (selected.base,)
-    return _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
+    lane = _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
+    return replace(lane, merge_commit=verified.merge_commit)
 
 
 def _report_merged_pull_request_left_nothing(
@@ -627,12 +624,14 @@ class _LandedLane:
     identity and branch, `proven_tips` (the head the forge recorded as landed, none under
     `storage = "state-ref"`, plus an adopted lane's `base`), and `rerun`, the
     `release` line that repeats this cleanup in the checkout holding its
-    worktree (REL-52)."""
+    worktree (REL-52), and `merge_commit`, the one the forge verified for a github release.
+    """
 
     identity: protocol.ClaimIdentity
     branch: str
     proven_tips: frozenset[str]
     rerun: str
+    merge_commit: str | None = None
 
 
 def _landed_lane(
