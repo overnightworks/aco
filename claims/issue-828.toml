@@ -3,6 +3,6 @@ agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
 role = "builder"
 base = "e8db04e8def977ab2e43c4a58974ae2bbf4a390e"
 branch = "claude/issue-828-every-lane-leaves-a-record"
-scope = ["README.md", "docs/VISION.md", "pyproject.toml", "quality/baseline.toml", "specs/lane-record.spec.md", "specs/release.spec.md", "specs/storage-pin.spec.md", "src/aco/cmd_land.py", "src/aco/cmd_release.py", "src/aco/lane_record.py", "src/aco/protocol.py", "src/aco/routing_line.py", "src/aco/store.py", "src/aco/workboard.py", "tests/support/cli_fixtures.py", "tests/support/lane_record_fixtures.py", "tests/test_lane_record.py", "tests/test_routing_line.py"]
+scope = ["README.md", "docs/VISION.md", "pyproject.toml", "quality/baseline.toml", "specs/lane-record.spec.md", "specs/release.spec.md", "specs/storage-pin.spec.md", "src/aco/cmd_land.py", "src/aco/cmd_release.py", "src/aco/lane_record.py", "src/aco/protocol.py", "src/aco/routing_line.py", "src/aco/store.py", "src/aco/workboard.py", "tests/support/cli_fixtures.py", "tests/support/github_fixtures.py", "tests/support/lane_record_fixtures.py", "tests/test_lane_record.py", "tests/test_routing_line.py"]
 opened_commit = "36a2fc6be5613f9863bbb88873130d9a279ab848"
 whole_reason = "One record written at the one release transition, with the grammar, config and import layers it reads."
