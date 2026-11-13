@@ -1,0 +1,8 @@
+claim_id = "b34b4269fe0848c3a8b37b455b600728"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "7e7aa4430fa171751a542b0e35e5e45dfe4d9f79"
+branch = "claude/issue-821-lane-shared-directories"
+scope = ["README.md", "specs/brief.spec.md", "specs/status.spec.md", "specs/storage-pin.spec.md", "src/aco/cmd_brief.py", "src/aco/cmd_status.py", "src/aco/session.py", "src/aco/workboard.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_cmd_brief.py", "tests/test_cmd_status.py"]
+opened_commit = "8692177acd2fb6a49587fddbce326ca27451958c"
+whole_reason = "One matcher for lane-shared paths and its three readers (config, status, brief) with their specs; split, a reader would disagree with the config it reads."
