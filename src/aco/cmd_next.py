@@ -190,11 +190,19 @@ _PARALLEL_UNKNOWN_LINE = "parallel: unknown (first action names no scope)"
 _PARALLEL_TEXT_LIMIT = 3
 
 
+def _parallel_overlap_note(overlap: workboard.ParallelOverlap, storage: body.Storage) -> str:
+    """One overlap in CLAIM-31's grammar, its paths capped as CLAIM-34 caps them."""
+    paths = protocol.named_with_overflow_count(overlap.paths)
+    return f"{overlap.subject(storage)} on {paths}"
+
+
 def _parallel_candidate_label(candidate: workboard.ParallelCandidate, storage: body.Storage) -> str:
     label = workboard.item_label(candidate.number, storage)
     count = len(candidate.scope)
     unit = "path" if count == 1 else "paths"
-    return f"{label} ({count} {unit})"
+    notes = ", ".join(_parallel_overlap_note(overlap, storage) for overlap in candidate.overlaps)
+    overlaps = f"; overlaps {notes}" if notes else ""
+    return f"{label} ({count} {unit}{overlaps})"
 
 
 def _parallel_line(parallel: workboard.ParallelSet, storage: body.Storage) -> str:
@@ -230,6 +238,20 @@ def _next_json_numbers(numbers: Iterable[int], storage: body.Storage) -> list[in
     return [workboard.item_json_reference(number, storage) for number in numbers]
 
 
+def _parallel_overlap_json(
+    overlap: workboard.ParallelOverlap, storage: body.Storage
+) -> dict[str, object]:
+    holder = overlap.holder
+    return {
+        "issue": workboard.item_json_reference(holder, storage)
+        if isinstance(holder, int)
+        else None,
+        "lane": holder if isinstance(holder, str) else None,
+        "claim_id": overlap.claim_id,
+        "paths": list(overlap.paths),
+    }
+
+
 def _parallel_json(parallel: workboard.ParallelSet, storage: body.Storage) -> dict[str, object]:
     return {
         "first_scope_unknown": parallel.first_scope_unknown,
@@ -237,6 +259,9 @@ def _parallel_json(parallel: workboard.ParallelSet, storage: body.Storage) -> di
             {
                 "number": workboard.item_json_reference(candidate.number, storage),
                 "scope": list(candidate.scope),
+                "overlaps": [
+                    _parallel_overlap_json(overlap, storage) for overlap in candidate.overlaps
+                ],
             }
             for candidate in parallel.candidates
         ],

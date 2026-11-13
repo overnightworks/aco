@@ -319,7 +319,7 @@ def _claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
 class _ObservedBoard:
     """`observed_board`'s own result: the projected board, plus every live
     claim it was built from -- `next`'s own `parallel_set`
-    needs each claim's scope for its occupied-paths accounting, and this is
+    needs each claim's scope for its overlap notes, and this is
     the one fetch that already read them, never a second store observation
     for the same run."""
 

@@ -546,7 +546,7 @@ class BoardItem:
     # The block's own top-level `scope = [...]`, exactly
     # `ParsedBody.scope`'s canonical tuple -- `None` when the item names no
     # scope of its own, the case `next`'s `Run:` line and `parallel_set`'s
-    # disjointness walk both have to name rather than guess through.
+    # overlap walk both have to name rather than guess through.
     scope: tuple[str, ...] | None
     # The block's own top-level `whole` reason, exactly
     # `ParsedBody.whole`: the reason `claim`/`start` read for a wide scope,
@@ -1995,14 +1995,14 @@ def _action_number(action: NextAction) -> int:
 def _action_scope(
     action: NextAction, uncut_by_container: Mapping[int, UncutSlices]
 ) -> tuple[str, ...] | None:
-    """The scope one `NextAction` occupies for `parallel_set`'s disjointness
+    """The scope one `NextAction` occupies for `parallel_set`'s overlap
     accounting: a work item's own top-level `scope`, or a cut
     proposal's row scope -- the same first uncut row `uncut_by_container`
     already named its `cut_title` from. `CloseContainerAction` and
     `CheckContainerAction` always return `()`: closing or checking a
     container is a zero-cost action against no paths, never one
     `parallel_set` has to guard against. `None` means unknown -- the action
-    names no scope of its own to check disjointness against."""
+    names no scope of its own to check overlaps against."""
     if isinstance(action, WorkItemAction):
         return action.scope
     if isinstance(action, CutSliceAction):
@@ -2011,30 +2011,73 @@ def _action_scope(
 
 
 @dataclass(frozen=True)
+class ParallelOverlap:
+    """One scope a placed candidate's own scope meets: `paths` are the deeper
+    meeting paths (CLAIM-33). `holder` is the item number of an issue claim,
+    the first action or an earlier candidate, or the branch of a lane claim;
+    `claim_id` is set for a live claim only."""
+
+    holder: int | str
+    claim_id: str | None
+    paths: tuple[str, ...]
+
+    def subject(self, storage: Storage) -> str:
+        """Who holds the scope, as `claim_subject` names a claim."""
+        return _subject_text(self.holder, storage)
+
+
+@dataclass(frozen=True)
+class _Occupant:
+    """A scope the `parallel_set` walk has taken so far, and whose it is."""
+
+    scope: tuple[str, ...]
+    holder: int | str
+    claim_id: str | None
+
+    def overlap_with(self, scope: tuple[str, ...]) -> ParallelOverlap | None:
+        paths = protocol.scope_overlap_paths(scope, self.scope)
+        if not paths:
+            return None
+        return ParallelOverlap(self.holder, self.claim_id, paths)
+
+
+def _claim_holder(claim: protocol.ScopedClaim) -> int | str:
+    match claim.identity:
+        case protocol.IssueIdentity(issue=issue):
+            return issue
+        case _:
+            return claim.branch
+
+
+def _claim_occupant(claim: protocol.ScopedClaim) -> _Occupant:
+    return _Occupant(claim.scope, _claim_holder(claim), claim.claim_id)
+
+
+@dataclass(frozen=True)
 class ParallelCandidate:
-    """One free item `parallel_set` placed into the maximal disjoint set
-    alongside the first action: its own number, and the exact
-    scope that earned it a place -- a work item's own top-level scope, or a
-    cut proposal's row scope."""
+    """One free item `parallel_set` placed alongside the first action: its
+    own number, the exact scope that earned it a place -- a work item's own
+    top-level scope, or a cut proposal's row scope -- and every overlap that
+    scope has with a live claim, the first action or an earlier candidate,
+    in that order; an overlap is a note, never a reason to withhold it."""
 
     number: int
     scope: tuple[str, ...]
+    overlaps: tuple[ParallelOverlap, ...]
 
 
 @dataclass(frozen=True)
 class ParallelSet:
-    """`next`'s own parallel-capacity projection: a priority-preserving
-    greedy walk of `_qualifying_actions`, occupying live claims' scopes and
-    the first action's own scope before it starts, then placing each further
-    candidate that stays disjoint from everything occupied so far and
-    occupying it in turn -- board order already *is* this repository's
-    priority order, so a greedy walk in that order is the packing this
-    projection owes, not a globally optimal one. `scope_unknown` names every
-    candidate the walk could not place either way, in board order, since a
-    candidate with no scope of its own cannot be checked for disjointness.
-    `first_scope_unknown` is set instead of computing anything at all when
-    the first action itself names no scope -- the one case with no baseline
-    to walk from -- and `candidates`/`scope_unknown` then stay empty."""
+    """`next`'s own parallel-capacity projection: a walk of
+    `_qualifying_actions` in board order -- this repository's priority order
+    -- that places every further candidate with a scope, noting on it the
+    overlaps with live claims, the first action's own scope and the
+    candidates placed before it. `scope_unknown` names every candidate the
+    walk could not place, in board order, since a candidate with no scope of
+    its own cannot be checked for overlaps. `first_scope_unknown` is set
+    instead of computing anything at all when the first action itself names
+    no scope -- the one case with no baseline to walk from -- and
+    `candidates`/`scope_unknown` then stay empty."""
 
     candidates: tuple[ParallelCandidate, ...]
     scope_unknown: tuple[int, ...]
@@ -2044,24 +2087,24 @@ class ParallelSet:
 def parallel_set(
     board: Board, live_claims: tuple[protocol.ScopedClaim, ...], action: NextAction | None
 ) -> ParallelSet:
-    """The maximal set of further free items `next`'s first `action` can run
-    alongside right now -- see `ParallelSet` for the packing
-    rule. `CloseContainerAction` and `CheckContainerAction` never compete
-    for scope at all and are skipped outright, whether one is `action`
-    itself (occupying nothing) or a later candidate. A
-    `board.recovery` item -- landed but still open -- is `zero_cost_closes`'
-    own domain too, never this walk's: it is skipped outright as a later
-    candidate, so it neither claims a place in `candidates` nor occupies a
-    scope that would silently crowd out a real free item behind it."""
+    """Every further free item `next`'s first `action` can run alongside right
+    now -- see `ParallelSet` for the walk. An overlap never withholds an item.
+    `CloseContainerAction` and `CheckContainerAction` never compete for scope
+    at all and are skipped outright, whether one is `action` itself
+    (occupying nothing) or a later candidate. A `board.recovery` item --
+    landed but still open -- is `zero_cost_closes`' own domain too, never
+    this walk's: it is skipped outright as a later candidate, so it neither
+    claims a place in `candidates` nor appears in another candidate's
+    overlaps."""
     if action is None:
         return ParallelSet((), (), False)
     uncut_by_container = _uncut_by_container(board)
     first_scope = _action_scope(action, uncut_by_container)
     if first_scope is None:
         return ParallelSet((), (), True)
-    occupied = [claim.scope for claim in live_claims]
-    occupied.append(first_scope)
     first_number = _action_number(action)
+    occupants = [_claim_occupant(claim) for claim in live_claims]
+    occupants.append(_Occupant(first_scope, first_number, None))
     recovery_numbers = frozenset(item.number for item in board.recovery)
     candidates: list[ParallelCandidate] = []
     scope_unknown: list[int] = []
@@ -2075,10 +2118,11 @@ def parallel_set(
         if scope is None:
             scope_unknown.append(number)
             continue
-        if any(protocol.scope_overlap_paths(scope, taken) for taken in occupied):
-            continue
-        candidates.append(ParallelCandidate(number, scope))
-        occupied.append(scope)
+        overlaps = tuple(
+            overlap for taken in occupants if (overlap := taken.overlap_with(scope)) is not None
+        )
+        candidates.append(ParallelCandidate(number, scope, overlaps))
+        occupants.append(_Occupant(scope, number, None))
     return ParallelSet(tuple(candidates), tuple(scope_unknown), False)
 
 
@@ -2745,12 +2789,14 @@ def _unreadable_children_reason(
     return f"container; its open children do not read: {labels}"
 
 
+def _subject_text(holder: int | str, storage: Storage) -> str:
+    if isinstance(holder, str):
+        return f"lane {protocol.terminal_text(holder)}"
+    return f"issue {item_label(holder, storage)}"
+
+
 def claim_subject(claim: protocol.ScopedClaim, storage: Storage) -> str:
-    return (
-        f"lane {protocol.terminal_text(claim.branch)}"
-        if isinstance(claim.identity, protocol.LaneIdentity)
-        else f"issue {item_label(claim.identity.issue, storage)}"
-    )
+    return _subject_text(_claim_holder(claim), storage)
 
 
 def claim_age_fields(opened_at: datetime, now: datetime) -> tuple[str, bool]:
