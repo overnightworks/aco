@@ -171,6 +171,24 @@ def test_the_experiment_tag_is_a_short_lowercase_token_or_unknown(
             "y",
             id="the-fields-before-blocking",
         ),
+        pytest.param(
+            "Routing: build a/b. Blocking: a → ci. Blocking: b → ci. Experiment: x",
+            None,
+            None,
+            id="an-experiment-after-a-doubled-blocking",
+        ),
+        pytest.param(
+            "Routing: build a/b. Blocking: a → ci. Blocking: b → ci. Fix rounds: 7",
+            None,
+            None,
+            id="rounds-after-a-doubled-blocking",
+        ),
+        pytest.param(
+            "Routing: build a/b. Experiment: y. Blocking: a → ci. Blocking: b → ci",
+            None,
+            "y",
+            id="the-fields-before-a-doubled-blocking",
+        ),
     ],
 )
 def test_the_rounds_and_the_experiment_are_never_read_from_a_finding(

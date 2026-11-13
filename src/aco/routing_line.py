@@ -56,8 +56,9 @@ def parse_routing_line(message: str) -> RoutingLine | None:
     if len(lines) != 1:
         return None
     body = lines[0].strip()
+    first_blocking = _BLOCKING_LABEL.search(body)
+    before_blocking = body if first_blocking is None else body[: first_blocking.start()]
     blocking = _sentence_value(_BLOCKING_LABEL, _BLOCKING, body)
-    before_blocking = body if blocking is None else body[: blocking.start()]
     rounds = _sentence_value(_FIX_ROUNDS_LABEL, _FIX_ROUNDS, before_blocking)
     experiment = _sentence_value(_EXPERIMENT_LABEL, _EXPERIMENT, before_blocking)
     return RoutingLine(
