@@ -194,7 +194,7 @@ def test_a_landed_lane_counts_production_files_and_lines_minus_dependency_paths(
 def test_a_renamed_production_file_is_one_file_with_only_its_changed_lines(
     history: LaneHistory, renamed_content: str, line_trailers: list[str]
 ) -> None:
-    """Spec: LANREC-09."""
+    """Spec: LANREC-09, LANREC-10."""
     real_git(history.path, "config", "diff.renames", "false")
     real_git(history.path, "mv", "src/a.py", "src/b.py")
     (history.path / "src" / "b.py").write_text(renamed_content)
@@ -211,6 +211,11 @@ def test_a_renamed_production_file_is_one_file_with_only_its_changed_lines(
 @pytest.mark.parametrize(
     ("config", "size_trailers"),
     [
+        pytest.param(
+            workboard.parse_config("production_paths = []", Path("board.toml")),
+            [],
+            id="an-empty-list",
+        ),
         pytest.param(workboard.BoardConfig(), [], id="no-production-paths"),
         pytest.param(
             workboard.BoardConfig(production_paths=("src/",), dependency_paths=("src/",)),
@@ -222,7 +227,7 @@ def test_a_renamed_production_file_is_one_file_with_only_its_changed_lines(
 def test_size_is_unknown_without_production_paths_and_zero_when_measured_empty(
     history: LaneHistory, config: workboard.BoardConfig, size_trailers: list[str]
 ) -> None:
-    """Spec: LANREC-04, LANREC-10."""
+    """Spec: LANREC-04, LANREC-10, LANREC-25."""
     merge = history.land("Landing")
 
     figures = compute_for(history, landed_outcome(merge), merge_commit=merge, config=config)

@@ -22,15 +22,19 @@ class RoutingStage(StrEnum):
     LAND = "land"
 
 
+_STAGE_ORDER = tuple(RoutingStage)
 NO_STAGE = "none"
 _STAGES_THAT_MAY_BE_ABSENT = frozenset({RoutingStage.FIX, RoutingStage.TEST, RoutingStage.GATE})
 
 _LINE = re.compile(r"^Routing: (.*)$", re.MULTILINE)
 _MODEL_AND_EFFORT = re.compile(r"[a-z0-9][a-z0-9.-]*/[a-z0-9-]+")
+_FIX_ROUNDS_LABEL = re.compile(r"\bFix rounds:")
 _FIX_ROUNDS = re.compile(r"\bFix rounds: (\d{1,3})(?=\.(?:\s|$)|, hard:|$)")
+_EXPERIMENT_LABEL = re.compile(r"(?:^|\. )Experiment:")
 _EXPERIMENT = re.compile(r"(?:^|\. )Experiment: ([a-z0-9-]{1,40})(?=\.(?:\s|$)|$)")
+_BLOCKING_LABEL = re.compile(r"(?:^|\. )Blocking:")
 _BLOCKING = re.compile(r"(?:^|\. )Blocking: (.*)$")
-_NO_BLOCKING = re.compile(r"none(?:\.(?:\s|$)|$)")
+_NO_BLOCKING = re.compile(r"none\.?")
 _ARROW = "→"
 _STAGE_AFTER_ARROW = re.compile(_ARROW + r"\s*[A-Za-z][A-Za-z0-9-]*")
 
@@ -52,10 +56,10 @@ def parse_routing_line(message: str) -> RoutingLine | None:
     if len(lines) != 1:
         return None
     body = lines[0].strip()
-    blocking = _BLOCKING.search(body)
+    blocking = _sentence_value(_BLOCKING_LABEL, _BLOCKING, body)
     before_blocking = body if blocking is None else body[: blocking.start()]
-    rounds = _FIX_ROUNDS.search(before_blocking)
-    experiment = _EXPERIMENT.search(before_blocking)
+    rounds = _sentence_value(_FIX_ROUNDS_LABEL, _FIX_ROUNDS, before_blocking)
+    experiment = _sentence_value(_EXPERIMENT_LABEL, _EXPERIMENT, before_blocking)
     return RoutingLine(
         stages=_stages(body.split(". ", 1)[0]),
         fix_rounds=None if rounds is None else int(rounds[1]),
@@ -64,12 +68,24 @@ def parse_routing_line(message: str) -> RoutingLine | None:
     )
 
 
+def _sentence_value(
+    label: re.Pattern[str], value: re.Pattern[str], text: str
+) -> re.Match[str] | None:
+    """The match of `value` when `text` holds exactly one sentence that starts with `label`: a
+    doubled sentence is ambiguous, so it reads as unknown."""
+    return value.search(text) if len(label.findall(text)) == 1 else None
+
+
 def _stages(text: str) -> Mapping[RoutingStage, str]:
+    appearance: list[RoutingStage] = []
     named: defaultdict[RoutingStage, list[str]] = defaultdict(list)
     for piece in text.removesuffix(".").split(";"):
         name, _, choice = piece.strip().partition(" ")
         if name in RoutingStage:
+            appearance.append(RoutingStage(name))
             named[RoutingStage(name)].append(choice)
+    if appearance != sorted(appearance, key=_STAGE_ORDER.index):
+        return MappingProxyType({})
     return MappingProxyType(
         {
             stage: choices[0]
@@ -86,7 +102,7 @@ def _fits(stage: RoutingStage, choice: str) -> bool:
 
 
 def _blocking_count(text: str) -> int | None:
-    if _NO_BLOCKING.match(text):
+    if _NO_BLOCKING.fullmatch(text):
         return 0
     findings = [finding for finding in text.split(";") if finding.strip()]
     if findings and all(_is_one_finding(finding) for finding in findings):

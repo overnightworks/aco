@@ -18,9 +18,9 @@ reason (an abandoned one).
 | nothing left to release (REL-47) | LANREC-02 | — |
 | the merge commit | LANREC-07 | — |
 | wall time | LANREC-08 | LANREC-08 |
-| production size | LANREC-09, LANREC-10 | — |
+| production size | LANREC-09, LANREC-10, LANREC-25 | — |
 | the routing line | LANREC-13..LANREC-15 | LANREC-13, LANREC-14 |
-| the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20 | LANREC-11, LANREC-12, LANREC-17..LANREC-20 |
+| the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24 |
 | a figure that cannot be computed | LANREC-21 | LANREC-21 |
 | a malformed `production_paths` | LANREC-22 | LANREC-22 |
 
@@ -57,6 +57,9 @@ Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effo
 - [ ] [LANREC-18] `Fix rounds: <n>` takes `<n>` of one to three digits; any other value records no rounds. The text after `, hard:` is never read.
 - [ ] [LANREC-19] `Blocking:` is `none`, which counts `0`, or findings separated by `; `, each ending `→ <stage>`, which count one each. A finding without exactly one `→ <stage>` makes the count unknown.
 - [ ] [LANREC-20] `Experiment: <tag>` takes `<tag>` of lowercase letters, digits and `-`, one to 40 characters, as a sentence of its own; any other value records no tag.
+- [ ] [LANREC-23] A doubled `Fix rounds:`, `Experiment:` or `Blocking:` sentence, `Blocking: none` plus more, or stages out of LANREC-16's order record that field as unknown; the others still read.
+- [ ] [LANREC-24] The word after a finding's `→` is never checked against the six stages: `ci`, `head` and any other word count the finding, because the line's writer owns the destinations.
+- [ ] [LANREC-25] `production_paths = []` is the key left unset: the three size figures have no line (LANREC-10), never a measured zero.
 
 ## Failure
 

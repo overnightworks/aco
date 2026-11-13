@@ -88,12 +88,17 @@ def test_a_message_without_exactly_one_routing_line_has_no_routing(message: str)
         pytest.param("Routing: build a/b. Fix rounds: 2x. Blocking: none", None, id="suffixed"),
         pytest.param("Routing: build a/b. Fix rounds: 2", 2, id="at-the-end-of-the-line"),
         pytest.param("Routing: build a/b. Blocking: none", None, id="absent"),
+        pytest.param(
+            "Routing: build a/b. Fix rounds: 1. Fix rounds: 2. Blocking: none",
+            None,
+            id="a-doubled-sentence",
+        ),
     ],
 )
 def test_fix_rounds_are_a_short_whole_number_or_unknown(
     line: str, expected_rounds: int | None
 ) -> None:
-    """Spec: LANREC-18."""
+    """Spec: LANREC-18, LANREC-23."""
     assert read(line)[1] == expected_rounds
 
 
@@ -102,6 +107,9 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
     [
         pytest.param("none", 0, id="none"),
         pytest.param("none.", 0, id="none-with-a-full-stop"),
+        pytest.param("none. Blocking: a → ci; b → ci", None, id="none-then-findings"),
+        pytest.param("none. The gate ran on another model.", None, id="none-then-a-sentence"),
+        pytest.param("a → nowhere", 1, id="a-destination-that-is-no-stage"),
         pytest.param("one thing → ci", 1, id="one"),
         pytest.param("a → build; b, with a comma → review; c → head", 3, id="three"),
         pytest.param("a → head, scope (rescope)", 1, id="a-stage-then-a-comment"),
@@ -117,7 +125,7 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
 def test_the_blocking_count_is_one_per_arrow_or_unknown_when_ambiguous(
     blocking: str, expected_count: int | None
 ) -> None:
-    """Spec: LANREC-19."""
+    """Spec: LANREC-19, LANREC-23, LANREC-24."""
     assert read(f"Routing: build a/b. Fix rounds: 0. Blocking: {blocking}")[2] == expected_count
 
 
@@ -131,13 +139,14 @@ def test_the_blocking_count_is_one_per_arrow_or_unknown_when_ambiguous(
         pytest.param("Experiment: a_b.", None, id="underscore"),
         pytest.param("Experiment: trial two.", None, id="two-words"),
         pytest.param("Experiment: trial.two.", None, id="a-dot-inside-the-tag"),
+        pytest.param("Experiment: a. Experiment: b.", None, id="a-doubled-sentence"),
         pytest.param("", None, id="absent"),
     ],
 )
 def test_the_experiment_tag_is_a_short_lowercase_token_or_unknown(
     sentence: str, expected_tag: str | None
 ) -> None:
-    """Spec: LANREC-20."""
+    """Spec: LANREC-20, LANREC-23."""
     assert read(f"Routing: build a/b. Fix rounds: 0. {sentence} Blocking: none")[3] == expected_tag
 
 
@@ -191,13 +200,15 @@ def test_the_rounds_and_the_experiment_are_never_read_from_a_finding(
         ),
         pytest.param("build a/b; build c/d", (), id="a-stage-named-twice-is-unknown"),
         pytest.param("build a b; fix", (), id="no-model-and-effort"),
+        pytest.param("review a/b; build c/d", (), id="two-stages-out-of-order"),
+        pytest.param("build a/b; land c/d; fix none", (), id="the-last-stage-misplaced"),
         pytest.param("deploy a/b; land c/d", ((RoutingStage.LAND, "c/d"),), id="an-unknown-stage"),
     ],
 )
 def test_a_stage_that_does_not_fit_is_left_out_and_the_others_stay(
     stages: str, expected: tuple[tuple[RoutingStage, str], ...]
 ) -> None:
-    """Spec: LANREC-16, LANREC-17."""
+    """Spec: LANREC-16, LANREC-17, LANREC-23."""
     assert read(f"Routing: {stages}. Fix rounds: 0. Blocking: none")[0] == expected
 
 
