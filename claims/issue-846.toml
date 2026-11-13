@@ -1,0 +1,8 @@
+claim_id = "0eb29548291f4abbbda751e814435873"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "3e17e21bd1cbaa151bb80c9ed68b402e17200691"
+branch = "claude/issue-846-brief-tells-unreachable-forge"
+scope = ["specs/brief.spec.md", "specs/output.spec.md", "src/aco/cmd_brief.py", "src/aco/github.py", "src/aco/report.py", "tests"]
+opened_commit = "653341104f5eb2cfd3e80e7c183cf0913dd17102"
+whole_reason = "One shared refusal token, its classifier input and its first command change together; splitting would leave a token no command gives."
