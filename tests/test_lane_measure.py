@@ -7,6 +7,7 @@ import pytest
 from aco import protocol
 from aco.lane_measure import DateRange, FigureName, measure, parse_group
 from aco.lane_record import LaneOutcome, LaneRecord, RecordedLane
+from aco.routing_line import parse_routing_line
 
 NOVEMBER = DateRange(date(2026, 11, 1), date(2026, 11, 30))
 
@@ -62,3 +63,17 @@ def test_a_text_that_is_no_range_and_no_tag_is_refused(group: str) -> None:
     """Spec: STATS-05, STATS-16, STATS-17."""
     with pytest.raises(protocol.ClaimError):
         parse_group(group)
+
+
+@pytest.mark.parametrize("tag", ["a", "a-b-9", "a" * 40, "a" * 41, "", "A", "a.b", "a_b"])
+def test_a_group_names_exactly_the_tags_a_routing_line_records(tag: str) -> None:
+    """Spec: STATS-03, LANREC-20."""
+    recorded = parse_routing_line(f"Routing: build a/b. Experiment: {tag}. Blocking: none")
+    assert recorded is not None
+
+    try:
+        selected = parse_group(f"tag:{tag}")
+    except protocol.ClaimError:
+        selected = None
+
+    assert (selected is not None) == (recorded.experiment == tag)

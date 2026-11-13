@@ -12,12 +12,11 @@ from enum import StrEnum
 
 from . import protocol
 from .lane_record import LaneOutcome, LaneRecord, RecordedLane
-from .routing_line import RoutingStage
+from .routing_line import EXPERIMENT_TAG, RoutingStage
 
 TAG_PREFIX = "tag:"
 _RANGE_SEPARATOR = ".."
 _DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
-_TAG = re.compile(r"[a-z0-9-]{1,40}")
 
 
 @dataclass(frozen=True)
@@ -48,7 +47,7 @@ def parse_group(text: str) -> LaneGroup:
     """`FROM..TO` (ISO days) or `tag:NAME`, refused by name when it is neither."""
     if text.startswith(TAG_PREFIX):
         tag = text.removeprefix(TAG_PREFIX)
-        if _TAG.fullmatch(tag) is None:
+        if EXPERIMENT_TAG.fullmatch(tag) is None:
             raise protocol.ClaimError(
                 f"group '{text}' names no tag: a tag is 1 to 40 lowercase letters, digits or '-'"
             )
