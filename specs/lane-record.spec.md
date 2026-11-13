@@ -43,7 +43,7 @@ reason (an abandoned one).
 
 The routing line is the form below; `<model>` and `<effort>` name a stage's model and effort,
 and the bracketed part comes from the third fix round on. The line `Experiment: <tag>.`
-may stand anywhere after the stages.
+may stand anywhere after the stages and before `Blocking:`.
 
 ```text
 Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effort>; test <model>/<effort>|none; gate <model>/<effort>|none; land <model>/<effort>. Fix rounds: <n>[, hard: <why>]. Experiment: <tag>. Blocking: <finding> → <stage>; …|none
