@@ -1,0 +1,7 @@
+claim_id = "24eeebf6355c4981bcd5b7995c68c78c"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "0f655162444b222921a4325d8ea9cd22fdeaa987"
+branch = "claude/issue-834-counted-blocking-finding"
+scope = ["specs/lane-record.spec.md", "src/aco/routing_line.py", "tests/test_routing_line.py"]
+opened_commit = "e272f574a2b387dfd9f979dcf58c2560f4d09c4e"
