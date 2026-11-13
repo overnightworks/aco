@@ -16,7 +16,7 @@ from .routing_line import EXPERIMENT_TAG, RoutingStage
 
 TAG_PREFIX = "tag:"
 _RANGE_SEPARATOR = ".."
-_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+_DAY = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 
 
 @dataclass(frozen=True)

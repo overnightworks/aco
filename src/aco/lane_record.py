@@ -256,7 +256,7 @@ class RecordedLane:
     record: LaneRecord
 
 
-_WHOLE_NUMBER = re.compile(r"[0-9]+")
+_WHOLE_NUMBER = re.compile(r"\d+", re.ASCII)
 
 
 def recorded_lanes(toplevel: Path, state_tip: str | None) -> tuple[RecordedLane, ...]:
