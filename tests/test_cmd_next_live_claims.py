@@ -90,7 +90,7 @@ def test_next_places_every_free_item_with_a_scope_and_notes_each_overlap_it_meet
     github_clone: Path,
     bare_remote: Path,
 ) -> None:
-    """Spec: NEXT-09, NEXT-15, NEXT-17, NEXT-21, NEXT-22, NEXT-56."""
+    """Spec: NEXT-09, NEXT-15, NEXT-17, NEXT-21, NEXT-22, NEXT-56..NEXT-58."""
     serve_board(
         monkeypatch,
         github_clone,
@@ -178,7 +178,7 @@ def test_next_carries_an_empty_overlaps_list_for_an_item_meeting_nothing(
     github_clone: Path,
     bare_remote: Path,
 ) -> None:
-    """Spec: NEXT-15, NEXT-56."""
+    """Spec: NEXT-15, NEXT-58."""
     serve_board(
         monkeypatch,
         github_clone,
