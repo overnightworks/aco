@@ -1,8 +1,0 @@
-claim_id = "66495fb265fb469aa29d4ef84e8a80f9"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "3dab4177283f0991bf0b4aa74c4d4570ab641bf4"
-branch = "claude/issue-848-merged-release-never-suggests-abandoned"
-scope = ["specs/landing-grammar.spec.md", "specs/release.spec.md", "src/aco/checkout.py", "tests"]
-opened_commit = "7f1f9ce153cda6f226614cdd5cb0ef9b079eed75"
-whole_reason = "One refusal sentence, its spec lines and their test change together."
