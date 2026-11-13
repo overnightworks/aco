@@ -14,7 +14,8 @@ named command starts (OUT-05) and the ones the argument parser itself
 raises on the way into a command that declares `--json` (OUT-06). It also
 owns the sentences and the two `reason` tokens, `overwritten` and
 `not_verified`, of a body write the forge's check answers (OUT-10, OUT-11), shared
-by every writer that answers it.
+by every writer that answers it, and the `reason` token `unreachable` of a refusal
+whose cause is a forge aco could not reach (OUT-12), shared by every command that gives it.
 
 ## Behavior table
 
@@ -27,6 +28,7 @@ by every writer that answers it.
 | `--repo` given a value not shaped OWNER/REPO | OUT-08 |
 | a long option spelled short of its full name | OUT-09 |
 | a body write the forge's check finds overwritten or not verified | OUT-10, OUT-11 |
+| a refusal whose cause is a forge aco could not reach | OUT-12 |
 
 ## The envelope
 
@@ -40,8 +42,10 @@ by every writer that answers it.
 - [ ] [OUT-09] On every command, a long option spelled short of its full name is never read as that option: it is a parser refusal, exit `2`, with `--json` as OUT-06 (see E-OUT-06).
 - [ ] [OUT-10] A body write the check finds overwritten, written over an unread change (`kept`: it stands only in the edit history) or not verified refuses with the check's sentence, exit `2`; the body was written.
 - [ ] [OUT-11] Under `--json`, OUT-10 gives `reason: "overwritten"` with `kept` (false: a later revision replaced the write) after the payload, or `"not_verified"` without `kept`; `message` stays last (E-OUT-07).
+- [ ] [OUT-12] Under `--json`, a refusal whose cause is a forge aco could not reach (a timeout, an HTTP 5xx, a DNS or connect failure) carries `reason: "unreachable"` where its command gives it; exit stays `2`.
 - OUT-04 (retired).
 - The check's sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (`kept` true) or `#<n> body written, not verified (<cause>)`.
+- A forge that answered and refused (a 404, a 403) is not unreachable: it keeps its command's own token, and the text form keeps its sentence either way.
 
 ## Never
 

@@ -88,7 +88,7 @@ object. A refusal reaching the shared collection point prints
 - [ ] [BRIEF-07] `aco brief <item>` on a canonical remote whose host has no forge adapter refuses `no forge adapter for host <host>`, exit `2`, before any forge resolution (see E-BRIEF-05).
 - [ ] [BRIEF-09] Under `storage = "state-ref"`, `aco brief <item>` resolves the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
 - [ ] [BRIEF-17] `--json` on a dispatched refusal (see BRIEF-07/09/15/18/19/20/24) prints `specs/output.spec.md`'s envelope, the sentence as `message`, `reason` from the table below (see E-BRIEF-11).
-- [ ] [BRIEF-19] A forge failure reading the item refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-BRIEF-13).
+- [ ] [BRIEF-19] A forge failure reading the item refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, or `"unreachable"` when the forge could not be reached (OUT-12) (see E-BRIEF-13).
 
 `reason`, by which refusal fired:
 
@@ -96,6 +96,7 @@ object. A refusal reaching the shared collection point prints
 |---|---|
 | PIN-04 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | BRIEF-07 (no forge adapter for host), PIN-05 (no resolvable default branch), BRIEF-15 (no tracked `.aco/brief.toml`), BRIEF-24 (an unknown `.aco/brief.toml` key), BRIEF-18 (the lane branch read or `<trunk>` diff fails), BRIEF-19 (the item read fails), BRIEF-20 and BRIEF-21 (no `<trunk>`) | `unavailable` |
+| BRIEF-19 (the item read fails because the forge could not be reached, OUT-12) | `unreachable` |
 
 ## Never
 
@@ -343,6 +344,8 @@ $ aco brief 42 --json
 {"ok": false, "reason": "unavailable", "message": "<detail>"}
 exit 2
 ```
+
+With the forge unreachable instead (a timeout, an HTTP 5xx, a DNS or connect failure), `{"ok": false, "reason": "unreachable", "message": "<detail>"}`, exit `2`.
 
 ### E-BRIEF-14 -- a trunk pull adds nothing to `TOUCHED`
 

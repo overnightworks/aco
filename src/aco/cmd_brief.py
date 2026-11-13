@@ -11,6 +11,7 @@ from typing import cast
 from . import (
     checkout,
     cmd_status,
+    forge,
     protocol,
     report,
     store,
@@ -236,12 +237,15 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     BRIEF-07, BRIEF-09's PIN-04/PIN-05, BRIEF-15, BRIEF-18's lane-tip read and
     trunk diff, BRIEF-20's trunk read, and the item read itself, which is a
     forge call like any other -- reports through `report.refuse` under
-    this command's own vocabulary."""
+    this command's own vocabulary, except a forge it could not reach, which
+    carries the shared `unreachable` (`specs/output.spec.md`)."""
     as_json = parsed.json
     try:
         return _brief_report(parsed, context)
     except RepoMeaninglessUnderStateRefError as error:
         return report.refuse(_BriefReason.INVALID_USAGE, error, as_json=as_json)
+    except forge.ForgeTransientError as error:
+        return report.refuse(report.ForgeReachReason.UNREACHABLE, error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_BriefReason.UNAVAILABLE, error, as_json=as_json)
 

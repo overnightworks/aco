@@ -247,21 +247,32 @@ def test_brief_refuses_with_gits_text_when_the_lane_tip_read_fails_outright(
     assert answered
 
 
-def test_brief_json_names_a_failing_item_read_unavailable(
-    lane: Lane, served_body: FakeForge, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("failure", "reason"),
+    [
+        pytest.param(forge.ForgeTransientError("simulated timeout"), "unreachable", id="transient"),
+        pytest.param(forge.ForgeNotFoundError("simulated 404"), "unavailable", id="not-found"),
+        pytest.param(
+            forge.ForgePermissionDeniedError("simulated 403"), "unavailable", id="permission"
+        ),
+        pytest.param(forge.ForgeError("simulated refusal"), "unavailable", id="plain-forge-error"),
+    ],
+)
+def test_brief_json_tells_a_forge_it_could_not_reach_from_one_that_refused(
+    lane: Lane,
+    served_body: FakeForge,
+    capsys: pytest.CaptureFixture[str],
+    failure: forge.ForgeError,
+    reason: str,
 ) -> None:
-    """Spec: BRIEF-19."""
-    served_body.scripted_item_reads = [forge.ForgeError("simulated forge read failure")]
+    """Spec: BRIEF-19, OUT-12."""
+    served_body.scripted_item_reads = [failure]
 
     result = brief(capsys, "--json")
 
-    assert (result.status, result.stderr) == (2, "ERROR: simulated forge read failure\n")
+    assert (result.status, result.stderr) == (2, f"ERROR: {failure}\n")
     assert (
-        result.stdout
-        == json.dumps(
-            {"ok": False, "reason": "unavailable", "message": "simulated forge read failure"}
-        )
-        + "\n"
+        result.stdout == json.dumps({"ok": False, "reason": reason, "message": str(failure)}) + "\n"
     )
 
 
