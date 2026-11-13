@@ -1906,30 +1906,21 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
     )
 
 
+def unusable_entry(entry: str) -> str:
+    return f"lane_shared entry '{entry}' is not a canonical path inside the repository"
+
+
 @pytest.mark.parametrize(
     ("lane_shared", "refusal"),
     [
-        pytest.param(
-            '["/etc/passwd"]',
-            "lane_shared entry '/etc/passwd' is not a canonical path inside the repository",
-            id="absolute",
-        ),
+        pytest.param('["/etc/passwd"]', unusable_entry("/etc/passwd"), id="absolute"),
         pytest.param(
             '["../sibling/registry.txt"]',
-            "lane_shared entry '../sibling/registry.txt' is not a canonical path inside the "
-            "repository",
+            unusable_entry("../sibling/registry.txt"),
             id="climbs-out",
         ),
-        pytest.param(
-            '["scripts//"]',
-            "lane_shared entry 'scripts//' is not a canonical path inside the repository",
-            id="doubled-trailing-slash",
-        ),
-        pytest.param(
-            '["/"]',
-            "lane_shared entry '/' is not a canonical path inside the repository",
-            id="only-a-slash",
-        ),
+        pytest.param('["scripts//"]', unusable_entry("scripts//"), id="doubled-trailing-slash"),
+        pytest.param('["/"]', unusable_entry("/"), id="only-a-slash"),
         pytest.param(
             '"scripts/registry.txt"',
             "lane_shared must be a list of unique repository paths",

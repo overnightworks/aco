@@ -26,7 +26,7 @@
 "src/aco/workboard.py" = 2866
 "tests/support/cli_fixtures.py" = 888
 "tests/support/github_fixtures.py" = 830
-"tests/test_board.py" = 3588
+"tests/test_board.py" = 3584
 "tests/test_checkout.py" = 2037
 "tests/test_cli.py" = 12076
 "tests/test_cmd_adopt.py" = 1427
