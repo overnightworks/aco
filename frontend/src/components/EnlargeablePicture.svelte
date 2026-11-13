@@ -84,6 +84,8 @@
 		display: block;
 		max-width: 100%;
 		height: auto;
+		outline: 1px solid var(--line-strong);
+		outline-offset: -1px;
 	}
 	.caption {
 		margin: 8px 0 0;
@@ -110,10 +112,12 @@
 		border: 1px solid var(--line);
 		border-radius: 12px;
 		background: var(--surface);
+		box-shadow: var(--dialog-shadow);
 		color: inherit;
 	}
 	dialog::backdrop {
 		background: var(--scrim);
+		backdrop-filter: blur(3px);
 	}
 	.big {
 		max-height: 70vh;

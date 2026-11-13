@@ -36,11 +36,18 @@
 		margin: 0;
 	}
 	.answer {
-		display: flex;
-		align-items: start;
-		gap: 12px;
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 14px 8px 12px;
+		border: 1px solid color-mix(in srgb, var(--good) 25%, transparent);
+		border-radius: 10px;
+		background: var(--good-soft);
+		font-weight: 600;
 	}
-	.answer :global(.shape) {
-		margin-top: 4px;
+	@media (min-width: 761px) {
+		.answer {
+			margin: -8px 0 -4px;
+		}
 	}
 </style>

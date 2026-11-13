@@ -114,6 +114,7 @@
 
 <style>
 	.point {
+		padding: 4px 0;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: center;
@@ -170,18 +171,29 @@
 		gap: 6px;
 	}
 	.point button.pick {
-		min-width: 40px;
-		height: 32px;
+		min-width: 46px;
+		height: 38px;
 		padding: 0 10px;
 		border: 1.5px solid var(--line-strong);
-		border-radius: 8px;
+		border-radius: 10px;
 		background: var(--surface);
 		font-family: var(--font-display);
 		font-size: 16px;
 		font-weight: 700;
+		transition:
+			background-color 0.12s,
+			border-color 0.12s,
+			color 0.12s;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.point button.pick {
+			transition: none;
+		}
 	}
 	.point button.pick.recommended {
+		border-width: 2px;
 		border-color: var(--accent);
+		background: var(--accent-soft);
 		color: var(--accent);
 	}
 	.point button.pick.chosen {
@@ -196,7 +208,11 @@
 		.point {
 			grid-template-columns: minmax(0, 1fr);
 		}
+		.picks {
+			padding-left: 28px;
+		}
 		.point button.pick {
+			min-width: 52px;
 			height: 44px;
 		}
 	}

@@ -296,9 +296,10 @@
 		--good-soft: #e4f2ea;
 		--warn: #99570c;
 		--warn-soft: #fdf3e2;
-		--scrim: rgba(10, 8, 14, 0.45);
+		--scrim: rgba(10, 10, 14, 0.42);
 		--shade: rgba(0, 0, 0, 0.28);
 		--shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 6px 20px rgba(20, 20, 30, 0.05);
+		--dialog-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
 		--font-display: 'Oswald', Impact, sans-serif;
 		--font-body: 'Open Sans', Arial, sans-serif;
 		--frame-width: 880px;
@@ -321,7 +322,6 @@
 			--good-soft: #17301a;
 			--warn: #f0a030;
 			--warn-soft: #2a1f10;
-			--scrim: rgba(0, 0, 0, 0.65);
 			--shade: rgba(0, 0, 0, 0.6);
 			--shadow: none;
 		}

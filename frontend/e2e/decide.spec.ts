@@ -386,6 +386,7 @@ for (const viewport of [
 
 			await expect(page.getByText('All decided')).toBeVisible();
 			await expect(page.locator('.question-pane')).toBeHidden();
+			await expect(page.locator('.tracks')).toBeFocused();
 			await page.screenshot({ path: testInfo.outputPath('all-decided.png') });
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			await openDecidedLine(page, 'Hosts allowed?');
