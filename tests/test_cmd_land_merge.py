@@ -93,12 +93,60 @@ class MergeCase:
     decoy_rules: tuple[frozenset[workboard.MergeMethod], ...] = ()
     length: RefusalLength = RefusalLength.WITHIN_LIMIT
     unknown_reads_before_clean: int = 0
+    merged_before_error: bool = False
+    unreadable_after_merge_request: bool = False
+    reads_after_merge_request: int | None = None
 
 
 @dataclass
 class MergeWorld(LaneLandingWorld):
     case: MergeCase
     lane: Path
+
+
+def arrange_unsettled_readiness(client: FakeForge, unknown_reads_before_clean: int) -> None:
+    if not unknown_reads_before_clean:
+        return
+    clean = client.readiness_by_number[12]
+    unknown = replace(clean, mergeable_state="unknown")
+    settling = (*(unknown,) * (unknown_reads_before_clean - 1), clean)
+    client.readiness_by_number[12], client.later_readiness_by_number[12] = unknown, settling
+
+
+def arrange_pending_merge(
+    client: FakeForge, monkeypatch: pytest.MonkeyPatch, case: MergeCase
+) -> None:
+    """A merge call whose failure leaves the pull request pending: it merges first when the case
+    says so. A case with `reads_after_merge_request` lets the pull request be read that often
+    while the failure stands, unreadably when the case says so; any further read fails the test."""
+    merge, read = client.merge_landing, client.landing
+    reads_left = case.reads_after_merge_request
+    if case.merged_before_error:
+
+        def merge_then_fail(
+            number: int, *, head_sha: str, method: workboard.MergeMethod, title: str, body: str
+        ) -> str:
+            error, client.merge_error = client.merge_error, None
+            merge(number, head_sha=head_sha, method=method, title=title, body=body)
+            client.merge_error = error
+            assert error is not None
+            raise error
+
+        monkeypatch.setattr(client, "merge_landing", merge_then_fail)
+
+    def landing_while_merge_fails(number: int) -> forge.Landing:
+        nonlocal reads_left
+        if client.merge_error is None or not client.merge_requests:
+            return read(number)
+        if not reads_left:
+            pytest.fail("the pull request was read more often than the merge failure allows")
+        reads_left -= 1
+        if case.unreadable_after_merge_request:
+            raise forge.ForgeTransientError("gh: Server Error (HTTP 503)")
+        return read(number)
+
+    if reads_left is not None:
+        monkeypatch.setattr(client, "landing", landing_while_merge_fails)
 
 
 @pytest.fixture
@@ -128,11 +176,8 @@ def world(
         if case.invalid_configuration:
             track_board_config(github_clone, case.trunk_config)
             real_git(github_clone, "push", "-q", "origin", default_branch)
-        if case.unknown_reads_before_clean:
-            clean = client.readiness_by_number[12]
-            unknown = replace(clean, mergeable_state="unknown")
-            settling = (*(unknown,) * (case.unknown_reads_before_clean - 1), clean)
-            client.readiness_by_number[12], client.later_readiness_by_number[12] = unknown, settling
+        arrange_unsettled_readiness(client, case.unknown_reads_before_clean)
+        arrange_pending_merge(client, monkeypatch, case)
         if case.lane_worktree is LaneWorktree.PRESENT:
             add_lane_worktree(github_clone, lane, case.branch)
         observed = (
@@ -372,12 +417,20 @@ class TestLandMerge:
                 MergeCase(Landed(), role=HeldRole.COORDINATOR),
                 id="holder-in-another-role-lands-without-a-role-flag",
             ),
+            pytest.param(
+                MergeCase(
+                    Landed(),
+                    error=forge.ForgeMergeUnansweredError("gh: Server Error (HTTP 502)"),
+                    merged_before_error=True,
+                ),
+                id="server-error-after-the-merge-went-through",
+            ),
         ],
         indirect=True,
     )
     def test_lands(self, world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-09, LANDCMD-10, LANDCMD-12, LANDCMD-13, LANDCMD-23, LANDCMD-29,
-        LANDCMD-32, LANDCMD-43.
+        LANDCMD-32, LANDCMD-43, LANDCMD-72.
         The reviewed head lands, releases the real claim and retains the classification trailer.
         """
         observed, expected = merge_observations(world, land(world, capsys))
@@ -649,11 +702,41 @@ class TestLandMergeForgeAnswer:
                 ),
                 id="refused-display-controls-escaped",
             ),
+            pytest.param(
+                MergeCase(
+                    "pull request #12 may still be merging (gh: Server Error (HTTP 502)); "
+                    "re-run aco land 12",
+                    error=forge.ForgeMergeUnansweredError("gh: Server Error (HTTP 502)"),
+                    reads_after_merge_request=1,
+                ),
+                id="server-error-with-the-pull-request-still-open",
+            ),
+            pytest.param(
+                MergeCase(
+                    "pull request #12 may still be merging (gh: Server Error (HTTP 502)); "
+                    "re-run aco land 12",
+                    error=forge.ForgeMergeUnansweredError("gh: Server Error (HTTP 502)"),
+                    unreadable_after_merge_request=True,
+                    reads_after_merge_request=1,
+                ),
+                id="server-error-and-the-pull-request-unreadable",
+            ),
+            pytest.param(
+                MergeCase(
+                    "pull request #12 may still be merging "
+                    "(gh: Merge already in progress (HTTP 405)); re-run aco land 12",
+                    error=forge.ForgeMergeInProgressError(
+                        "gh: Merge already in progress (HTTP 405)"
+                    ),
+                    reads_after_merge_request=0,
+                ),
+                id="merge-already-in-progress-405",
+            ),
         ],
         indirect=True,
     )
     def test_refusal(self, world: MergeWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-14, LANDCMD-37.
+        """Spec: LANDCMD-14, LANDCMD-37, LANDCMD-71, LANDCMD-72.
         A rejected pinned request names its reason and leaves every durable effect unchanged.
         """
         observed, expected = refused_observations(world, capsys)
@@ -678,4 +761,34 @@ class TestLandMergeForgeAnswer:
                 "entry.anchor": None,
             }
         )
+        assert observed == expected
+
+    @pytest.mark.parametrize(
+        "world",
+        [
+            pytest.param(
+                MergeCase(
+                    Landed(),
+                    error=forge.ForgeMergeUnansweredError("gh: Server Error (HTTP 502)"),
+                    merged_before_error=True,
+                    unreadable_after_merge_request=True,
+                    reads_after_merge_request=1,
+                ),
+                id="server-error-the-merge-outlived",
+            ),
+        ],
+        indirect=True,
+    )
+    def test_rerun_after_a_pending_merge_finishes_without_a_second_merge(
+        self, world: MergeWorld, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: LANDCMD-73, LANDCMD-18.
+        A pull request that merged while the first run refused is released by the re-run.
+        """
+        first = land(world, capsys)
+        world.forge.merge_error = None
+
+        observed, expected = merge_observations(world, land(world, capsys))
+
+        assert first.stderr.startswith("ERROR: pull request #12 may still be merging (")
         assert observed == expected

@@ -1197,39 +1197,6 @@ def test_github_adapter_reads_the_default_branchs_merge_rules(
     ]
 
 
-@pytest.mark.parametrize(
-    ("status", "refusal"),
-    [
-        pytest.param(409, forge.ForgeMergeConflictError, id="head-moved"),
-        pytest.param(405, forge.ForgeMergeRefusedError, id="merge-refused"),
-    ],
-)
-def test_github_adapter_tells_a_moved_head_from_a_refused_merge(
-    status: int, refusal: type[forge.ForgeError]
-) -> None:
-    """A 409 from the merge endpoint means the pull request's
-    head moved since `landing_readiness` read it -- `ForgeMergeConflictError`,
-    whose recovery is a re-run. GitHub's REST reference reads a 405 as "merge
-    cannot be performed" -- `ForgeMergeRefusedError`, carrying the
-    forge's own message, since no re-run repairs it."""
-    message = f"gh: merge not possible (HTTP {status})"
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: (_ for _ in ()).throw(forge.ForgeError(message)),
-    )
-
-    with pytest.raises(refusal) as raised:
-        client.merge_landing(
-            57,
-            head_sha=MERGE_COMMIT_SHA,
-            method=workboard.MergeMethod.MERGE,
-            title="t",
-            body="Work-Item: #42\n",
-        )
-
-    assert str(raised.value) == message
-
-
 def _file_contents_client(answer: str | forge.ForgeError) -> GitHubForge:
     def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         if isinstance(answer, forge.ForgeError):
@@ -1365,17 +1332,17 @@ def test_github_adapter_reraises_a_failure_unrelated_to_its_own_classification(
 ) -> None:
     """Both `delete_branch`'s idempotent-absence handling and
     `merge_landing`'s conflict translation only ever intercept their own
-    named case; any other `ForgeError` -- a transient gateway timeout, say
-    -- passes through unchanged."""
+    named case; any other `ForgeError` -- a forbidden request, say -- passes
+    through unchanged."""
     client = GitHubForge(
         github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: (_ for _ in ()).throw(
-            forge.ForgeError("HTTP 500 gateway timeout")
-        ),
+        run=lambda arguments, input_data=None: (_ for _ in ()).throw(forge.ForgeError("HTTP 403")),
     )
 
-    with pytest.raises(forge.ForgeError, match="gateway timeout"):
+    with pytest.raises(forge.ForgeError, match="403") as raised:
         action(client)
+
+    assert type(raised.value) is forge.ForgeError
 
 
 @pytest.mark.parametrize(

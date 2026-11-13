@@ -68,6 +68,18 @@ class ForgeMergeRefusedError(ForgeError):
     is a re-run."""
 
 
+class ForgeMergeInProgressError(ForgeError):
+    """`merge_landing`'s pinned merge was refused because GitHub is still
+    performing an earlier one (HTTP 405, "Merge already in progress"): the
+    pull request will merge on its own, and a re-run finishes the landing."""
+
+
+class ForgeMergeUnansweredError(ForgeError):
+    """`merge_landing`'s pinned merge failed with a server error (HTTP 5xx):
+    GitHub may have merged the pull request anyway, which only a read of the
+    pull request tells."""
+
+
 class ForgeEnqueueHeadMovedError(ForgeError):
     """`enqueue_pull_request` was refused because the pull request's head is no
     longer the commit the caller pinned: the caller re-reads and decides again
