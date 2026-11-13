@@ -1892,7 +1892,7 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
     config_path.write_text(
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
         'canonical_remote = "upstream"\n'
-        'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py"]\n'
+        'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py", "tests/"]\n'
         'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
     )
 
@@ -1901,7 +1901,7 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         "idea",
         "upstream",
         Storage.STATE_REF,
-        ("scripts/whitelist.py",),
+        ("scripts/whitelist.py", "tests/"),
         dependency_paths=("pyproject.toml", "uv.lock", ".github/workflows/"),
     )
 
@@ -1921,18 +1921,23 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
             id="climbs-out",
         ),
         pytest.param(
-            '["scripts/"]',
-            "lane_shared entry 'scripts/' is not a canonical path inside the repository",
-            id="trailing-slash",
+            '["scripts//"]',
+            "lane_shared entry 'scripts//' is not a canonical path inside the repository",
+            id="doubled-trailing-slash",
+        ),
+        pytest.param(
+            '["/"]',
+            "lane_shared entry '/' is not a canonical path inside the repository",
+            id="only-a-slash",
         ),
         pytest.param(
             '"scripts/registry.txt"',
-            "lane_shared must be a list of unique repository file paths",
+            "lane_shared must be a list of unique repository paths",
             id="not-a-list",
         ),
         pytest.param(
             '["a.txt", "a.txt"]',
-            "lane_shared must be a list of unique repository file paths",
+            "lane_shared must be a list of unique repository paths",
             id="duplicate",
         ),
     ],

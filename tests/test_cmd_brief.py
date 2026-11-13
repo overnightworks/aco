@@ -59,6 +59,7 @@ def served_body(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
 
 
 def commit_file(directory: Path, name: str, text: str) -> str:
+    (directory / name).parent.mkdir(parents=True, exist_ok=True)
     (directory / name).write_text(text)
     real_git(directory, "add", name)
     real_git(directory, "commit", "-q", "-m", f"add {name}")
@@ -149,7 +150,7 @@ def test_brief_prints_body_claim_lane_tip_and_touched_files(
         "",
         "CLAIM",
         *claim_lines(world, whole="too wide"),
-        "  lane-shared: scripts/registry.txt (names no file)",
+        "  lane-shared: scripts/registry.txt (names no tracked path)",
         "",
         "TIP",
         world.tip,
@@ -292,8 +293,35 @@ def test_brief_json_prints_one_object_with_body_claim_tip_and_touched(
     assert (result.status, result.stderr, result.stdout) == (0, "", json.dumps(expected) + "\n")
 
 
-@pytest.mark.parametrize(("claimed", "outside_claim"), [(True, ["board.py"]), (False, None)])
-def test_brief_json_names_touched_paths_the_claim_scope_does_not_cover(
+TOUCHED_BEYOND_THE_SCOPE = ["board.py", "scripts/registry.txt", "tests/test_new.py"]
+
+
+@pytest.mark.parametrize(
+    ("claimed", "lane_shared", "outside_claim"),
+    [
+        pytest.param(True, "lane_shared = []\n", TOUCHED_BEYOND_THE_SCOPE, id="no-lane-shared"),
+        pytest.param(
+            True,
+            'lane_shared = ["scripts/registry.txt"]\n',
+            ["board.py", "tests/test_new.py"],
+            id="a-lane-shared-file",
+        ),
+        pytest.param(
+            True,
+            'lane_shared = ["scripts/registry.txt", "tests/"]\n',
+            ["board.py"],
+            id="a-lane-shared-directory",
+        ),
+        pytest.param(
+            True,
+            'lane_shared = ["docs/", "tests"]\n',
+            TOUCHED_BEYOND_THE_SCOPE,
+            id="no-tracked-path",
+        ),
+        pytest.param(False, "lane_shared = []\n", None, id="no-claim"),
+    ],
+)
+def test_brief_json_names_touched_paths_neither_the_claim_scope_nor_lane_shared_covers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     github_clone: Path,
@@ -301,11 +329,17 @@ def test_brief_json_names_touched_paths_the_claim_scope_does_not_cover(
     served_body: FakeForge,
     capsys: pytest.CaptureFixture[str],
     claimed: bool,
+    lane_shared: str,
     outside_claim: list[str] | None,
 ) -> None:
     """Spec: BRIEF-27."""
+    commit_file(github_clone, "scripts/registry.txt", "")
+    commit_file(github_clone, "tests/test_one.py", "")
+    track_board_config(github_clone, lane_shared)
+    real_git(github_clone, "push", "-q", "origin", "main")
     world = make_lane(monkeypatch, tmp_path, github_clone, bare_remote, claimed=claimed)
-    commit_file(world.directory, "board.py", "print()\n")
+    for name in TOUCHED_BEYOND_THE_SCOPE:
+        commit_file(world.directory, name, "print()\n")
 
     result = brief(capsys, "--json")
 

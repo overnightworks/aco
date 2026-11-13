@@ -18,7 +18,7 @@ from .session import (
     LaneSharedReading,
     LaneSharedUnavailable,
     RunContext,
-    lane_shared_files,
+    lane_shared_covers,
     trunk_lane_shared_reading,
 )
 
@@ -211,13 +211,13 @@ def _status_path(
     storage: body.Storage,
     lane_shared: LaneSharedReading,
 ) -> None:
-    """`path`'s holders; with none, `LANE-SHARED` for a file the trunk's
-    `lane_shared` names, which any claim may write, else
+    """`path`'s holders; with none, `LANE-SHARED` for a path the trunk's
+    `lane_shared` covers, which any claim may write, else
     `UNCLAIMED`. A defective trunk configuration adds its own line."""
     holders = protocol.claims_holding_path(claims, path)
     if holders:
         _print_path_holders(holders, path, storage)
-    elif path in lane_shared_files(lane_shared):
+    elif lane_shared_covers(lane_shared, path):
         print(f"LANE-SHARED {path}")
     else:
         print(f"UNCLAIMED {path}")
@@ -255,8 +255,8 @@ def _lane_shared_unavailable_line(unavailable: LaneSharedUnavailable) -> str:
 
 def lane_shared_line(lane_shared: LaneSharedReading) -> str | None:
     """The one line `status` and `brief` name the repository's lane-shared
-    registry files with, so a builder comparing its changes
-    with its claim scope counts them as allowed: an entry naming no file the
+    entries with, so a builder comparing its changes
+    with its claim scope counts them as allowed: an entry naming no path the
     trunk tracks is marked so, never shown as a grant, and a defective trunk
     configuration names its defect; `None` when none is
     configured."""
@@ -265,7 +265,7 @@ def lane_shared_line(lane_shared: LaneSharedReading) -> str | None:
     if not lane_shared:
         return None
     return "lane-shared: " + ", ".join(
-        entry.path if entry.names_a_file else f"{entry.path} (names no file)"
+        entry.path if entry.tracked else f"{entry.path} (names no tracked path)"
         for entry in lane_shared
     )
 
@@ -273,13 +273,11 @@ def lane_shared_line(lane_shared: LaneSharedReading) -> str | None:
 def lane_shared_json(lane_shared: LaneSharedReading) -> dict[str, object]:
     """`lane_shared` and `lane_shared_unavailable`, the `--json` form of
     `lane_shared_line`: the entries with whether each names a
-    trunk-tracked file, or `null` beside the defect that hides them."""
+    trunk-tracked path, or `null` beside the defect that hides them."""
     if isinstance(lane_shared, LaneSharedUnavailable):
         return {"lane_shared": None, "lane_shared_unavailable": lane_shared.defect}
     return {
-        "lane_shared": [
-            {"path": entry.path, "names_a_file": entry.names_a_file} for entry in lane_shared
-        ],
+        "lane_shared": [{"path": entry.path, "tracked": entry.tracked} for entry in lane_shared],
         "lane_shared_unavailable": None,
     }
 

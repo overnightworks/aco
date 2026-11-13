@@ -282,6 +282,38 @@ LIVE_ROWS["no-trunk-resolves"] = replace(
         trunk_resolves=False,
     ),
 )
+
+
+def lane_shared_path_row(
+    lane_shared: str, path: str, answer: str, entry: str, *, tracked: bool
+) -> StatusCase:
+    """`status --path` over a trunk that tracks `.aco/board.toml`, naming `lane_shared`."""
+    return StatusCase(
+        replace(CLAIM_ON_SRC.world, board_configuration=lane_shared),
+        ("status", "--path", path),
+        0,
+        f"{answer} {path}\n",
+        {
+            **path_listing("unclaimed", path),
+            "lane_shared": [{"path": entry, "tracked": tracked}],
+        },
+    )
+
+
+LANE_SHARED_PATH_ROWS = {
+    "under-a-tracked-directory": lane_shared_path_row(
+        'lane_shared = [".aco/"]\n', ".aco/board.toml", "LANE-SHARED", ".aco/", tracked=True
+    ),
+    "beside-a-tracked-directory": lane_shared_path_row(
+        'lane_shared = [".aco/"]\n', ".aco-other/file.toml", "UNCLAIMED", ".aco/", tracked=True
+    ),
+    "under-a-bare-directory": lane_shared_path_row(
+        'lane_shared = [".aco"]\n', ".aco/board.toml", "UNCLAIMED", ".aco", tracked=False
+    ),
+    "under-an-untracked-directory": lane_shared_path_row(
+        'lane_shared = ["docs/"]\n', "docs/guide.md", "UNCLAIMED", "docs/", tracked=False
+    ),
+}
 OVERLAPPING_ROWS = {
     "overlapping-claims": StatusCase(
         StatusWorld(claims=(SHARED, SHARED_FILE)),
@@ -739,6 +771,15 @@ def test_overlapping_claims_name_each_other(
     case: StatusCase, flags: Flags, check_status: StatusCheck
 ) -> None:
     """Spec: STAT-06, STAT-08, STAT-24"""
+    check_status(case, flags)
+
+
+@IN_BOTH_FORMS
+@pytest.mark.parametrize("case", LANE_SHARED_PATH_ROWS.values(), ids=LANE_SHARED_PATH_ROWS.keys())
+def test_a_path_under_a_tracked_lane_shared_directory_is_lane_shared(
+    case: StatusCase, flags: Flags, check_status: StatusCheck
+) -> None:
+    """Spec: STAT-22, STAT-23"""
     check_status(case, flags)
 
 

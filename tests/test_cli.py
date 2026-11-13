@@ -2641,10 +2641,10 @@ def _trunk_defect(sentence: str) -> str:
     [
         pytest.param(
             'lane_shared = ["scripts/registry.txt", "src"]\n',
-            ["lane-shared: scripts/registry.txt, src (names no file)"],
+            ["lane-shared: scripts/registry.txt, src (names no tracked path)"],
             [
-                {"path": "scripts/registry.txt", "names_a_file": True},
-                {"path": "src", "names_a_file": False},
+                {"path": "scripts/registry.txt", "tracked": True},
+                {"path": "src", "tracked": False},
             ],
             None,
             "LANE-SHARED",
@@ -2666,10 +2666,10 @@ def _trunk_defect(sentence: str) -> str:
             'lane_shared = "scripts/registry.txt"\n',
             [
                 "lane-shared: unavailable "
-                f"({_trunk_defect('lane_shared must be a list of unique repository file paths')})"
+                f"({_trunk_defect('lane_shared must be a list of unique repository paths')})"
             ],
             None,
-            _trunk_defect("lane_shared must be a list of unique repository file paths"),
+            _trunk_defect("lane_shared must be a list of unique repository paths"),
             "UNCLAIMED",
             id="an-invalid-value",
         ),

@@ -210,11 +210,12 @@ def _trunk_board_configuration(remote: str, toplevel: Path) -> _TrunkBoardConfig
 
 @dataclass(frozen=True)
 class LaneSharedEntry:
-    """One `lane_shared` entry, and whether it names a file the trunk tracks
-    a directory or a missing file grants nothing."""
+    """One `lane_shared` entry, and whether it names a path the trunk tracks:
+    a file it tracks, or a directory (an entry ending `/`) with a tracked path
+    below it. A bare directory or a missing file grants nothing."""
 
     path: str
-    names_a_file: bool
+    tracked: bool
 
 
 @dataclass(frozen=True)
@@ -229,10 +230,10 @@ LaneSharedReading = tuple[LaneSharedEntry, ...] | LaneSharedUnavailable
 
 
 def trunk_lane_shared_reading(remote: str, toplevel: Path) -> LaneSharedReading:
-    """The lane-shared registry files the trunk's committed
+    """The lane-shared entries the trunk's committed
     board configuration names (`_trunk_board_configuration`), as `status` and
     `brief` show them: each entry beside whether the trunk
-    tracks it as a file, or the defect that keeps the trunk's configuration
+    tracks a path it names, or the defect that keeps the trunk's configuration
     from naming any -- reported by these orientation reads rather than
     stopping them. Only the trunk's copy is read, so a lane cannot change
     the list by editing its worktree's `board.toml`."""
@@ -246,23 +247,33 @@ def trunk_lane_shared_reading(remote: str, toplevel: Path) -> LaneSharedReading:
     return _lane_shared_entries(entries, trunk=configuration.trunk, toplevel=toplevel)
 
 
-def lane_shared_files(reading: LaneSharedReading) -> tuple[str, ...]:
-    """The files a lane-shared `reading` grants: each entry the trunk tracks
-    as a file; none when the trunk's configuration is unavailable."""
+def lane_shared_covers(reading: LaneSharedReading, path: str) -> bool:
+    """Whether a lane-shared `reading` grants `path`: a tracked file entry
+    equals it or a tracked directory entry is its prefix; never when the
+    trunk's configuration is unavailable."""
     if isinstance(reading, LaneSharedUnavailable):
-        return ()
-    return tuple(entry.path for entry in reading if entry.names_a_file)
+        return False
+    return any(entry.tracked and _entry_names(entry.path, path) for entry in reading)
+
+
+def _entry_names(entry: str, path: str) -> bool:
+    """Whether a `lane_shared` `entry` names `path`: a directory entry (one
+    ending `/`) every path below it, any other exactly one path."""
+    return path.startswith(entry) if entry.endswith("/") else path == entry
 
 
 def _lane_shared_entries(
     entries: tuple[str, ...], *, trunk: str, toplevel: Path
 ) -> tuple[LaneSharedEntry, ...]:
-    """Each `lane_shared` entry beside whether `trunk` tracks it as a file in
-    the checkout at `toplevel` -- the one decider of what an entry names."""
+    """Each `lane_shared` entry beside whether `trunk` tracks a path it names
+    in the checkout at `toplevel` -- the one decider of what an entry names."""
     if not entries:
         return ()
-    trunk_files = frozenset(checkout.versioned_paths(directory=toplevel, revision=trunk))
-    return tuple(LaneSharedEntry(entry, entry in trunk_files) for entry in entries)
+    trunk_files = checkout.versioned_paths(directory=toplevel, revision=trunk)
+    return tuple(
+        LaneSharedEntry(entry, any(_entry_names(entry, tracked) for tracked in trunk_files))
+        for entry in entries
+    )
 
 
 def _absent_board_config_refusal(toplevel: Path) -> str:
