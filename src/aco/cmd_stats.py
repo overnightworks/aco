@@ -4,7 +4,7 @@
 import argparse
 from enum import StrEnum
 
-from . import lane_measure, lane_record, protocol, report, usage
+from . import lane_measure, lane_record, protocol, report, store, usage
 from .lane_measure import Figure, SideStats, StageChoices
 from .session import RunContext
 
@@ -83,7 +83,10 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     if parsed.repo is not None:
         return report.refuse(_StatsReason.INVALID_USAGE, _REPO_MESSAGE, as_json=as_json)
     try:
-        lanes = lane_record.recorded_lanes(context.toplevel, context.observation.tip)
+        observed = store.peek_state(
+            worktree=context.toplevel, remote=context.configured_canonical_remote
+        )
+        lanes = lane_record.recorded_lanes(context.toplevel, observed.tip)
     except protocol.ClaimError as error:
         return report.refuse(_StatsReason.UNAVAILABLE, error, as_json=as_json)
     sides = [lane_measure.measure(getattr(parsed, name), lanes) for name in _SIDE_NAMES]

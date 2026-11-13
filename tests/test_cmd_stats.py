@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 from cli_fixtures import forbid_forge_resolution, real_git, run_cli
-from store_fixtures import publish_claims_from_a_second_clone, state_ref_tip
+from store_fixtures import (
+    lineage_observation,
+    publish_claims_from_a_second_clone,
+    state_ref_tip,
+)
 
 from aco import store
 from aco.lane_record import LaneOutcome, LaneRecord, ProductionSize
@@ -329,12 +333,17 @@ def test_a_checkout_that_cannot_read_its_state_ref_is_refused(
     assert stderr == f"ERROR: {payload['message']}\n"
 
 
-def test_reading_the_lanes_changes_nothing_on_the_state_ref(
+def test_reading_the_lanes_changes_nothing_on_the_state_ref_or_the_checkout(
     recorded: Path, bare_remote: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: STATS-01."""
-    before = state_ref_tip(bare_remote)
+    tip_before = state_ref_tip(bare_remote)
+    bookkeeping_before = lineage_observation(recorded)
 
     status, _stdout, _stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG)
 
-    assert (status, state_ref_tip(bare_remote)) == (0, before)
+    assert (status, state_ref_tip(bare_remote), lineage_observation(recorded)) == (
+        0,
+        tip_before,
+        bookkeeping_before,
+    )
