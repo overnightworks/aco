@@ -511,14 +511,7 @@ class BoardConfig:
     dependency_paths: tuple[str, ...] = ()
 
     def covers_dependency_path(self, path: str) -> bool:
-        try:
-            protocol.valid_scope([path])
-        except protocol.InvalidClaimMarkerError:
-            return False
-        return any(
-            path.startswith(entry) if entry.endswith("/") else path == entry
-            for entry in self.dependency_paths
-        )
+        return any(repository_path_entry_covers(entry, path) for entry in self.dependency_paths)
 
 
 # Every key `.aco/board.toml` defines; anything else is a typo, and
@@ -683,6 +676,18 @@ def _validated_merge_method(raw: dict[str, object], path: Path) -> MergeMethod |
         f"board configuration {path} merge_method must be "
         f"{MergeMethod.MERGE.value!r} or {MergeMethod.SQUASH.value!r}"
     )
+
+
+def repository_path_entry_covers(entry: str, path: str) -> bool:
+    """Whether a validated `lane_shared` or `dependency_paths` `entry` names
+    `path`: a directory entry (one ending `/`) every canonical path below it,
+    any other exactly one path. A path that is not a canonical
+    repository-relative path is named by no entry."""
+    try:
+        protocol.valid_scope([path])
+    except protocol.InvalidClaimMarkerError:
+        return False
+    return path.startswith(entry) if entry.endswith("/") else path == entry
 
 
 def _validated_repository_paths(raw: dict[str, object], path: Path, key: str) -> tuple[str, ...]:

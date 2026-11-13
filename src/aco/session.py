@@ -253,25 +253,25 @@ def lane_shared_covers(reading: LaneSharedReading, path: str) -> bool:
     trunk's configuration is unavailable."""
     if isinstance(reading, LaneSharedUnavailable):
         return False
-    return any(entry.tracked and _entry_names(entry.path, path) for entry in reading)
-
-
-def _entry_names(entry: str, path: str) -> bool:
-    """Whether a `lane_shared` `entry` names `path`: a directory entry (one
-    ending `/`) every path below it, any other exactly one path."""
-    return path.startswith(entry) if entry.endswith("/") else path == entry
+    return any(
+        entry.tracked and workboard.repository_path_entry_covers(entry.path, path)
+        for entry in reading
+    )
 
 
 def _lane_shared_entries(
     entries: tuple[str, ...], *, trunk: str, toplevel: Path
 ) -> tuple[LaneSharedEntry, ...]:
     """Each `lane_shared` entry beside whether `trunk` tracks a path it names
-    in the checkout at `toplevel` -- the one decider of what an entry names."""
+    in the checkout at `toplevel`, as `workboard.repository_path_entry_covers` decides."""
     if not entries:
         return ()
     trunk_files = checkout.versioned_paths(directory=toplevel, revision=trunk)
     return tuple(
-        LaneSharedEntry(entry, any(_entry_names(entry, tracked) for tracked in trunk_files))
+        LaneSharedEntry(
+            entry,
+            any(workboard.repository_path_entry_covers(entry, tracked) for tracked in trunk_files),
+        )
         for entry in entries
     )
 
