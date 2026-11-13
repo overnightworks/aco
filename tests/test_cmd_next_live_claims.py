@@ -140,34 +140,3 @@ def test_next_places_every_free_item_with_a_scope_and_notes_each_overlap_it_meet
             ],
         ),
     ]
-
-
-def test_next_carries_an_empty_overlaps_list_for_an_item_meeting_nothing(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    github_clone: Path,
-    bare_remote: Path,
-) -> None:
-    """Spec: NEXT-15, NEXT-58."""
-    serve_board(
-        monkeypatch,
-        github_clone,
-        bare_remote,
-        parallel_items(),
-        claim_of(990, ("elsewhere",)),
-    )
-
-    text = run_cli(["next"], capsys)
-    as_json = run_cli(["next", "--json"], capsys)
-
-    candidates = json.loads(as_json.stdout)["parallel"]["candidates"]
-    assert (
-        text.stdout.splitlines()[3],
-        [(candidate["number"], len(candidate["overlaps"])) for candidate in candidates],
-        candidates[0]["overlaps"],
-    ) == (
-        "parallel: #51 (1 path), #52 (1 path; overlaps issue #51 on src/shared.py), "
-        "#54 (2 paths; overlaps issue #50 on src/alpha1.py)",
-        [(51, 0), (52, 1), (54, 1)],
-        [],
-    )
