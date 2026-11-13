@@ -1,8 +1,0 @@
-claim_id = "7ed2f07840434f728e55ca1986983ff6"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "4310a132a716d885784360f956e7ad3c1063b660"
-branch = "claude/issue-829-aco-stats-compares-two-groups-of-lanes"
-scope = [".aco/board.toml", "README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/lane-record.spec.md", "specs/stats.spec.md", "src/aco/cli.py", "src/aco/cmd_stats.py", "src/aco/lane_measure.py", "src/aco/lane_record.py", "src/aco/routing_line.py", "tests/support/lane_record_fixtures.py", "tests/test_cmd_stats.py", "tests/test_lane_measure.py", "tests/test_lane_record.py", "tests/test_routing_line.py"]
-opened_commit = "2aca7530630f176ac23fb07749b9c26c51d448d4"
-whole_reason = "The read side of the lane record and the record grammar's open cases it counts; split, stats would count fields whose ambiguous cases no spec settles."
