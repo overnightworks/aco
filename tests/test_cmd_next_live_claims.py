@@ -39,6 +39,26 @@ def serve_board(
     publish_claims_from_a_second_clone(github_clone, bare_remote, claims)
 
 
+def lane_claim_of(branch: str, scope: tuple[str, ...]) -> protocol.ClaimIntent:
+    return claim_intent(
+        identity=protocol.LaneIdentity(),
+        claim_id="claim-lane",
+        operation_id="op-lane",
+        branch=branch,
+        scope=scope,
+    )
+
+
+def overlap_json(
+    *,
+    issue: int | None = None,
+    lane: str | None = None,
+    claim_id: str | None = None,
+    paths: tuple[str, ...],
+) -> dict[str, object]:
+    return {"issue": issue, "lane": lane, "claim_id": claim_id, "paths": list(paths)}
+
+
 def parallel_items() -> tuple[workboard.Issue, ...]:
     return (
         board_issue(
@@ -48,7 +68,18 @@ def parallel_items() -> tuple[workboard.Issue, ...]:
         board_issue(52, "Gamma", complete_contract("Ship Gamma.", scope=["src/shared.py"])),
         board_issue(53, "Delta", complete_contract("Ship Delta.")),
         board_issue(
-            54, "Epsilon", complete_contract("Ship Epsilon.", scope=["claimed/deep/file.py"])
+            54,
+            "Epsilon",
+            complete_contract(
+                "Ship Epsilon.",
+                scope=[
+                    "claimed/deep/file.py",
+                    "claimed/b.py",
+                    "claimed/c.py",
+                    "claimed/d.py",
+                    "src/alpha1.py",
+                ],
+            ),
         ),
     )
 
@@ -72,13 +103,13 @@ def test_next_names_an_item_under_a_live_claim_as_claimed_and_pulls_nothing(
     )
 
 
-def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_every_live_claim(
+def test_next_places_every_free_item_with_a_scope_and_notes_each_overlap_it_meets(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     github_clone: Path,
     bare_remote: Path,
 ) -> None:
-    """Spec: NEXT-09, NEXT-15, NEXT-17, NEXT-21, NEXT-22."""
+    """Spec: NEXT-09, NEXT-15, NEXT-17, NEXT-21, NEXT-22, NEXT-56..NEXT-58."""
     serve_board(
         monkeypatch,
         github_clone,
@@ -86,6 +117,7 @@ def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_ever
         parallel_items(),
         claim_of(990, ("claimed",)),
         claim_of(991, ("claimed/two.py",)),
+        lane_claim_of("codex/lane-x", ("src/shared.py",)),
     )
 
     text = run_cli(["next"], capsys)
@@ -95,32 +127,34 @@ def test_next_places_only_the_free_items_disjoint_from_the_first_action_and_ever
         0,
         "#50 score -10: Alpha\nNext: Ship Alpha.\n"
         "Run: aco start 50 --slug=alpha\n"
-        "parallel: #51 (1 path)\nscope unknown: #53\nclose: none\n",
+        "parallel: #51 (1 path; overlaps lane codex/lane-x on src/shared.py), "
+        "#52 (1 path; overlaps lane codex/lane-x on src/shared.py, issue #51 on src/shared.py), "
+        "#54 (5 paths; overlaps issue #990 on claimed/b.py, claimed/c.py, claimed/d.py, "
+        "and 1 more, issue #50 on src/alpha1.py)\n"
+        "scope unknown: #53\nclose: none\n",
     )
-    assert (as_json.status, json.loads(as_json.stdout)) == (
-        0,
-        {
-            "ok": True,
-            "reason": "work_item",
-            "number": 50,
-            "score": -10,
-            "title": "Alpha",
-            "next": "Ship Alpha.",
-            "command": "aco start 50 --slug=alpha",
-            "recovery": [],
-            "skipped": [],
-            "ruling_landings": None,
-            "ruling_old": None,
-            "parallel": {
-                "first_scope_unknown": False,
-                "candidates": [{"number": 51, "scope": ["src/shared.py"]}],
-                "scope_unknown": [53],
-            },
-            "close": [],
-            "waiting_on_operator": [],
-            "ideas": [],
-            "with_head": [],
-            "ahead_of_caller": [],
-            "ahead_of_caller_unavailable": None,
-        },
-    )
+    parallel = json.loads(as_json.stdout)["parallel"]
+    assert (as_json.status, parallel["scope_unknown"]) == (0, [53])
+    assert [
+        (candidate["number"], candidate["overlaps"]) for candidate in parallel["candidates"]
+    ] == [
+        (51, [overlap_json(lane="codex/lane-x", claim_id="claim-lane", paths=("src/shared.py",))]),
+        (
+            52,
+            [
+                overlap_json(lane="codex/lane-x", claim_id="claim-lane", paths=("src/shared.py",)),
+                overlap_json(issue=51, paths=("src/shared.py",)),
+            ],
+        ),
+        (
+            54,
+            [
+                overlap_json(
+                    issue=990,
+                    claim_id="claim-990",
+                    paths=("claimed/b.py", "claimed/c.py", "claimed/d.py", "claimed/deep/file.py"),
+                ),
+                overlap_json(issue=50, paths=("src/alpha1.py",)),
+            ],
+        ),
+    ]

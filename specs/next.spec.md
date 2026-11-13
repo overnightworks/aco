@@ -12,7 +12,7 @@ placement (`specs/landing-grammar.spec.md`, LAND-53), the kind
 exclusion a container without a recognized `kind` gets from every
 container-shaped view (`specs/board.spec.md`, BOARD-08), and the scope
 overlap grammar `aco claim`'s own cost line already defines
-(`specs/claim-record.spec.md`, CLAIM-31/CLAIM-32); `specs/output.spec.md`
+(`specs/claim-record.spec.md`, CLAIM-31..CLAIM-34); `specs/output.spec.md`
 owns the `--json` envelope itself (OUT-nn: key order, `ok`, `message`)
 that wraps NEXT-11..13's own action fields. `<n>` is an
 item number, `<label>` an item as `specs/landing-grammar.spec.md` prints
@@ -57,7 +57,8 @@ other printable space are text.
 | an item carries the label `needs-operator` | NEXT-39, NEXT-40 | NEXT-14 |
 | a container is labelled `needs-operator` or frozen | NEXT-39, NEXT-28 | NEXT-14 |
 | an item carries the idea label | NEXT-43, NEXT-28 | NEXT-44 |
-| further free items exist, disjoint from the first action | NEXT-09, NEXT-21, NEXT-22 | NEXT-15 |
+| further free items exist | NEXT-09, NEXT-21, NEXT-22 | NEXT-15 |
+| a placed item meets a live claim, the first action or an earlier candidate | NEXT-56, NEXT-57 | NEXT-58 |
 | more than three such candidates | NEXT-10 | NEXT-15 |
 | the first action itself names no scope | NEXT-16 | NEXT-15 |
 | a candidate names no scope of its own | NEXT-17 | NEXT-15 |
@@ -115,9 +116,11 @@ other printable space are text.
 
 ## `parallel:`
 
-- [ ] [NEXT-09] `parallel:` lists every further free item the walk placed, `<label> (<n> path[s])`, comma-joined, in board order, alongside the first action (see E-NEXT-05).
-- [ ] [NEXT-21] `parallel:` occupies live claims' scopes and the first action's scope, then walks further qualifying actions in board order, skipping a close, check or recovery item outright (see E-NEXT-05).
-- [ ] [NEXT-22] A candidate whose `scope` stays disjoint (CLAIM-31/CLAIM-32's grammar) from everything occupied is placed, its `scope` then joining what's occupied for the rest of the walk (see E-NEXT-05).
+- [ ] [NEXT-09] `parallel:` lists every further free item the walk placed, `<label> (<n> path[s])`, comma-joined, in board order, alongside the first action (see E-NEXT-05, E-NEXT-18).
+- [ ] [NEXT-21] `parallel:` walks further qualifying actions in board order, skipping a close, check or recovery item outright, and holds none back for an overlap (see E-NEXT-05, E-NEXT-18).
+- [ ] [NEXT-22] A candidate with a `scope` is placed whatever that scope meets; its `scope` is then met by the candidates after it (see E-NEXT-05, E-NEXT-18).
+- [ ] [NEXT-56] A candidate meeting a live claim's, the first action's or an earlier candidate's scope prints `<label> (<n> path[s]; overlaps issue <label> on <paths>, lane <branch> on <paths>)` (E-NEXT-18).
+- [ ] [NEXT-57] That note lists the live claims first, then the first action, then the earlier candidates, in CLAIM-31's grammar with CLAIM-33's deeper path and CLAIM-34's cap of three paths (E-NEXT-18).
 - [ ] [NEXT-10] Beyond three placed candidates, only the first three are named, followed by `, and <n> more`; `--json`'s own `candidates` array still carries every one (see E-NEXT-05).
 - [ ] [NEXT-16] Once the first action names no scope, the tail collapses to `parallel: unknown (first action names no scope)`; `scope unknown:` is skipped, never printed as `none` (see E-NEXT-02).
 - [ ] [NEXT-17] `scope unknown:` lists, in board order, every candidate the walk could not place for lacking a scope of its own, or `none`; printed whenever the first action does name a scope.
@@ -134,7 +137,8 @@ other printable space are text.
 - [ ] [NEXT-12] A cut proposal's `reason` is `"cut_slice"` (`ok: true`), the object adding `number`, `title`, `slice`, `cut_title`, `command` (see E-NEXT-07).
 - [ ] [NEXT-13] A close or check proposal's `reason` is `"close_container"` or `"check_container"` (`ok: true`), adding `number`, `closed`, `total`, `next_step` (`null` on close), never `command`.
 - [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}`), `skipped` (`{number, reason}`), `close`, `waiting_on_operator` (bare number arrays), whatever `reason`; see NEXT-44, NEXT-51, NEXT-52.
-- [ ] [NEXT-15] `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope}` each, uncapped), and `scope_unknown` (a bare number array).
+- [ ] [NEXT-15] `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope, overlaps}` each, uncapped), and `scope_unknown` (a bare number array).
+- [ ] [NEXT-58] A candidate's `overlaps` holds one `{issue, lane, claim_id, paths}` per note, `[]` when none: `lane` a lane claim's branch, else `issue` (NEXT-35); `claim_id` null off a claim; `paths` uncapped.
 - [ ] [NEXT-44] The object always carries `ideas`, a bare number array after `waiting_on_operator`, `[]` when no item carries the idea label (NEXT-43).
 - [ ] [NEXT-46] The object always carries `with_head`, after `ideas`: `{number, lines}` per item named by NEXT-45, `lines` the bare line indexes, `[]` when no line is with its head.
 - [ ] [NEXT-35] Under `storage = "state-ref"` each item these fields name, `number` included, is the `aco-xxxxxx` id the text prints, a string in place of the bare number.
@@ -165,6 +169,7 @@ other printable space are text.
 - `close:` never fires the cut proposal's own `Next:`/`Run:` lines: a closable container's own action, when it is also the top action, never carries a command -- NEXT-06/NEXT-07 already refuse to invent one.
 - `parallel:`/`scope unknown:` never occupy or place a `board.recovery` item: a landed-but-open item is `close:`'s domain alone, never a `parallel:` candidate or an occupant that could crowd out a real free item behind it.
 - The first action's own row is never repeated inside `parallel:`'s candidate list, whatever its own scope is.
+- An overlap never withholds a free item: `parallel:` names the item with the overlap as its note, and the first action carries no note (`aco start` prints its overlaps, CLAIM-31).
 - Exit `3` never carries any action-specific line: `No actionable item.` alone stands where `Next:`/`Run:` would.
 - Exit `3` is never returned for a refusal (NEXT-24's `invalid_usage`/`unavailable`): those exit `2`, matching every other emitter refusal; `3` is `nothing_actionable`'s alone.
 - `next --json` never carries an `action` key; the action type is the `reason` token.
@@ -264,7 +269,7 @@ SKIPPED
 exit 3
 ```
 
-### E-NEXT-05 — five disjoint candidates, capped at three
+### E-NEXT-05 — five candidates meeting nothing, capped at three
 
 Setup: bare-remote, fake `gh`, six open items each naming its own disjoint scope
 
@@ -491,5 +496,23 @@ ahead of caller: src/token.py: item 12 is closed (token helper)
 exit 0
 $ aco next --json
 {"ok": true, ..., "with_head": [], "ahead_of_caller": [{"path": "src/token.py", "item": 12, "reason": "token helper", "state": "closed", "error": null}], "ahead_of_caller_unavailable": null, ...}
+exit 0
+```
+
+### E-NEXT-18 — a candidate meeting a live claim and the first action
+
+Setup: bare-remote, fake `gh`, open items `#50` (scope `src/a.py`) and `#51` (scope `docs/guide.md`, `src/a.py`); a live claim on issue `#99` holds scope `docs`
+
+```console
+$ aco next
+#50 score -10: Alpha
+Next: Ship Alpha.
+Run: aco start 50 --slug=alpha
+parallel: #51 (2 paths; overlaps issue #99 on docs/guide.md, issue #50 on src/a.py)
+scope unknown: none
+close: none
+exit 0
+$ aco next --json
+{"ok": true, ..., "parallel": {"first_scope_unknown": false, "candidates": [{"number": 51, "scope": ["docs/guide.md", "src/a.py"], "overlaps": [{"issue": 99, "lane": null, "claim_id": "claim-99", "paths": ["docs/guide.md"]}, {"issue": 50, "lane": null, "claim_id": null, "paths": ["src/a.py"]}]}], "scope_unknown": []}, ...}
 exit 0
 ```

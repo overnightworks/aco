@@ -5674,70 +5674,42 @@ def test_next_caps_the_parallel_text_list_at_three_and_counts_the_rest(
     assert json_exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["parallel"]["candidates"] == [
-        {"number": 61, "scope": ["Bravo/x.py"]},
-        {"number": 62, "scope": ["Charlie/x.py"]},
-        {"number": 63, "scope": ["Delta/x.py"]},
-        {"number": 64, "scope": ["Echo/x.py"]},
-        {"number": 65, "scope": ["Foxtrot/x.py"]},
+        {"number": 61, "scope": ["Bravo/x.py"], "overlaps": []},
+        {"number": 62, "scope": ["Charlie/x.py"], "overlaps": []},
+        {"number": 63, "scope": ["Delta/x.py"], "overlaps": []},
+        {"number": 64, "scope": ["Echo/x.py"], "overlaps": []},
+        {"number": 65, "scope": ["Foxtrot/x.py"], "overlaps": []},
     ]
 
 
-def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
+def test_next_notes_a_cut_proposals_row_scope_overlap_with_the_first_action(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """A cut proposal's own uncut-row scope is what
-    `workboard.parallel_set` occupies and checks disjointness against -- exactly like
-    a work item's top-level scope, never a second rule. `#82`'s row repeats
-    `#80`'s own path and is dropped silently, the same way an overlapping
-    work item would be; the scopeless-row collapse into `parallel: unknown`
-    is `test_next_names_a_cuttable_container_slice`'s own proof."""
-    epic1 = Issue(
-        80,
-        "Epic1",
-        (),
-        complete_contract(
-            "Cut it.", slice=[{"index": 1, "title": "Slice A", "scope": ["epic/a.py"]}]
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
+    """A cut proposal's own uncut-row scope is what `workboard.parallel_set` checks
+    for overlaps -- exactly like a work item's top-level scope, never a second
+    rule. `#82`'s row repeats `#80`'s own path and is still placed, with a note
+    naming `#80`; the scopeless-row collapse into `parallel: unknown` is
+    `test_next_names_a_cuttable_container_slice`'s own proof."""
+    epics = tuple(
+        _childless_container(
+            number,
+            complete_contract("Cut it.", slice=[{"index": 1, "title": title, "scope": [path]}]),
+        )
+        for number, title, path in (
+            (80, "Slice A", "epic/a.py"),
+            (81, "Slice B", "epic/b.py"),
+            (82, "Slice C", "epic/a.py"),
+        )
     )
-    epic2 = Issue(
-        81,
-        "Epic2",
-        (),
-        complete_contract(
-            "Cut it.", slice=[{"index": 1, "title": "Slice B", "scope": ["epic/b.py"]}]
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    epic3 = Issue(
-        82,
-        "Epic3",
-        (),
-        complete_contract(
-            "Cut it.", slice=[{"index": 1, "title": "Slice C", "scope": ["epic/a.py"]}]
-        ),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=0,
-        children_total=0,
-    )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(epic1, epic2, epic3))
+    _configured_board_client(monkeypatch, tmp_path, open_issues=epics)
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
         "cut_slice #80: Cut it.\nNext: aco cut 80\n"
-        "parallel: #81 (1 path)\nscope unknown: none\nclose: none\n"
+        "parallel: #81 (1 path), #82 (1 path; overlaps issue #80 on epic/a.py)\n"
+        "scope unknown: none\nclose: none\n"
         '\nSKIPPED\n#81: cut slice "Slice B"; run aco cut 81\n'
         '#82: cut slice "Slice C"; run aco cut 82\n'
     )
@@ -5747,7 +5719,14 @@ def test_next_parallel_set_uses_a_cut_proposals_own_row_scope(
     payload = json.loads(capsys.readouterr().out)
     assert payload["parallel"] == {
         "first_scope_unknown": False,
-        "candidates": [{"number": 81, "scope": ["epic/b.py"]}],
+        "candidates": [
+            {"number": 81, "scope": ["epic/b.py"], "overlaps": []},
+            {
+                "number": 82,
+                "scope": ["epic/a.py"],
+                "overlaps": [{"issue": 80, "lane": None, "claim_id": None, "paths": ["epic/a.py"]}],
+            },
+        ],
         "scope_unknown": [],
     }
 
@@ -5899,7 +5878,7 @@ def test_next_parallel_set_never_lets_a_recovery_item_occupy_or_candidate(
     payload = json.loads(capsys.readouterr().out)
     assert payload["parallel"] == {
         "first_scope_unknown": False,
-        "candidates": [{"number": 72, "scope": [_RECOVERY_SHARED_SCOPE]}],
+        "candidates": [{"number": 72, "scope": [_RECOVERY_SHARED_SCOPE], "overlaps": []}],
         "scope_unknown": [],
     }
     assert payload["close"] == [71]
