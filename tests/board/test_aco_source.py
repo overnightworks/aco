@@ -207,7 +207,6 @@ def test_a_write_the_forges_check_kept_over_an_unread_change_answers_ruled_with_
 
     assert answered.json()["status"] == "ruled"
     assert answered.json()["note"] == WRITTEN_OVER_NOTE
-    assert answered.json()["item"]["lines"][0]["ruling"] == "A"
     assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"
 
 

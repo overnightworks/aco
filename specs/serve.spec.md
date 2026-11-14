@@ -70,7 +70,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 - [ ] [ABRD-41] A card changed, withdrawn, gone, closed or unreadable on its fresh read is `failed` `Diese Zeile hat sich geändert, bitte neu laden`; a ruled line `already_ruled`; else `failed`, aco's sentence, but for ABRD-129.
 - ABRD-42 (removed).
 - [ ] [ABRD-129] A write the body check keeps over a change aco had not read answers `ruled` (or `returned`) with the item and `note`: `Written over a change aco had not read; that change is only in the item's edit history.`
-- [ ] [ABRD-130] The page shows a noted answer's card as decided, the note beside it, never as `failed`; an overwritten write and one the check could not verify stay `failed` (ABRD-41).
+- [ ] [ABRD-130] The page shows a ruled answer's card with a note as decided, the note beside it, never as `failed`; an overwritten write and one the check could not verify stay `failed` (ABRD-41).
 
 - [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
 - [ ] [ABRD-78] It reads item `<n>` once and writes its body once through aco's writer: every posted line, `via board` for an option or `other`, each with that read's card hash, or every line back to its head.
