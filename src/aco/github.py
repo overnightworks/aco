@@ -58,6 +58,7 @@ ITEM_KIND_TYPE_NAMES: dict[ItemKind, str] = {
 # strictly under this count could only have come from one request -- one live
 # snapshot a concurrent open/close cannot have shifted an issue across.
 ISSUES_PER_PAGE = 100
+_READINESS_JQ = "{state,draft:.draft,headSha:.head.sha,mergeableState:.mergeable_state}"
 MALFORMED_PULL_REQUEST = "GitHub returned a malformed pull request"
 MALFORMED_FILE_CONTENTS = "GitHub returned malformed file contents"
 MALFORMED_MERGE_SETTINGS = "GitHub returned malformed repository merge settings"
@@ -735,25 +736,20 @@ class GitHubForge:
     def landing_readiness(self, number: int) -> forge.LandingReadiness:
         """Whether pull request `number` is safe to merge with its own pinned
         head sha (`aco land`'s preflight): the pull request itself (open state,
-        head sha, mergeable state) and `commit_checks` of that same head sha --
+        draft flag, head sha, mergeable state) and `commit_checks` of that same head sha --
         a merge is safe only once they all agree."""
-        raw = self._run(
-            [
-                "api",
-                f"repos/{self.repository}/pulls/{number}",
-                "--jq",
-                "{state,headSha:.head.sha,mergeableState:.mergeable_state}",
-            ]
-        )
+        raw = self._run(["api", f"repos/{self.repository}/pulls/{number}", "--jq", _READINESS_JQ])
         values = self._json_lines(raw, "pull request readiness")
         if len(values) != 1 or not isinstance(values[0], dict):
             raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
         value = values[0]
         state = value.get("state")
+        draft = value.get("draft")
         head_sha = value.get("headSha")
         mergeable_state = value.get("mergeableState")
         if (
             state not in {"open", "closed"}
+            or not isinstance(draft, bool)
             or not isinstance(head_sha, str)
             or protocol.COMMIT_PATTERN.fullmatch(head_sha) is None
             or not isinstance(mergeable_state, str)
@@ -761,7 +757,9 @@ class GitHubForge:
         ):
             raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
         checks = self.commit_checks(head_sha)
-        return forge.LandingReadiness(number, state == "open", head_sha, mergeable_state, checks)
+        return forge.LandingReadiness(
+            number, state == "open", draft, head_sha, mergeable_state, checks
+        )
 
     def allowed_merge_methods(self) -> frozenset[workboard.MergeMethod] | None:
         """Which merge methods this repository allows, from its

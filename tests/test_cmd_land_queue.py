@@ -52,6 +52,7 @@ class QueueCase:
     body: str = CLASSIFIED
     queue_rule: bool = True
     mergeable_state: str = "clean"
+    draft: bool = False
     untracked_file: bool = False
     head_repository: str | None = None
     head_moved: bool = False
@@ -89,9 +90,10 @@ def world(
     queue.closes_on_merge = True
     queue.queue_branches = {"main"} if case.queue_rule else set()
     queue.queue_reads = {NUMBER: list(case.reads)}
-    queue.readiness_by_number[NUMBER] = landing_readiness(
+    readiness = landing_readiness(
         head_sha=landed.landing.head, mergeable_state=case.mergeable_state
     )
+    queue.readiness_by_number[NUMBER] = replace(readiness, draft=case.draft)
     queue.enqueue_error = case.enqueue_error
     queue.rules_error = case.rules_error
     queue.update_item_body_error = case.body_error
@@ -263,6 +265,21 @@ class TestLandThroughTheMergeQueue:
                     pauses=0,
                 ),
                 id="a-failed-preflight-check-writes-and-queues-nothing",
+            ),
+            pytest.param(
+                QueueCase(
+                    reads=(NOT_QUEUED,),
+                    draft=True,
+                    status=2,
+                    stderr=(
+                        f"ERROR: pull request #{NUMBER} is a draft; "
+                        f"mark it ready with gh pr ready {NUMBER}\n"
+                    ),
+                    written=(),
+                    enqueues=0,
+                    pauses=0,
+                ),
+                id="a-draft-writes-and-queues-nothing",
             ),
             pytest.param(
                 QueueCase(

@@ -398,6 +398,7 @@ class LandingReadiness:
 
     number: int
     open: bool
+    draft: bool
     head_sha: str
     mergeable_state: str
     checks: tuple[CheckRun, ...]
