@@ -67,8 +67,11 @@ def _repo_json(reading: RepoReading) -> dict[str, object]:
 
 def decision_result_json(result: DecisionResult, repo: str) -> str:
     """A refusal is `status` and `message`; a stored answer adds the written
-    item as `GET /api/board` lists it (ABRD-09)."""
+    item as `GET /api/board` lists it (ABRD-09) and, when it has one, its `note`
+    (ABRD-129)."""
     answer: dict[str, object] = {"status": result.status.value, "message": result.message}
+    if result.note is not None:
+        answer["note"] = result.note
     if result.item is not None:
         item = _item_json(result.item, repo)
         if item is None:

@@ -28,6 +28,20 @@ from .ports import (
     UnclearCardAnswer,
 )
 
+WRITTEN_OVER_NOTE = (
+    "Written over a change aco had not read; that change is only in the item's edit history."
+)
+"""The note of a decision the forge's body check kept (ABRD-129)."""
+
+
+@dataclass(frozen=True)
+class _ReadItem:
+    """An item as one read of the forge shows it."""
+
+    number: int
+    title: str
+    lines: tuple[expectations.ExpectationLine, ...]
+
 
 @dataclass(frozen=True)
 class AcoSource:
@@ -75,16 +89,30 @@ def _checked_and_written_in_turn(
     decision = check(expectations.expectation_lines(fresh.body, storage=fresh.storage))
     if decision is None:
         return CardChanged()
-    committed = decide.rule(
-        context,
-        fresh,
-        _line_outcomes(decision),
-        context.today(),
-        state=repositories.state_directory(os.environ, Path.home()),
-    )
     returned = isinstance(decision.answer, UnclearCardAnswer)
     status = DecisionStatus.RETURNED if returned else DecisionStatus.RULED
+    try:
+        committed = decide.rule(
+            context,
+            fresh,
+            _line_outcomes(decision),
+            context.today(),
+            state=repositories.state_directory(os.environ, Path.home()),
+        )
+    except forge.ForgeBodyOverwrittenError as error:
+        if not error.kept:
+            raise
+        # The write is the newest revision and stands; only the change before it
+        # is in the history alone.
+        return DecisionResult(status, item=_item_as_read(context, fresh), note=WRITTEN_OVER_NOTE)
     return DecisionResult(status, item=committed)
+
+
+def _item_as_read(context: session.RunContext, written: decide.FreshItem) -> _ReadItem:
+    """The item as the forge holds it now, read once more."""
+    fresh = decide.fresh_item(context, written.number, command="rule")
+    lines = tuple(expectations.expectation_lines(fresh.body, storage=fresh.storage))
+    return _ReadItem(fresh.number, fresh.title, lines)
 
 
 def _line_outcomes(decision: CardDecision) -> tuple[decide.LineOutcome, ...]:

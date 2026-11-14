@@ -101,6 +101,8 @@ class DecisionResult:
     message: str | None = None
     item: ListedItem | None = None
     """The item as written, set on a stored answer (`ruled`, `returned`)."""
+    note: str | None = None
+    """What the operator should know of a stored answer; set only beside `item`."""
 
 
 @dataclass(frozen=True)
