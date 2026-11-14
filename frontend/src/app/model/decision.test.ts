@@ -80,6 +80,16 @@ describe('readDecisionResult', () => {
 		expect(readDecisionResult(storedAnswer(written))).toEqual({ kind: 'ruled', item: written });
 	});
 
+	test('[ABRD-130] a ruled result with a note carries it and is never read as a failure', () => {
+		const written = item({ number: 42 });
+
+		expect(readDecisionResult(storedAnswer(written, 'ruled', 'Written over a change.'))).toEqual({
+			kind: 'ruled',
+			item: written,
+			note: 'Written over a change.'
+		});
+	});
+
 	test('[ABRD-76] a returned result carries its item and is read as stored, not as a refusal', () => {
 		const written = item({ number: 42 });
 

@@ -100,7 +100,7 @@ export function noteOrNull(raw: string): string | null {
 }
 
 export type DecisionOutcome =
-	| { kind: 'ruled'; item: BoardItem }
+	| { kind: 'ruled'; item: BoardItem; note?: string }
 	| { kind: 'returned'; item: BoardItem }
 	| { kind: 'already-ruled'; message: string }
 	| { kind: 'changed'; message: string }
@@ -109,7 +109,7 @@ export type DecisionOutcome =
 export function readDecisionResult(result: DecisionResult): DecisionOutcome {
 	switch (result.status) {
 		case 'ruled':
-			return { kind: 'ruled', item: result.item };
+			return { kind: 'ruled', item: result.item, note: result.note };
 		case 'returned':
 			return { kind: 'returned', item: result.item };
 		case 'already_ruled':

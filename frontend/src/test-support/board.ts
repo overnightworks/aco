@@ -135,12 +135,14 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 	};
 }
 
-/** `POST /api/rule`'s answer for a stored card: the written item as listed. */
+/** `POST /api/rule`'s answer for a stored card: the written item as listed, with
+ * its note when it has one. */
 export function storedAnswer(
 	written: BoardItem,
-	status: 'ruled' | 'returned' = 'ruled'
+	status: 'ruled' | 'returned' = 'ruled',
+	note?: string
 ): DecisionResult {
-	return { status, message: null, item: written };
+	return { status, message: null, item: written, ...(note !== undefined && { note }) };
 }
 
 /** A `BoardStore` showing `repos` as ready, over a fake fetch that answers `repos`, and the

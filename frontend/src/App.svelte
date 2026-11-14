@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import {
+		decidedKeyOf,
 		nextOpenAfter,
 		stageAfterReturned,
 		firstDecidedKey,
@@ -160,7 +161,10 @@
 	// card they moved to in the meantime (picture: `nextOpenAfter`).
 	$effect(() => {
 		if (decisions !== null && decisions.justRuled !== null && decisions.justRuled === selectedKey) {
-			selectedKey = nextOpenAfter(board.repos, decisions.justRuled);
+			const ruled = decisions.justRuled;
+			// A noted answer keeps its decided card on the stage, so the note is read.
+			const noted = decisions.note(ruled) === null ? null : decidedKeyOf(board.repos, ruled);
+			selectedKey = noted ?? nextOpenAfter(board.repos, ruled);
 			void resetQuestion(question);
 		}
 	});

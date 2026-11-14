@@ -34,7 +34,12 @@
 	{:else if selected.kind === 'decided'}
 		{@const ruledLine = selected.line}
 		{#key lineKey(selected.repo, selected.item.number, ruledLine)}
-			<DecidedCard repo={selected.repo} item={selected.item} line={ruledLine} />
+			<DecidedCard
+				repo={selected.repo}
+				item={selected.item}
+				line={ruledLine}
+				note={decisions.note(cardKey(selected.repo, selected.item.number))}
+			/>
 		{/key}
 	{:else}
 		{@const points = selected.points}

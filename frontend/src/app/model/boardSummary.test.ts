@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { item, line, optionLine, repo } from '../../test-support/board';
 import {
 	cardHeading,
+	decidedKeyOf,
 	decidedList,
 	findSelection,
 	selectionHeading,
@@ -554,6 +555,33 @@ describe('selectionHeading', () => {
 		expect(selectionHeading({ kind: 'decided', repo: 'a', item: members, line: ruled })).toBe(
 			'Guests allowed?'
 		);
+	});
+});
+
+describe('decidedKeyOf', () => {
+	const ruledCard = [
+		repo({
+			items: [
+				item({
+					number: 7,
+					lines: [
+						optionLine({ index: 1, ruling: 'A', ruled_on: '2026-10-01', via: 'board' }),
+						optionLine({ index: 2, ruling: 'B', ruled_on: '2026-10-01', via: 'board' })
+					]
+				})
+			]
+		})
+	];
+
+	test('[ABRD-130] names the first ruled line of the card as the stage shows it decided', () => {
+		expect(decidedKeyOf(ruledCard, 'repo:7:card')).toBe('repo:7:1');
+	});
+
+	test('[ABRD-130] names nothing for a card whose item holds no ruled line or is gone', () => {
+		const stillOpen = [repo({ items: [item({ number: 7, lines: [optionLine({ index: 1 })] })] })];
+
+		expect(decidedKeyOf(stillOpen, 'repo:7:card')).toBeNull();
+		expect(decidedKeyOf(ruledCard, 'repo:8:card')).toBeNull();
 	});
 });
 
