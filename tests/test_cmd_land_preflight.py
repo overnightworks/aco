@@ -102,6 +102,13 @@ class TestLandReadiness:
             ),
             pytest.param(
                 LandingCase(
+                    replace(landing_readiness(mergeable_state="dirty", checks=()), draft=True),
+                    "pull request #12 is a draft; mark it ready with gh pr ready 12",
+                ),
+                id="draft-before-mergeable",
+            ),
+            pytest.param(
+                LandingCase(
                     landing_readiness(mergeable_state="dirty", checks=()),
                     "pull request #12 is not mergeable (dirty)",
                     length=RefusalLength.WITHIN_LIMIT,
@@ -247,7 +254,7 @@ class TestLandReadiness:
         indirect=True,
     )
     def test_refusal(self, world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-02, LANDCMD-03, LANDCMD-04, LANDCMD-05, LANDCMD-06, LANDCMD-45.
+        """Spec: LANDCMD-02, LANDCMD-74, LANDCMD-03, LANDCMD-04, LANDCMD-05, LANDCMD-06, LANDCMD-45.
         Exact refusal and no writes; GitHub's transient `unknown` is waited out first.
         """
         capsys.readouterr()

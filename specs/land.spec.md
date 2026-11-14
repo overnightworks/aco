@@ -51,6 +51,7 @@ order `merge`, `squash`, `rebase`.
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
 | no `--head` given | LANDCMD-32 |
 | pull request not open | LANDCMD-02 |
+| pull request is a draft | LANDCMD-74 |
 | the default branch adopts the quality gate and the completed checks hold no `quality / verdict` | LANDCMD-43 |
 | not mergeable | LANDCMD-03 |
 | `mergeable_state` is `unknown` | LANDCMD-45 |
@@ -103,6 +104,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` pins whatever head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) never compares `--head`, since its merge already happened.
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
+- [ ] [LANDCMD-74] An open pull request that is a draft refuses `pull request #<n> is a draft; mark it ready with gh pr ready <n>`, exit `2`; it is judged after LANDCMD-02 and before LANDCMD-43, and the queue path (LANDCMD-60) refuses it alike (E-LANDCMD-74).
 - [ ] [LANDCMD-43] If `<branch>`'s config has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
@@ -244,6 +246,18 @@ $ aco land 57
 2> ERROR: pull request #57 is not open; it cannot be landed
 exit 2
 ```
+
+### E-LANDCMD-74 — a draft pull request refuses and names the step that readies it
+
+Setup: bare-remote, fake `gh`, pull request `#57` open and a draft, `mergeable_state` `clean`, one completed check `build`
+
+```console
+$ aco land 57
+2> ERROR: pull request #57 is a draft; mark it ready with gh pr ready 57
+exit 2
+```
+
+Nothing is written, merged or enqueued, and `aco land` never marks the pull request ready itself: a draft can be deliberate. The claim stands.
 
 ### E-LANDCMD-43 — a pull request without the quality verdict refuses where the default branch adopts the gate
 

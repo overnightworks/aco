@@ -79,6 +79,10 @@ def _land_not_open_refusal(number: int) -> str:
     return f"pull request #{number} is not open; it cannot be landed"
 
 
+def _land_draft_refusal(number: int) -> str:
+    return f"pull request #{number} is a draft; mark it ready with gh pr ready {number}"
+
+
 def _land_not_mergeable_refusal(number: int, state: str) -> str:
     return f"pull request #{number} is not mergeable ({state})"
 
@@ -191,6 +195,8 @@ def _refuse_land_readiness(
 ) -> None:
     if not readiness.open:
         raise protocol.ClaimUnavailableError(_land_not_open_refusal(readiness.number))
+    if readiness.draft:
+        raise protocol.ClaimUnavailableError(_land_draft_refusal(readiness.number))
     _refuse_land_missing_quality_verdict(client, readiness, resolve_default_branch)
     if readiness.mergeable_state != forge.MERGEABLE_STATE_CLEAN:
         raise protocol.ClaimUnavailableError(

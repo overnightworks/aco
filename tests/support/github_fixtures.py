@@ -73,7 +73,7 @@ def landing_readiness(
     mergeable_state: str = forge.MERGEABLE_STATE_CLEAN,
     checks: tuple[forge.CheckRun, ...] = (forge.CheckRun("ci", forge.CHECK_CONCLUSION_SUCCESS),),
 ) -> forge.LandingReadiness:
-    return forge.LandingReadiness(number, True, head_sha, mergeable_state, checks)
+    return forge.LandingReadiness(number, True, False, head_sha, mergeable_state, checks)
 
 
 def serve_forge[ServedForge: "FakeForge | github.GitHubForge"](

@@ -647,6 +647,12 @@ _READINESS_CHECK_RUNS_PATH = f"repos/{REPOSITORY}/commits/{MERGE_COMMIT_SHA}/che
 _READINESS_STATUS_PATH = f"repos/{REPOSITORY}/commits/{MERGE_COMMIT_SHA}/status"
 
 
+def _pull_request(**fields: object) -> dict[str, object]:
+    return (
+        dict(state="open", draft=False, headSha=MERGE_COMMIT_SHA, mergeableState="clean") | fields
+    )
+
+
 def _readiness_client(
     *,
     check_run_pages: dict[int, list[dict[str, object]]],
@@ -663,9 +669,7 @@ def _readiness_client(
     names page only when the summary is not passing) stay faithful to
     `_combined_status_checks`'s own shape."""
     calls: list[list[str]] = []
-    pull_request = json.dumps(
-        {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": mergeable_state}
-    )
+    pull_request = json.dumps(_pull_request(mergeableState=mergeable_state))
     conclusions = [row.get("conclusion") for row in statuses]
     if not statuses:
         combined_state = "pending"  # GitHub's own default state for zero statuses.
@@ -712,7 +716,7 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
             "api",
             _READINESS_PULL_REQUEST_PATH,
             "--jq",
-            "{state,headSha:.head.sha,mergeableState:.mergeable_state}",
+            "{state,draft:.draft,headSha:.head.sha,mergeableState:.mergeable_state}",
         ],
         [
             "api",
@@ -730,7 +734,7 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
         ],
     ]
     assert readiness == forge.LandingReadiness(
-        57, True, MERGE_COMMIT_SHA, "clean", (forge.CheckRun("build", "success"),)
+        57, True, False, MERGE_COMMIT_SHA, "clean", (forge.CheckRun("build", "success"),)
     )
 
 
@@ -799,9 +803,7 @@ def _raw_status_client(*, summary: str, names_page: str) -> GitHubForge:
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[1]
         if path == _READINESS_PULL_REQUEST_PATH:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "clean"}
-            )
+            return json.dumps(_pull_request())
         if path.startswith(_READINESS_CHECK_RUNS_PATH):
             return ""
         if path == _READINESS_STATUS_PATH:
@@ -903,9 +905,7 @@ def test_github_adapter_accepts_a_mergeable_state_it_has_never_seen_before() -> 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[1]
         if "pulls" in path:
-            return json.dumps(
-                {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": "exploding"}
-            )
+            return json.dumps(_pull_request(mergeableState="exploding"))
         if path.startswith(_READINESS_CHECK_RUNS_PATH):
             return ""
         if path == _READINESS_STATUS_PATH:
@@ -922,9 +922,7 @@ def test_github_adapter_accepts_a_mergeable_state_it_has_never_seen_before() -> 
 def test_github_adapter_fails_loud_on_an_empty_mergeable_state() -> None:
     client = GitHubForge(
         github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(
-            {"state": "open", "headSha": MERGE_COMMIT_SHA, "mergeableState": ""}
-        ),
+        run=lambda arguments, input_data=None: json.dumps(_pull_request(mergeableState="")),
     )
 
     with pytest.raises(ClaimError, match="malformed pull request"):
