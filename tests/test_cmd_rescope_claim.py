@@ -321,3 +321,25 @@ def test_a_rescope_reads_the_checkout_its_path_names_never_the_working_directory
     result = run_cli(rescope_arguments("--add", f"{root}/src/not/yet/there.py"), capsys)
 
     assert (result.status, *reads.drain()) == (0, {root / "src": 1}, {root: 1}, {root: 2})
+
+
+@pytest.mark.parametrize("pattern", ["src/a?b", "src/*.py"])
+def test_a_rescope_refuses_a_glob_pattern_and_leaves_the_claim_as_it_stood(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    capsys: pytest.CaptureFixture[str],
+    pattern: str,
+) -> None:
+    """Spec: RESC-15, RESC-35. A glob pattern is no scope entry, so `--add` refuses it with the
+    scope grammar's own sentence, as `invalid_usage` under `--json`."""
+    standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
+    serve_body(monkeypatch, complete_contract("Build it."))
+    refusal = f"claim scope entries are paths or directories, not glob patterns: {pattern!r}"
+    flags = ("--add", f"{standpoint.directory}/{pattern}")
+
+    text = run_cli(rescope_arguments(*flags), capsys)
+    json_run = run_cli(rescope_arguments(*flags, "--json"), capsys)
+
+    assert (text.status, text.stdout, text.stderr) == (2, "", f"ERROR: {refusal}\n")
+    assert (json_run.status, json.loads(json_run.stdout)["reason"]) == (2, "invalid_usage")
+    assert claimed_here(standpoint).scope == HELD_SCOPE

@@ -104,6 +104,10 @@ class InvalidClaimMarkerError(ClaimError):
     pass
 
 
+class GlobScopeEntryError(InvalidClaimMarkerError):
+    pass
+
+
 @dataclass(frozen=True)
 class IssueIdentity:
     """A claim scoped to one numbered GitHub issue."""
@@ -362,14 +366,9 @@ def valid_branch(payload: dict[str, object]) -> str:
 SCOPE_ENTRIES_MUST_BE_CANONICAL = "claim scope entries must be canonical bounded paths"
 
 
-def _scope_list_entries(scope: object) -> list[str]:
-    """Validate a stored or CLI scope list: one list entry, one path.
-
-    A path is taken verbatim, comma and all -- a repository-relative path
-    that contains a comma is otherwise unrepresentable. A caller with more
-    than one path repeats the flag (`--scope a --scope b`); nothing here
-    joins or splits entries.
-    """
+def _scope_list_entries(scope: object, *, allow_glob_characters: bool) -> list[str]:
+    """Validate a stored or CLI scope list: one list entry, one path, taken verbatim -- a comma
+    stays in its path, and a caller with more paths repeats the flag."""
     if not isinstance(scope, list) or not scope:
         raise InvalidClaimMarkerError("claim marker scope must be a non-empty list")
     entries: list[str] = []
@@ -378,23 +377,23 @@ def _scope_list_entries(scope: object) -> list[str]:
             raise InvalidClaimMarkerError("claim scope entries must be text")
         if raw_path.strip() != raw_path or not raw_path:
             raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
+        if not allow_glob_characters and ("*" in raw_path or "?" in raw_path):
+            raise GlobScopeEntryError(
+                f"claim scope entries are paths or directories, not glob patterns: {raw_path!r}"
+            )
         entries.append(raw_path)
     if len(entries) > MAX_SCOPE_ENTRIES:
         raise InvalidClaimMarkerError(f"claim marker scope exceeds {MAX_SCOPE_ENTRIES} entries")
     return entries
 
 
-def valid_scope(scope: object) -> tuple[str, ...]:
-    """The one canonical scope form: sorted, deduplicated,
-    every entry a validated repository-relative path. Every claim's scope
-    passes through here at creation (`cmd_claim._request`) and at rescope
-    (`combined_scope`), so a live claim's scope is always already this
-    exact form; `workboard._canonical_scope` calls this same function to
-    project a body's own `scope = [...]`, rather than sorting a second
-    time, so the two stay comparable as tuples regardless of the order
-    either was typed in."""
+def valid_scope(scope: object, *, allow_glob_characters: bool = False) -> tuple[str, ...]:
+    """The one canonical scope form: sorted, deduplicated, every entry a validated
+    repository-relative path. Every claim's scope passes through here, and
+    `workboard._canonical_scope` projects a body's `scope` with it, so the two compare as
+    tuples. A claim scope refuses `*` and `?`; a board path entry passes `allow_glob_characters`."""
     result: list[str] = []
-    for path in _scope_list_entries(scope):
+    for path in _scope_list_entries(scope, allow_glob_characters=allow_glob_characters):
         if len(path) > MAX_SCOPE_PATH_LENGTH or "\\" in path or has_line_control(path):
             raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
         parsed = PurePosixPath(path)

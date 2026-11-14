@@ -41,6 +41,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 | canonical remote has no URL configured | RESC-21 | RESC-21 | RESC-21 | — |
 | the path is below a file or a dangling symlink, or the checkout root | RESC-19 | RESC-19 | — | — |
 | the path resolves outside the checkout | RESC-05 | RESC-05 | — | — |
+| the entry holds `*` or `?` | RESC-35 | RESC-35 | — | — |
 | no live claim on this identity/branch | RESC-14 | RESC-14 | RESC-14 | — |
 | lane mode, branch outside `docs/`/`fix/` | RESC-27 | RESC-27 | RESC-27 | — |
 | a different agent than the claimant | CLAIM-37 | CLAIM-37 | CLAIM-37 | — |
@@ -73,6 +74,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 - [ ] [RESC-28] A resolved checkout with no commit yet (an unborn branch) refuses `no commit on this branch`, exit `2`.
 - [ ] [RESC-29] A resolved checkout whose canonical `<remote>` records no resolving `HEAD` refuses `default branch unknown; run git remote set-head <remote> --auto`, exit `2`, never a `main`/`master` guess.
 - [ ] [RESC-30] A path naming a nested checkout's own root is judged by that checkout, not an outer one its parent sits inside, and refuses `<root> is the checkout root itself`, exit `2`, after RESC-02..04.
+- [ ] [RESC-35] A `--add`/`--drop` entry holding `*` or `?` refuses CLM-38's sentence, exit `2`, before the store is read; `--json` reports `invalid_usage` (see E-RESC-12).
 - [ ] [RESC-31] A git read failing on a path inside a git directory (`.git/`, a bare repository, one the environment selects) refuses `not a checkout: <git-directory> is a git directory`, exit `2`, not git's text.
 - [ ] [RESC-32] While `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_OBJECT_DIRECTORY` is set, even empty, a failed git read never reads as outside every repository: it refuses git's text or, in a git directory, RESC-31's.
 
@@ -103,7 +105,7 @@ those IDs rather than restating them. `<flag>` is `--add` or `--drop`,
 
 ## `--json`'s own `reason` vocabulary
 
-- [ ] [RESC-15] A malformed `--add`/`--drop` value (RESC-01, RESC-05..09, RESC-19, RESC-30) reports `reason: "invalid_usage"` under `--json`.
+- [ ] [RESC-15] A malformed `--add`/`--drop` value (RESC-01, RESC-05..09, RESC-19, RESC-30, RESC-35) reports `reason: "invalid_usage"` under `--json`.
 - [ ] [RESC-16] No live claim (RESC-14), a foreign claimant (CLAIM-37), a wide combined scope (RESC-10) or an item body that cannot take it (RESC-24) reports `reason: "precondition_failed"` (see E-RESC-04).
 - [ ] [RESC-17] Every other refusal but RESC-34 -- an unresolved checkout (RESC-02..04/26/28/29/31/32), a failed write (RESC-23) or a corrupted record -- reports `reason: "unavailable"` (a missing identity: OUT-05).
 
@@ -266,3 +268,16 @@ exit 0
 ```
 
 The first run leaves the claim as it stood; the second finds the body already holding the scope and moves the claim.
+
+### E-RESC-12 — a glob pattern refuses, the directory is the entry
+
+Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-42`, already `aco claim 42 --scope README.md`
+
+```console
+$ aco rescope 42 --add <worktree>/src/a?b
+2> ERROR: claim scope entries are paths or directories, not glob patterns: 'src/a?b'
+exit 2
+$ aco rescope 42 --add <worktree>/src
+RESCOPED issue #42: <claim-id>
+exit 0
+```

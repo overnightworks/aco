@@ -59,6 +59,11 @@ def stand_in(
                 ("docs/a\tb.md", "TAB"),
             )
         ),
+        pytest.param(
+            ["--scope", "src/*.py"],
+            "claim scope entries are paths or directories, not glob patterns: 'src/*.py'",
+            id="glob-pattern",
+        ),
     ],
 )
 def test_a_lane_claim_refuses_a_missing_or_display_control_scope_by_name(
@@ -70,8 +75,8 @@ def test_a_lane_claim_refuses_a_missing_or_display_control_scope_by_name(
     scope_arguments: list[str],
     refusal: str,
 ) -> None:
-    """Spec: CLM-06, CLAIM-20, NEXT-37. Lane mode has no item to derive a
-    scope from, and a path holding a display control or a TAB refuses with the
+    """Spec: CLM-06, CLAIM-20, CLM-38, NEXT-37. Lane mode has no item to derive a
+    scope from, and a path holding a display control, a TAB or a glob pattern refuses with the
     scope grammar's own sentence; both before any write, forge-free."""
     place = make_stand_in(monkeypatch, tmp_path, clone, bare_remote, TRUNK_FILES)
     standpoint = place(branch=LANE_MODE_BRANCH)
