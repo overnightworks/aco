@@ -1,8 +1,0 @@
-claim_id = "ccc4944ac99544bbabb60f65f9d09208"
-agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
-role = "builder"
-base = "fe3813ae96e7dd990392ad4f98bad37018c211bd"
-branch = "claude/issue-827-aco-land-refuses-a-draft"
-scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/forge.py", "src/aco/github.py", "tests"]
-opened_commit = "00a42662152df522956d7b9cd9e16d84e2d045be"
-whole_reason = "One preflight refusal end to end: the forge read, its record, the land command's judgement, its spec and its tests."
