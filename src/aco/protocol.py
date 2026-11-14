@@ -390,9 +390,8 @@ def _scope_list_entries(scope: object, *, allow_glob_characters: bool) -> list[s
 def valid_scope(scope: object, *, allow_glob_characters: bool = False) -> tuple[str, ...]:
     """The one canonical scope form: sorted, deduplicated, every entry a validated
     repository-relative path. Every claim's scope passes through here, and
-    `workboard._canonical_scope` projects a body's `scope` with this same function so the two
-    compare as tuples in whatever order either was typed. A claim scope refuses `*` and `?`; a
-    board path entry, compared as text, passes `allow_glob_characters`."""
+    `workboard._canonical_scope` projects a body's `scope` with it, so the two compare as
+    tuples. A claim scope refuses `*` and `?`; a board path entry passes `allow_glob_characters`."""
     result: list[str] = []
     for path in _scope_list_entries(scope, allow_glob_characters=allow_glob_characters):
         if len(path) > MAX_SCOPE_PATH_LENGTH or "\\" in path or has_line_control(path):
