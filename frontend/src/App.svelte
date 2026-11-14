@@ -162,9 +162,19 @@
 	$effect(() => {
 		if (decisions !== null && decisions.justRuled !== null && decisions.justRuled === selectedKey) {
 			const ruled = decisions.justRuled;
-			// A noted answer keeps its decided card on the stage, so the note is read.
+			const next = nextOpenAfter(board.repos, ruled);
+			// A noted answer keeps its decided card on the stage, so the note is read;
+			// with no open card left the Open view shows only its calm state, so the
+			// card stands in the Decided view.
 			const noted = decisions.note(ruled) === null ? null : decidedKeyOf(board.repos, ruled);
-			selectedKey = noted ?? nextOpenAfter(board.repos, ruled);
+			if (noted !== null && next === null) {
+				selectedKey = null;
+				decidedKey = noted;
+				showDecidedCard = true;
+				view = 'decided';
+			} else {
+				selectedKey = noted ?? next;
+			}
 			void resetQuestion(question);
 		}
 	});
