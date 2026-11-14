@@ -104,7 +104,8 @@ class InvalidClaimMarkerError(ClaimError):
     pass
 
 
-class GlobScopeEntryError(InvalidClaimMarkerError): ...
+class GlobScopeEntryError(InvalidClaimMarkerError):
+    pass
 
 
 @dataclass(frozen=True)
