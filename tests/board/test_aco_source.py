@@ -13,6 +13,7 @@ from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body, ite
 from option_cards import open_option_entry
 
 from aco import forge
+from aco.board.aco_source import WRITTEN_OVER_NOTE
 from aco.board.board import LINE_CHANGED
 
 _ITEM = 12
@@ -172,10 +173,6 @@ def test_a_decision_hands_the_forge_the_body_it_read_as_the_text_it_replaces(
             forge.ForgeBodyOverwrittenError(_ITEM, "2026-11-08T10:05:00Z", "ghost", kept=False),
             id="overwritten",
         ),
-        pytest.param(
-            forge.ForgeBodyOverwrittenError(_ITEM, "2026-11-08T10:05:00Z", "ghost", kept=True),
-            id="kept",
-        ),
         pytest.param(forge.ForgeBodyNotVerifiedError(_ITEM, "timeout"), id="not-verified"),
     ],
 )
@@ -192,6 +189,24 @@ def test_a_write_the_forges_check_answers_fails_the_decision_with_the_check_sent
     answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
 
     assert answered.json() == {"status": "failed", "message": str(answer)}
+    assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"
+
+
+def test_a_write_the_forges_check_kept_over_an_unread_change_answers_ruled_with_a_note(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-129: the ruling stands, so the card is decided; the note says where the
+    change it wrote over is."""
+    repository.put_item(_ITEM, item_body(open_option_entry()))
+    shown = first_listed_line(board)
+    repository.answer_next_write(
+        forge.ForgeBodyOverwrittenError(_ITEM, "2026-11-08T10:05:00Z", "ghost", kept=True)
+    )
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert answered.json()["status"] == "ruled"
+    assert answered.json()["note"] == WRITTEN_OVER_NOTE
     assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"
 
 

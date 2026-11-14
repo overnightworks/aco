@@ -68,6 +68,30 @@ test('once the window elapses, exactly one request is sent and the stored item s
 	expect(send).toHaveBeenCalledTimes(1);
 });
 
+test('[ABRD-130] a stored answer with a note shows its item, keeps the note and raises no banner', async () => {
+	const send = sender(storedAnswer(storedSong, 'ruled', 'Written over a change.'));
+	const { store: board, wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const store = new DecisionStore('token', wiring, send);
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(board.repos[0]?.items).toEqual([storedSong]);
+	expect(store.note(songKey)).toBe('Written over a change.');
+	expect(store.banner(songKey)).toBeNull();
+	expect(store.justRuled).toBe(songKey);
+});
+
+test('a stored answer without a note leaves its card without one', async () => {
+	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const store = new DecisionStore('token', wiring, sender(storedAnswer(storedSong)));
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.note(songKey)).toBeNull();
+});
+
 test('an already-ruled answer becomes a banner, and reads nothing on its own', async () => {
 	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
 	const { wiring, reads } = readyBoard();

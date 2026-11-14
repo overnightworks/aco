@@ -335,6 +335,19 @@ export function nextOpenAfter(repos: Readings, key: string): string | null {
 	return others.find((row) => ROW_RANK[row.state] === bestRank)?.key ?? null;
 }
 
+/** The first ruled line of the card `key` names, as the stage shows it decided;
+ * `null` when the reading holds no such line. */
+export function decidedKeyOf(repos: Readings, key: string): string | null {
+	for (const reading of repos) {
+		const item = reading.items.find((candidate) => cardKey(reading.name, candidate.number) === key);
+		const ruled = item?.lines.find(isRuled);
+		if (item !== undefined && ruled !== undefined) {
+			return lineKey(reading.name, item.number, ruled);
+		}
+	}
+	return null;
+}
+
 /** Where the stage goes once `key` is sent back to its head: the first other
  * open row, else the card itself, which now reads `with head`. */
 export function stageAfterReturned(repos: Readings, key: string): string {

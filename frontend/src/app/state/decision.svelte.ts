@@ -99,13 +99,16 @@ export class DecisionStore {
 	/** The cards whose own `Neu laden` read after a refusal has not been answered yet. */
 	readonly #reading = new SvelteSet<string>();
 	/** The key this store itself just wrote a ruling for, its item applied --
-	 * `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`)
-	 * when it is still the one shown, never for a manual reload after a
-	 * refusal banner. */
+	 * `App.svelte` advances the stage off it (`boardSummary.nextOpenAfter`, or
+	 * to its decided card when the answer came with a note) when it is still
+	 * the one shown, never for a manual reload after a refusal banner. */
 	#justRuled: string | null = $state(null);
 	/** The key this store itself just sent back to its head, reported once
 	 * (`acknowledgeReturned`) so selecting the card later never moves the stage. */
 	#justReturned: string | null = $state(null);
+	/** The word an answer came with (ABRD-129), per card key, kept for the session
+	 * because a later read lists the ruled item without it. */
+	#notes: Record<string, string> = $state({});
 	/** The text typed per card and escape kind, kept until its decision is stored. */
 	#drafts: Record<string, string> = $state({});
 	/** The one open escape panel per card, with the card as shown when it opened. */
@@ -157,6 +160,11 @@ export class DecisionStore {
 
 	get justReturned(): string | null {
 		return this.#justReturned;
+	}
+
+	/** The note the card's stored answer came with, or null. */
+	note(key: string): string | null {
+		return this.#notes[key] ?? null;
 	}
 
 	acknowledgeReturned(): void {
@@ -340,6 +348,9 @@ export class DecisionStore {
 		if (outcome.kind === 'ruled') {
 			this.#picks = withoutKey(this.#picks, key);
 			this.#dropDrafts(key, ['other', 'unclear']);
+			if (outcome.note !== undefined) {
+				this.#notes = { ...this.#notes, [key]: outcome.note };
+			}
 			this.board.applyItem(request.repo, outcome.item);
 			this.#justRuled = key;
 		} else if (outcome.kind === 'returned') {

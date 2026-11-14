@@ -8,7 +8,12 @@
 	import ContractFold from './ContractFold.svelte';
 	import StateShape from './StateShape.svelte';
 
-	let { repo, item, line }: { repo: string; item: BoardItem; line: RuledLine } = $props();
+	let {
+		repo,
+		item,
+		line,
+		note = null
+	}: { repo: string; item: BoardItem; line: RuledLine; note?: string | null } = $props();
 </script>
 
 <div class="decided-card">
@@ -19,6 +24,11 @@
 				<p>{decidedAnswer(line)}</p>
 			</div>
 		</CardRow>
+		{#if note !== null}
+			<CardRow label={ROW_LABEL.note}>
+				<p class="note">{note}</p>
+			</CardRow>
+		{/if}
 		<CardRow label={ROW_LABEL.how}>
 			<p>{howText(line)}</p>
 		</CardRow>
@@ -34,6 +44,10 @@
 <style>
 	p {
 		margin: 0;
+	}
+	.note {
+		padding-left: 12px;
+		border-left: 3px solid var(--warn);
 	}
 	.answer {
 		display: inline-flex;

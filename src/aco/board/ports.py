@@ -81,9 +81,9 @@ class DecisionStatus(StrEnum):
 
 
 class ListedItem(Protocol):
-    """An item with its lines, as the board lists it: `rulings.Row` and
-    `decide.Committed` both satisfy it. Read-only properties, so frozen
-    dataclass fields and tuples fit."""
+    """An item with its lines, as the board lists it: `rulings.Row`,
+    `decide.Committed` and the re-read item of a kept write satisfy it.
+    Read-only properties, so frozen dataclass fields and tuples fit."""
 
     @property
     def number(self) -> int: ...
@@ -101,6 +101,8 @@ class DecisionResult:
     message: str | None = None
     item: ListedItem | None = None
     """The item as written, set on a stored answer (`ruled`, `returned`)."""
+    note: str | None = None
+    """What the operator should know of a stored answer; set only beside `item`."""
 
 
 @dataclass(frozen=True)

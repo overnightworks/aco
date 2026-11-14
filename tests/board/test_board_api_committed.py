@@ -10,6 +10,8 @@ from aco_board_fixtures import BoardClient, Lister
 from board_forge import BoardForge, item_body
 from option_cards import group_body, open_option_entry
 
+from aco import forge
+from aco.board.aco_source import WRITTEN_OVER_NOTE
 from aco.board.api import decision_result_json
 from aco.board.board import LINE_CHANGED
 from aco.board.ports import DecisionResult, DecisionStatus
@@ -55,6 +57,26 @@ def test_a_stored_card_answers_with_the_item_the_next_listing_shows(
     assert answered.json() == {
         "status": status,
         "message": None,
+        "item": _listed_item(board, listed_items),
+    }
+
+
+def test_a_stored_card_the_forge_check_kept_answers_with_its_item_and_a_note(
+    repository: BoardForge, board: BoardClient, listed_items: Lister
+) -> None:
+    """ABRD-129."""
+    repository.put_item(_ITEM, item_body(open_option_entry()), title=_TITLE)
+    [shown] = _listed_item(board, listed_items)["lines"]
+    repository.answer_next_write(
+        forge.ForgeBodyOverwrittenError(_ITEM, "2026-11-08T10:05:00Z", "ghost", kept=True)
+    )
+
+    answered = board.decide_card_through_api(_ITEM, [shown], ["A"])
+
+    assert answered.json() == {
+        "status": "ruled",
+        "message": None,
+        "note": WRITTEN_OVER_NOTE,
         "item": _listed_item(board, listed_items),
     }
 

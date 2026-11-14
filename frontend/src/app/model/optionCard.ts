@@ -15,6 +15,7 @@ export const ROW_LABEL = {
 	recommendation: 'Recommendation',
 	decide: 'Decide',
 	decided: 'Decided',
+	note: 'Note',
 	how: 'How',
 	result: 'Result',
 	notice: 'You notice',

@@ -94,6 +94,28 @@ test('[ABRD-37] hostile text renders as text', () => {
 	expect(container.querySelector('img[onerror]')).toBeNull();
 });
 
+test('[ABRD-130] a note shows as its own Note row, and no note shows no row', () => {
+	const plain = renderOption();
+	expect(screen.queryByText('Note', { selector: 'dt' })).not.toBeInTheDocument();
+	plain.unmount();
+
+	render(DecidedCard, {
+		repo: 'songmaker',
+		item: item({ number: 1843, title: 'Song' }),
+		line: ruledOption(),
+		note: 'Written over a change.'
+	});
+
+	const row = screen.getByText('Note', { selector: 'dt' }).closest('div') as HTMLElement;
+	expect(row).toHaveTextContent('Written over a change.');
+	expect(screen.getAllByRole('term').map((term) => term.textContent)).toEqual([
+		'Decided',
+		'Note',
+		'How',
+		'Contract'
+	]);
+});
+
 test('[ABRD-37] a hostile item title on a ruled yes/no line shows as text in the meta line', () => {
 	const hostile = '<img src=x onerror=alert(1)>';
 	const { container } = render(DecidedCard, {

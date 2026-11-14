@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { decidedList, expectDecidedAnswer, openDecidedLine } from './decidedView';
+import { decidedCard, decidedList, expectDecidedAnswer, openDecidedLine } from './decidedView';
 import { countBoardReads, countPosts, pick, picks } from './decideRow';
 import {
 	arrange,
@@ -337,6 +337,29 @@ for (const viewport of [
 			if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 			await page.getByRole('button', { name: /^Decided 1$/ }).click();
 			await expect(decidedList(page).getByRole('button')).toHaveCount(1);
+		});
+
+		test('[ABRD-130] an answer with a note on the last open card stands decided with its note', async ({
+			page
+		}) => {
+			const { appUrl, token } = readBoardRuntime();
+			const note = 'Written over a change aco had not read.';
+			await arrange([item(913, 'Noted answer', card('Noted?'))]);
+			await page.clock.install();
+			await page.goto(`${appUrl}#t=${token}`);
+			await page.route('**/api/rule', async (route) => {
+				const response = await route.fetch();
+				await route.fulfill({ response, json: { ...(await response.json()), note } });
+			});
+			await listRow(page, 'Noted?').click();
+			await pick(page, 'A').click();
+			const stored = page.waitForResponse('**/api/rule');
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await stored;
+
+			await expect(decidedCard(page)).toBeVisible();
+			await expect(decidedCard(page).getByText(note)).toBeVisible();
+			await expect(page.getByRole('alert')).toHaveCount(0);
 		});
 
 		test('access, loading, empty and error messages remain readable', async ({

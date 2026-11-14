@@ -74,6 +74,32 @@ test('[ABRD-44] a ruled option line offers no Decide group', () => {
 	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
 });
 
+test('[ABRD-130] the decided card of a noted answer shows the note, never a failure', async () => {
+	const open = optionLine({ index: 2, fingerprint: 'fp-option' });
+	const ruled = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01', via: 'board' });
+	const written = item({ number: 42, lines: [ruled] });
+	const answer = storedAnswer(written, 'ruled', 'Written over a change.');
+	const decisions = storeAnswering(answer);
+	const first = render(Stage, {
+		repos: [repo({ items: [item({ number: 42, lines: [open] })] })],
+		selectedKey: cardKey('repo', 42),
+		decisions
+	});
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
+	await tick();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	first.unmount();
+
+	render(Stage, {
+		repos: [repo({ items: [written] })],
+		selectedKey: lineKey('repo', 42, ruled),
+		decisions
+	});
+
+	expect(screen.getByText('Written over a change.')).toBeInTheDocument();
+	expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
 test('[ABRD-44] picking an option disables the picks, then posts the card with exactly that letter', async () => {
 	const card = optionLine({ index: 2, fingerprint: 'fp-option' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];

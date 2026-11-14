@@ -155,7 +155,8 @@ export type DecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearR
 
 /** `POST /api/rule`'s 200 (`aco.board.ports.DecisionStatus`'s four values): a
  * stored card carries the written item as `GET /api/board` lists it, a refusal
- * only its sentence. */
+ * only its sentence. A `note` comes beside the item when the answer needs a word
+ * (ABRD-129). */
 export type DecisionResult =
-	| { status: 'ruled' | 'returned'; message: null; item: BoardItem }
+	| { status: 'ruled' | 'returned'; message: null; item: BoardItem; note?: string }
 	| { status: 'already_ruled' | 'failed'; message: string | null };

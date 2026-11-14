@@ -43,6 +43,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a malformed card post | — | ABRD-81 |
 | a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17, ABRD-113 |
 | a decision written | — | ABRD-122 |
+| a decision written over a change aco had not read, which the body check keeps | — | ABRD-129, ABRD-130 |
 | the board is stopping | — | ABRD-04, ABRD-18 |
 | a note or an answer on the decision | — | ABRD-05 |
 | one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
@@ -68,6 +69,8 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 - [ ] [ABRD-40] A post without `lines` answers 400 `bad request: decision`, no forge request (ABRD-77).
 - [ ] [ABRD-41] A card changed, withdrawn, gone, closed or unreadable on its fresh read is `failed` `Diese Zeile hat sich geändert, bitte neu laden`; a ruled line `already_ruled`; else `failed`, aco's sentence.
 - ABRD-42 (removed).
+- [ ] [ABRD-129] A write kept over a change aco had not read answers `ruled` (or `returned`) with the item and `note`: `Written over a change aco had not read; that change is only in the item's edit history.`
+- [ ] [ABRD-130] The page shows a ruled answer's card with a note as decided, the note beside it, never as `failed`; an overwritten write and one the check could not verify stay `failed` (ABRD-41).
 
 - [ ] [ABRD-77] A post with `lines` decides one card: `repo`, `item`, and `lines` of `{"line", "fingerprint"}`, each with its own `option`, or one `other` or `unclear` for all (card key rules, see E-ABRD-15).
 - [ ] [ABRD-78] It reads item `<n>` once and writes its body once through aco's writer: every posted line, `via board` for an option or `other`, each with that read's card hash, or every line back to its head.
@@ -175,7 +178,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 ## The JSON API
 
 - [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items"}]}`; `items`: RUL-03's rows (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06).
-- [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"`, the written item as ABRD-08 lists it, once stored; else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
+- [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"` (ABRD-08's row) once stored, and `"note"` (ABRD-129); else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
 - [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
