@@ -120,7 +120,10 @@ def _rescope_scope_entries(
         unscopable = checkout.unscopable_path_reason(raw_path, toplevel=toplevel)
         if unscopable is not None:
             raise _RescopeInvalidUsageError(unscopable)
-        relative = checkout.relative_scope_entry(raw_path, toplevel=toplevel)
+        try:
+            relative = checkout.relative_scope_entry(raw_path, toplevel=toplevel)
+        except protocol.GlobScopeEntryError as error:
+            raise _RescopeInvalidUsageError(str(error)) from error
         if relative is None:
             raise _RescopeInvalidUsageError(_outside_checkout_reason(flag, raw_path, toplevel))
         canonical.append(relative)

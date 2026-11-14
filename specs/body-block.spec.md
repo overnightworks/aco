@@ -50,7 +50,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 | a `[[slice]]` `done_when` holding a display control | BODY-66 | BODY-64 | BODY-64 |
 | `slice = []` | BODY-49, BODY-67 | — | — |
 | a key or message of any defect holding a display control | BODY-68 | BODY-68 | BODY-68 |
-| `scope` defective | BODY-53..BODY-56 | BODY-50 | BODY-52 |
+| `scope` defective | BODY-53..BODY-56, BODY-111 | BODY-50 | BODY-52 |
 | `size` valid or defective | BODY-57..BODY-59 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `whole` valid or defective | BODY-60..BODY-62 | BODY-50 (defective only) | BODY-52 (defective only) |
 | a block table header outside every fence | BODY-109 | BODY-50 | BODY-52 |
@@ -260,6 +260,7 @@ keeps its index. Inside one entry the refusals print in this order: `text`,
 - [ ] [BODY-53] A block carrying `scope = ["README.md", "docs"]` is valid, and a `[[slice]]` row may carry its own `scope = ["docs"]` under the same grammar: `aco check -` prints `body ok`, exit `0`.
 - [ ] [BODY-54] `scope = []` prints `body malformed: scope: scope must name at least one path`, exit `2`; an empty `[[slice]]` row `scope` prints the `slice[0].scope` form. Absent `scope` means unknown, never empty.
 - [ ] [BODY-55] A `scope = ["/etc/passwd"]` entry fails the same way `claim --scope` would: `body malformed: scope: claim scope must be repository-relative: '/etc/passwd'`.
+- [ ] [BODY-111] A `scope = ["frontend/**"]` entry fails as CLM-38 does: `body malformed: scope: claim scope entries are paths or directories, not glob patterns: 'frontend/**'`.
 - [ ] [BODY-56] A valid `scope` renders sorted, deduplicated, ahead of the first `[[expectation]]`/`[[slice]]` table — else TOML binds a bare key to the prior table — so a re-read names the same canonical `scope`.
 
 ## `size`, the item's own estimate class

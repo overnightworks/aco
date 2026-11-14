@@ -160,6 +160,19 @@ class TestBodyCheck:
                 id="no-block",
             ),
             pytest.param(
+                block_body(MINIMAL_BLOCK_TOML + 'scope = ["frontend/**"]\n'),
+                [
+                    "body malformed: scope: claim scope entries are paths or directories, "
+                    "not glob patterns: 'frontend/**'"
+                ],
+                "malformed",
+                2,
+                '{"ok": false, "reason": "malformed", "defects": ["body malformed: scope: '
+                "claim scope entries are paths or directories, "
+                "not glob patterns: 'frontend/**'\"]}\n",
+                id="glob-pattern-in-scope",
+            ),
+            pytest.param(
                 block_body('version = 1\nnext = "X"\n'),
                 [
                     "body malformed: now: now is required",

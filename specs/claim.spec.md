@@ -36,6 +36,7 @@ sentence.
 | `--scope` differs from the item's own scope | CLAIM-54 | — | — |
 | target unreachable while deriving scope | — | CLM-24 | — |
 | higher-priority actionable item is free | CLM-08 | CLM-08 | — |
+| `--scope` value holds `*` or `?` | CLM-38 | CLM-38 | CLM-38 |
 | `--out-of-order REASON` given | CLM-09 | CLM-09 | — |
 | that item's title holds a display control | CLM-34 | CLM-34 | — |
 | target is blocked | CLM-10 | CLM-10 | — |
@@ -80,6 +81,10 @@ to the clause each names below.
 
 - [ ] [CLM-06] Lane mode (the positional issue omitted) with no `--scope` refuses `lane claim requires --scope; a lane names no item to derive it from`, exit `2` (see E-CLM-01).
 - [ ] [CLM-07] A lane-mode branch not prefixed `docs/`/`fix/` refuses `branch '<branch>' is not an issueless lane; pass an issue number, or check out a branch prefixed 'docs/' or 'fix/'`, exit `2`.
+
+## The scope's entries
+
+- [ ] [CLM-38] A `--scope` value holding `*` or `?` refuses `claim scope entries are paths or directories, not glob patterns: '<path>'`, exit `2`, before any write; `[` `]` stay valid (see E-CLM-11).
 
 ## Slice-rule checks against the open board
 
@@ -267,3 +272,17 @@ exit 2
 ```
 
 `git for-each-ref refs/aco` on `origin` reads afterwards exactly as before the call.
+
+### E-CLM-11 — a glob pattern in the scope refuses, a directory entry is the fix
+
+Setup: bare-remote, bootstrapped, a linked worktree on `ada/issue-42`
+
+```console
+$ aco claim 42 --scope 'frontend/**'
+2> ERROR: claim scope entries are paths or directories, not glob patterns: 'frontend/**'
+exit 2
+$ aco claim 42 --scope frontend
+CLAIMED issue #42: <claim-id>
+<n> of <total> versioned files (<share>%); overlaps no other open claims
+exit 0
+```

@@ -16,6 +16,7 @@ from .protocol import (
     AGENT_MAX_LENGTH,
     ClaimError,
     ClaimRequest,
+    GlobScopeEntryError,
     InvalidClaimMarkerError,
     is_safe_branch_name,
     named_with_overflow_count,
@@ -534,15 +535,14 @@ def checkout_relative(path: Path, *, toplevel: Path) -> PurePosixPath | None:
 
 
 def relative_scope_entry(absolute_path: str, *, toplevel: Path) -> str | None:
-    """`absolute_path` (already an absolute filesystem path -- a
-    `rescope --add`/`--drop` entry given that way) as a canonical,
-    repository-relative scope entry under `toplevel`, or `None` when it
-    resolves outside `toplevel` or is otherwise not a valid scope entry."""
+    """The absolute `rescope --add`/`--drop` path as a canonical repository-relative scope entry
+    under `toplevel`, or `None` when it resolves outside `toplevel` or is not a valid entry; a
+    glob pattern is the one refusal that propagates, so the caller names it."""
     try:
         relative = checkout_relative(Path(absolute_path), toplevel=toplevel)
-        if relative is None:
-            return None
-        return valid_scope([relative.as_posix()])[0]
+        return None if relative is None else valid_scope([relative.as_posix()])[0]
+    except GlobScopeEntryError:
+        raise
     except InvalidClaimMarkerError, OSError, ValueError:
         return None
 
