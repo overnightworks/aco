@@ -1,0 +1,8 @@
+claim_id = "30fc1f51b52b42dc831d805d70a55603"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "702df25b65f28aa371642aa16164f3bf58cd1ef5"
+branch = "claude/issue-840-a-standing-ruling-never-shows-failed"
+scope = ["frontend", "quality/baseline.toml", "specs/serve.spec.md", "src/aco/board/aco_source.py", "src/aco/board/api.py", "src/aco/board/ports.py", "src/aco/board/static", "tests"]
+opened_commit = "9ca9c290b5767a788a9e6c6ba1b6ffbebce1a2e4"
+whole_reason = "One answer of the board's rule endpoint changes end to end: its source, its JSON, the page that maps it, its rebuilt assets, its spec and its tests."
