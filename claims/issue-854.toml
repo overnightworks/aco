@@ -1,0 +1,8 @@
+claim_id = "234864a2921b407e8899a7d6db93f600"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "42222ea8b13952fb6be629bc7887bb4955ea1473"
+branch = "claude/issue-854-foreign-sub-issues-are-read-as-children"
+scope = ["quality/baseline.toml", "specs/board.spec.md", "specs/landing-grammar.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/cmd_cut.py", "src/aco/github.py", "src/aco/policy.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests"]
+opened_commit = "79f079955f787b109acbdd4df8182c08c987001d"
+whole_reason = "One record gains its repository and every reader of a container's children follows it, or the board lies about which containers can close."
