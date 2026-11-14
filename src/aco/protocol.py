@@ -104,8 +104,7 @@ class InvalidClaimMarkerError(ClaimError):
     pass
 
 
-class GlobScopeEntryError(InvalidClaimMarkerError):
-    pass
+class GlobScopeEntryError(InvalidClaimMarkerError): ...
 
 
 @dataclass(frozen=True)
@@ -366,7 +365,7 @@ def valid_branch(payload: dict[str, object]) -> str:
 SCOPE_ENTRIES_MUST_BE_CANONICAL = "claim scope entries must be canonical bounded paths"
 
 
-def _scope_list_entries(scope: object) -> list[str]:
+def _scope_list_entries(scope: object, *, allow_glob_characters: bool) -> list[str]:
     """Validate a stored or CLI scope list: one list entry, one path, taken verbatim -- a comma
     stays in its path, and a caller with more paths repeats the flag."""
     if not isinstance(scope, list) or not scope:
@@ -377,7 +376,7 @@ def _scope_list_entries(scope: object) -> list[str]:
             raise InvalidClaimMarkerError("claim scope entries must be text")
         if raw_path.strip() != raw_path or not raw_path:
             raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
-        if "*" in raw_path or "?" in raw_path:
+        if not allow_glob_characters and ("*" in raw_path or "?" in raw_path):
             raise GlobScopeEntryError(
                 f"claim scope entries are paths or directories, not glob patterns: {raw_path!r}"
             )
@@ -387,13 +386,14 @@ def _scope_list_entries(scope: object) -> list[str]:
     return entries
 
 
-def valid_scope(scope: object) -> tuple[str, ...]:
+def valid_scope(scope: object, *, allow_glob_characters: bool = False) -> tuple[str, ...]:
     """The one canonical scope form: sorted, deduplicated, every entry a validated
     repository-relative path. Every claim's scope passes through here, and
     `workboard._canonical_scope` projects a body's `scope` with this same function so the two
-    compare as tuples in whatever order either was typed."""
+    compare as tuples in whatever order either was typed. A claim scope refuses `*` and `?`; a
+    board path entry, compared as text, passes `allow_glob_characters`."""
     result: list[str] = []
-    for path in _scope_list_entries(scope):
+    for path in _scope_list_entries(scope, allow_glob_characters=allow_glob_characters):
         if len(path) > MAX_SCOPE_PATH_LENGTH or "\\" in path or has_line_control(path):
             raise InvalidClaimMarkerError(SCOPE_ENTRIES_MUST_BE_CANONICAL)
         parsed = PurePosixPath(path)

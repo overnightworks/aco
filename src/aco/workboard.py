@@ -683,7 +683,7 @@ def repository_path_entry_covers(entry: str, path: str) -> bool:
     any other exactly one path. A path that is not a canonical
     repository-relative path is named by no entry."""
     try:
-        protocol.valid_scope([path])
+        protocol.valid_scope([path], allow_glob_characters=True)
     except protocol.InvalidClaimMarkerError:
         return False
     return path.startswith(entry) if entry.endswith("/") else path == entry
@@ -707,7 +707,7 @@ def _validated_repository_paths(raw: dict[str, object], path: Path, key: str) ->
         )
     for entry in entries:
         try:
-            protocol.valid_scope([entry.removesuffix("/")])
+            protocol.valid_scope([entry.removesuffix("/")], allow_glob_characters=True)
         except protocol.InvalidClaimMarkerError as error:
             raise protocol.ClaimError(
                 f"board configuration {path} {key} entry '{protocol.terminal_text(entry)}' "
