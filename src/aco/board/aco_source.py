@@ -36,7 +36,8 @@ WRITTEN_OVER_NOTE = (
 
 @dataclass(frozen=True)
 class _ReadItem:
-    """An item as one read of the forge shows it."""
+    """An item as one read of the forge shows it: `decide.Committed` without its
+    open count, which only a write reports."""
 
     number: int
     title: str
