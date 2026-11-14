@@ -1,0 +1,8 @@
+claim_id = "bbebd3fadf5e4bf78b1c941bdcb80028"
+agent = "Claude 0f727edf-d2b0-4b89-b658-3a71f71d1459"
+role = "builder"
+base = "167dae40041274756f8905a66abcfe788c199a18"
+branch = "claude/issue-852-a-claim-scope-refuses-glob-patterns"
+scope = ["quality/baseline.toml", "specs/body-block.spec.md", "specs/claim.spec.md", "specs/rescope.spec.md", "src/aco/protocol.py", "tests"]
+opened_commit = "cc59c24a92ae89b9921e5744782c45433c86b219"
+whole_reason = "One validator rule end to end: the shared scope validator, the specs of its three entry points and their tests."
