@@ -579,7 +579,7 @@ def _cleanup_unless_claimed_again(
     this cleanup, so the claim state is read afresh right before it; on a
     foreign branch (REL-59) any claim then on the branch, issue or lane,
     keeps both. A claim taken after that read is the accepted residual: `start` builds the clean
-    merged worktree again. `None`: no local branch, or the default branch, so no cleanup to report (REL-65)."""
+    merged worktree again. `None`: no local branch or the default branch (REL-65)."""
     if checkout.is_default_branch(lane.branch, context.recorded_default_branch):
         return None
     if not parsed.keep_worktree:
