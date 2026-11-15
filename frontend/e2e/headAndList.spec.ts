@@ -136,7 +136,7 @@ for (const viewport of [
 			const open = views.getByRole('button', { name: 'Open 2' });
 			const brand = page.getByRole('heading', { level: 1 });
 
-			await expect(views.getByRole('button')).toHaveCount(2);
+			await expect(views.getByRole('button')).toHaveCount(3);
 			await expect(open.locator('.n')).toHaveText('2');
 			const radius = await open.evaluate((tab) => parseFloat(getComputedStyle(tab).borderRadius));
 			expect(radius).toBeGreaterThanOrEqual((await height(open)) ?? Infinity);
