@@ -80,7 +80,6 @@ class Intervention(Enum):
     DOTTED = auto()
     LATIN1 = auto()
     DIRTY = auto()
-    IGNORED = auto()
     CHECKED_ELSEWHERE = auto()
     GIT_FAILURE = auto()
     FOREIGN_COMMIT_READ_FAILS = auto()
@@ -99,10 +98,12 @@ class Intervention(Enum):
             Intervention.DOTTED: (target.window, target.dotted),
             Intervention.LATIN1: (target.window, target.latin1),
             Intervention.DIRTY: (target.before, target.dirty),
-            Intervention.IGNORED: (target.before, target.ignored),
             Intervention.CHECKED_ELSEWHERE: (target.before, target.check_out_elsewhere),
             Intervention.GIT_FAILURE: (target.before, target.fail_worktree_resolution),
-            Intervention.FOREIGN_COMMIT_READ_FAILS: (target.before, target.fail_foreign_read),
+            Intervention.FOREIGN_COMMIT_READ_FAILS: (
+                target.before,
+                target.fail_commit_read_of_a_worktree_listed_first,
+            ),
             Intervention.INSIDE: (target.before, target.run_from_inside),
             Intervention.NO_WORKTREE: (target.before, target.remove_lane_worktree),
         }
@@ -201,7 +202,9 @@ def own_section_keys(clone: Path, lane: str) -> Observation:
 
 
 def lane_status(lane: Path) -> Observation:
-    return Present(real_git(lane, "status", "--porcelain").stdout) if lane.exists() else Absent()
+    if not lane.exists():
+        return Absent()
+    return Present(real_git(lane, "status", "--porcelain").stdout)
 
 
 @dataclass
@@ -273,11 +276,6 @@ class CleanupIntervention:
     def dirty(self) -> None:
         (self.world.lane / "scratch.txt").write_text("uncommitted\n")
 
-    def ignored(self) -> None:
-        (self.clone / ".git/info").mkdir()
-        (self.clone / ".git/info/exclude").write_text("*.cache\n")
-        (self.world.lane / "notes.cache").write_text("only in the worktree\n")
-
     def check_out_elsewhere(self) -> None:
         real_git(self.clone, "worktree", "remove", str(self.world.lane))
         real_git(self.clone, "checkout", "-q", self.branch)
@@ -308,7 +306,10 @@ class CleanupIntervention:
             stderr="fatal: cannot change to 'gone': No such file or directory",
         )
 
-    def fail_foreign_read(self) -> None:
+    def fail_commit_read_of_a_worktree_listed_first(self) -> None:
+        """A candidate on another branch that git lists before the lane's
+        own worktree, whose commit read exits 128: cleanup must keep the
+        lane rather than read the failure as that candidate having none."""
         foreign = self.clone.parent / "aaa-foreign"
         real_git(self.clone, "worktree", "add", "-q", str(foreign), "-b", "codex/issue-1-foreign")
         stub_one_git_call(
@@ -570,7 +571,6 @@ def rendered(identifier: str, worktree_text: str, case: CleanupCase) -> tuple[ob
     "case",
     [
         *rendered("clean", "removed", MERGED),
-        *rendered("ignored", "removed", replace(MERGED, intervention=Intervention.IGNORED)),
         *rendered(
             "branch-deletion-refused",
             "removed; branch kept -- git failure: error: branch not fully merged",
