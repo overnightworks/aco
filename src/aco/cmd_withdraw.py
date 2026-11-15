@@ -15,7 +15,7 @@ from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 # No `--via` and no `--card-hash`: withdrawing decides nothing for the operator.
 add_parser = partial(
-    decide.add_lines_command_parser,
+    report.add_lines_command_parser,
     help="withdraw an expectation line of your own that nobody has ruled",
     item_help="the item whose expectation line is withdrawn",
     lines_help="the 1-based expectation line index, as rulings prints it; "

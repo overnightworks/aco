@@ -27,7 +27,7 @@ clock = time.monotonic
 
 
 add_parser = partial(
-    decide.add_lines_command_parser,
+    report.add_lines_command_parser,
     help="wait until an expectation line is ruled, returned or withdrawn",
     item_help="the item whose lines are waited on",
     lines_help="the 1-based expectation line index, as rulings prints it; "
