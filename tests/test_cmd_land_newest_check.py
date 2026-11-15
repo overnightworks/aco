@@ -1,4 +1,4 @@
-"""What `aco land` judges when one check name has several runs on the head."""
+"""What `aco land` judges of the check runs on the head: several runs of a name, each conclusion."""
 
 import json
 from dataclasses import dataclass, replace
@@ -28,6 +28,8 @@ OLD_GREEN = pr_check(OLD_RUN, "success")
 NEW_GREEN = pr_check(NEW_RUN, "success")
 NEW_RED = pr_check(NEW_RUN, "failure")
 NEW_PENDING = pr_check(NEW_RUN, None)
+NEW_SKIPPED = pr_check(NEW_RUN, "skipped")
+NEW_NEUTRAL = pr_check(NEW_RUN, "neutral")
 
 
 @dataclass(frozen=True)
@@ -83,7 +85,44 @@ def test_land_judges_only_the_newest_run_of_a_check_name(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: LANDCMD-56, LANDCMD-06, LANDCMD-45."""
+    """Spec: LANDCMD-56, LANDCMD-45."""
+    assert_land_outcome(case, github_clone, bare_remote, monkeypatch, capsys)
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        pytest.param(RunsCase([NEW_SKIPPED], 0, RELEASED), id="skipped-lands"),
+        pytest.param(
+            RunsCase(
+                [NEW_NEUTRAL],
+                2,
+                "",
+                "ERROR: pull request #12 has non-successful checks: pr-check (neutral); land "
+                "only after every check succeeds\n",
+            ),
+            id="neutral-refuses",
+        ),
+    ],
+)
+def test_land_reads_a_skipped_check_as_no_failure_and_a_neutral_one_as_failure(
+    case: RunsCase,
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: LANDCMD-06."""
+    assert_land_outcome(case, github_clone, bare_remote, monkeypatch, capsys)
+
+
+def assert_land_outcome(
+    case: RunsCase,
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
 
     def arrange(client: FakeForge, _head: str) -> None:
         readiness = client.readiness_by_number[12]

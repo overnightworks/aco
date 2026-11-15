@@ -58,7 +58,7 @@ order `merge`, `squash`, `rebase`.
 | a GitHub read before the merge fails | LANDCMD-46, LANDCMD-47, LANDCMD-48, LANDCMD-49 |
 | no CI checks at all | LANDCMD-04 |
 | a check still running | LANDCMD-05 |
-| a check finished without success | LANDCMD-06 |
+| a check finished neither successful nor skipped | LANDCMD-06 |
 | pull request's own shape (classification line, cross-repository head, target branch) invalid | LANDCMD-07 (LAND-06..13, 32, cited) |
 | the head removes `<path>`, changes `storage` or `canonical_remote` in it, or carries an invalid one | LANDCMD-22, LANDCMD-23, LANDCMD-24 |
 | named work item not open | LANDCMD-08 |
@@ -114,7 +114,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable or invalid `quality/config.toml` takes LANDCMD-46).
 - [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
-- [ ] [LANDCMD-06] A pull request whose checks all completed, at least one without success, refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
+- [ ] [LANDCMD-06] Once all checks completed, one neither successful nor skipped refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
 - [ ] [LANDCMD-56] Of several check runs with one name on the head, only the newest (highest id) counts: a red run a later green one replaced never refuses, a newer red one always does.
 - [ ] [LANDCMD-07] This pull request's own shape decides its classification, exactly as `check <pr>` reads it (LAND-06..13, 32): a shape defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
 - [ ] [LANDCMD-22] After LANDCMD-07, a head without `<path>` refuses `pull request #<n> removes <path>; aco land cannot release its claim across that change`, exit `2` (E-LANDCMD-22).

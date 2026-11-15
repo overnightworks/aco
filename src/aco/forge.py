@@ -374,7 +374,9 @@ MergeQueueState = MergedPullRequest | QueuedPullRequest | UnqueuedPullRequest | 
 MERGEABLE_STATE_CLEAN = "clean"
 MERGEABLE_STATE_UNKNOWN = "unknown"
 CHECK_CONCLUSION_SUCCESS = "success"
-CHECK_CONCLUSIONS_NOT_FAILED = frozenset({"skipped", "neutral"})
+CHECK_CONCLUSION_SKIPPED = "skipped"
+CHECK_CONCLUSIONS_PASSING = frozenset({CHECK_CONCLUSION_SUCCESS, CHECK_CONCLUSION_SKIPPED})
+CHECK_CONCLUSIONS_NOT_FAILED = CHECK_CONCLUSIONS_PASSING | {"neutral"}
 
 
 @dataclass(frozen=True)

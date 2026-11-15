@@ -93,12 +93,15 @@ def _land_pending_check_names(checks: tuple[forge.CheckRun, ...]) -> tuple[str, 
     )
 
 
-def _land_failed_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | None:
+def _land_failed_check(
+    checks: tuple[forge.CheckRun, ...],
+    tolerated: frozenset[str] = forge.CHECK_CONCLUSIONS_PASSING,
+) -> forge.CheckRun | None:
     return next(
         (
             check
             for check in checks
-            if check.conclusion is not None and check.conclusion != forge.CHECK_CONCLUSION_SUCCESS
+            if check.conclusion is not None and check.conclusion not in tolerated
         ),
         None,
     )
@@ -106,11 +109,7 @@ def _land_failed_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | N
 
 def _land_failed_trunk_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | None:
     """The first failed check of the trunk: a skipped or neutral one is not a failure."""
-    return _land_failed_check(
-        tuple(
-            check for check in checks if check.conclusion not in forge.CHECK_CONCLUSIONS_NOT_FAILED
-        )
-    )
+    return _land_failed_check(checks, forge.CHECK_CONCLUSIONS_NOT_FAILED)
 
 
 def _land_checks_refusal(number: int, checks: tuple[forge.CheckRun, ...]) -> str | None:
