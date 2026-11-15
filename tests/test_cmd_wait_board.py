@@ -293,7 +293,11 @@ class TestWaitingOnTheBoard:
                 board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
             ),
         )
-        client.during_the_read = lambda: rule_through_aco(client, capsys)
+
+        def rule() -> None:
+            rule_through_aco(client, capsys)
+
+        client.during_the_read = rule
         ticks = install(monkeypatch, lambda: 0)
         result = run_cli(["wait"], capsys)
         assert (result.status, result.stderr, len(ticks.pauses)) == (0, "", 1)
@@ -315,7 +319,11 @@ class TestWaitingOnTheBoard:
             ),
         )
         ticks = install(monkeypatch, lambda: 0)
-        ticks.afterwards[3] = lambda: rule_through_aco(client, capsys, line=3)
+
+        def rule_the_third_line() -> None:
+            rule_through_aco(client, capsys, line=3)
+
+        ticks.afterwards[3] = rule_the_third_line
         result = run_cli(["wait"], capsys)
         assert (result.status, result.stderr) == (0, "")
         assert re.fullmatch(r"CHANGED #7 line 3: ruled A \d{4}-\d{2}-\d{2}\n", result.stdout)

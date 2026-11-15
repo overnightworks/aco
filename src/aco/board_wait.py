@@ -263,7 +263,7 @@ class _BoardWatch:
         probed = probe_due(now, self._schedule)
         if probed:
             self._schedule = replace(self._schedule, last_probe=now)
-            self._probe_the_forge()
+            self._pending = self._probe_the_forge() or self._pending
             self._probe_the_state_ref()
         if now >= self._schedule.retry_after:
             end = self._reread_items(moved) if moved else None
