@@ -340,7 +340,11 @@ def _judged_selection(
     except protocol.ClaimError as error:
         raise _RescopePreconditionError(str(error)) from error
     if requested.agent != selected.agent:
-        route = item_handover.handover_route(selected.identity, selected.agent)
+        route = item_handover.handover_route(
+            selected.identity,
+            selected.agent,
+            workboard.item_labeller(checkout_context.config.storage),
+        )
         takeover = "" if route is None else f"; take the claim over with `{route}`"
         raise _RescopePreconditionError(
             f"only the original claimant may rescope{takeover} "

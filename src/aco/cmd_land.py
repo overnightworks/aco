@@ -320,7 +320,7 @@ def _land_preflight(
         detail.source_branch,
         context.storage,
     )
-    cmd_release.authorize_releaser(parsed, selected)
+    cmd_release.authorize_releaser(parsed, selected, workboard.item_labeller(context.storage))
     return detail, structural, readiness
 
 

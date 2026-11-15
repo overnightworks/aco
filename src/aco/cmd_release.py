@@ -252,7 +252,7 @@ def _resolve_release_claimant(
     storage: body.Storage,
 ) -> _ResolvedRelease:
     selected = select_release_claim(parsed, observed, identity, release_branch, storage)
-    return authorize_releaser(parsed, selected)
+    return authorize_releaser(parsed, selected, workboard.item_labeller(storage))
 
 
 def _is_adopted_lane(identity: protocol.ClaimIdentity, branch: str) -> bool:
@@ -345,7 +345,7 @@ def select_release_claim(
 
 
 def authorize_releaser(
-    parsed: argparse.Namespace, selected: protocol.ActiveClaim
+    parsed: argparse.Namespace, selected: protocol.ActiveClaim, item_label: protocol.ItemLabel
 ) -> _ResolvedRelease:
     """This session's right to release `selected`: its own claimant, or an
     explicit coordinator override. An item's claim held by another session
@@ -355,7 +355,7 @@ def authorize_releaser(
         if role is None:
             role = selected.role
         if (parsed.agent, role) != (selected.agent, selected.role):
-            route = item_handover.handover_route(selected.identity, selected.agent)
+            route = item_handover.handover_route(selected.identity, selected.agent, item_label)
             takeover = "use" if route is None else f"take the claim over with `{route}`, or use"
             raise protocol.ClaimUnavailableError(
                 f"only the original claimant may release; {takeover} an explicit "

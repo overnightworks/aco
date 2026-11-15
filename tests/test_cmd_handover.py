@@ -348,9 +348,11 @@ def test_a_handover_under_state_ref_storage_records_on_the_item_and_repeats(
     taken = run_cli(handover, capsys)
     repeated = run_cli(handover, capsys)
     rescoped = run_cli(["rescope", item, "--add", NEW_FILE], capsys)
+    refused = run_cli(["rescope", item, "--agent", PREDECESSOR, "--add", NEW_FILE], capsys)
     shown = run_cli(["item", "show", item], capsys)
 
     assert (taken.status, repeated.status, rescoped.status) == (0, 0, 0)
+    assert f"`aco handover {item} --from {SUCCESSOR} --reason <text>`" in refused.stderr
     assert taken.stdout == f"HANDED OVER {item}: {PREDECESSOR} -> {SUCCESSOR}\n"
     assert repeated.stdout == f"ALREADY HANDED OVER {item}: {PREDECESSOR} -> {SUCCESSOR}\n"
     record = item_handover.parse_handover(body.locate_block(shown.stdout).data)

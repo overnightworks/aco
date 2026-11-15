@@ -15,16 +15,6 @@ RECORD_LINE = (
 )
 
 
-def _parsed(handover_line: str) -> body.ParsedBody:
-    return body.parse_body(block_body(MINIMAL_BLOCK_TOML + handover_line + "\n"))
-
-
-def _printed_defects(handover_line: str) -> list[str]:
-    parsed = _parsed(handover_line)
-    assert parsed.read_state is body.BodyReadState.MALFORMED
-    return [body.body_defect_text(defect) for defect in parsed.contract.defects]
-
-
 def test_a_block_reads_its_one_handover() -> None:
     located = body.locate_block(block_body(MINIMAL_BLOCK_TOML + RECORD_LINE + "\n"))
 
@@ -73,7 +63,10 @@ def test_a_block_without_a_handover_reads_none() -> None:
     ],
 )
 def test_a_block_refuses_a_malformed_handover(handover_line: str, printed: str) -> None:
-    assert _printed_defects(handover_line) == [printed]
+    parsed = body.parse_body(block_body(MINIMAL_BLOCK_TOML + handover_line + "\n"))
+
+    assert parsed.read_state is body.BodyReadState.MALFORMED
+    assert [body.body_defect_text(defect) for defect in parsed.contract.defects] == [printed]
 
 
 def test_a_block_with_a_handover_renders_it_back_unchanged() -> None:
@@ -93,17 +86,24 @@ def test_a_written_handover_is_a_valid_block() -> None:
 
 
 @pytest.mark.parametrize(
-    ("identity", "route"),
+    ("identity", "label", "route"),
     [
         pytest.param(
             protocol.IssueIdentity(72),
+            lambda number: f"#{number}",
             "aco handover 72 --from 'Claude af54' --reason <text>",
-            id="an-item-claim-names-the-command",
+            id="a-github-item-claim-names-its-number",
         ),
-        pytest.param(protocol.LaneIdentity(), None, id="a-lane-claim-has-none"),
+        pytest.param(
+            protocol.IssueIdentity(72),
+            lambda _number: "aco-abc123",
+            "aco handover aco-abc123 --from 'Claude af54' --reason <text>",
+            id="a-state-ref-item-claim-names-its-id",
+        ),
+        pytest.param(protocol.LaneIdentity(), str, None, id="a-lane-claim-has-none"),
     ],
 )
 def test_the_route_names_the_handover_command_of_an_item_claim(
-    identity: protocol.ClaimIdentity, route: str | None
+    identity: protocol.ClaimIdentity, label: protocol.ItemLabel, route: str | None
 ) -> None:
-    assert item_handover.handover_route(identity, "Claude af54") == route
+    assert item_handover.handover_route(identity, "Claude af54", label) == route

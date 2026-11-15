@@ -96,9 +96,13 @@ def render_handover(data: Mapping[str, object]) -> list[str]:
     return ["", f"{HANDOVER_KEY} = {{ {', '.join(fields)} }}"]
 
 
-def handover_route(identity: protocol.ClaimIdentity, holder: str) -> str | None:
-    """The command a successor takes the claim of `identity`, held by `holder`, over with:
-    only an item's claim has one."""
+def handover_route(
+    identity: protocol.ClaimIdentity, holder: str, item_label: protocol.ItemLabel
+) -> str | None:
+    """The command a successor takes the claim of `identity`, held by `holder`, over with,
+    the item named as `item_label` prints it without a leading `#`: only an item's claim
+    has one."""
     if not isinstance(identity, protocol.IssueIdentity):
         return None
-    return f"aco handover {identity.issue} --{FROM_KEY} {shlex.quote(holder)} --{REASON_KEY} <text>"
+    item = item_label(identity.issue).removeprefix("#")
+    return f"aco handover {item} --{FROM_KEY} {shlex.quote(holder)} --{REASON_KEY} <text>"
