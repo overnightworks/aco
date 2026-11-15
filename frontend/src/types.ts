@@ -105,11 +105,41 @@ export interface BoardItem {
 	lines: ExpectationLine[];
 }
 
+/** The counts of one top-level container or of a whole repo; `percent` is
+ * `null` while nothing is planned (ABRD-131). */
+export interface ProgressCounts {
+	closed: number;
+	planned: number;
+	open: number;
+	uncut: number;
+	percent: number | null;
+}
+
+export interface ProgressContainer extends ProgressCounts {
+	number: number;
+	title: string;
+}
+
+/** A repo's progress read (ABRD-132): the sum of its top-level containers. */
+export interface ProgressRead extends ProgressCounts {
+	error: null;
+	/** The items waiting on the operator. */
+	waiting: number;
+	containers: ProgressContainer[];
+}
+
+/** A repo whose progress could not be read: the sentence, and no counts (ABRD-134). */
+interface ProgressUnknown {
+	error: string;
+}
+
 export interface RepoReading {
 	name: string;
 	/** aco's own failure sentence once this repo's read failed, else null. */
 	error: string | null;
 	items: BoardItem[];
+	/** `null` once this repo's read failed. */
+	progress: ProgressRead | ProgressUnknown | null;
 }
 
 export interface BoardResponse {
