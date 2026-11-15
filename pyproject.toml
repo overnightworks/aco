@@ -73,7 +73,7 @@ containers = ["aco"]
 exhaustive = true
 layers = [
     "cli",
-    "cmd_adopt | cmd_board | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_fleet_plans | cmd_item | cmd_land | cmd_mcp | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_stats | cmd_status | cmd_wait | cmd_withdraw",
+    "cmd_adopt | cmd_board | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_fleet_plans | cmd_handover | cmd_item | cmd_land | cmd_mcp | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_stats | cmd_status | cmd_wait | cmd_withdraw",
     "cmd_land_merge | cmd_land_queue",
     "board | mcp_server",
     "decide",
@@ -91,7 +91,7 @@ layers = [
     "workboard",
     "items | expectations",
     "body",
-    "item_wait",
+    "item_wait | item_handover",
     "expectation_grammar | body_fence | trunk_message",
     "card_rules",
     "usage",

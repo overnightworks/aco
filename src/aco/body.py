@@ -22,6 +22,7 @@ from typing import TypeGuard, cast
 from . import expectation_grammar, protocol
 from .body_fence import walk_fences
 from .expectation_grammar import block_expectation_defects, render_expectations
+from .item_handover import handover_defects, render_handover
 from .item_wait import ItemWait, parse_wait, render_wait, wait_defects
 from .toml_text import toml_string
 
@@ -43,6 +44,7 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "next",
         "done_when",
         "wait",
+        "handover",
         "scope",
         "size",
         "whole",
@@ -533,6 +535,7 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
         defects.append(version_defect)
     defects.extend(_block_projection_defects(data))
     defects.extend(ContractDefect(*defect) for defect in wait_defects(data))
+    defects.extend(ContractDefect(*defect) for defect in handover_defects(data))
     defects.extend(_block_scope_defects(data))
     size_defect = _block_size_defect(data)
     if size_defect is not None:
@@ -949,6 +952,7 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     lines = [f"version = {data['version']}"]
     lines.extend(f"{key} = {toml_string(data[key])}" for key in ("now", "next", "done_when"))
     lines.extend(render_wait(data))
+    lines.extend(render_handover(data))
     lines.extend(_render_scope(data))
     lines.extend(_render_size(data))
     lines.extend(_render_whole(data))

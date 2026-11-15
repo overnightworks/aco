@@ -20,6 +20,7 @@ from . import (
     cmd_claim,
     cmd_cut,
     cmd_fleet_plans,
+    cmd_handover,
     cmd_item,
     cmd_land,
     cmd_mcp,
@@ -651,6 +652,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "land": _RepositoryCommand(_add_land_parser, cmd_land.run, resolves_agent=True),
     "adopt": _RepositoryCommand(_add_adopt_parser, cmd_adopt.run, resolves_agent=True),
     "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
+    "handover": _RepositoryCommand(cmd_handover.add_parser, cmd_handover.run, resolves_agent=True),
     "cut": _RepositoryCommand(_add_cut_parser, cmd_cut.run),
     "rule": _RepositoryCommand(_add_rule_parser, cmd_rule.run),
     "withdraw": _RepositoryCommand(cmd_withdraw.add_parser, cmd_withdraw.run),
@@ -790,13 +792,10 @@ def _run_repository_command(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    # Every refusal the parse itself raises -- argparse's own usage errors,
-    # and `workboard.parse_item_reference`, an argparse `type=` whose refusal is
-    # a `ClaimError` -- fires before any namespace carries `--json`, so the
-    # mode is read back off the parsers this parse reached.
-    # Both report `invalid_usage` through the one envelope. Past the parse
-    # the plain sentence alone still stands: a refusal a command raises
-    # outside its own reported vocabulary must not be dressed as one.
+    # A parse refusal (argparse's own, or `workboard.parse_item_reference`'s `ClaimError`)
+    # fires before any namespace carries `--json`, so the mode is read back off the parsers
+    # this parse reached. Both report `invalid_usage` through the one envelope; past the
+    # parse the plain sentence alone stands, never dressed as a reason outside a command's own.
     given = sys.argv[1:] if arguments is None else arguments
     parser = _parser()
     try:

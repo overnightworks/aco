@@ -1077,6 +1077,17 @@ class RescopeIntent:
 
 
 @dataclass(frozen=True)
+class HandoverIntent:
+    """Makes `agent` the holder of the live claim `previous_agent` holds; role, id,
+    branch and scope stay."""
+
+    claim_id: ClaimId
+    previous_agent: str
+    agent: str
+    operation_id: str
+
+
+@dataclass(frozen=True)
 class ReleaseIntent:
     """Deletes `claims/<key>.toml`; `ids/` and `resources/` are unchanged (a
     released claim id and a released resource value are both terminal:
@@ -1176,7 +1187,13 @@ class LandingIntent:
 
 
 ClaimTransitionIntent = (
-    ClaimIntent | RescopeIntent | ReleaseIntent | ItemWriteIntent | ItemCloseIntent | LandingIntent
+    ClaimIntent
+    | RescopeIntent
+    | HandoverIntent
+    | ReleaseIntent
+    | ItemWriteIntent
+    | ItemCloseIntent
+    | LandingIntent
 )
 
 
@@ -1372,6 +1389,23 @@ def _apply_rescope_intent(state: ClaimState, intent: RescopeIntent) -> ClaimStat
     )
 
 
+def _apply_handover_intent(state: ClaimState, intent: HandoverIntent) -> ClaimState:
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(
+            f"claim id {intent.claim_id!r} has no active claim to hand over"
+        )
+    key, current = found
+    if current.agent != intent.previous_agent:
+        raise ClaimUnavailableError(
+            f"the claim is held by {current.agent!r}, not by {intent.previous_agent!r}"
+        )
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType({**state.claims, key: replace(current, agent=intent.agent)}),
+    )
+
+
 def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingIntent) -> None:
     """Raises unless `intent` may release `current`: the original claimant,
     or an explicit coordinator override by role coordinator. Shared by
@@ -1503,16 +1537,20 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
     `state.tip` is already real -- `store.py` never calls this against
     `EMPTY_STATE`."""
     if isinstance(intent, ClaimIntent):
-        return _apply_claim_intent(state, intent)
-    if isinstance(intent, RescopeIntent):
-        return _apply_rescope_intent(state, intent)
-    if isinstance(intent, ReleaseIntent):
-        return _apply_release_intent(state, intent)
-    if isinstance(intent, LandingIntent):
-        return _apply_landing_intent(state, intent)
-    if isinstance(intent, ItemCloseIntent):
-        return _apply_item_close_intent(state, intent)
-    return _apply_item_write_intent(state, intent)
+        applied = _apply_claim_intent(state, intent)
+    elif isinstance(intent, RescopeIntent):
+        applied = _apply_rescope_intent(state, intent)
+    elif isinstance(intent, HandoverIntent):
+        applied = _apply_handover_intent(state, intent)
+    elif isinstance(intent, ReleaseIntent):
+        applied = _apply_release_intent(state, intent)
+    elif isinstance(intent, LandingIntent):
+        applied = _apply_landing_intent(state, intent)
+    elif isinstance(intent, ItemCloseIntent):
+        applied = _apply_item_close_intent(state, intent)
+    else:
+        applied = _apply_item_write_intent(state, intent)
+    return applied
 
 
 # --- `claims/<key>.toml` and `resources/<name>.toml` codecs -----------------
