@@ -394,6 +394,16 @@ class ClosedPullRequest:
 MergeQueueState = MergedPullRequest | QueuedPullRequest | UnqueuedPullRequest | ClosedPullRequest
 
 
+@dataclass(frozen=True)
+class BranchMergeRules:
+    """What the rules applying to one branch say about merging into it, read once:
+    whether a `merge_queue` rule applies, and the merge methods each other rule allows,
+    one set per rule."""
+
+    requires_merge_queue: bool
+    merge_methods: tuple[frozenset[workboard.MergeMethod], ...]
+
+
 # GitHub's own open vocabularies for a pull request's `mergeable_state` and a
 # completed check run's `conclusion` (`aco land`'s preflight):
 # each is owned by GitHub, can grow a new value without this tool's notice,

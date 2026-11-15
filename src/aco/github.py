@@ -291,7 +291,7 @@ class GitHubForge:
     ) -> None:
         self.repository = repository
         self._perform = run if run is not None else self._gh
-        self._merge_queue = github_merge_queue.MergeQueue(repository, self._run, self._json_lines)
+        self._merge_queue = github_merge_queue.MergeQueue(repository, self._graphql)
         self.requests = 0
         self._requests_lock = threading.Lock()
         self._current_name: str | None = None
@@ -359,23 +359,19 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed issue reference")
         return github_issue_payload.item_reference(values[0])
 
+    def _graphql(
+        self, query: str, variables: Mapping[str, str], jq: str, description: str
+    ) -> tuple[object, ...]:
+        """One GraphQL round trip: the JSON values `jq` selects from `query`'s answer."""
+        arguments = ["api", "graphql", "-f", f"query={query}"]
+        for name, value in variables.items():
+            arguments += ["-f", f"{name}={value}"]
+        return self._json_lines(self._run([*arguments, "--jq", jq]), description)
+
     def _graphql_block(self, query: str, description: str) -> tuple[object, ...]:
         """One GraphQL round trip: the `repository` object `query` answers."""
-        raw = self._run(
-            [
-                "api",
-                "graphql",
-                "-f",
-                f"query={query}",
-                "-f",
-                f"owner={self.repository.namespace[0]}",
-                "-f",
-                f"name={self.repository.name}",
-                "--jq",
-                ".data.repository",
-            ]
-        )
-        return self._json_lines(raw, description)
+        variables = {"owner": self.repository.namespace[0], "name": self.repository.name}
+        return self._graphql(query, variables, ".data.repository", description)
 
     def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
         return github_graphql.read_batched(
@@ -784,21 +780,21 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError(MALFORMED_MERGE_SETTINGS)
         return frozenset(method for method, allowed in settings.items() if allowed)
 
-    def branch_merge_rules(self, branch: str) -> tuple[frozenset[workboard.MergeMethod], ...]:
-        """The merge methods each rule on `branch` allows, one
-        set per rule, read through the branch-rules endpoint that resolves
-        every ruleset applying to it: GitHub refuses a method any one rule
-        excludes, even where the repository settings allow it. A
-        `pull_request` rule allows its own `allowed_merge_methods`, and a
-        `required_linear_history` rule everything but a merge commit. A
-        branch without such a rule, or on a plan without rulesets, answers an
-        empty tuple."""
-        allowed_per_rule = map(github_merge_queue.rule_merge_methods, self._branch_rules(branch))
-        return tuple(allowed for allowed in allowed_per_rule if allowed is not None)
-
-    def requires_merge_queue(self, branch: str) -> bool:
-        """Whether a `merge_queue` rule applies to `branch`."""
-        return github_merge_queue.has_merge_queue_rule(self._branch_rules(branch))
+    def merge_rules(self, branch: str) -> forge.BranchMergeRules:
+        """What the rules on `branch` say about merging into it, from one read of the
+        branch-rules endpoint, which resolves every ruleset applying to it. A
+        `merge_queue` rule requires the queue. Each other rule allows a set of merge
+        methods, and GitHub refuses a method any one rule excludes, even where the
+        repository settings allow it: a `pull_request` rule allows its own
+        `allowed_merge_methods`, and a `required_linear_history` rule everything but a
+        merge commit. A branch without such a rule, or on a plan without rulesets,
+        has no method set and no queue."""
+        rules = self._branch_rules(branch)
+        allowed_per_rule = map(github_merge_queue.rule_merge_methods, rules)
+        return forge.BranchMergeRules(
+            requires_merge_queue=github_merge_queue.has_merge_queue_rule(rules),
+            merge_methods=tuple(allowed for allowed in allowed_per_rule if allowed is not None),
+        )
 
     def merge_queue_state(self, number: int) -> forge.MergeQueueState:
         """Pull request `number` as merged, queued, open and not queued, or closed."""

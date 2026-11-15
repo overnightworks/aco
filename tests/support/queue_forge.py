@@ -45,12 +45,13 @@ class QueueForge(FakeForge):
         """A queue forge holding `base`'s arrangement, its collections shared."""
         return cls(**{item.name: getattr(base, item.name) for item in fields(base) if item.init})
 
-    def requires_merge_queue(self, branch: str) -> bool:
-        """This fake's mirror of `GitHubForge.requires_merge_queue`."""
-        self._run()
+    def merge_rules(self, branch: str) -> forge.BranchMergeRules:
+        """This fake's mirror of `GitHubForge.merge_rules`: the rules of `FakeForge`, the
+        queue rule on `queue_branches`."""
+        rules = super().merge_rules(branch)
         if self.rules_error is not None:
             raise self.rules_error
-        return branch in self.queue_branches
+        return replace(rules, requires_merge_queue=branch in self.queue_branches)
 
     def merge_queue_state(self, number: int) -> forge.MergeQueueState:
         """This fake's mirror of `GitHubForge.merge_queue_state`."""

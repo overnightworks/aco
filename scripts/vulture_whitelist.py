@@ -45,7 +45,7 @@ value (`DecisionKind(value)`) and by iteration when the grammar lists the
 accepted kinds; no code names one of them. `RulingVia.CHAT` is reached the
 same way, from `--via` and from a stored `via`.
 
-`GitHubForge.requires_merge_queue`, `merge_queue_state` and `enqueue_pull_request` and
+`GitHubForge.merge_queue_state` and `enqueue_pull_request` and
 `UnqueuedPullRequest.removal_reason` are the merge queue surface of the GitHub adapter that
 no command calls yet; its tests drive them.
 """
@@ -136,7 +136,6 @@ _referenced_only_for_vulture = (
     argparse.Action.const,
     argparse.Action.default,
     argparse.Action.metavar,
-    GitHubForge.requires_merge_queue,
     GitHubForge.merge_queue_state,
     GitHubForge.enqueue_pull_request,
     UnqueuedPullRequest.removal_reason,

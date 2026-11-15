@@ -22,35 +22,49 @@ HEAD = "5f46e82d36b5629a8bfee52902166528f06e0ca8"
 MOVED_HEAD = "79e377c4d29252ff81cb5e837cc6b0405a0b79e3"
 NUMBER = 3
 
+ADDED_AT = "2026-11-15T09:00:00Z"
+REMOVED_AT = "2026-11-15T10:00:00Z"
+ADDED_AGAIN_AT = "2026-11-15T11:00:00Z"
+
+
+def timeline(removals: object = (), additions: object = ()) -> dict[str, dict[str, object]]:
+    """The two timeline reads of the state query, each answering the nodes given."""
+    return {"removals": {"nodes": removals}, "additions": {"nodes": additions}}
+
+
+def a_removal(reason: object = "failed_checks", created_at: object = REMOVED_AT) -> object:
+    return {"createdAt": created_at, "reason": reason}
+
+
 MERGED = {
     "mergeCommit": {"oid": MERGE_COMMIT},
     "mergeQueueEntry": None,
     "state": "MERGED",
-    "timelineItems": {"nodes": [{"reason": "merged"}]},
+    **timeline([a_removal("merged")]),
 }
 QUEUED = {
     "mergeCommit": None,
     "mergeQueueEntry": {"id": "MQE_kwDOVpnG6s4AAAAB"},
     "state": "OPEN",
-    "timelineItems": {"nodes": []},
+    **timeline(),
 }
 REMOVED_AFTER_RED_RUN = {
     "mergeCommit": None,
     "mergeQueueEntry": None,
     "state": "OPEN",
-    "timelineItems": {"nodes": [{"reason": "failed_checks"}]},
+    **timeline([a_removal()], [{"createdAt": ADDED_AT}]),
 }
 NEVER_QUEUED_OR_DROPPED = {
     "mergeCommit": None,
     "mergeQueueEntry": None,
     "state": "OPEN",
-    "timelineItems": {"nodes": []},
+    **timeline(),
 }
 CLOSED = {
     "mergeCommit": None,
     "mergeQueueEntry": None,
     "state": "CLOSED",
-    "timelineItems": {"nodes": [{"reason": "failed_checks"}]},
+    **timeline([a_removal()], [{"createdAt": ADDED_AT}]),
 }
 ENQUEUED = {"mergeQueueEntry": {"id": "MQE_kwDOVpnG6s4AAAAB"}}
 
@@ -59,8 +73,8 @@ def merged_commit_is(commit: object) -> dict[str, object]:
     return {**MERGED, "mergeCommit": {"oid": commit}}
 
 
-def removal_is(nodes: object) -> dict[str, object]:
-    return {**REMOVED_AFTER_RED_RUN, "timelineItems": {"nodes": nodes}}
+def removal_is(nodes: object, additions: object = ()) -> dict[str, object]:
+    return {**REMOVED_AFTER_RED_RUN, **timeline(nodes, additions)}
 
 
 def adapter_answering(
@@ -97,7 +111,7 @@ def test_requires_merge_queue_reads_the_rule_on_the_branch(
 ) -> None:
     client, _ = adapter_answering(lambda _arguments: rules_answer(*rule_types))
 
-    assert client.requires_merge_queue("main") is required
+    assert client.merge_rules("main").requires_merge_queue is required
 
 
 def test_requires_merge_queue_is_false_on_a_plan_without_rulesets() -> None:
@@ -108,20 +122,30 @@ def test_requires_merge_queue_is_false_on_a_plan_without_rulesets() -> None:
 
     client, _ = adapter_answering(refuse)
 
-    assert client.requires_merge_queue("main") is False
+    assert client.merge_rules("main").requires_merge_queue is False
 
 
 def test_requires_merge_queue_refuses_a_rule_it_cannot_read() -> None:
     client, _ = adapter_answering(lambda _arguments: json.dumps(["merge_queue"]))
 
     with pytest.raises(forge.ForgeMalformedResponseError, match="branch merge rule"):
-        client.requires_merge_queue("main")
+        client.merge_rules("main")
 
 
 def test_a_merge_queue_rule_leaves_the_merge_method_read_unchanged() -> None:
     client, _ = adapter_answering(lambda _arguments: rules_answer("merge_queue", "pull_request"))
 
-    assert client.branch_merge_rules("main") == ()
+    assert client.merge_rules("main").merge_methods == ()
+
+
+def test_one_read_of_the_branch_rules_answers_the_queue_rule_and_the_merge_methods() -> None:
+    client, observed = adapter_answering(
+        lambda _arguments: rules_answer("merge_queue", "required_linear_history")
+    )
+
+    rules = client.merge_rules("main")
+
+    assert (len(observed), rules.requires_merge_queue, len(rules.merge_methods)) == (1, True, 1)
 
 
 @pytest.mark.parametrize(
@@ -136,13 +160,28 @@ def test_a_merge_queue_rule_leaves_the_merge_method_read_unchanged() -> None:
             NEVER_QUEUED_OR_DROPPED, forge.UnqueuedPullRequest(None), id="no-removal-recorded"
         ),
         pytest.param(
-            removal_is([{"reason": None}]), forge.UnqueuedPullRequest(None), id="removal-no-reason"
+            removal_is([a_removal(None)]), forge.UnqueuedPullRequest(None), id="removal-no-reason"
         ),
         pytest.param(CLOSED, forge.ClosedPullRequest("failed_checks"), id="closed-after-removal"),
         pytest.param(
-            {**CLOSED, "timelineItems": {"nodes": []}},
+            {**CLOSED, **timeline()},
             forge.ClosedPullRequest(None),
             id="closed-no-removal-recorded",
+        ),
+        pytest.param(
+            removal_is([a_removal()], [{"createdAt": ADDED_AGAIN_AT}]),
+            forge.UnqueuedPullRequest(None),
+            id="requeued-after-the-removal",
+        ),
+        pytest.param(
+            removal_is([a_removal()]),
+            forge.UnqueuedPullRequest("failed_checks"),
+            id="removal-without-an-addition-on-the-timeline",
+        ),
+        pytest.param(
+            {**CLOSED, **timeline([a_removal()], [{"createdAt": ADDED_AGAIN_AT}])},
+            forge.ClosedPullRequest(None),
+            id="closed-after-a-later-requeue",
         ),
     ],
 )
@@ -178,9 +217,18 @@ def test_merge_queue_state_of_a_missing_pull_request_is_not_found() -> None:
         pytest.param({**MERGED, "mergeCommit": None}, id="merged-without-commit"),
         pytest.param({**QUEUED, "mergeQueueEntry": "queued"}, id="entry-not-an-object"),
         pytest.param(removal_is("none"), id="removals-not-a-list"),
-        pytest.param(removal_is([{"reason": 5}]), id="reason-not-text"),
+        pytest.param(removal_is([a_removal(5)]), id="reason-not-text"),
         pytest.param(removal_is(["failed_checks"]), id="removal-not-an-object"),
-        pytest.param(removal_is([{"reason": "a"}, {"reason": "b"}]), id="two-removals"),
+        pytest.param(removal_is([a_removal("a"), a_removal("b")]), id="two-removals"),
+        pytest.param(
+            removal_is([{"reason": "a"}], [{"createdAt": ADDED_AT}]), id="removal-without-a-time"
+        ),
+        pytest.param(
+            removal_is([a_removal(created_at="yesterday")], [{"createdAt": ADDED_AT}]),
+            id="removal-time-not-a-time",
+        ),
+        pytest.param(removal_is([a_removal()], [{"createdAt": 5}]), id="addition-time-not-text"),
+        pytest.param(removal_is([{"reason": "a"}]), id="removal-without-a-time-and-no-addition"),
     ],
 )
 def test_merge_queue_state_refuses_an_answer_it_cannot_read(answer: object) -> None:
@@ -300,7 +348,10 @@ def test_enqueue_refuses_a_mutation_answer_with_no_entry(mutation_answer: object
 def test_the_fake_forge_answers_each_queue_state(state: forge.MergeQueueState) -> None:
     fake = QueueForge(queue_branches={"main"}, queue_states={NUMBER: state})
 
-    assert (fake.requires_merge_queue("main"), fake.merge_queue_state(NUMBER)) == (True, state)
+    assert (fake.merge_rules("main").requires_merge_queue, fake.merge_queue_state(NUMBER)) == (
+        True,
+        state,
+    )
 
 
 def test_the_fake_forge_queues_a_pull_request_on_its_pinned_head_only() -> None:

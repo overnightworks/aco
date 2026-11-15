@@ -80,7 +80,7 @@ def lane(
         pytest.param(
             with_json_error("allowed_merge_methods", MERGE_RULES_STEP), id="merge-rules-settings"
         ),
-        pytest.param(with_json_error("branch_merge_rules", MERGE_RULES_STEP), id="merge-rules"),
+        pytest.param(with_json_error("merge_rules", MERGE_RULES_STEP), id="merge-rules"),
         pytest.param(
             ReadFailure(
                 "landing_readiness",
