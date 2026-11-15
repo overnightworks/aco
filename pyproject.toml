@@ -98,6 +98,7 @@ layers = [
     "lineage_stamp",
     "file_lock",
     "protocol | process | routing_line",
+    "toml_text",
 ]
 # `items` may import `body`, never the reverse.
 # The five cmd_* -> cmd_* edges: land.spec cites the release rules;

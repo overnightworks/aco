@@ -9,7 +9,9 @@ from enum import StrEnum
 from functools import partial
 from pathlib import PurePosixPath, PureWindowsPath
 from types import MappingProxyType
-from typing import Protocol, cast
+from typing import Protocol
+
+from .toml_text import toml_string
 
 # Named refusal when a write-path command would otherwise create
 # `refs/aco/state` as a side effect. One owner so
@@ -55,11 +57,6 @@ WIDE_SCOPE_SHARE_FLOOR = 12
 # the dirty-tree refusal's and the claim overlap notice's shared shape for a
 # list too long to print whole.
 NAMED_PATH_OVERFLOW_LIMIT = 3
-# The first printable ASCII code point (space) and DEL bound the control
-# characters a claim marker field, scope path, or outbound text may never
-# contain -- each is meant to read as a single printable line.
-ASCII_PRINTABLE_MIN = 0x20
-ASCII_DEL = 0x7F
 
 
 ItemLabel = Callable[[int], str]
@@ -278,12 +275,6 @@ def has_line_control(text: str) -> bool:
     """Whether `text` holds what a one-line field refuses: TAB or any
     `is_display_control` character (CLAIM-20, CLAIM-58)."""
     return any(character == "\t" or is_display_control(character) for character in text)
-
-
-def has_control_character(text: str) -> bool:
-    return any(
-        ord(character) < ASCII_PRINTABLE_MIN or ord(character) == ASCII_DEL for character in text
-    )
 
 
 def _is_bounded_line(value: str, maximum: int) -> bool:
@@ -1525,62 +1516,6 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
 
 
 # --- `claims/<key>.toml` and `resources/<name>.toml` codecs -----------------
-#
-# Hand-written, not a TOML-writing library: `toml_string` is this
-# repository's one TOML basic-string writer, living here
-# because this module sits below `workboard` in the Layers contract --
-# `workboard.py`'s renderers import it rather than keeping a second escape
-# table and drifting from what `tomllib.loads` (the reader) accepts back.
-# It escapes every control character TOML's basic-string grammar forbids
-# unescaped (U+0000-U+001F and U+007F) and the line separators U+0085, U+2028
-# and U+2029, which `str.splitlines` ends a line at, so a raw one would split a
-# value in the body's line-wise fence walk: the short escapes where TOML has
-# one, `\uXXXX` for the rest.
-
-_TOML_STRING_ESCAPES = {
-    "\\": "\\\\",
-    '"': '\\"',
-    "\b": "\\b",
-    "\t": "\\t",
-    "\n": "\\n",
-    "\f": "\\f",
-    "\r": "\\r",
-}
-
-
-def toml_string(value: object) -> str:
-    """A TOML basic string for `value` -- the writer's one escaping path,
-    matching what `tomllib.loads` (the reader) accepts back unchanged."""
-    escaped = "".join(_toml_string_escape(char) for char in cast(str, value))
-    return f'"{escaped}"'
-
-
-# A multi-line basic string keeps a newline and a tab literally.
-_TOML_MULTILINE_LITERALS = frozenset("\n\t")
-_FENCE_CHARACTERS = frozenset("`~")
-
-
-def toml_multiline_string(value: str) -> str:
-    """A TOML multi-line basic string for `value` -- a `picture`'s inline SVG.
-    The text stands inside a fenced block, so a raw run of backticks or tildes
-    could end it: each is written as `\\uXXXX`, every other character as
-    `toml_string` does. `tomllib.loads` reads it back to `value` unchanged."""
-    escaped = "".join(_multiline_escape(char) for char in value)
-    return f'"""\n{escaped}"""'
-
-
-def _multiline_escape(char: str) -> str:
-    if char in _FENCE_CHARACTERS:
-        return f"\\u{ord(char):04X}"
-    return char if char in _TOML_MULTILINE_LITERALS else _toml_string_escape(char)
-
-
-def _toml_string_escape(char: str) -> str:
-    if char in _TOML_STRING_ESCAPES:
-        return _TOML_STRING_ESCAPES[char]
-    if has_control_character(char) or char.splitlines() != [char]:
-        return f"\\u{ord(char):04X}"
-    return char
 
 
 def _toml_string_array(values: tuple[str, ...]) -> str:

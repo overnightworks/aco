@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import cast
 
-from . import protocol
 from .expectation_grammar import NOT_A_LOCAL_DATE
+from .toml_text import toml_string
 
 WAIT_KEY = "wait"
 SINCE_KEY = "since"
@@ -125,11 +125,11 @@ def render_wait(data: Mapping[str, object]) -> list[str]:
         return []
     since = f"{SINCE_KEY} = {wait.since.isoformat()}"
     if isinstance(wait, OperatorWait):
-        kind = f"{OPERATOR_KEY} = {protocol.toml_string(wait.step)}"
+        kind = f"{OPERATOR_KEY} = {toml_string(wait.step)}"
     elif isinstance(wait, UntilWait):
         kind = f"{UNTIL_KEY} = {wait.until.isoformat()}"
     else:
-        kind = f"{TRIGGER_KEY} = {protocol.toml_string(wait.trigger)}"
+        kind = f"{TRIGGER_KEY} = {toml_string(wait.trigger)}"
     return ["", f"{WAIT_KEY} = {{ {kind}, {since} }}"]
 
 
