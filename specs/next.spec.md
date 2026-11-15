@@ -112,7 +112,7 @@ other printable space are text.
 - [ ] [NEXT-34] A NEXT-05 container not the first action reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` in `<title>` escaped in text and `--json`; never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] A `needs-operator` item or container, whether or not it carries a `wait`, is never pulled, cut or checked; `waiting on operator: <labels>` names it (E-NEXT-13, E-NEXT-15).
-- [ ] [NEXT-59] An item whose `wait` still holds is never pulled; `SKIPPED` reads `waiting: <text>`: the `operator` step, the `trigger` or `until <date>`, which holds until today reaches the date. A container whose `wait` holds is likewise never cut or checked, with no `needs-operator` label needed (E-NEXT-15).
+- [ ] [NEXT-59] A `wait` that holds (`operator` step, `trigger`, or `until <date>` up to that date) keeps an item unpulled and a container uncut and unchecked; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
 - [ ] [NEXT-40] `aco next --help` names that label and how to set or remove it: `gh issue edit <n> --add-label/--remove-label`, or `aco item edit <item-id>` under `storage = "state-ref"`.
 - [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut, checked or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
 - [ ] [NEXT-45] `with head: <label> line <k>, …` follows `ideas:` and names each open item's option lines sent back by `rule --unclear` (RULE-22); absent when none; an unreadable body names none (E-NEXT-16).
