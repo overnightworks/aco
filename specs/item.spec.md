@@ -50,6 +50,8 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | `--size` given, valid or invalid | ITEM-20 | — | ITEM-21, ITEM-22, ITEM-49, ITEM-51 | — |
 | `--whole` given, valid or invalid | ITEM-23 | — | ITEM-24, ITEM-49, ITEM-51 | — |
 | `--size`, `--whole` or `--kind` naming the value already set | — | — | ITEM-64 | — |
+| `--repo` names another repository, discovered or not | ITEM-67, ITEM-68 | — | — | — |
+| `--repo` names this checkout's own repository | ITEM-69 | — | — | — |
 | the item's lock is held, or cannot be taken | — | — | ITEM-65 | — |
 | prose piped without a block, or nothing piped, either storage | ITEM-58, ITEM-60 | — | — | — |
 | a piped block a flag agrees with or contradicts, either storage | ITEM-59, ITEM-62 | — | — | — |
@@ -92,6 +94,12 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   writes size = "M" at the block's top level, ahead of [record]
   ```
 - [ ] [ITEM-23] `--whole REASON` writes the item's own top-level `whole` (BODY-60..BODY-62), the same bound `claim`'s own `--whole` enforces; `claim`/`start` read it back when their own call names none (CLM-21).
+
+## `item new` in another repository
+
+- [ ] [ITEM-67] `aco --repo OWNER/NAME item new` naming another repository creates the item in its checkout, found by MCP-19's scan, under its own storage, rules and canonical remote (PIN-57).
+- [ ] [ITEM-68] A `--repo` no discovered repository carries refuses `no repository <OWNER/NAME> found`, exit `2`, under `--json` as ITEM-25's `precondition_failed`, and writes nothing.
+- [ ] [ITEM-69] A `--repo` naming this checkout's own repository (its canonical remote's) creates the item here without any scan, so a checkout outside the configured root works; under `state-ref` PIN-04 refuses it.
 
 ## The body `item new` stores
 
@@ -202,7 +210,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 - `aco item new --scope` never applies CLAIM-25/CLAIM-26's wide-scope gate: a bare directory or four-plus paths write cleanly into the item's own `scope`; only a later `aco claim` on that item enforces width.
 - `aco item new` under `storage = "github"` never adds a `Parent: #<n>` line or a `[record]` table to the piped body: the forge's own sub-issue relation and issue type carry both.
-- `aco item show` never refuses merely for its storage value itself (ITEM-11 covers both); it does resolve the state-ref forge like `item new`/`edit`/`close`, so `--repo` there refuses same as those (PIN-04, PIN-05).
+- `aco item show` never refuses merely for its storage value itself (ITEM-11 covers both); it does resolve the state-ref forge like `item new`/`edit`/`close`, so `--repo` there refuses same as `edit`/`close` (PIN-04, PIN-05); `item new` alone accepts another discovered repository's label (PIN-57).
 - `aco item edit`/`close` never reach ITEM-17's refusal object ahead of PIN-08's own argparse-level check: the item argument is parsed before either command body ever runs.
 
 ## Examples

@@ -16,6 +16,7 @@ from . import (
     cmd_cut,
     decide,
     forge,
+    inbox,
     items,
     protocol,
     report,
@@ -103,6 +104,15 @@ def _refuse_item_body_invalid(defects: tuple[str, ...], *, as_json: bool) -> int
     )
 
 
+def _context_of_item_new(context: RunContext) -> RunContext:
+    """Where `item new` creates its item: this checkout, or, when `--repo` names
+    another repository, that repository's checkout on this machine, found by
+    the discovery the MCP tools use, under its own storage and rules."""
+    if context.repo is None or context.repo.path == context.remote_repository_id.path:
+        return context
+    return inbox.context_in_checkout_of(inbox.discovered(), context.repo.path)
+
+
 def _cmd_item_new(parsed: argparse.Namespace, context: RunContext) -> int:
     """`aco item new`: one fresh item under
     either storage pin, each through its own adapter's write
@@ -112,6 +122,7 @@ def _cmd_item_new(parsed: argparse.Namespace, context: RunContext) -> int:
     shared envelope as `precondition_failed`."""
     as_json = parsed.json
     try:
+        context = _context_of_item_new(context)
         if context.config.storage is body.Storage.GITHUB:
             return _item_new_on_github(parsed, context)
         return _item_new_on_state_ref(parsed, context)
