@@ -30,6 +30,7 @@ from . import (
     session,
     workboard,
 )
+from .progress import Progress, ProgressUnavailable
 
 
 def rows(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[rulings.Row, ...]:
@@ -120,7 +121,7 @@ class Reading:
     rows: tuple[rulings.Row, ...]
     steps: tuple[Step, ...]
     plans: tuple[Plan, ...] = ()
-    progress: progress.Progress | progress.ProgressUnavailable | None = None
+    progress: Progress | ProgressUnavailable | None = None
     """The repository's progress view; `None` unless the read asked for it."""
 
 

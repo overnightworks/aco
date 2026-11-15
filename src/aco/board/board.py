@@ -17,7 +17,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 
-from .. import expectations, inbox, progress, rulings
+from .. import expectations, inbox, rulings
+from ..progress import Progress, ProgressUnavailable
 from .ports import (
     CardChanged,
     CardDecision,
@@ -49,7 +50,7 @@ class RepoSnapshot:
     name: str
     rows: tuple[rulings.Row, ...]
     """This repo's open items with expectation lines, in RUL-03's order."""
-    progress: progress.Progress | progress.ProgressUnavailable | None = None
+    progress: Progress | ProgressUnavailable | None = None
     """This repo's progress view; `None` when the source gave none."""
 
 
