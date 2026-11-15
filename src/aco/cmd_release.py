@@ -577,12 +577,10 @@ def _report_nothing_left_to_release(
     lane: _LandedLane,
     fetched_trunk_ref: Callable[[], str],
 ) -> None:
-    """REL-49/REL-51: a verified landing whose release already
-    happened closes nothing and writes no claim state; it reports that, then
-    its lane's cleanup, which may still be due in this checkout."""
-    worktree = _worktree_cleanup_outcome_text(
-        _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
-    )
+    """REL-49/REL-51: a verified landing whose release already happened closes nothing and writes
+    no claim state; reports that, then its lane's cleanup (none without a local branch, REL-65)."""
+    cleanup = _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
+    worktree = None if cleanup is None else _worktree_cleanup_outcome_text(cleanup)
     if parsed.json:
         report.emit_json(
             True,
@@ -594,7 +592,8 @@ def _report_nothing_left_to_release(
         )
         return
     print(f"LANDED {landing} already; {_NOTHING_LEFT_TO_RELEASE}")
-    print(f"worktree: {worktree}")
+    if worktree is not None:
+        print(f"worktree: {worktree}")
 
 
 def _cleanup_unless_claimed_again(
@@ -602,19 +601,20 @@ def _cleanup_unless_claimed_again(
     context: RunContext,
     lane: _LandedLane,
     fetched_trunk_ref: Callable[[], str],
-) -> checkout.WorktreeCleanupOutcome:
+) -> checkout.WorktreeCleanupOutcome | None:
     """REL-55: the missing claim REL-47 acts on was read before
     the landing's verification; a claim taken meanwhile -- `start` reopening
     the lane on its clean worktree (START-11) -- would lose that worktree to
     this cleanup, so the claim state is read afresh right before it; on a
     foreign branch (REL-59) any claim then on the branch, issue or lane,
-    keeps both. A claim taken between that read and the removal is the
-    accepted residual: the worktree removed is clean and merged, and `start`
-    builds it again."""
+    keeps both. A claim taken after that read is the accepted residual: `start` builds the clean
+    merged worktree again. `None`: no local branch, so no cleanup to report (REL-65)."""
     if not parsed.keep_worktree:
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:
             return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_CLAIMED_AGAIN_REASON)
+        if not checkout.branch_exists(lane.branch):
+            return None
     return _cleanup_landed_worktree(parsed, lane, context, fetched_trunk_ref)
 
 

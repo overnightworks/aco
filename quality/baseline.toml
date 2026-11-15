@@ -28,10 +28,10 @@
 "tests/support/github_fixtures.py" = 830
 "tests/test_board.py" = 3584
 "tests/test_checkout.py" = 2037
-"tests/test_cli.py" = 12076
+"tests/test_cli.py" = 12074
 "tests/test_cmd_adopt.py" = 1427
 "tests/test_cmd_cut.py" = 1067
-"tests/test_cmd_land_after_merge_rerun.py" = 870
+"tests/test_cmd_land_after_merge_rerun.py" = 862
 "tests/test_cmd_land_preflight_claim.py" = 856
 "tests/test_cmd_release_cleanup.py" = 802
 "tests/test_cmd_rescope_checkout.py" = 1085
@@ -79,7 +79,7 @@
 "test_next_close_names_every_zero_cost_action_regardless_of_rank" = 62
 "test_next_names_a_nested_containers_repair_where_cut_refuses_its_row" = 60
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
-"test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 71
+"test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 62
 "test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 66
 "test_start_mints_a_fresh_id_after_a_merged_release_reopens_the_item" = 60
 
