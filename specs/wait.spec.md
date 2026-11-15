@@ -43,7 +43,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01; every read is fresh from the store, under `state-ref` a new fetch of the state ref.
 - [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too.
 - [ ] [WAIT-09] The command has no timeout and no other end of its own; the session that started it stops it.
-- [ ] [WAIT-10] A forge failure at the start refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, so does a signal file that cannot be read; a transient forge failure on a later read does not end the wait, any other forge failure ends it like a failure at the start:
+- [ ] [WAIT-10] A forge failure at the start refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, so do an unreadable signal file and a later read's forge failure that is not transient:
   - `cannot watch the item's signal at <signal path>: <detail>`, before the item is read
   - a later read that fails transiently prints one `WARNING: the item could not be read, still waiting: <sentence>` to stderr for a run of failed reads; the wait goes on and the next read that answers decides (WAIT-01, WAIT-04)
 - [ ] [WAIT-11] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
