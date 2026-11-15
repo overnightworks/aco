@@ -19,13 +19,13 @@
 "src/aco/cli.py" = 823
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 887
-"src/aco/github.py" = 1445
+"src/aco/github.py" = 1441
 "src/aco/protocol.py" = 1837
 "src/aco/state_board.py" = 923
 "src/aco/store.py" = 1742
 "src/aco/workboard.py" = 2786
 "tests/support/cli_fixtures.py" = 888
-"tests/support/github_fixtures.py" = 809
+"tests/support/github_fixtures.py" = 808
 "tests/test_board.py" = 3582
 "tests/test_checkout.py" = 2037
 "tests/test_cli.py" = 12071

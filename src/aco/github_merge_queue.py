@@ -2,11 +2,12 @@
 queue, where a pull request stands in it, and enqueueing a pull request pinned to its head.
 
 Nothing here merges, retries or waits: every call is one decision for the caller.
-The module never runs `gh`: the adapter hands in the callables that perform and
-parse one round trip, so every round trip stays counted where the adapter counts them.
+The module never runs `gh`: the adapter hands in the callable that performs and
+parses one round trip, so every round trip stays counted where the adapter counts them.
 """
 
 from collections.abc import Callable, Iterable, Mapping
+from datetime import datetime
 from enum import StrEnum
 
 from . import forge, protocol, workboard
@@ -22,7 +23,7 @@ _ENQUEUE_SUBJECT = "enqueue result"
 
 # GraphQL reference: `PullRequest.mergeQueueEntry` is null outside the queue,
 # `RemovedFromMergeQueueEvent.reason` is the removal's own reason. `last: 1` is the
-# latest removal on the timeline.
+# latest event of its type on the timeline.
 _STATE_QUERY = """
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
@@ -30,8 +31,11 @@ query($owner: String!, $name: String!) {
       state
       mergeCommit { oid }
       mergeQueueEntry { id }
-      timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-        nodes { ... on RemovedFromMergeQueueEvent { reason } }
+      removals: timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
+        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
+      }
+      additions: timelineItems(last: 1, itemTypes: [ADDED_TO_MERGE_QUEUE_EVENT]) {
+        nodes { ... on AddedToMergeQueueEvent { createdAt } }
       }
     }
   }
@@ -59,10 +63,9 @@ class _PullRequestState(StrEnum):
     MERGED = "MERGED"
 
 
-# The adapter's one round trip (`GitHubForge._run`) and its tolerant JSON reader
-# (`GitHubForge._json_lines`).
-Run = Callable[[list[str]], str]
-JsonLines = Callable[[str, str], tuple[object, ...]]
+# The adapter's one GraphQL round trip (`GitHubForge._graphql`): query, variables, the `jq`
+# selecting from the answer, and what the answer is called in a refusal.
+Graphql = Callable[[str, Mapping[str, str], str, str], tuple[object, ...]]
 
 
 def _malformed(subject: str) -> forge.ForgeMalformedResponseError:
@@ -111,15 +114,35 @@ def _object(value: object, subject: str) -> Mapping[str, object]:
     return value
 
 
-def _removal_reason(pull_request: Mapping[str, object]) -> str | None:
-    """The reason of the latest queue removal, `None` where the timeline records none
-    or the removal names no reason."""
-    nodes = _object(pull_request.get("timelineItems"), _REMOVAL_SUBJECT).get("nodes")
+def _latest_event(pull_request: Mapping[str, object], alias: str) -> Mapping[str, object] | None:
+    """The one event the timeline read `alias` answers, `None` where it records none."""
+    nodes = _object(pull_request.get(alias), _REMOVAL_SUBJECT).get("nodes")
     if not isinstance(nodes, list) or len(nodes) > 1:
         raise _malformed(_REMOVAL_SUBJECT)
-    if not nodes:
+    return _object(nodes[0], _REMOVAL_SUBJECT) if nodes else None
+
+
+def _created_at(event: Mapping[str, object]) -> datetime:
+    created_at = event.get("createdAt")
+    if not isinstance(created_at, str):
+        raise _malformed(_REMOVAL_SUBJECT)
+    try:
+        return datetime.fromisoformat(created_at)
+    except ValueError as error:
+        raise _malformed(_REMOVAL_SUBJECT) from error
+
+
+def _removal_reason(pull_request: Mapping[str, object]) -> str | None:
+    """The reason of the latest queue removal, `None` where the timeline records none,
+    the removal names no reason, or the pull request was added to the queue again after
+    it: only a removal newer than the latest addition counts."""
+    removal = _latest_event(pull_request, "removals")
+    if removal is None:
         return None
-    reason = _object(nodes[0], _REMOVAL_SUBJECT).get("reason")
+    addition = _latest_event(pull_request, "additions")
+    if addition is not None and _created_at(removal) <= _created_at(addition):
+        return None
+    reason = removal.get("reason")
     if reason is not None and not isinstance(reason, str):
         raise _malformed(_REMOVAL_SUBJECT)
     return reason
@@ -146,17 +169,13 @@ def _queue_state(pull_request: object) -> forge.MergeQueueState:
 class MergeQueue:
     """The merge queue of one repository's pull requests."""
 
-    def __init__(self, repository: forge.RepositoryId, run: Run, json_lines: JsonLines) -> None:
+    def __init__(self, repository: forge.RepositoryId, graphql: Graphql) -> None:
         self._repository = repository
-        self._run = run
-        self._json_lines = json_lines
+        self._round_trip = graphql
 
     def _graphql(self, query: str, variables: Mapping[str, str], jq: str, subject: str) -> object:
         """The one JSON value `jq` selects from `query`'s answer."""
-        arguments = ["api", "graphql", "-f", f"query={query}"]
-        for name, value in variables.items():
-            arguments += ["-f", f"{name}={value}"]
-        values = self._json_lines(self._run([*arguments, "--jq", jq]), subject)
+        values = self._round_trip(query, variables, jq, subject)
         if len(values) != 1:
             raise _malformed(subject)
         return values[0]

@@ -362,7 +362,11 @@ def _land_merge_body(
 
 
 def _land_merge_method(
-    pinned: workboard.MergeMethod | None, client: github.GitHubForge, number: int, branch: str
+    pinned: workboard.MergeMethod | None,
+    client: github.GitHubForge,
+    number: int,
+    branch: str,
+    rules: forge.BranchMergeRules,
 ) -> workboard.MergeMethod:
     """The method `aco land` merges pull request `number` into `branch` with: the board
     configuration's own pin, refused where the forge's allowed methods exclude it;
@@ -370,7 +374,7 @@ def _land_merge_method(
     allows a merge commit but no squash -- never a rebase, so a forge allowing no
     method at all, or only a rebase, to an unpinned land refuses."""
     allowed = _land_read(
-        number, "its merge rules", lambda: _forge_allowed_merge_methods(client, number, branch)
+        number, "its merge rules", lambda: _forge_allowed_merge_methods(client, number, rules)
     )
     if pinned is not None and allowed:
         if pinned not in allowed:
@@ -389,7 +393,7 @@ def _land_merge_method(
 
 
 def _forge_allowed_merge_methods(
-    client: github.GitHubForge, number: int, branch: str
+    client: github.GitHubForge, number: int, rules: forge.BranchMergeRules
 ) -> frozenset[workboard.MergeMethod]:
     """Every method the forge allows on `branch`: the repository's own
     settings -- every method where it withholds them from a token without
@@ -403,7 +407,7 @@ def _forge_allowed_merge_methods(
             f"pull request #{number} cannot land: this repository allows neither a merge commit "
             "nor a squash merge"
         )
-    for rule in client.branch_merge_rules(branch):
+    for rule in rules.merge_methods:
         allowed &= rule
     return allowed
 
@@ -683,16 +687,17 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
 
 def _land_queue_standing(
     client: github.GitHubForge, detail: forge.Landing
-) -> forge.MergeQueueState | None:
-    """Where the pull request stands in the merge queue of its target branch, `None` where
-    a direct merge is the way: no `merge_queue` rule applies (LANDCMD-59). The target is
-    read from the pull request, so a closed one reads nothing of the default branch."""
+) -> tuple[forge.BranchMergeRules, forge.MergeQueueState | None]:
+    """The rules on the target branch, read once for the whole run, and where the pull
+    request stands in the branch's merge queue, `None` where a direct merge is the way: no
+    `merge_queue` rule applies (LANDCMD-59). The target is read from the pull request, so a
+    closed one reads nothing of the default branch."""
     number = detail.number
-    if not _land_read(
-        number, "its merge rules", lambda: client.requires_merge_queue(detail.target_branch)
-    ):
-        return None
-    return _land_read(number, "its merge queue state", lambda: client.merge_queue_state(number))
+    rules = _land_read(number, "its merge rules", lambda: client.merge_rules(detail.target_branch))
+    if not rules.requires_merge_queue:
+        return rules, None
+    standing = _land_read(number, "its merge queue state", lambda: client.merge_queue_state(number))
+    return rules, standing
 
 
 def _land_merge_unmerged(
@@ -708,7 +713,7 @@ def _land_merge_unmerged(
     merge commit's own trailer. Returns the pull request, that classification and the
     merge commit."""
     number = detail.number
-    standing = _land_queue_standing(client, detail)
+    rules, standing = _land_queue_standing(client, detail)
     pause = cmd_land_queue.pause_between_queue_reads
     if isinstance(standing, forge.MergedPullRequest | forge.QueuedPullRequest):
         defect = policy.cross_repository_defect(client.repository.path, detail)
@@ -729,7 +734,7 @@ def _land_merge_unmerged(
     checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
     if standing is None:
         method = _land_merge_method(
-            context.config.merge_method, client, number, context.default_branch
+            context.config.merge_method, client, number, context.default_branch, rules
         )
         body = _land_merge_body(
             _land_merge_title(method, detail),

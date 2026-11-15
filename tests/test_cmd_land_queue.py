@@ -65,6 +65,7 @@ class QueueCase:
     enqueues: int = 1
     pauses: int = 2
     direct_merges: int = 0
+    rule_reads: int = 1
 
 
 @dataclass
@@ -124,6 +125,7 @@ def observations(world: QueueWorld, result: CliRun) -> tuple[dict[str, object], 
         "written": tuple(body for _, body in queue.body_writes),
         "enqueued with": queue.enqueue_attempts,
         "direct merges": len(queue.merge_calls),
+        "reads of the branch rules": len(queue.merge_rules_reads),
         "pauses": len(world.pauses),
         "pauses of a minute or more": min(world.pauses, default=MINUTE) >= MINUTE,
     }
@@ -137,6 +139,7 @@ def observations(world: QueueWorld, result: CliRun) -> tuple[dict[str, object], 
         "written": case.written,
         "enqueued with": [(NUMBER, landing.head)] * case.enqueues,
         "direct merges": case.direct_merges,
+        "reads of the branch rules": case.rule_reads,
         "pauses": case.pauses,
         "pauses of a minute or more": True,
     }

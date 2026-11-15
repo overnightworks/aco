@@ -193,6 +193,7 @@ class FakeForge:
     closes_on_merge: bool = False
     allowed_methods: frozenset[MergeMethod] | None = None
     branch_rules: dict[str, tuple[frozenset[MergeMethod], ...]] = field(default_factory=dict)
+    merge_rules_reads: list[str] = field(default_factory=list)
     deleted_branches: list[str] = field(default_factory=list)
     head_board_config: str | None = ""
     file_reads: list[tuple[Path, str]] = field(default_factory=list)
@@ -323,14 +324,12 @@ class FakeForge:
         self._run()
         return self.allowed_methods
 
-    def branch_merge_rules(self, branch: str) -> tuple[frozenset[MergeMethod], ...]:
-        """This fake's mirror of `GitHubForge.branch_merge_rules`:
-        `branch_rules` for `branch`, no rule by default."""
+    def merge_rules(self, branch: str) -> forge.BranchMergeRules:
+        """This fake's mirror of `GitHubForge.merge_rules`: `branch_rules` for `branch`,
+        no rule and no queue by default; every read is recorded in `merge_rules_reads`."""
         self._run()
-        return self.branch_rules.get(branch, ())
-
-    def requires_merge_queue(self, branch: str) -> bool:
-        return False
+        self.merge_rules_reads.append(branch)
+        return forge.BranchMergeRules(False, self.branch_rules.get(branch, ()))
 
     def merge_landing(
         self,
