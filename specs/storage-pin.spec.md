@@ -104,6 +104,7 @@ them.
 - [ ] [PIN-54] A tracked `<path>` may name `production_paths = ["<entry>", ...]`, in `dependency_paths`'s form (PIN-44, PIN-48): a path is production when an entry covers it and no `dependency_paths` entry does.
 - [ ] [PIN-55] A `production_paths` value that is no list of unique strings refuses `board configuration <path> production_paths must be a list of unique repository paths`.
 - [ ] [PIN-56] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> production_paths entry '<entry>' is not a canonical path inside the repository`.
+- [ ] [PIN-57] `item new` alone resolves a `--repo` naming another discovered repository to that checkout, under either storage, so PIN-04 and PIN-53 judge its own remote (ITEM-67).
 
 ## `storage = "state-ref"` is forge-free
 

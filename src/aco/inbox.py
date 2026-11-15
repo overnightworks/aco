@@ -188,6 +188,23 @@ def discovered() -> repositories.Discovery:
     return discovery
 
 
+class RepositoryNotFoundError(protocol.ClaimError):
+    """No repository the scan found carries the label."""
+
+    def __init__(self, label: str) -> None:
+        super().__init__(f"no repository {label} found")
+
+
+def context_in_checkout_of(discovery: repositories.Discovery, label: str) -> session.RunContext:
+    """The run context in the checkout of the repository `label` of `discovery`,
+    with no `--repo` of its own, so the checkout's own remote is the target;
+    refused when `discovery` has no repository of that label."""
+    found = {repository.label: repository for repository in discovery.repositories}
+    if label not in found:
+        raise RepositoryNotFoundError(label)
+    return session.run_context(None).for_directory(found[label].directory)
+
+
 def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbox:
     """What waits on the operator in every repository of `discovery`, the
     repositories read concurrently; one that cannot be read is listed as

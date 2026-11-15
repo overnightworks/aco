@@ -20,7 +20,6 @@ from . import (
     report,
     repositories,
     rulings,
-    session,
     usage,
 )
 from .session import RunContext
@@ -35,11 +34,11 @@ def read_inbox() -> dict[str, object]:
 
 def _context_in(discovery: repositories.Discovery, label: str) -> RunContext:
     """The run context of the repository `label` of `discovery`; refused when
-    it has none of that label."""
-    found = {repository.label: repository for repository in discovery.repositories}
-    if label not in found:
-        raise protocol.ClaimError(f"no repository {label} found; read_inbox lists them")
-    return session.run_context(None).for_directory(found[label].directory)
+    it has none of that label, the refusal pointing at `read_inbox`."""
+    try:
+        return inbox.context_in_checkout_of(discovery, label)
+    except inbox.RepositoryNotFoundError as error:
+        raise protocol.ClaimError(f"{error}; read_inbox lists them") from error
 
 
 def _context_of(label: str) -> RunContext:

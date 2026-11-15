@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from aco_board_fixtures import board_checkout
 from board_forge import BoardForge, item_body
+from cli_fixtures import push_repository_trunk, real_git, track_board_config
 from option_cards import open_option_entry
 
 
@@ -42,3 +43,18 @@ def repository_with_card(directory: Path, item: int, title: str) -> BoardForge:
     checkout = board_checkout(directory)
     checkout.put_item(item, item_body(open_option_entry()), title=title)
     return checkout
+
+
+def discovered_checkout(
+    directory: Path, remote_url: str, bare_remote: Path, board_config: str
+) -> Path:
+    """A real checkout at `directory` whose `origin` is `remote_url`, routed to
+    `bare_remote` for transport, tracking `board_config` with its trunk pushed,
+    so a scan under the root finds it as the repository `remote_url` names."""
+    directory.mkdir(parents=True)
+    real_git(directory, "init", "-q", "-b", "main")
+    real_git(directory, "config", f"url.{bare_remote}.insteadOf", remote_url)
+    real_git(directory, "remote", "add", "origin", remote_url)
+    track_board_config(directory, board_config)
+    push_repository_trunk(directory, "origin")
+    return directory
