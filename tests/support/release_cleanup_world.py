@@ -405,6 +405,53 @@ def rendered(identifier: str, worktree_text: str, case: CleanupCase) -> tuple[ob
     )
 
 
+def assert_initial_state(world: LandedWorld, github_clone: Path, lane: str) -> None:
+    head = world.landing.head
+    observed = {
+        "forge.allowed-methods": world.landing.forge.allowed_methods,
+        "initial.lane.head": real_git(world.lane, "rev-parse", "HEAD").stdout.strip(),
+        "initial.own-section.keys": configuration_keys(github_clone),
+    }
+    expected = {
+        "forge.allowed-methods": frozenset({workboard.MergeMethod.SQUASH}),
+        "initial.lane.head": head,
+        "initial.own-section.keys": Present(OWN_KEYS).format(lane=lane),
+    }
+    assert observed == expected
+
+
+def assert_prepared_state(world: LandedWorld, case: CleanupCase) -> None:
+    observed = {
+        "prepared.landing.merged": world.landing.forge.landings[12].merged,
+        "prepared.merge.methods": tuple(call[2] for call in world.landing.forge.merge_calls),
+    }
+    expected = {
+        "prepared.landing.merged": case.premerge is not None,
+        "prepared.merge.methods": () if case.premerge is None else (case.premerge,),
+    }
+    assert observed == expected
+
+
+def assert_intervention(
+    case: CleanupCase, record: InterventionRecord, values: dict[str, str]
+) -> None:
+    observed = {"intervention.applications": record.applications, **record.snapshot}
+    expected = {
+        "intervention.applications": 1,
+        "intervention.phase": case.phase,
+        "intervention.branch.existed-before": case.existed_before.format(**values),
+        "intervention.branch.tip-after": case.intervention_tip.format(**values),
+        "intervention.branch.parent-after": case.intervention_parent.format(**values),
+        "intervention.config-lock.exists": case.locked,
+        "intervention.configuration.keys": case.intervention_keys.format(**values),
+        "intervention.latin1-description.present": case.latin1,
+        "intervention.lane.status": case.lane_status,
+        "intervention.landing.branch": case.landing_branch.format(**values),
+        "intervention.workplace": (case.workplace.format(**values),) * 2,
+    }
+    assert observed == expected
+
+
 def verify_cleanup(
     case: CleanupCase,
     github_clone: Path,
@@ -416,28 +463,10 @@ def verify_cleanup(
     head = world.landing.head
     lane = "codex/issue-72-claims"
     parent = real_git(github_clone, "rev-parse", f"{head}^").stdout.strip()
-    observed_initial = {
-        "forge.allowed-methods": world.landing.forge.allowed_methods,
-        "initial.lane.head": real_git(world.lane, "rev-parse", "HEAD").stdout.strip(),
-        "initial.own-section.keys": configuration_keys(github_clone),
-    }
-    expected_initial = {
-        "forge.allowed-methods": frozenset({workboard.MergeMethod.SQUASH}),
-        "initial.lane.head": head,
-        "initial.own-section.keys": Present(OWN_KEYS).format(lane=lane),
-    }
-    assert observed_initial == expected_initial
+    assert_initial_state(world, github_clone, lane)
     if case.premerge is not None:
         merge_before_run(world, method=case.premerge)
-    observed_prepared = {
-        "prepared.landing.merged": world.landing.forge.landings[12].merged,
-        "prepared.merge.methods": tuple(call[2] for call in world.landing.forge.merge_calls),
-    }
-    expected_prepared = {
-        "prepared.landing.merged": case.premerge is not None,
-        "prepared.merge.methods": () if case.premerge is None else (case.premerge,),
-    }
-    assert observed_prepared == expected_prepared
+    assert_prepared_state(world, case)
     record = InterventionRecord()
     case.intervention.install(CleanupIntervention(world, monkeypatch, lane, record))
     capsys.readouterr()
@@ -452,30 +481,14 @@ def verify_cleanup(
         "bystander": record.bystander,
         "worktree": str(world.lane),
     }
-    observed_guard = {"intervention.applications": record.applications, **record.snapshot}
-    expected_guard = {
-        "intervention.applications": 1,
-        "intervention.phase": case.phase,
-        "intervention.branch.existed-before": case.existed_before.format(**values),
-        "intervention.branch.tip-after": case.intervention_tip.format(**values),
-        "intervention.branch.parent-after": case.intervention_parent.format(**values),
-        "intervention.config-lock.exists": case.locked,
-        "intervention.configuration.keys": case.intervention_keys.format(**values),
-        "intervention.latin1-description.present": case.latin1,
-        "intervention.lane.status": case.lane_status,
-        "intervention.landing.branch": case.landing_branch.format(**values),
-        "intervention.workplace": (case.workplace.format(**values),) * 2,
-    }
-    assert observed_guard == expected_guard
-    actual_tip = branch_tip(github_clone, lane)
-    keys = configuration_keys(github_clone)
+    assert_intervention(case, record, values)
     observed = {
         "exit": result.status,
         "stdout": result.stdout,
         "stderr": result.stderr,
         "lane.worktree.exists": world.lane.exists(),
-        "lane.branch": actual_tip,
-        "configuration.keys": keys,
+        "lane.branch": branch_tip(github_clone, lane),
+        "configuration.keys": configuration_keys(github_clone),
         "configuration.own-section.keys": own_section_keys(github_clone, lane),
         "launch.argv": record.launches,
     }
