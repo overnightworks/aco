@@ -269,18 +269,18 @@ class _BoardWatch:
             end = self._reread_items(moved) if moved else None
             if end is not None:
                 return end
-            if self._read_due(now, self._schedule):
+            if self._read_due(now, self._schedule.retry_after):
                 return self._read(now)
             probed, moved = probed or bool(moved), []
-        owed = bool(moved) or self._read_due(now, replace(self._schedule, retry_after=0.0))
+        owed = bool(moved) or self._read_due(now, retry_after=0.0)
         if probed and not owed:
             self._failing = False
         return None
 
-    def _read_due(self, now: float, schedule: Schedule) -> bool:
+    def _read_due(self, now: float, retry_after: float) -> bool:
         return read_due(
             now,
-            schedule,
+            Schedule(self._schedule.last_probe, self._schedule.last_read, retry_after),
             pending=self._pending,
             today=self._context.today(),
             earliest_until=self._until,
