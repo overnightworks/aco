@@ -550,21 +550,21 @@ merged: <sha>
 exit 0
 ```
 
-### E-LANDCMD-18a — a rerun after a completed release finishes, naming where the lane lives
+### E-LANDCMD-18a — a rerun after a completed release finishes
 
 Setup: bare-remote, fake `gh`, pull request `#57` from `ada/issue-42` merged and released by an
-earlier `aco land 57` from this landing clone, which holds no worktree; the lane worktree on
-`ada/issue-42` lives in the original checkout
+earlier `aco land 57` from this landing clone, which holds no worktree and no local `ada/issue-42`;
+the lane worktree lives in the original checkout
 
 ```console
 $ aco land 57
 LANDED pull request #57 already; nothing left to release
-worktree: kept -- no linked worktree on ada/issue-42 in this checkout; run aco release 42 --merged 57 --branch ada/issue-42 in the checkout that holds it
 exit 0
 ```
 
-That `aco release` line, run in the original checkout, prints REL-49's line and `worktree: removed`
-(E-REL-24).
+No `worktree:` line: this checkout has no local branch of the lane, so it has no cleanup to report
+(REL-65). With the branch here but no linked worktree, the rerun prints REL-30's `worktree: kept --
+no linked worktree ...` line naming the `aco release` line to run in the checkout that holds it.
 
 ### E-LANDCMD-65 — a queued landing waits for the queue and releases
 

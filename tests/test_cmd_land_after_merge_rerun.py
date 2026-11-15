@@ -39,12 +39,7 @@ class SeparateCase:
     release_command: str = "aco release 72 --merged 12 --branch codex/issue-72-claims"
     keep_arguments: tuple[str, ...] = ()
     land_status: int = 0
-    land_stdout: str = (
-        "LANDED pull request #12 already; nothing left to release\n"
-        "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
-        "run aco release 72 --merged 12 --branch codex/issue-72-claims "
-        "in the checkout that holds it\n"
-    )
+    land_stdout: str = "LANDED pull request #12 already; nothing left to release\n"
     land_stderr: str = ""
     release_status: int = 0
     release_stdout: str = (
@@ -522,10 +517,7 @@ FOREIGN_LANE = SeparateCase(
     branch="dependabot/x",
     body="No-Item: fix",
     release_command="aco release --merged 12 --branch dependabot/x",
-    land_stdout="LANDED pull request #12 already; nothing left to release\n"
-    "worktree: kept -- no linked worktree on dependabot/x in this checkout; "
-    "run aco release --merged 12 --branch dependabot/x "
-    "in the checkout that holds it\n",
+    land_stdout="LANDED pull request #12 already; nothing left to release\n",
 )
 RACE_RELEASE_STDOUT = (
     "LANDED pull request #12 already; nothing left to release\n"

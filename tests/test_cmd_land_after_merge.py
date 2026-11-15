@@ -113,12 +113,7 @@ class PackageCase:
         "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
         "merged: {merged}\n"
     )
-    rerun_stdout: str = (
-        "LANDED pull request #12 already; nothing left to release\n"
-        "worktree: kept -- no linked worktree on codex/issue-72-claims in this checkout; "
-        "run aco release 72 --merged 12 --branch codex/issue-72-claims "
-        "in the checkout that holds it\n"
-    )
+    rerun_stdout: str = "LANDED pull request #12 already; nothing left to release\n"
     arguments: tuple[str, ...] = ("land", "12")
     status: int = 0
     stderr: str = ""

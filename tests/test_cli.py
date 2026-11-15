@@ -7009,17 +7009,24 @@ def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose
 
 
 @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+@pytest.mark.parametrize(
+    ("branch_here", "flags"),
+    [(True, []), (False, []), (False, ["--keep-worktree"])],
+    ids=["branch-here", "no-branch", "no-branch-keep-worktree"],
+)
 def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_rerun(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     as_json: bool,
+    branch_here: bool,
+    flags: list[str],
 ) -> None:
-    """Under `storage = "state-ref"`: a release
-    whose lane worktree lives elsewhere names the line that repeats its
-    cleanup there; run as printed once the claim is gone, it verifies the
-    trunk commit, closes nothing, moves `refs/aco/state` not at all, and
-    reports only the cleanup (REL-47, REL-49, REL-51, REL-52)."""
+    """Under `storage = "state-ref"`: a release whose lane worktree lives elsewhere
+    names the line that repeats its cleanup there; run as printed once the claim is
+    gone, it verifies the trunk commit, closes nothing, moves `refs/aco/state` not at
+    all, and reports only the cleanup, none without a local branch
+    (REL-47, REL-49, REL-51, REL-52, REL-65)."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
     sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     branch = "codex/issue-10-claims"
@@ -7028,17 +7035,15 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
         f"kept -- no linked worktree on {branch} in this checkout; "
         f"run {rerun} in the checkout that holds it"
     )
-    assert (
-        issue_claim.main(
-            ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
-        )
-        == 0
-    )
+    release = ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
+    assert issue_claim.main(release) == 0
     assert capsys.readouterr().out.splitlines()[-1] == f"worktree: {kept}"
     tip_after_release = _state_ref_tip(repo, remote)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    if branch_here:
+        real_git(repo, "branch", branch, "main")
 
-    status = issue_claim.main([*shlex.split(rerun)[1:], *(["--json"] if as_json else [])])
+    status = issue_claim.main([*shlex.split(rerun)[1:], *flags, *(["--json"] if as_json else [])])
 
     output = capsys.readouterr().out
     reported = json.loads(output) if as_json else output
@@ -7051,10 +7056,11 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
             "issue": 10,
             "lane": None,
             "branch": branch,
-            "worktree": kept,
+            "worktree": kept if branch_here else None,
         }
         if as_json
-        else f"LANDED commit {sha} already; nothing left to release\nworktree: {kept}\n",
+        else f"LANDED commit {sha} already; nothing left to release\n"
+        + (f"worktree: {kept}\n" if branch_here else ""),
     )
     assert _state_ref_tip(repo, remote) == tip_after_release
 
@@ -7171,9 +7177,6 @@ def test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_
 
     status = issue_claim.main(rerun)
 
-    printed_rerun = (
-        f"aco release {items.format_item_id(10)} --merged {sha} --branch {landed_branch}"
-    )
     refusals = {
         "codex/issue-10-again": (
             f"ERROR: issue aco-00000a is claimed on 'codex/issue-10-again', not on commit "
@@ -7185,13 +7188,7 @@ def test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_
         ),
     }
     expected = (
-        (
-            0,
-            f"LANDED commit {sha} already; nothing left to release\n"
-            f"worktree: kept -- no linked worktree on {landed_branch} in this checkout; "
-            f"run {printed_rerun} in the checkout that holds it\n",
-            "",
-        )
+        (0, f"LANDED commit {sha} already; nothing left to release\n", "")
         if reclaim_on is None
         else (2, "", refusals[reclaim_on])
     )
