@@ -11,11 +11,12 @@ from cli_fixtures import track_board_config
 from github_fixtures import FakeForge
 from option_cards import card, ruled_card
 
-from aco import body, decide, forge, protocol, workboard
+from aco import body, decide, forge, item_wait, protocol, workboard
 from aco.session import RunContext
 
 NUMBER = 90
 STEP = "Rotate the deploy key."
+TODAY = date(2026, 11, 8)
 
 
 @dataclass
@@ -46,7 +47,7 @@ def _world(
     served.issue_references[NUMBER] = forge.ItemReference(
         state, "Titel", item_body, author_is_member=author_is_member
     )
-    context = searchless(None, build_forge=lambda _context: served, today=lambda: date(2026, 11, 8))
+    context = searchless(None, build_forge=lambda _context: served, today=lambda: TODAY)
     return context, served
 
 
@@ -63,10 +64,35 @@ def test_the_step_replaces_next_and_keeps_every_other_field_and_byte(clone: Path
 
     written = client.item_bodies[NUMBER]
     old, new = body.locate_block(before), body.locate_block(written)
-    assert new.data == {**old.data, "next": STEP}
+    assert new.data == {**old.data, "next": STEP, "wait": {"operator": STEP, "since": TODAY}}
     assert written[: new.content_start] == before[: old.content_start]
     assert written[new.content_end :] == before[old.content_end :]
     assert client.body_replacings == [before]
+
+
+def test_a_repeat_on_a_later_day_keeps_the_day_the_wait_began(clone: Path) -> None:
+    context, client = _world(clone, _stepped_item())
+    _mark(context)
+    client.issue_references[NUMBER] = forge.ItemReference(
+        forge.ItemState.OPEN, "Titel", client.item_bodies[NUMBER], author_is_member=True
+    )
+    context.today = lambda: date(2026, 11, 20)
+
+    _mark(context)
+
+    assert body.parse_body(client.item_bodies[NUMBER]).wait == item_wait.OperatorWait(STEP, TODAY)
+    assert len(client.body_writes) == 1
+
+
+def test_the_step_replaces_a_wait_of_another_kind(clone: Path) -> None:
+    held = _stepped_item().replace(
+        "[[expectation]]", "wait = { until = 2030-01-01, since = 2026-10-01 }\n[[expectation]]", 1
+    )
+    context, client = _world(clone, held)
+
+    _mark(context)
+
+    assert body.parse_body(client.item_bodies[NUMBER]).wait == item_wait.OperatorWait(STEP, TODAY)
 
 
 def test_the_label_is_set_after_the_body_is_written(clone: Path) -> None:

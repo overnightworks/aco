@@ -288,6 +288,7 @@ def build_board(
             config=config,
             repository=client.repository.path,
             now=now,
+            today=context.today(),
             trunk_landings=tuple(landing.committed_at for landing in trunk_landings),
             trunk_landing_items=_trunk_landing_items(trunk_landings),
             children=children,

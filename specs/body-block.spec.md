@@ -31,7 +31,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 | unknown top-level key | BODY-13 | BODY-50 | BODY-52 |
 | `[record]` under `storage = "github"` | BODY-15 | BODY-50 | BODY-52 |
 | `[record]` under `storage = "state-ref"` | BODY-16..BODY-20 | — | — |
-| `frozen_until` defective | BODY-21..BODY-24 | BODY-50 | BODY-52 |
+| `wait` defective | BODY-21..BODY-24, BODY-112, BODY-113 | BODY-50 | BODY-52 |
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
@@ -75,7 +75,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-10] A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
 - [ ] [BODY-11] A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
 - [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
-- [ ] [BODY-13] A top-level key outside `version`, `now`, `next`, `done_when`, `frozen_until`, `scope`, `size`, `whole`, `expectation`, `slice` prints `body malformed: <key>: unknown top-level key <key>`, exit `2`.
+- [ ] [BODY-13] A top-level key outside `version`, `now`, `next`, `done_when`, `wait`, `scope`, `size`, `whole`, `expectation`, `slice` prints `body malformed: <key>: unknown top-level key <key>`, exit `2`.
 - [ ] [BODY-14] A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
 
 ## `[record]`, the state-ref item identity
@@ -87,12 +87,14 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-19] A `[record]` timestamp that is not an RFC 3339 UTC instant prints `body malformed: record.created_at: record.created_at must be an RFC 3339 UTC timestamp`, exit `2`.
 - [ ] [BODY-20] A `[record]` key outside the ten allowed keys prints `body malformed: record.<key>: unknown key record.<key>`, exit `2`.
 
-## `frozen_until`
+## `wait`
 
-- [ ] [BODY-21] A `frozen_until` that is not a table prints `body malformed: frozen_until.trigger: frozen_until must be a table with trigger and ruled_on` on stderr, exit `2`.
-- [ ] [BODY-22] A `frozen_until` whose `trigger` is missing, blank or not a string prints `body malformed: frozen_until.trigger: frozen_until.trigger must be a non-empty string`, exit `2`.
-- [ ] [BODY-23] A `frozen_until` whose `ruled_on` is not a TOML local date prints `body malformed: frozen_until.ruled_on: frozen_until.ruled_on must be a TOML local date`, exit `2`.
-- [ ] [BODY-24] A `frozen_until` key outside `trigger` and `ruled_on` prints `body malformed: frozen_until.<key>: unknown key frozen_until.<key>` on stderr, exit `2`.
+- [ ] [BODY-21] A `wait` that is not a table prints `body malformed: wait: wait must be a table` on stderr, exit `2`.
+- [ ] [BODY-22] A `wait` naming none or more than one of `operator`, `until`, `trigger` prints `body malformed: wait: wait must name exactly one of operator, until, trigger`, exit `2`.
+- [ ] [BODY-23] A `wait.since` that is missing or not a TOML local date prints `body malformed: wait.since: wait.since must be a TOML local date`, exit `2`.
+- [ ] [BODY-24] A `wait` key outside `operator`, `until`, `trigger` and `since` prints `body malformed: wait.<key>: unknown key wait.<key>` on stderr, exit `2`.
+- [ ] [BODY-112] A blank or non-string `wait.operator` or `wait.trigger` prints `body malformed: wait.<key>: wait.<key> must be a non-empty string`, exit `2`.
+- [ ] [BODY-113] A `wait.until` that is not a TOML local date prints `body malformed: wait.until: wait.until must be a TOML local date`, exit `2`.
 
 ## `[[expectation]]`
 

@@ -21,7 +21,8 @@ from typing import TypeGuard, cast
 
 from . import expectation_grammar, protocol
 from .body_fence import walk_fences
-from .expectation_grammar import NOT_A_LOCAL_DATE, block_expectation_defects, render_expectations
+from .expectation_grammar import block_expectation_defects, render_expectations
+from .item_wait import ItemWait, parse_wait, render_wait, wait_defects
 
 # A fresh container carries no automatic parent-provenance the way `cut`
 # gives a fresh child one, so `item new` with nothing piped states the prose
@@ -40,7 +41,7 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "now",
         "next",
         "done_when",
-        "frozen_until",
+        "wait",
         "scope",
         "size",
         "whole",
@@ -222,7 +223,7 @@ class ParsedBody:
     expectation_state: ExpectationState
     expectation_progress: ExpectationProgress
     ruling_date: date | None
-    frozen_trigger: str | None
+    wait: ItemWait | None
     # The block's own top-level `scope = [...]`, exactly the
     # canonical (sorted, deduplicated) tuple `protocol.valid_scope` returns
     # -- the same function a live claim's own scope passes through, so the
@@ -305,36 +306,6 @@ def _block_projection_defects(data: dict[str, object]) -> list[ContractDefect]:
             defects.append(ContractDefect(key, f"{key} is required"))
         elif not isinstance(data[key], str):
             defects.append(ContractDefect(key, f"{key} must be a string"))
-    return defects
-
-
-def _block_frozen_until_defects(data: dict[str, object]) -> list[ContractDefect]:
-    if "frozen_until" not in data:
-        return []
-    value = data["frozen_until"]
-    if not isinstance(value, dict):
-        return [
-            ContractDefect(
-                "frozen_until.trigger", "frozen_until must be a table with trigger and ruled_on"
-            )
-        ]
-    defects: list[ContractDefect] = []
-    trigger = value.get("trigger")
-    if not isinstance(trigger, str) or not trigger.strip():
-        defects.append(
-            ContractDefect(
-                "frozen_until.trigger", "frozen_until.trigger must be a non-empty string"
-            )
-        )
-    ruled_on = value.get("ruled_on")
-    if type(ruled_on) is not date:
-        defects.append(
-            ContractDefect("frozen_until.ruled_on", f"frozen_until.ruled_on {NOT_A_LOCAL_DATE}")
-        )
-    unknown = sorted(set(value) - {"trigger", "ruled_on"})
-    defects.extend(
-        ContractDefect(f"frozen_until.{key}", f"unknown key frozen_until.{key}") for key in unknown
-    )
     return defects
 
 
@@ -560,7 +531,7 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
     if version_defect is not None:
         defects.append(version_defect)
     defects.extend(_block_projection_defects(data))
-    defects.extend(_block_frozen_until_defects(data))
+    defects.extend(ContractDefect(*defect) for defect in wait_defects(data))
     defects.extend(_block_scope_defects(data))
     size_defect = _block_size_defect(data)
     if size_defect is not None:
@@ -596,7 +567,7 @@ def malformed_parsed_body(defects: tuple[ContractDefect, ...]) -> ParsedBody:
         expectation_state=ExpectationState.NONE,
         expectation_progress=ExpectationProgress(0, 0),
         ruling_date=None,
-        frozen_trigger=None,
+        wait=None,
         scope=None,
         slices=(),
         read_state=BodyReadState.MALFORMED,
@@ -638,12 +609,6 @@ def _block_ruling_date(expectations: list[dict[str, object]]) -> date | None:
         if "ruled_on" in entry and type(entry["ruled_on"]) is date
     ]
     return min(ruled_dates) if ruled_dates else None
-
-
-def _block_frozen_trigger(data: dict[str, object]) -> str | None:
-    value = data.get("frozen_until")
-    trigger = value.get("trigger") if isinstance(value, dict) else None
-    return trigger if isinstance(trigger, str) else None
 
 
 def slice_row(entry: Mapping[str, object]) -> SliceRow:
@@ -691,7 +656,7 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
             if expectation_state is ExpectationState.RULED
             else None
         ),
-        frozen_trigger=_block_frozen_trigger(data),
+        wait=parse_wait(data),
         scope=_canonical_scope(data["scope"]) if "scope" in data else None,
         slices=_block_slices(data),
         read_state=BodyReadState.VALID,
@@ -889,18 +854,6 @@ _JsonRows = list[_JsonObject]
 # multi-line twin `protocol.toml_multiline_string`.
 
 
-def _render_frozen_until(data: Mapping[str, object]) -> list[str]:
-    frozen_until = data.get("frozen_until")
-    if not isinstance(frozen_until, dict):
-        return []
-    ruled_on = cast(date, frozen_until["ruled_on"])
-    return [
-        "",
-        f"frozen_until = {{ trigger = {protocol.toml_string(frozen_until['trigger'])}, "
-        f"ruled_on = {ruled_on.isoformat()} }}",
-    ]
-
-
 def _render_scope_array(values: object) -> str:
     """`values`'s scope entries as a canonical TOML array: the one rendering
     `_render_scope` (top-level) and `_render_slices` (per row) both call,
@@ -1001,7 +954,7 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     lines.extend(
         f"{key} = {protocol.toml_string(data[key])}" for key in ("now", "next", "done_when")
     )
-    lines.extend(_render_frozen_until(data))
+    lines.extend(render_wait(data))
     lines.extend(_render_scope(data))
     lines.extend(_render_size(data))
     lines.extend(_render_whole(data))

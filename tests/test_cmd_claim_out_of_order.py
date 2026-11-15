@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import (
-    FROZEN_UNTIL,
+    TRIGGER_WAIT,
     block_dependency,
     blocked_issue,
     board_issue,
@@ -275,7 +275,7 @@ def test_claim_does_not_require_out_of_order_past_a_higher_ranked_labelled_idea(
             board_issue(
                 11,
                 "Highest scored",
-                complete_contract("Claim #11.", scope=TOP_SCOPE, frozen_until=FROZEN_UNTIL),
+                complete_contract("Claim #11.", scope=TOP_SCOPE, wait=TRIGGER_WAIT),
                 labels=("security",),
             ),
             id="frozen",

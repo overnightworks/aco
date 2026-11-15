@@ -88,7 +88,7 @@ _board_item_for_vulture = BoardItem(
     expectation_progress=ExpectationProgress(open=0, total=0),
     ruling_landings=None,
     ruling_old=None,
-    frozen_trigger=None,
+    wait=None,
     open_blockers=(),
     freed_on=None,
     freed_days=None,

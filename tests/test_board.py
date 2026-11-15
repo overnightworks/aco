@@ -13,8 +13,8 @@ from typing import cast
 
 import pytest
 from board_fixtures import (
-    FROZEN_TRIGGER,
-    FROZEN_UNTIL,
+    WAIT_TRIGGER,
+    TRIGGER_WAIT,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
     RULED_ON,
@@ -434,7 +434,7 @@ def _slice_pull_request_body(epic: int) -> str:
 def test_render_block_round_trips_every_field() -> None:
     toml_text = (
         f"{MINIMAL_BLOCK_TOML}"
-        'frozen_until = { trigger = "named trigger", ruled_on = 2026-09-06 }\n'
+        'wait = { trigger = "named trigger", since = 2026-09-06 }\n'
         'scope = ["docs/plan.md", "src/widget.py"]\n'
         '[[expectation]]\ntext = "Deferred"\nruling = "later"\nruled_on = 2026-09-04\n'
         '[[expectation]]\ntext = "Ruled"\nruling = "yes"\nruled_on = 2026-09-05\n'
@@ -718,22 +718,22 @@ def test_a_fresh_unfilled_block_is_an_incomplete_contract_with_no_defects() -> N
             id="incomplete",
         ),
         pytest.param(
-            board_issue(10, "Frozen", complete_contract("Claim #10.", frozen_until=FROZEN_UNTIL)),
+            board_issue(10, "Frozen", complete_contract("Claim #10.", wait=TRIGGER_WAIT)),
             (),
             (),
-            (False, f"frozen: {FROZEN_TRIGGER}"),
+            (False, f"waiting: {WAIT_TRIGGER}"),
             id="frozen",
         ),
         pytest.param(
             board_issue(
                 10,
                 "Frozen and claimed",
-                complete_contract("Claim #10.", frozen_until=FROZEN_UNTIL),
+                complete_contract("Claim #10.", wait=TRIGGER_WAIT),
             ),
             (request(issue=10),),
             (),
-            (False, f"frozen: {FROZEN_TRIGGER}"),
-            id="frozen_takes_priority_over_claimed",
+            (False, f"waiting: {WAIT_TRIGGER}"),
+            id="wait_takes_priority_over_claimed",
         ),
     ],
 )
@@ -800,11 +800,11 @@ def test_board_treats_an_item_with_no_dependency_as_unblocked() -> None:
     assert projected.items[0].actionable_reason is None
 
 
-def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() -> None:
+def test_waiting_item_leaves_actionable_and_frees_when_the_wait_is_removed() -> None:
     frozen = board_issue(
         301,
         "Highest scored",
-        complete_contract("Claim #301.", frozen_until=FROZEN_UNTIL, scope=["src/widget.py"]),
+        complete_contract("Claim #301.", wait=TRIGGER_WAIT, scope=["src/widget.py"]),
     )
     projected_while_frozen = projected_board(
         (frozen,),
@@ -817,8 +817,8 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
     item = projected_while_frozen.items[0]
 
     assert item.actionable is False
-    assert item.actionable_reason == f"frozen: {FROZEN_TRIGGER}"
-    assert item.frozen_trigger == FROZEN_TRIGGER
+    assert item.actionable_reason == f"waiting: {WAIT_TRIGGER}"
+    assert item.wait == WAIT_TRIGGER
     assert item not in projected_while_frozen.ready_now
     assert workboard.highest_scored_actionable(projected_while_frozen) is None
 
@@ -837,10 +837,10 @@ def test_frozen_item_leaves_actionable_and_thaws_when_the_marker_is_removed() ->
 
     assert thawed_item.actionable is True
     assert thawed_item.actionable_reason is None
-    assert thawed_item.frozen_trigger is None
+    assert thawed_item.wait is None
     assert thawed_item in projected_after_thaw.ready_now
     assert workboard.highest_scored_actionable(projected_after_thaw) is thawed_item
-    # The frozen marker alone changes actionability, never the score itself.
+    # The wait alone changes actionability, never the score itself.
     assert item.score == thawed_item.score
 
 
@@ -2091,7 +2091,7 @@ def test_parse_body_orders_schema_defects_deterministically() -> None:
     toml_text = (
         "now = 1\n"
         "unexpected = 1\n"
-        'frozen_until = { trigger = "", ruled_on = "2026-09-06", odd = 1 }\n'
+        'wait = { trigger = "", since = "2026-09-06", odd = 1 }\n'
         "[[expectation]]\n"
         'text = ""\n'
         "[[slice]]\n"
@@ -2107,9 +2107,9 @@ def test_parse_body_orders_schema_defects_deterministically() -> None:
         "now",
         "next",
         "done_when",
-        "frozen_until.trigger",
-        "frozen_until.ruled_on",
-        "frozen_until.odd",
+        "wait.trigger",
+        "wait.since",
+        "wait.odd",
         "expectation[0].text",
         "expectation[0]",
         "slice[0].index",
@@ -2164,7 +2164,7 @@ def test_parse_body_ruling_date_is_the_oldest_across_non_monotonic_expectations(
 @pytest.mark.parametrize(
     ("entry", "field"),
     [
-        pytest.param('frozen_until = "not a table"', "frozen_until.trigger", id="frozen-until"),
+        pytest.param('wait = "not a table"', "wait", id="wait"),
         pytest.param('expectation = ["oops"]', "expectation[0]", id="expectation"),
         pytest.param('slice = ["oops"]', "slice[0]", id="slice"),
     ],
@@ -2800,22 +2800,20 @@ def test_board_treats_a_same_repository_pull_request_dependency_like_any_other()
 
 
 @pytest.mark.parametrize(
-    ("frozen_until", "claims", "dependencies"),
+    ("wait", "claims", "dependencies"),
     [
-        pytest.param(FROZEN_UNTIL, (), (), id="frozen"),
+        pytest.param(TRIGGER_WAIT, (), (), id="waiting"),
         pytest.param(None, (request(issue=10, agent="Grok 4.6"),), (), id="claimed"),
         pytest.param(None, (), (block_dependency(9),), id="blocked"),
     ],
 )
 def test_the_idea_label_alone_decides_over_freeze_claim_and_blocker(
-    frozen_until: dict[str, object] | None,
+    wait: dict[str, object] | None,
     claims: tuple[ClaimRequest, ...],
     dependencies: tuple[workboard.IssueDependency, ...],
 ) -> None:
     wish = "## Wunsch\nMake the board clearer.\n\n"
-    block_entries: dict[str, object] = (
-        {} if frozen_until is None else {"frozen_until": frozen_until}
-    )
+    block_entries: dict[str, object] = {} if wait is None else {"wait": wait}
     idea = board_issue(
         10,
         "Operator idea",

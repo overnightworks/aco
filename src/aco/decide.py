@@ -22,6 +22,7 @@ from . import (
     expectations,
     file_lock,
     forge,
+    item_wait,
     protocol,
     repositories,
     workboard,
@@ -337,7 +338,8 @@ def mark_step(context: RunContext, fresh: FreshItem, step: str) -> None:
     finishes a call whose label failed. Raises `protocol.ClaimError` by name for
     a closed item and one a non-member wrote, before the write."""
     _refuse_an_item_the_inbox_omits(fresh, "step")
-    folded = {**fresh.located.data, "next": step}
+    wait = item_wait.operator_wait_table(step, context.today(), fresh.located.data)
+    folded = {**fresh.located.data, "next": step, item_wait.WAIT_KEY: wait}
     new_body = body.replace_block(fresh.body, fresh.located, folded)
     write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
     _label_as_a_step(context.forge_writer, fresh.number, standing=f"#{fresh.number} holds the step")
@@ -351,6 +353,7 @@ def open_step_item(context: RunContext, title: str, step: str) -> int:
     fields = {
         "now": f"Opened by the step tool on {context.today().isoformat()}.",
         "next": step,
+        item_wait.WAIT_KEY: item_wait.operator_wait_table(step, context.today()),
         "done_when": (
             "The operator has taken the step and the head has removed the label "
             f"{workboard.NEEDS_OPERATOR_LABEL}."
