@@ -654,7 +654,7 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
     observed_children_calls: list[int] = []
     original_list_children = client.list_children
 
-    def spy_list_children(number: int) -> tuple[ChildItem, ...]:
+    def spy_list_children(number: int) -> tuple[object, ...]:
         observed_children_calls.append(number)
         return original_list_children(number)
 

@@ -34,7 +34,7 @@ from board_fixtures import (
 )
 from option_cards import open_option_entry
 
-from aco import body, checkout, expectation_grammar, expectations, protocol, workboard
+from aco import body, checkout, cmd_board, expectation_grammar, expectations, protocol, workboard
 from aco.body import (
     BLOCK_FENCE_INFO,
     BodyReadState,
@@ -968,9 +968,8 @@ def test_board_records_the_latest_closed_dependency(
 
 
 def _payload_items(payload: dict[str, object]) -> list[dict[str, object]]:
-    """`board_payload`'s own `items` array, cast back from the envelope's
-    declared `dict[str, object]` so a test can index one row
-    without every nested key losing its type to `object`."""
+    """`board_payload`'s own `items` array, cast back from the envelope's declared
+    `dict[str, object]` so a test can index one row without losing the nested key types."""
     return cast("list[dict[str, object]]", payload["items"])
 
 
@@ -1002,7 +1001,7 @@ def test_board_reports_when_the_last_stale_dependency_closed() -> None:
         now=datetime(2026, 9, 5, tzinfo=UTC),
     )
 
-    item = _payload_items(workboard.board_payload(projected))[0]
+    item = _payload_items(cmd_board.board_payload(projected))[0]
     assert item["freed_on"] == "2026-09-03"
     assert item["freed_days"] == 2
 
@@ -1028,7 +1027,7 @@ def test_board_json_shows_freed_on_and_freed_days() -> None:
         now=datetime(2026, 9, 5, tzinfo=UTC),
     )
 
-    items = {item["number"]: item for item in _payload_items(workboard.board_payload(projected))}
+    items = {item["number"]: item for item in _payload_items(cmd_board.board_payload(projected))}
     assert items[20]["freed_on"] == "2026-09-03"
     assert items[20]["freed_days"] == 2
     assert items[21]["freed_on"] is None
@@ -1212,7 +1211,7 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
         1, 2, (workboard.ChildItem(121, workboard.ChildState.OPEN, blocked_by=()),)
     )
 
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     child_json = next(item for item in _payload_items(payload) if item["number"] == 121)
     assert container_json["kind"] == "container"
@@ -1222,6 +1221,7 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
         "open_children": [
             {"number": 121, "state": "open", "blocked_by": [], "foreign_blockers": []}
         ],
+        "foreign_children": [],
     }
     assert container_json["container_parent"] is None
     assert child_json["kind"] is None
@@ -1259,7 +1259,7 @@ def test_board_shows_a_container_child_blocked_by_another_open_issue() -> None:
         children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
     )
 
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     assert _as_dict(container_json["container"])["open_children"] == [
         {"number": 121, "state": "open", "blocked_by": [130], "foreign_blockers": []}
@@ -1335,7 +1335,7 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
         dependencies=dependencies,
     )
 
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     open_children = _as_dict(container_json["container"])["open_children"]
 
@@ -1365,7 +1365,7 @@ def test_board_json_carries_a_nonzero_priority_order_for_a_critical_label() -> N
         BoardConfig(priority_labels=("ux", "security")),
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     by_number = {item["number"]: item for item in _payload_items(payload)}
 
     assert by_number[60]["priority_order"] == 1
@@ -1564,7 +1564,7 @@ def test_board_json_reports_uncut_slice_rows(
     )
 
     assert projected.uncut == (workboard.UncutSlices(item, expected_uncut),)
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     assert payload["uncut"] == [{"item": item, "rows": expected_json_rows}]
 
 
@@ -2724,7 +2724,7 @@ def test_board_json_splits_local_and_foreign_blockers() -> None:
         dependencies=dependencies,
     )
 
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     item = next(item for item in _payload_items(payload) if item["number"] == 300)
 
     assert item["open_blockers"] == [3]
@@ -2744,7 +2744,7 @@ def test_board_json_carries_an_empty_foreign_blockers_list_without_a_foreign_dep
         now=datetime(2026, 8, 21, tzinfo=UTC),
     )
 
-    payload = workboard.board_payload(projected)
+    payload = cmd_board.board_payload(projected)
     item = next(item for item in _payload_items(payload) if item["number"] == 10)
 
     assert item["open_blockers"] == [642]
@@ -3323,7 +3323,7 @@ def test_board_json_carries_an_items_own_size(size: str | None, expected: str | 
         (issue,), (), (), (), BoardConfig(), now=datetime(2026, 8, 21, tzinfo=UTC)
     )
 
-    assert _payload_items(workboard.board_payload(projected))[0]["size"] == expected
+    assert _payload_items(cmd_board.board_payload(projected))[0]["size"] == expected
 
 
 @pytest.mark.parametrize(

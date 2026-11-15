@@ -338,7 +338,7 @@ class BoardForge:
     ) -> tuple[workboard.PullRequest, ...]:
         _unsupported("list_recent_merged_board_pull_requests")
 
-    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
+    def list_children(self, number: int) -> workboard.ChildList:
         _unsupported("list_children")
 
     def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:

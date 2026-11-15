@@ -82,9 +82,10 @@ from aco.body import (
     prose_above_fresh_block,
     render_block,
 )
+from aco.cmd_board import board_payload
 from aco.protocol import ClaimUnavailableError, MalformedStateTreeError
 from aco.state_board import ItemWriter, StateRefBoard
-from aco.workboard import BlockerState, IssueDependency, IssueReference, board_payload
+from aco.workboard import BlockerState, IssueDependency, IssueReference
 
 REPOSITORY_PATH = "acme/items"
 REPOSITORY = forge.RepositoryId("file", ("acme",), "items")
@@ -210,7 +211,7 @@ CHILD_B_ISSUE = workboard.Issue(
     blocked_by_count=1,
 )
 GITHUB_ISSUES = (CONTAINER_ISSUE, CHILD_A_ISSUE, CHILD_B_ISSUE)
-GITHUB_CHILDREN = {
+GITHUB_CHILDREN: dict[int, workboard.ChildList] = {
     CONTAINER_NUMBER: (
         workboard.ChildItem(CHILD_A_NUMBER, workboard.ChildState.OPEN),
         workboard.ChildItem(CHILD_B_NUMBER, workboard.ChildState.OPEN),
@@ -1256,10 +1257,9 @@ EXPECTED_RULINGS_LINES_BY_STORAGE = {
     Storage.GITHUB: EXPECTED_RULINGS_LINES,
     Storage.STATE_REF: _rulings_lines(_github_fake(), storage=Storage.STATE_REF),
 }
-# `state-ref` projects the identical scenario, never `_EXPECTED_BOARD` itself
-# `replace`d: `item.actionable_reason` is baked
-# in at build time from `config.storage`, exactly like every other field a
-# real `state-ref` pin changes, so reusing the `Storage.GITHUB`-built board
+# `state-ref` projects the identical scenario, never `_EXPECTED_BOARD` itself `replace`d:
+# `item.actionable_reason` is baked in at build time from `config.storage`, exactly like
+# every other field a real `state-ref` pin changes, so reusing the `Storage.GITHUB`-built board
 # for a different storage's own payload would silently keep its stale `#n`
 # blocker text. A fresh `_projected` call under `Storage.STATE_REF` bakes
 # that text correctly; the two payloads otherwise agree apart from the

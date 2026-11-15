@@ -999,15 +999,13 @@ class GitHubForge:
         parent = self.parent_issue(number)
         return None if parent is None else parent.reference.number
 
-    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
+    def list_children(self, number: int) -> workboard.ChildList:
         """Every sub-issue GitHub records under `number`, open or closed.
 
         Every child's state is read here rather than filtered by `--jq`: a
         state this adapter does not understand would otherwise vanish and make
         a parent look childless, which is exactly the landing this check must
-        refuse. A child recorded in another repository is refused outright --
-        `workboard.ChildItem` has no field to hold that fact honestly, and
-        containers and their children are same-repository only, for now.
+        refuse. A child recorded in another repository is a `ForeignChild`.
         """
         raw = self._run(
             [
@@ -1018,15 +1016,14 @@ class GitHubForge:
                 ".[] | {number,repository:.repository_url,state,type:(.type.name // null)}",
             ]
         )
-        children: list[workboard.ChildItem] = []
+        children: list[workboard.ChildItem | workboard.ForeignChild] = []
         for value in self._json_lines(raw, "sub-issue"):
             child = self._issue_reference(value, "sub-issue")
-            if child.repository != self.repository.path:
-                raise forge.ForgeMalformedResponseError(
-                    "GitHub returned a sub-issue from another repository"
-                )
-            state = self._issue_state(value, "sub-issue")
-            children.append(workboard.ChildItem(child.number, workboard.ChildState(state.value)))
+            state = workboard.ChildState(self._issue_state(value, "sub-issue").value)
+            if child.repository == self.repository.path:
+                children.append(workboard.ChildItem(child.number, state))
+            else:
+                children.append(workboard.ForeignChild(child, state))
         return tuple(children)
 
     def default_branch(self) -> str:

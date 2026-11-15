@@ -311,7 +311,8 @@ def _parent_requirement(
     remaining = tuple(
         child
         for child in context.client.list_children(parent.reference.number)
-        if child.state is workboard.ChildState.OPEN and child.number != item.number
+        if child.state is workboard.ChildState.OPEN
+        and (isinstance(child, workboard.ForeignChild) or child.number != item.number)
     )
     completion = workboard.parent_completion(parsed_parent)
     if not remaining:

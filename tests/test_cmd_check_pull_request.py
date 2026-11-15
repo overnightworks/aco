@@ -38,6 +38,7 @@ README_LISTING = forge.PullRequestChanges(
 class ParentWorld:
     text: str
     other_open_children: int = 0
+    foreign_open_children: int = 0
     closed_children: int = 0
     kind: body.ItemKind | None = body.ItemKind.CONTAINER
     repository: str = REPOSITORY
@@ -186,7 +187,7 @@ def parent_of_work_item(parent: ParentWorld | None) -> dict[int, workboard.Paren
     return {WORK_ITEM_ISSUE: workboard.ParentIssue(reference, parent.text, parent.kind)}
 
 
-def children_of_parent(parent: ParentWorld | None) -> dict[int, tuple[workboard.ChildItem, ...]]:
+def children_of_parent(parent: ParentWorld | None) -> dict[int, workboard.ChildList]:
     if parent is None:
         return {}
     open_numbers = (WORK_ITEM_ISSUE, *range(73, 73 + parent.other_open_children))
@@ -194,6 +195,12 @@ def children_of_parent(parent: ParentWorld | None) -> dict[int, tuple[workboard.
     return {
         PARENT_ISSUE: (
             *(workboard.ChildItem(number, workboard.ChildState.OPEN) for number in open_numbers),
+            *(
+                workboard.ForeignChild(
+                    workboard.IssueReference("other/repo", number), workboard.ChildState.OPEN
+                )
+                for number in range(954, 954 + parent.foreign_open_children)
+            ),
             *(
                 workboard.ChildItem(number, workboard.ChildState.CLOSED)
                 for number in closed_numbers
@@ -207,7 +214,8 @@ def assert_parent_arranged(forge_world: FakeForge, parent: ParentWorld | None) -
         assert (forge_world.parents, forge_world.children) == ({}, {})
         return
     assert set(forge_world.parents) == {WORK_ITEM_ISSUE}
-    children = forge_world.children.get(PARENT_ISSUE, ())
+    listed = forge_world.children.get(PARENT_ISSUE, ())
+    children = workboard.local_children(listed)
     open_numbers = [child.number for child in children if child.state is workboard.ChildState.OPEN]
     closed_numbers = [
         child.number for child in children if child.state is workboard.ChildState.CLOSED
@@ -216,6 +224,7 @@ def assert_parent_arranged(forge_world: FakeForge, parent: ParentWorld | None) -
     assert len(open_numbers) - 1 == parent.other_open_children
     assert len(closed_numbers) == parent.closed_children
     assert len({*open_numbers, *closed_numbers}) == len(children)
+    assert len(listed) - len(children) == parent.foreign_open_children
 
 
 def written_by(forge_world: FakeForge, clone: Path, remote: Path) -> WriteTrace:
@@ -656,6 +665,9 @@ PARENT_ACCEPTANCES = {
     "other-children-parent-says-what-comes-next": accepted_with_parent(
         WORK_ITEM_BODY, ParentWorld(complete_contract("Dispatch slice 4."), other_open_children=1)
     ),
+    "foreign-child-and-next-names-no-work": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(complete_contract("keiner"), foreign_open_children=1)
+    ),
     "other-child-and-next-names-no-work": accepted_with_parent(
         WORK_ITEM_BODY, ParentWorld(complete_contract("keiner"), other_open_children=1)
     ),
@@ -669,6 +681,11 @@ PARENT_CLOSING_REFUSALS = {
         WORK_ITEM_BODY,
         NO_NEXT_LINE.format(1, "child"),
         ParentWorld(complete_contract("", now="Epic without a next step."), other_open_children=1),
+    ),
+    "foreign-child-and-no-next-line": refused_with_parent(
+        WORK_ITEM_BODY,
+        NO_NEXT_LINE.format(1, "child"),
+        ParentWorld(complete_contract(""), foreign_open_children=1),
     ),
     "two-other-children-and-no-next-line": refused_with_parent(
         WORK_ITEM_BODY,
@@ -760,7 +777,7 @@ PARENT_REFUSALS = {
 def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-21, LAND-22, LAND-23, LAND-25, CHECK-01"""
+    """Spec: LAND-21, LAND-22, LAND-23, LAND-25, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
@@ -768,7 +785,7 @@ def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
 def test_a_landing_that_contradicts_what_its_parent_still_holds_is_refused(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, CHECK-01"""
+    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 

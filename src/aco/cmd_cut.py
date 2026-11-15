@@ -272,7 +272,7 @@ def _adopt_existing_child(
     """
     linked = [
         child
-        for child in client.list_children(container)
+        for child in workboard.local_children(client.list_children(container))
         if client.item_reference(child.number).title == title
     ]
     open_linked = [child.number for child in linked if child.state is workboard.ChildState.OPEN]

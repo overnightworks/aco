@@ -98,7 +98,7 @@ def projected_board(
     today: date | None = None,
     trunk_landings: tuple[datetime, ...] = (),
     trunk_landing_items: tuple[workboard.TrunkLandingItem, ...] = (),
-    children: Mapping[int, tuple[workboard.ChildItem, ...]] = MappingProxyType({}),
+    children: Mapping[int, workboard.ChildList] = (MappingProxyType({})),
     dependencies: Mapping[int, tuple[workboard.IssueDependency, ...]] = MappingProxyType({}),
     open_pull_requests_supported: bool = True,
 ) -> workboard.Board:
@@ -273,12 +273,18 @@ def container_with_children(
     open_children: tuple[int, ...] = (),
     title: str = "Container",
     body: str = "",
-) -> tuple[workboard.Issue, tuple[workboard.ChildItem, ...]]:
+    foreign_open: tuple[workboard.IssueReference, ...] = (),
+) -> tuple[workboard.Issue, workboard.ChildList]:
     """A container whose child-count summary matches its sub-issue list: the
-    `open_children` numbers listed open, then `closed` closed children
-    numbered from 1000."""
+    `open_children` numbers listed open, the `foreign_open` references listed
+    open from another repository, then `closed` closed children numbered
+    from 1000."""
     listed = (
         *(workboard.ChildItem(child, workboard.ChildState.OPEN) for child in open_children),
+        *(
+            workboard.ForeignChild(reference, workboard.ChildState.OPEN)
+            for reference in foreign_open
+        ),
         *(
             workboard.ChildItem(1000 + index, workboard.ChildState.CLOSED)
             for index in range(closed)

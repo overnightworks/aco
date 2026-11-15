@@ -130,7 +130,7 @@ class FakeForge:
     )
     changes_reads: list[int] = field(default_factory=list)
     parents: dict[int, workboard.ParentIssue] = field(default_factory=dict)
-    children: dict[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
+    children: dict[int, workboard.ChildList] = field(default_factory=dict)
     closed_issues: set[int] = field(default_factory=set)
     recently_closed_issues: tuple[forge.ClosedIssue, ...] = ()
     closed_issue_cutoffs: list[datetime] = field(default_factory=list)
@@ -436,7 +436,7 @@ class FakeForge:
         parent = self.parents.get(number)
         return parent.reference.number if parent else None
 
-    def list_children(self, number: int) -> tuple[workboard.ChildItem, ...]:
+    def list_children(self, number: int) -> workboard.ChildList:
         self._run()
         return self.children.get(number, ())
 

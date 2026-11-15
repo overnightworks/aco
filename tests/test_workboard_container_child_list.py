@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import (
+    REPOSITORY,
+    board_issue,
     complete_contract,
     container_with_children,
     projected_board,
@@ -16,7 +18,7 @@ from cli_fixtures import freeze_cli_now, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
 
 from aco import workboard
-from aco.body import Storage
+from aco.body import ItemKind, Storage
 from aco.workboard import BoardConfig, CloseContainerAction, ContainerProgress
 
 CONTAINER = 243
@@ -117,3 +119,80 @@ def test_next_names_a_container_closable_whose_summary_lags_its_closed_children(
         0,
         f"close_container #{CONTAINER}: 2/2 children closed, no Next work",
     )
+
+
+FOREIGN_CHILD = workboard.IssueReference("other/repo", 954)
+
+
+def _foreign_figures(
+    progress: ContainerProgress | None,
+) -> tuple[int, int, tuple[int, ...], tuple[str, ...]]:
+    assert progress is not None
+    return (
+        progress.closed,
+        progress.total,
+        tuple(child.number for child in progress.open_children),
+        tuple(str(reference) for reference in progress.foreign_children),
+    )
+
+
+def test_an_open_child_in_another_repository_counts_but_is_never_listed_as_an_open_child() -> None:
+    """Spec: BOARD-59, BOARD-60"""
+    listed, children = container_with_children(
+        CONTAINER,
+        closed=1,
+        open_children=(244,),
+        foreign_open=(FOREIGN_CHILD,),
+        body=complete_contract("Cut the next slice."),
+    )
+    open_child = board_issue(244, "Open child", complete_contract("Ship it."))
+
+    projected = projected_board(
+        (listed, open_child), (), (), (), BoardConfig(), now=NOW, children={CONTAINER: children}
+    )
+    container_item = next(item for item in projected.items if item.number == CONTAINER)
+    child_item = next(item for item in projected.items if item.number == 244)
+
+    assert (
+        _foreign_figures(container_item.container),
+        child_item.container_parent,
+        [item.number for item in projected.items],
+    ) == ((1, 3, (244,), ("other/repo#954",)), CONTAINER, [CONTAINER, 244])
+
+
+def test_an_open_child_in_another_repository_keeps_its_container_from_closing() -> None:
+    """Spec: BOARD-60"""
+    listed, children = container_with_children(
+        CONTAINER, closed=1, foreign_open=(FOREIGN_CHILD,), body=complete_contract("keiner")
+    )
+
+    projected = projected_board(
+        (listed,), (), (), (), BoardConfig(), now=NOW, children={CONTAINER: children}
+    )
+
+    assert (
+        workboard.zero_cost_closes(projected),
+        isinstance(workboard.next_action(projected), CloseContainerAction),
+    ) == ((), False)
+
+
+@pytest.mark.parametrize(
+    ("foreign_state", "closable"),
+    [(workboard.ChildState.OPEN, None), (workboard.ChildState.CLOSED, CONTAINER)],
+    ids=["open", "closed"],
+)
+def test_a_container_is_named_closable_only_while_no_child_in_another_repository_is_open(
+    foreign_state: workboard.ChildState, closable: int | None
+) -> None:
+    """Spec: BOARD-60"""
+    parent = workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, CONTAINER),
+        complete_contract("keiner"),
+        ItemKind.CONTAINER,
+    )
+    children = (
+        workboard.ChildItem(244, workboard.ChildState.CLOSED),
+        workboard.ForeignChild(FOREIGN_CHILD, foreign_state),
+    )
+
+    assert workboard.closable_container_number(parent, children, Storage.GITHUB) == closable
