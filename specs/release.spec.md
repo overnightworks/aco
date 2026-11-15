@@ -172,7 +172,7 @@ never a commit; `git branch -u` restores it.
 - [ ] [REL-44] A value under `branch.*` in git config that is no UTF-8 never stops the squashed branch's section removal: only key names are read (see E-REL-21).
 - [ ] [REL-26] `--keep-worktree` skips that removal outright: `worktree: kept -- --keep-worktree was given`, worktree and branch both left exactly as found (see E-REL-09).
 - [ ] [REL-27] A release run from inside the lane's own worktree cannot remove its own cwd: `worktree: kept -- release ran from inside it`, and keeps both (see E-REL-10).
-- [ ] [REL-28] A dirty worktree keeps it: `worktree: kept -- dirty`, exit code unaffected (see E-REL-11).
+- [ ] [REL-28] A tracked change or an untracked, not git-ignored file makes the worktree dirty: `worktree: kept -- dirty`, exit code unaffected; a git-ignored file is no dirt (see E-REL-11).
 - [ ] [REL-29] A branch neither provably merged into the default branch nor REL-61's adopted lane on its `base` keeps it: `worktree: kept -- not merged into the default branch` (see E-REL-12).
 - [ ] [REL-30] No linked worktree on that branch here reads `worktree: kept -- no linked worktree on <branch> in this checkout; run <rerun> in the checkout that holds it` (see E-REL-13).
 - [ ] [REL-52] `<rerun>` is `aco release`, the item (none for a lane), `--merged` with the pull request or the verified `<sha>`, `--branch <branch>`; there it meets REL-47 (see E-REL-24).
