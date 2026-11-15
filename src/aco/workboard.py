@@ -39,6 +39,7 @@ from .body import (
     unprintable_slice_line_key,
 )
 from .body_fence import walk_fences
+from .item_wait import active_wait_text
 
 DEFAULT_PRIORITY_LABELS = ("security", "data", "ci", "product", "ux", "cleanup")
 DEFAULT_CANONICAL_REMOTE = "origin"
@@ -552,7 +553,7 @@ class BoardItem:
     expectation_progress: ExpectationProgress
     ruling_landings: int | None
     ruling_old: bool | None
-    frozen_trigger: str | None
+    wait: str | None
     open_blockers: tuple[IssueReference, ...]
     freed_on: datetime | None
     freed_days: int | None
@@ -1474,6 +1475,7 @@ class _BoardBuildContext:
     nesting_parents: Mapping[int, IssueReference]
     repository: str
     unreadable_numbers: frozenset[int]
+    today: date
 
 
 def _board_stage(
@@ -1595,7 +1597,7 @@ def _board_item(
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
-        frozen_trigger=parsed.frozen_trigger,
+        wait=active_wait_text(parsed.wait, context.today),
         active_claim=active_claim,
         open_blockers=open_blockers,
         repository=context.repository,
@@ -1637,7 +1639,7 @@ def _board_item(
         expectation_progress=parsed.expectation_progress,
         ruling_landings=ruling_landings,
         ruling_old=ruling_old,
-        frozen_trigger=parsed.frozen_trigger,
+        wait=actionability.wait,
         open_blockers=open_blockers,
         freed_on=freed_at,
         freed_days=(None if freed_at is None else max(0, (observed_at - freed_at).days)),
@@ -1671,6 +1673,7 @@ class BoardBuildInputs:
     config: BoardConfig
     repository: str
     now: datetime
+    today: date
     trunk_landings: tuple[datetime, ...] = ()
     # Every item a trunk commit's trailer names as landed, `sha` and all: the one
     # source of `landing_rows` and of the items trunk already lands, while
@@ -1711,7 +1714,6 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         )
         for issue in issues
     }
-    contracts = {number: parsed.contract for number, parsed in parsed_bodies.items()}
     blockers: dict[int, tuple[IssueReference, ...]] = {
         issue.number: open_dependency_blockers(
             inputs.dependencies.get(issue.number, ()), repository
@@ -1731,7 +1733,8 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         for child in progress.open_children
     }
     context = _BoardBuildContext(
-        contracts=contracts,
+        contracts={number: parsed.contract for number, parsed in parsed_bodies.items()},
+        today=inputs.today,
         parsed_bodies=parsed_bodies,
         blockers=blockers,
         freed_on={
@@ -2148,17 +2151,15 @@ def closable_container_number(
 
 
 def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
-    """The action a childless container qualifies for, read off its one
-    `childless_verdict`, or `None` to skip it: a non-`VALID` body names its
-    own finding elsewhere and is never guessed through, a
-    `NestedRepairVerdict` names its repair under `SKIPPED` instead of a `cut`
-    that `cut` refuses, a container waiting on the operator is only ever
-    closed, never cut or checked, and an open blocker bars the check
-    (NEXT-47). An idea container is none of these."""
+    """The action a childless container qualifies for, read off its one `childless_verdict`, or
+    `None` to skip it: a non-`VALID` body names its own finding elsewhere and is never guessed
+    through, a `NestedRepairVerdict` names its repair under `SKIPPED`, not a `cut` that `cut`
+    refuses, a container waiting on the operator or on a `wait` is only ever closed, never cut
+    or checked, and an open blocker bars the check (NEXT-47). An idea container is none of these."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
-    if item.waits_on_operator and not isinstance(verdict, CloseVerdict):
+    if (item.waits_on_operator or item.wait is not None) and not isinstance(verdict, CloseVerdict):
         return None
     match verdict:
         case CutVerdict(title=cut_title):
@@ -2459,7 +2460,7 @@ class _ActionabilityFacts:
     beside every other reason instead of a special case at each call site."""
 
     kind: ItemKind | None
-    frozen_trigger: str | None
+    wait: str | None
     active_claim: str | None
     open_blockers: tuple[IssueReference, ...]
     repository: str
@@ -2672,8 +2673,8 @@ def _nested_container_repair(
 
 
 def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
-    if facts.frozen_trigger is not None:
-        return f"frozen: {facts.frozen_trigger}"
+    if facts.wait is not None:
+        return f"waiting: {facts.wait}"
     if facts.active_claim is not None:
         return "claimed"
     if facts.open_blockers:
@@ -2688,20 +2689,17 @@ def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
 
 
 def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
-    """Whether only the operator's ruling frees this item: a readable container
-    labelled `NEEDS_OPERATOR_LABEL` or frozen,
-    which `next` then never cuts or checks, or any other readable item so
-    labelled while unfrozen and unclaimed -- a frozen or claimed one names
-    that reason instead. An idea waits on no ruling: `next` lists it apart."""
+    """Whether only the operator's ruling frees this item: the label
+    `NEEDS_OPERATOR_LABEL` alone decides, on a readable container, which `next`
+    then never cuts or checks, or on any other readable item while unclaimed --
+    a claimed one names that reason instead. A `wait` beside the label changes
+    nothing; without the label it only keeps the item out of ready. An idea
+    waits on no ruling: `next` lists it apart."""
     if facts.idea or facts.read_state is BodyReadState.MALFORMED:
         return False
     if facts.kind is ItemKind.CONTAINER:
-        return facts.labelled_needs_operator or facts.frozen_trigger is not None
-    return (
-        facts.labelled_needs_operator
-        and facts.frozen_trigger is None
-        and facts.active_claim is None
-    )
+        return facts.labelled_needs_operator
+    return facts.labelled_needs_operator and facts.active_claim is None
 
 
 def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
@@ -2714,7 +2712,8 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        if _check_barred(facts.childless_verdict, bool(facts.open_blockers)):
+        blocked = bool(facts.open_blockers)
+        if facts.wait is not None or _check_barred(facts.childless_verdict, blocked):
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason

@@ -17,9 +17,8 @@ from aco import body
             id="BODY-32",
         ),
         pytest.param(
-            'frozen_until = { trigger = "T", ruled_on = "2026-10-01" }\n',
-            "body malformed: frozen_until.ruled_on: "
-            "frozen_until.ruled_on must be a TOML local date",
+            'wait = { trigger = "T", since = "2026-10-01" }\n',
+            "body malformed: wait.since: wait.since must be a TOML local date",
             id="BODY-23",
         ),
     ],

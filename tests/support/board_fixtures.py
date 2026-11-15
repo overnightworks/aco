@@ -95,6 +95,7 @@ def projected_board(
     *,
     repository: str = REPOSITORY,
     now: datetime | None = None,
+    today: date | None = None,
     trunk_landings: tuple[datetime, ...] = (),
     trunk_landing_items: tuple[workboard.TrunkLandingItem, ...] = (),
     children: Mapping[int, tuple[workboard.ChildItem, ...]] = MappingProxyType({}),
@@ -112,6 +113,7 @@ def projected_board(
             config=config,
             repository=repository,
             now=observed_at,
+            today=today or observed_at.date(),
             trunk_landings=trunk_landings,
             trunk_landing_items=trunk_landing_items,
             children=children,
@@ -315,7 +317,7 @@ def complete_contract(
     **block_entries: object,
 ) -> str:
     """A body whose one `aco` block carries every projection key
-    filled, plus whatever `[[expectation]]`/`[[slice]]`/`frozen_until`
+    filled, plus whatever `[[expectation]]`/`[[slice]]`/`wait`
     entries the scenario needs -- serialized by the production writer, so no
     test hand-writes the block's TOML escaping."""
     data: dict[str, object] = {
@@ -336,8 +338,8 @@ def unfilled_block_body(prose: str = "") -> str:
     return prose_above_fresh_block(prose, {})
 
 
-FROZEN_TRIGGER = "eine zweite Maschine bekommt einen Grund"
-FROZEN_UNTIL = {"trigger": FROZEN_TRIGGER, "ruled_on": date(2026, 8, 31)}
+WAIT_TRIGGER = "eine zweite Maschine bekommt einen Grund"
+TRIGGER_WAIT = {"trigger": WAIT_TRIGGER, "since": date(2026, 8, 31)}
 
 
 def ruled_expectation(

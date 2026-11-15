@@ -23,10 +23,10 @@ import pytest
 from board_fixtures import (
     BASE,
     BIDI_AND_ZERO_WIDTH_CONTROLS,
-    FROZEN_TRIGGER,
-    FROZEN_UNTIL,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
+    TRIGGER_WAIT,
+    WAIT_TRIGGER,
     block_body,
     block_dependency,
     blocked_issue,
@@ -468,7 +468,7 @@ def test_board_json_pins_the_raw_envelope_text_for_a_single_item(
         '"done_when": "The work is merged.", "defects": []}, "next_step": "Ship #10.", '
         '"contract_complete": true, "idea": false, "expectation_state": "-", '
         '"expectation_progress": {"open": 0, "total": 0}, "ruling_landings": null, '
-        '"ruling_old": null, "frozen_trigger": null, "freed_on": null, "freed_days": null, '
+        '"ruling_old": null, "wait": null, "freed_on": null, "freed_days": null, '
         '"stage": "text-only", "age_days": 1, "idle_days": 1, "active_claim": null, '
         '"claim_age": null, "claim_old": false, "unblocks_count": 0, "score": -10, '
         '"actionable": true, "actionable_reason": null, "size": null, "has_slices": false, '
@@ -480,7 +480,7 @@ def test_board_json_pins_the_raw_envelope_text_for_a_single_item(
         '"done_when": "The work is merged.", "defects": []}, "next_step": "Ship #10.", '
         '"contract_complete": true, "idea": false, "expectation_state": "-", '
         '"expectation_progress": {"open": 0, "total": 0}, "ruling_landings": null, '
-        '"ruling_old": null, "frozen_trigger": null, "freed_on": null, "freed_days": null, '
+        '"ruling_old": null, "wait": null, "freed_on": null, "freed_days": null, '
         '"stage": "text-only", "age_days": 1, "idle_days": 1, "active_claim": null, '
         '"claim_age": null, "claim_old": false, "unblocks_count": 0, "score": -10, '
         '"actionable": true, "actionable_reason": null, "size": null, "has_slices": false, '
@@ -843,17 +843,17 @@ def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...]
     )
 
 
-# Containers the operator holds -- one labelled with an
-# uncut row, one frozen whose `Next` still names work, one labelled but
-# closable -- beside one pullable item.
+# Containers the operator holds -- one labelled with an uncut row, one labelled with a `wait`, one
+# labelled but closable -- beside one unlabelled with a `wait` and one pullable item.
+_CHECK_WHILE_WAITING = complete_contract("Check it.", wait=TRIGGER_WAIT)
+_HELD_LABELS = (NEEDS_OPERATOR_LABEL,)
 _OPERATOR_HELD_CONTAINERS = (
     _childless_container(
-        441,
-        complete_contract("Cut it.", slice=slice_entries("Scheibe A")),
-        labels=(NEEDS_OPERATOR_LABEL,),
+        441, complete_contract("Cut it.", slice=slice_entries("Scheibe A")), labels=_HELD_LABELS
     ),
-    _childless_container(442, complete_contract("Check it.", frozen_until=FROZEN_UNTIL)),
-    _childless_container(443, complete_contract("keiner"), labels=(NEEDS_OPERATOR_LABEL,)),
+    _childless_container(442, _CHECK_WHILE_WAITING, labels=_HELD_LABELS),
+    _childless_container(443, complete_contract("keiner"), labels=_HELD_LABELS),
+    _childless_container(444, _CHECK_WHILE_WAITING),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
@@ -1020,7 +1020,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
             "Run: aco claim 11 --scope <paths>\n"
             + _SCOPE_UNKNOWN_NOTE_LINE
             + "parallel: unknown (first action names no scope)\nclose: #443\n"
-            + "waiting on operator: #441, #442\n",
+            + f"waiting on operator: #441, #442\n\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
             id="never_cuts_or_checks_a_container_the_operator_holds_but_still_closes_one",
         ),
         pytest.param(
@@ -1037,7 +1037,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
                 "next": "Claim #11.",
                 "command": "aco claim 11 --scope <paths>",
                 "recovery": [],
-                "skipped": [],
+                "skipped": [{"number": 444, "reason": f"waiting: {WAIT_TRIGGER}"}],
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
@@ -4267,9 +4267,7 @@ def test_claim_checks_a_slice_shaped_title_for_its_recorded_parent(
 def test_next_skips_a_frozen_item_and_names_it_as_such(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    frozen = board_issue(
-        301, "Highest scored", complete_contract("Claim #301.", frozen_until=FROZEN_UNTIL)
-    )
+    frozen = board_issue(301, "Highest scored", complete_contract("Claim #301.", wait=TRIGGER_WAIT))
     lower = board_issue(10, "Lower work", complete_contract("Claim #10."))
     client = FakeForge()
     monkeypatch.setattr(client, "list_open_board_issues", lambda: (frozen, lower))
@@ -4285,13 +4283,13 @@ def test_next_skips_a_frozen_item_and_names_it_as_such(
         "Next: Claim #10.\n"
         "Run: aco claim 10 --scope <paths>\n" + _UNKNOWN_SCOPE_NEXT_TAIL + "\n"
         "SKIPPED\n"
-        f"#301: frozen: {FROZEN_TRIGGER}\n"
+        f"#301: waiting: {WAIT_TRIGGER}\n"
     )
 
     assert issue_claim.main(["--repo", REPOSITORY, "next", "--json"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["number"] == 10
-    assert payload["skipped"] == [{"number": 301, "reason": f"frozen: {FROZEN_TRIGGER}"}]
+    assert payload["skipped"] == [{"number": 301, "reason": f"waiting: {WAIT_TRIGGER}"}]
 
 
 def test_board_reads_priority_configuration_from_the_checkout_root(
@@ -4967,7 +4965,7 @@ def _hostile_frozen_board() -> dict[int, str]:
         10: _state_ref_item_body("Workable", scope=["docs/a.md"]),
         42: _state_ref_item_body(
             "Frozen",
-            frozen_until={"trigger": "thaw\x1b]0;pwned\x07", "ruled_on": date(2026, 9, 27)},
+            wait={"trigger": "thaw\x1b]0;pwned\x07", "since": date(2026, 9, 27)},
         ),
     }
 
@@ -4998,7 +4996,7 @@ def hostile_next_board(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         ),
         pytest.param(
             _hostile_frozen_board,
-            f"{items.format_item_id(42)}: frozen: thaw\\x1b]0;pwned\\x07\n",
+            f"{items.format_item_id(42)}: waiting: thaw\\x1b]0;pwned\\x07\n",
             id="frozen-skipped",
         ),
     ],

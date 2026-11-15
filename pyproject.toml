@@ -91,6 +91,7 @@ layers = [
     "workboard",
     "items | expectations",
     "body",
+    "item_wait",
     "expectation_grammar | body_fence | trunk_message",
     "card_rules",
     "usage",

@@ -14,7 +14,7 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1205
+"src/aco/body.py" = 1158
 "src/aco/checkout.py" = 2019
 "src/aco/cli.py" = 823
 "src/aco/cmd_claim.py" = 1132
@@ -23,12 +23,12 @@
 "src/aco/protocol.py" = 1864
 "src/aco/state_board.py" = 923
 "src/aco/store.py" = 1742
-"src/aco/workboard.py" = 2866
+"src/aco/workboard.py" = 2865
 "tests/support/cli_fixtures.py" = 888
 "tests/support/github_fixtures.py" = 830
-"tests/test_board.py" = 3584
+"tests/test_board.py" = 3582
 "tests/test_checkout.py" = 2037
-"tests/test_cli.py" = 12073
+"tests/test_cli.py" = 12071
 "tests/test_cmd_adopt.py" = 1427
 "tests/test_cmd_cut.py" = 1067
 "tests/test_cmd_land_after_merge_rerun.py" = 862
@@ -41,7 +41,7 @@
 "tests/test_store.py" = 5103
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 82
+"build_board" = 80
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84
