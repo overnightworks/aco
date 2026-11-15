@@ -4,9 +4,10 @@ from collections.abc import Mapping
 from datetime import date
 
 import pytest
-from board_fixtures import board_issue, complete_contract, projected_board
+from board_fixtures import board_issue, complete_contract, projected_board, slice_entries
 
 from aco import workboard
+from aco.body import ItemKind
 from aco.workboard import BoardConfig
 
 NUMBER = 301
@@ -64,6 +65,48 @@ def test_the_label_alone_decides_that_a_wait_beside_it_still_waits_on_the_operat
     assert item.waits_on_operator
     assert item.actionable_reason == workboard.WAITING_ON_OPERATOR
     assert item not in board.ready_now
+
+
+@pytest.mark.parametrize(
+    ("wait", "reason"),
+    [
+        pytest.param(
+            {"trigger": "A second machine exists."},
+            "waiting: A second machine exists.",
+            id="trigger",
+        ),
+        pytest.param({"until": date(2026, 12, 1)}, "waiting: until 2026-12-01", id="until"),
+    ],
+)
+@pytest.mark.parametrize(
+    "next_line",
+    [
+        pytest.param("Cut it.", id="uncut-row-would-be-cut"),
+        pytest.param("Check it.", id="no-row-would-be-checked"),
+    ],
+)
+def test_a_container_with_a_wait_and_no_label_is_never_cut_or_checked(
+    wait: Mapping[str, object], reason: str, next_line: str
+) -> None:
+    rows = slice_entries("Scheibe A") if next_line == "Cut it." else []
+    contract = complete_contract(next_line, slice=rows, wait={**wait, "since": date(2026, 11, 1)})
+    issue = workboard.Issue(
+        NUMBER,
+        "Held epic",
+        (),
+        contract,
+        "2026-08-20T00:00:00Z",
+        "2026-08-20T00:00:00Z",
+        kind=ItemKind.CONTAINER,
+        children_closed=1,
+        children_total=1,
+    )
+    board = projected_board((issue,), (), (), (), BoardConfig(), today=date(2026, 11, 15))
+    item = board.items[0]
+
+    assert workboard.next_action(board) is None
+    assert item.actionable_reason == reason
+    assert not item.waits_on_operator
 
 
 @pytest.mark.parametrize(
