@@ -210,7 +210,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 - `aco item new --scope` never applies CLAIM-25/CLAIM-26's wide-scope gate: a bare directory or four-plus paths write cleanly into the item's own `scope`; only a later `aco claim` on that item enforces width.
 - `aco item new` under `storage = "github"` never adds a `Parent: #<n>` line or a `[record]` table to the piped body: the forge's own sub-issue relation and issue type carry both.
-- `aco item show` never refuses merely for its storage value itself (ITEM-11 covers both); it does resolve the state-ref forge like `item new`/`edit`/`close`, so `--repo` there refuses same as those (PIN-04, PIN-05).
+- `aco item show` never refuses merely for its storage value itself (ITEM-11 covers both); it does resolve the state-ref forge like `item new`/`edit`/`close`, so `--repo` there refuses same as `edit`/`close` (PIN-04, PIN-05); `item new` alone accepts another discovered repository's label (PIN-57).
 - `aco item edit`/`close` never reach ITEM-17's refusal object ahead of PIN-08's own argparse-level check: the item argument is parsed before either command body ever runs.
 
 ## Examples
