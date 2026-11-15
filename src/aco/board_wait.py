@@ -373,7 +373,10 @@ class _BoardWatch:
         self._pending = False
         self._failing = False
         self._schedule = Schedule(now, now)
-        return self._read(now) if self._probe_the_forge() else None
+        if not self._probe_the_forge():
+            return None
+        self._pending = True
+        return self._read(now)
 
 
 def wait_for_board(context: RunContext, clock: WaitClock) -> BoardEnd:

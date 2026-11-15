@@ -326,6 +326,51 @@ class TestWaitingOnTheBoard:
         )
         assert ticks.pauses == []
 
+    def test_a_read_for_a_new_blocker_that_fails_is_retried_until_it_answers(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-14, WAIT-18, WAIT-20 -- the read that follows a blocker's first probe
+        stays owed while it fails, though the probes after it find nothing moved."""
+        raw = group_body()
+        client = serve_forge(
+            monkeypatch,
+            UnreadableBoardForge(
+                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+        blocked = blocked_board(closed=False)
+        ask = probe.changed_since
+
+        def the_blocker_is_found_but_the_board_cannot_be_read_again(
+            target: forge.ProbeTarget, token: str | None
+        ) -> forge.ProbeAnswer:
+            if target.number is not None and token is None:
+                client.board_failure = forge.ForgeTransientError(DOWN)
+            return ask(target, token)
+
+        def the_board_gains_a_blocked_item() -> None:
+            client.board_issues = (card_issue(raw), *blocked.board_issues)
+            client.board_dependencies = blocked.board_dependencies
+            probe.change(forge.ProbeTarget(REPOSITORY))
+
+        def the_board_is_readable_and_the_blocker_closed() -> None:
+            client.board_failure = None
+            client.board_dependencies = blocked_board(closed=True).board_dependencies
+
+        monkeypatch.setattr(
+            probe, "changed_since", the_blocker_is_found_but_the_board_cannot_be_read_again
+        )
+        ticks.afterwards[3] = the_board_gains_a_blocked_item
+        ticks.afterwards[130] = the_board_is_readable_and_the_blocker_closed
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stdout) == (0, ACTIONABLE_AFTER_THE_BLOCKER)
+        assert result.stderr == f"{STILL_WAITING}{DOWN}\n"
+        assert 130 <= len(ticks.pauses) <= 130 + POLLS_PER_PROBE
+
     def test_a_ruled_card_whose_item_no_longer_reads_as_one_is_left_to_the_board_read(
         self,
         monkeypatch: pytest.MonkeyPatch,
