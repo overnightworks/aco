@@ -63,10 +63,22 @@ interface WithdrawnEntry {
 
 type Entry = OptionEntry | YesNoEntry | WithdrawnEntry;
 
+/** A container's counts as the forge's summary reports them. */
+export interface ContainerCounts {
+	closed: number;
+	total: number;
+}
+
 export interface Item {
 	number: number;
 	title: string;
 	entries: Entry[];
+	/** Set once the item is a container. */
+	container?: ContainerCounts;
+	/** The item this one is a child of. */
+	parent?: number;
+	/** Whether the item waits on the operator. */
+	waiting?: true;
 }
 
 /** The first arranged item's open cards are asked on this day, each later one a day before. */
@@ -150,4 +162,14 @@ export async function storedLine(number: number, index: number): Promise<Record<
 	const response = await fetch(`${readBoardRuntime().controlUrl}/items/${number}/lines`);
 	const lines = (await response.json()) as Record<string, unknown>[];
 	return lines[index - 1];
+}
+
+/** A container with `closed` of `total` children closed, no card of its own. */
+export function container(
+	number: number,
+	title: string,
+	counts: ContainerCounts,
+	overrides: Partial<Item> = {}
+): Item {
+	return { number, title, entries: [], container: counts, ...overrides };
 }

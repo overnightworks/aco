@@ -56,6 +56,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — |
 | no repository found, at start or on a later read | ABRD-109 | — |
 | a directory under the root that cannot be read | ABRD-110 | — |
+| a repo with open containers, none, or a failed read of a container's parent | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135 | — |
 
 ## Writing a decision
 
@@ -118,7 +119,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-106] A card's meta ends in `Asked DD.MM.YYYY` when its line carries `asked_on`, a card of points its newest point's day; its row shows that day as `DD.MM.`, a Decided row its decision day.
 - [ ] [ABRD-107] On the Open and Decided tabs groups stand by their first row: open before with head, then the newest day, then the higher item; a failed repository with kept cards too, one without cards last.
 - [ ] [ABRD-50] Once the shown card's decision is stored, the stage moves to the list's first open option card, else to its first row; a card selected meanwhile stays (ABRD-32).
-- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n`, `Decided n` and Refresh (ABRD-104); n counts the open rows and the ruled lines.
+- [ ] [ABRD-51] A 56 px header (52 px on phones) holds the brand `Entscheidungs-Board`, the tabs `Open n`, `Decided n`, `Progress` and Refresh (ABRD-104); n counts the open rows and the ruled lines.
 - [ ] [ABRD-125] The tabs are pills; `Open`'s count is an accent badge, quiet at 0. On phones they start left; the brand shows where none do (loading, no access, failure) and yields to the tabs or back header.
 - [ ] [ABRD-126] The selected row carries an accent bar on a light accent ground without hover; every row has one height; a repository's heading keeps the case it is typed in.
 - [ ] [ABRD-127] With no row to list, the list shows one centred state with its check and sentences, no stage beside it; loading a turning ring, still if motion is reduced; no access or no answer a centred warn card.
@@ -177,7 +178,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 ## The JSON API
 
-- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items"}]}`; `items`: RUL-03's rows (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06).
+- [ ] [ABRD-08] `GET /api/board` answers `{"root", "repos": [{"name", "error", "items", "progress"}]}`; `items`: RUL-03's rows (E-ABRD-03); `error`: `null` or a sentence (E-ABRD-06); `progress`: ABRD-131.
 - [ ] [ABRD-09] `POST /api/rule` takes a card (ABRD-77); 200 `{"status", "message"}`, plus `"item"` (ABRD-08's row) once stored, and `"note"` (ABRD-129); else 400 `bad request: decision` (E-ABRD-04, -07, -12..15).
 - [ ] [ABRD-10] Every `/api/` request, any method, needs exactly one `X-Board-Token` header with the board token, else 403 `{"error": "forbidden: missing or wrong token"}` before any forge request (see E-ABRD-05).
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
@@ -199,6 +200,16 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 `fingerprint` last, a yes/no line has none; pictures are SVG text as stored.
+
+## Progress
+
+- [ ] [ABRD-131] Each repo's `progress` lists its top-level containers: `closed` children, `planned` (all children plus uncut `[[slice]]` rows), `open`, `uncut` and `percent`, rounded down (E-ABRD-20).
+- [ ] [ABRD-132] `percent` is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line is the sum of its top-level containers, a container with a parent in any repo has none.
+- [ ] [ABRD-133] `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
+- [ ] [ABRD-134] A failed read of a container's parent leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; the repo's items stay listed (E-ABRD-21).
+- [ ] [ABRD-135] The tab `Progress` lists per repo and per top-level container a bar and `closed/planned · percent %` (`7/48 · 14 %`), open, uncut and waiting counts; an unknown progress shows its sentence.
+
+A closed child counts however it closed, not-planned included. A container whose own state is closed is not listed, so its children are not counted.
 
 ## The SPA shell
 
@@ -250,7 +261,7 @@ request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing
 answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
   {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"},
-  {"index": 2, "text": "Hosts?", "ruling": "no", "ruled_on": "2026-10-01"}]}]}]}
+  {"index": 2, "text": "Hosts?", "ruling": "no", "ruled_on": "2026-10-01"}]}], "progress": {"error": null, "closed": 0, "planned": 0, "open": 0, "uncut": 0, "percent": null, "waiting": 0, "containers": []}}]}
 ```
 
 ### E-ABRD-04 -- a post naming an outcome is refused
@@ -283,11 +294,11 @@ request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing in owner/a, the open-item listing in owner/b
 answer 200: {"root": "<root>", "repos": [
   {"name": "owner/a", "error": null, "items": [{"number": 42, "title": "Share page", "lines": [
-    {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}]},
-  {"name": "owner/b", "error": "no forge adapter for host", "items": []}]}
+    {"index": 1, "text": "Guests?", "ruling": "yes", "ruled_on": "2026-10-01"}]}], "progress": {"error": null, ...}},
+  {"name": "owner/b", "error": "no forge adapter for host", "items": [], "progress": null}]}
 ```
 
-Had `owner/b`'s test-forge listed only an item whose block aco's grammar refuses instead, its entry would read `{"name": "owner/b", "error": null, "items": []}` (ABRD-07).
+Had `owner/b`'s test-forge listed only an item whose block aco's grammar refuses instead, its entry would read `{"name": "owner/b", "error": null, "items": [], "progress": {...}}` (ABRD-07).
 
 Had `owner/a`'s test-forge failed too, the answer would be 502 with the same two-entry `repos[]` envelope (ABRD-20).
 
@@ -476,5 +487,26 @@ Setup: the root holds a checkout of `owner/a` listing item `#42`, and `<root>/br
 request: GET /api/board, header X-Board-Token: <board token>
 answer 200: {"root": "<root>", "repos": [
   {"name": "owner/a", "error": null, "items": [{"number": 42, ...}]},
-  {"name": "<root>/broken", "error": "<git's refusal>", "items": []}]}
+  {"name": "<root>/broken", "error": "<git's refusal>", "items": [], "progress": null}]}
+```
+
+### E-ABRD-20 -- progress per top-level container
+
+Setup: test-forge, open container `#10` titled `Song jump` with 3 children closed of 4 and 2 uncut `[[slice]]` rows, container `#11` with a parent `#10`, and item `#20` labelled `needs-operator`
+
+```text
+request: GET /api/board, header X-Board-Token: <board token>
+forge requests: the open-item listing, the parent of #10, the parent of #11
+answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [], "progress": {
+  "error": null, "closed": 3, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
+  "containers": [{"number": 10, "title": "Song jump", "closed": 3, "planned": 6, "open": 1, "uncut": 2, "percent": 50}]}}]}
+```
+
+### E-ABRD-21 -- a container's parent cannot be read
+
+Setup: test-forge, open container `#10` with 3 children closed of 4, whose parent read fails with `GitHub is down`
+
+```text
+request: GET /api/board, header X-Board-Token: <board token>
+answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [], "progress": {"error": "GitHub is down"}}]}
 ```

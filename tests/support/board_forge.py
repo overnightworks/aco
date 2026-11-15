@@ -31,6 +31,7 @@ _REQUEST_LOG = "board-forge-requests.jsonl"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _ITEM_READ_FAILURE = "item_read_failure"
+_PARENT_READ_FAILURE = "parent_read_failure"
 _WRITE_FAILURE = "write_failure"
 _WRITE_ANSWER = "write_answer"
 _REPLACINGS = "replacings"
@@ -41,6 +42,7 @@ RULING_DAY = date(2026, 10, 3)
 
 class ForgeOperation(StrEnum):
     LIST_OPEN_ISSUES = "list_open_board_issues"
+    READ_PARENT = "parent_issue"
     READ_ITEM = "item_reference"
     WRITE_BODY = "update_item_body"
     CREATE_ISSUE = "create_issue"
@@ -60,6 +62,9 @@ class StoredItem:
     author_is_member: bool = True
     labels: list[str] = field(default_factory=list[str])
     kind: str | None = None
+    children_closed: int | None = None
+    children_total: int | None = None
+    parent: int | None = None
 
 
 type _CheckAnswer = forge.ForgeBodyOverwrittenError | forge.ForgeBodyNotVerifiedError
@@ -72,6 +77,7 @@ class _ForgeState:
     items: dict[int, StoredItem] = field(default_factory=dict[int, StoredItem])
     listing_failure: str | None = None
     item_read_failure: str | None = None
+    parent_read_failure: str | None = None
     write_failure: str | None = None
     write_answer: _CheckAnswer | None = None
     replacings: list[str] = field(default_factory=list[str])
@@ -84,6 +90,7 @@ class _ForgeState:
             {int(number): StoredItem(**item) for number, item in stored[_ITEMS].items()},
             stored[_LISTING_FAILURE],
             stored[_ITEM_READ_FAILURE],
+            stored[_PARENT_READ_FAILURE],
             stored[_WRITE_FAILURE],
             _answer_from_json(stored[_WRITE_ANSWER]),
             stored[_REPLACINGS],
@@ -96,6 +103,7 @@ class _ForgeState:
                 _ITEMS: {number: asdict(item) for number, item in self.items.items()},
                 _LISTING_FAILURE: self.listing_failure,
                 _ITEM_READ_FAILURE: self.item_read_failure,
+                _PARENT_READ_FAILURE: self.parent_read_failure,
                 _WRITE_FAILURE: self.write_failure,
                 _WRITE_ANSWER: _answer_to_json(self.write_answer),
                 _REPLACINGS: self.replacings,
@@ -144,9 +152,24 @@ class BoardForge:
         title: str = "Karte",
         author_is_member: bool = True,
         labels: Iterable[str] = (),
+        kind: ItemKind | None = None,
+        children: tuple[int, int] | None = None,
+        parent: int | None = None,
     ) -> None:
+        """Item `number`; a container's `children` are its (closed, total)
+        counts, and `parent` the item it is a child of."""
         state = self._state()
-        state.items[number] = StoredItem(title, raw_body, author_is_member, list(labels))
+        closed, total = children if children is not None else (None, None)
+        state.items[number] = StoredItem(
+            title,
+            raw_body,
+            author_is_member,
+            list(labels),
+            None if kind is None else kind.value,
+            closed,
+            total,
+            parent,
+        )
         self._replace_state(state)
 
     def replace_items(self, items: Mapping[int, StoredItem]) -> None:
@@ -170,6 +193,12 @@ class BoardForge:
         """Every later read of one item raises a forge failure carrying `message`."""
         state = self._state()
         state.item_read_failure = message
+        self._replace_state(state)
+
+    def fail_parent_reads(self, message: str) -> None:
+        """Every later read of an item's parent raises a forge failure carrying `message`."""
+        state = self._state()
+        state.parent_read_failure = message
         self._replace_state(state)
 
     def close_item(self, number: int) -> None:
@@ -262,6 +291,8 @@ class BoardForge:
                 labels=tuple(item.labels),
                 kind=None if item.kind is None else ItemKind(item.kind),
                 author_is_member=item.author_is_member,
+                children_closed=item.children_closed,
+                children_total=item.children_total,
             )
             for number, item in state.items.items()
             if number not in state.closed
@@ -320,7 +351,16 @@ class BoardForge:
         _unsupported("pull_request_changes")
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
-        _unsupported("parent_issue")
+        self._log(ForgeRequest(ForgeOperation.READ_PARENT, number))
+        state = self._state()
+        if state.parent_read_failure is not None:
+            raise forge.ForgeTransientError(state.parent_read_failure)
+        parent = state.items[number].parent
+        if parent is None:
+            return None
+        return workboard.ParentIssue(
+            workboard.IssueReference(str(self.repository), parent), state.items[parent].body
+        )
 
     def parent_number(self, number: int) -> int | None:
         _unsupported("parent_number")

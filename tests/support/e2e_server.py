@@ -48,7 +48,7 @@ from aco_board_fixtures import (
 )
 from board_forge import BoardForge, StoredItem
 
-from aco import body, expectation_grammar, session
+from aco import body, expectation_grammar, session, workboard
 from aco.board.board import Boards
 from aco.board.cli import discovered_boards
 from aco.board.server import start_board
@@ -90,7 +90,20 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
                 for defect in parsed.contract.defects
             ]
         )
-    return StoredItem(str(arranged["title"]), raw_body)
+    container = arranged.get("container")
+    counts: tuple[int | None, int | None] = (None, None)
+    if isinstance(container, dict):
+        counts = (int(container["closed"]), int(container["total"]))
+    parent = arranged.get("parent")
+    return StoredItem(
+        str(arranged["title"]),
+        raw_body,
+        labels=[workboard.NEEDS_OPERATOR_LABEL] if arranged.get("waiting") else [],
+        kind=body.ItemKind.CONTAINER.value if container is not None else None,
+        children_closed=counts[0],
+        children_total=counts[1],
+        parent=parent if isinstance(parent, int) else None,
+    )
 
 
 def arrange_board(repository: BoardForge, arrangement: Mapping[str, object]) -> None:

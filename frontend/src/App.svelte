@@ -6,7 +6,7 @@
 		stageAfterReturned,
 		firstDecidedKey,
 		firstOpenKey,
-		type ListView,
+		type BoardView,
 		OPEN_TAB_LABEL,
 		SERVER_SILENT_SENTENCE,
 		DECIDED_TAB_LABEL,
@@ -15,9 +15,11 @@
 		lastReadAt,
 		tabCounts
 	} from './app/model/boardSummary';
+	import { PROGRESS_TAB_LABEL } from './app/model/progress';
 	import { BoardStore } from './app/state/board.svelte';
 	import { cardKey } from './app/model/decision';
 	import { DecisionStore } from './app/state/decision.svelte';
+	import ProgressView from './components/ProgressView.svelte';
 	import QuietSign from './components/QuietSign.svelte';
 	import RefreshButton from './components/RefreshButton.svelte';
 	import Stage from './components/Stage.svelte';
@@ -34,7 +36,7 @@
 	let showQuestion = $state(false);
 	let decidedKey: string | null = $state(null);
 	let showDecidedCard = $state(false);
-	let view: ListView = $state('open');
+	let view: BoardView = $state('open');
 	const counts = $derived(tabCounts(board.repos));
 	const hasViews = $derived(board.status === 'ready' && decisions !== null);
 	const cardView = $derived(view === 'open' ? showQuestion : view === 'decided' && showDecidedCard);
@@ -218,6 +220,11 @@
 					aria-current={view === 'decided' ? 'page' : undefined}
 					onclick={openDecided}>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
 				>
+				<button
+					type="button"
+					aria-current={view === 'progress' ? 'page' : undefined}
+					onclick={() => (view = 'progress')}>{PROGRESS_TAB_LABEL}</button
+				>
 			</nav>
 			{#if token !== null}
 				{@const readToken = token}
@@ -265,6 +272,9 @@
 				</div>
 			</div>
 		</div>
+		{#if view === 'progress'}
+			<ProgressView repos={board.repos} />
+		{/if}
 		{#if view === 'decided'}
 			<div class="split" class:show-question={showDecidedCard}>
 				<div class="tracks" bind:this={decidedTracks} tabindex="-1">
