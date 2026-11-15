@@ -14,13 +14,13 @@
 "check_status.check" = 19
 
 [file_lines]
-"src/aco/body.py" = 1156
+"src/aco/body.py" = 1158
 "src/aco/checkout.py" = 2019
-"src/aco/cli.py" = 822
+"src/aco/cli.py" = 823
 "src/aco/cmd_claim.py" = 1132
-"src/aco/cmd_release.py" = 883
+"src/aco/cmd_release.py" = 916
 "src/aco/github.py" = 1448
-"src/aco/protocol.py" = 1837
+"src/aco/protocol.py" = 1864
 "src/aco/state_board.py" = 923
 "src/aco/store.py" = 1742
 "src/aco/workboard.py" = 2865
@@ -32,7 +32,7 @@
 "tests/test_cmd_adopt.py" = 1427
 "tests/test_cmd_cut.py" = 1067
 "tests/test_cmd_land_after_merge_rerun.py" = 862
-"tests/test_cmd_land_preflight_claim.py" = 853
+"tests/test_cmd_land_preflight_claim.py" = 856
 "tests/test_cmd_release_cleanup.py" = 802
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
