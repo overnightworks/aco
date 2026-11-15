@@ -1575,12 +1575,8 @@ def _container_progress(
         replace(item, blocked_by=blockers.get(item.number, ()))
         for item in local_children(open_listed)
     )
-    foreign_children = tuple(
-        child.reference for child in open_listed if isinstance(child, ForeignChild)
-    )
-    return ContainerProgress(
-        len(listed) - len(open_listed), len(listed), open_children, foreign_children
-    )
+    foreign = tuple(child.reference for child in open_listed if isinstance(child, ForeignChild))
+    return ContainerProgress(len(listed) - len(open_listed), len(listed), open_children, foreign)
 
 
 def _completes_container(
