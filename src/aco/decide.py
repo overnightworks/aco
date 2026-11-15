@@ -63,6 +63,14 @@ class FreshItem:
 
 
 @dataclass(frozen=True)
+class HeldItem(FreshItem):
+    """The item `turn` yields: the fresh read and the state directory its lock
+    and its signal live under, which a ruling write passes on as `state`."""
+
+    state_directory: Path
+
+
+@dataclass(frozen=True)
 class Asked:
     """The answer to an ask: the option line the card stands as, and whether
     this call wrote it (False when the same card already stood)."""
@@ -171,12 +179,15 @@ def turn(
     command: str,
     environment: Mapping[str, str],
     home: Path,
-) -> Iterator[FreshItem]:
+) -> Iterator[HeldItem]:
     """The per-item turn: holds the item's lock, reads it fresh through the target
-    gate and yields that read; the caller writes at most once before the turn
-    ends. Not re-entrant."""
+    gate and yields that read with the state directory of the lock; the caller
+    writes at most once before the turn ends. Not re-entrant."""
     with item_lock(context, number, environment=environment, home=home):
-        yield fresh_item(context, number, command=command)
+        fresh = fresh_item(context, number, command=command)
+        yield HeldItem(
+            **vars(fresh), state_directory=repositories.state_directory(environment, home)
+        )
 
 
 def _written_body(current_body: str, line: int, outcome: Outcome, today: date) -> str:

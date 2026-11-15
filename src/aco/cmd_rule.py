@@ -18,7 +18,6 @@ from . import (
     expectations,
     protocol,
     report,
-    repositories,
     workboard,
 )
 from .session import RepoMeaninglessUnderStateRefError, RunContext
@@ -363,7 +362,7 @@ def _rule_expectation_lines(parsed: argparse.Namespace, context: RunContext) -> 
             fresh,
             named,
             context.today(),
-            state=repositories.state_directory(os.environ, Path.home()),
+            state=fresh.state_directory,
         )
     # A successful write names only option lines: every other form refused before it.
     ruled = cast(

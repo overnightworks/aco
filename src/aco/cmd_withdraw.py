@@ -10,7 +10,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import body, decide, expectations, protocol, report, repositories, workboard
+from . import body, decide, expectations, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 # No `--via` and no `--card-hash`: withdrawing decides nothing for the operator.
@@ -105,7 +105,7 @@ def _withdraw_lines(parsed: argparse.Namespace, context: RunContext) -> int:
             fresh,
             indexes,
             today,
-            state=repositories.state_directory(os.environ, Path.home()),
+            state=fresh.state_directory,
         )
     _emit_withdrawn(committed, indexes, today, fresh.storage, as_json=parsed.json)
     return 0

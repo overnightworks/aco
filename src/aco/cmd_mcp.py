@@ -104,7 +104,7 @@ def record_answer(
             fresh,
             [decide.LineOutcome(line, choice)],
             context.today(),
-            state=repositories.state_directory(os.environ, Path.home()),
+            state=fresh.state_directory,
         )
     return {
         "repository": label,
