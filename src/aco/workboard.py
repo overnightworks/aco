@@ -2156,8 +2156,8 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
     own finding elsewhere and is never guessed through, a
     `NestedRepairVerdict` names its repair under `SKIPPED` instead of a `cut`
     that `cut` refuses, a container waiting on the operator or carrying a
-    `wait` that still holds is only ever closed, never cut or checked, and an open blocker bars the check
-    (NEXT-47). An idea container is none of these."""
+    `wait` that still holds is only ever closed, never cut or checked, and an
+    open blocker bars the check (NEXT-47). An idea container is none of these."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
