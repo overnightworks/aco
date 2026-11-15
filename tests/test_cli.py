@@ -852,7 +852,9 @@ _OPERATOR_HELD_CONTAINERS = (
         complete_contract("Cut it.", slice=slice_entries("Scheibe A")),
         labels=(NEEDS_OPERATOR_LABEL,),
     ),
-    _childless_container(442, complete_contract("Check it.", wait=TRIGGER_WAIT)),
+    _childless_container(
+        442, complete_contract("Check it.", wait=TRIGGER_WAIT), labels=(NEEDS_OPERATOR_LABEL,)
+    ),
     _childless_container(443, complete_contract("keiner"), labels=(NEEDS_OPERATOR_LABEL,)),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )

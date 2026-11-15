@@ -2691,16 +2691,17 @@ def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
 
 
 def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
-    """Whether only the operator's ruling frees this item: a readable container
-    labelled `NEEDS_OPERATOR_LABEL` or waiting, which `next` then never cuts or
-    checks, or any other readable item so labelled while not waiting and
-    unclaimed -- a waiting or claimed one names that reason instead. An idea
+    """Whether only the operator's ruling frees this item: the label
+    `NEEDS_OPERATOR_LABEL` alone decides, on a readable container, which `next`
+    then never cuts or checks, or on any other readable item while unclaimed --
+    a claimed one names that reason instead. A `wait` beside the label changes
+    nothing; without the label it only keeps the item out of ready. An idea
     waits on no ruling: `next` lists it apart."""
     if facts.idea or facts.read_state is BodyReadState.MALFORMED:
         return False
     if facts.kind is ItemKind.CONTAINER:
-        return facts.labelled_needs_operator or facts.wait is not None
-    return facts.labelled_needs_operator and facts.wait is None and facts.active_claim is None
+        return facts.labelled_needs_operator
+    return facts.labelled_needs_operator and facts.active_claim is None
 
 
 def _actionable_reason(facts: _ActionabilityFacts) -> str | None:

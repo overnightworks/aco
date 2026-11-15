@@ -41,12 +41,6 @@ def _item(wait: Mapping[str, object], today: date, labels: tuple[str, ...] = ())
             "waiting: until 2026-12-01",
             id="until-in-the-future",
         ),
-        pytest.param(
-            {"operator": STEP, "since": date(2026, 11, 1)},
-            (workboard.NEEDS_OPERATOR_LABEL,),
-            f"waiting: {STEP}",
-            id="operator-wait-beside-the-label",
-        ),
     ],
 )
 def test_a_waiting_item_is_never_ready_and_never_named_first(
@@ -58,6 +52,18 @@ def test_a_waiting_item_is_never_ready_and_never_named_first(
     assert item.wait == reason.removeprefix("waiting: ")
     assert item not in board.ready_now
     assert workboard.highest_scored_actionable(board) is None
+
+
+def test_the_label_alone_decides_that_a_wait_beside_it_still_waits_on_the_operator() -> None:
+    board, item = _item(
+        {"operator": STEP, "since": date(2026, 11, 1)},
+        date(2026, 11, 15),
+        (workboard.NEEDS_OPERATOR_LABEL,),
+    )
+
+    assert item.waits_on_operator
+    assert item.actionable_reason == workboard.WAITING_ON_OPERATOR
+    assert item not in board.ready_now
 
 
 @pytest.mark.parametrize(
