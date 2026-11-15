@@ -122,7 +122,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 
 - [ ] [CLAIM-36] An omitted `--role` makes the record a `builder`, and `aco status` prints `<agent> (builder)`.
 - [ ] [CLAIM-37] A rescope by a different agent refuses `only the original claimant may rescope`, REL-41's route, `(holder='Ada (builder)', this session='Bob (builder)')`, exit `2`.
-- [ ] [CLAIM-38] A release by a different agent or role refuses, exit `2`, naming holder and session, the successor's `aco handover` route before the coordinator override (`specs/release.spec.md` REL-12, REL-41).
+- [ ] [CLAIM-38] A release by a different agent or role refuses, exit `2`, naming holder and session and, for another agent, the `aco handover` route before the override (REL-12, REL-41).
 - [ ] [CLAIM-39] `--coordinator-override` without `--role coordinator` refuses `a coordinator override requires --role coordinator`, exit `2`.
 - [ ] [CLAIM-40] `--coordinator-override --role coordinator` releases a foreign live claim and removes its record, so `aco status` prints `UNCLAIMED issue #42`, exit `0`.
 

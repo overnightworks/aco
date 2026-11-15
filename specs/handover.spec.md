@@ -33,7 +33,7 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 - [ ] [HANDOVER-05] The new holder then lands, releases and rescopes the claim with no override and no `--agent` of the predecessor; the predecessor's next write refuses as a non-holder (see E-HANDOVER-02).
 - [ ] [HANDOVER-06] A `--from` that is not the holder refuses `<label> is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write (see E-HANDOVER-03).
 - [ ] [HANDOVER-07] A session that already holds the claim, with no recorded takeover of the same `--from` and `--reason`, refuses `this session already holds <label>`, exit `2`, before any write.
-- [ ] [HANDOVER-08] An item with no live claim refuses `<label> has no active build claim`, exit `2`, before any write (see E-HANDOVER-03).
+- [ ] [HANDOVER-08] An item with no live claim refuses `issue <label> has no active build claim` (REL-09), exit `2`, before any write (see E-HANDOVER-03).
 - [ ] [HANDOVER-09] A `--reason` that is blank, spans more than one line or exceeds 512 characters refuses `reason must be one bounded non-empty line`, exit `2`, before any read of the item.
 - [ ] [HANDOVER-10] A repeat of a standing takeover (the acting session holds the claim, the item records the same `--from` and `--reason`) prints `ALREADY HANDED OVER <label>: <from> -> <to>`, exit `0`, writing nothing.
 - [ ] [HANDOVER-11] A claim write that fails after the record refuses `<label> records the handover, but the claim was not handed over: <detail>; run the same command again`, exit `2`; the same command finishes it.
@@ -114,7 +114,7 @@ $ aco handover 42 --from 'Someone Else' --reason 'restart order of the operator'
 2> ERROR: #42 is held by 'Claude af547fd1', not by 'Someone Else'; pass the holder as --from
 exit 2
 $ aco handover 43 --from 'Claude af547fd1' --reason 'restart order of the operator'
-2> ERROR: #43 has no active build claim
+2> ERROR: issue #43 has no active build claim
 exit 2
 ```
 
