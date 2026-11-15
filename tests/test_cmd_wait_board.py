@@ -5,6 +5,7 @@ the pause and clock the command takes."""
 import json
 import re
 from collections.abc import Callable
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
@@ -44,7 +45,19 @@ DOWN = "the forge is down"
 STILL_WAITING = "WARNING: the board could not be read, still waiting: "
 
 
-def blocked_board(*, closed: bool) -> FakeForge:
+@dataclass
+class UnreadableBoardForge(FakeForge):
+    """A forge whose board read answers `board_failure` while one is set."""
+
+    board_failure: forge.ForgeError | None = None
+
+    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
+        if self.board_failure is not None:
+            raise self.board_failure
+        return super().list_open_board_issues()
+
+
+def blocked_board(*, closed: bool) -> UnreadableBoardForge:
     """Item 50, blocked by an issue of another repository, closed or not."""
     state = workboard.BlockerState.CLOSED if closed else workboard.BlockerState.OPEN
     closed_at = FROZEN_CLI_NOW if closed else None
@@ -53,7 +66,7 @@ def blocked_board(*, closed: bool) -> FakeForge:
         "Alpha",
         block_dependency(3, repository=FOREIGN, state=state, closed_at=closed_at),
     )
-    return FakeForge(board_issues=(issue,), board_dependencies=dependencies)
+    return UnreadableBoardForge(board_issues=(issue,), board_dependencies=dependencies)
 
 
 def card_issue(raw: str) -> workboard.Issue:
@@ -73,6 +86,14 @@ def _world(monkeypatch: pytest.MonkeyPatch, github_world: Path) -> None:
 @pytest.fixture
 def probe(monkeypatch: pytest.MonkeyPatch) -> FakeBoardProbe:
     return serve_board_probe(monkeypatch, FakeBoardProbe())
+
+
+def rule_through_aco(client: FakeForge, capsys: pytest.CaptureFixture[str]) -> str:
+    """`aco rule` on line 2 of item 7, which the forge then serves as the item's body."""
+    assert run_cli(["rule", str(ITEM), *decide("A", "chat")], capsys).status == 0
+    written = client.body_writes[-1][1]
+    client.issue_references[ITEM] = open_reference(written)
+    return written
 
 
 def close_the_blocker(client: FakeForge, probe: FakeBoardProbe) -> Callable[[], None]:
@@ -130,7 +151,8 @@ class TestWaitingOnTheBoard:
         "as_json", [pytest.param(False, id="text"), pytest.param(True, id="json")]
     )
     @pytest.mark.parametrize(
-        "freed", [pytest.param(False, id="card-alone"), pytest.param(True, id="and-an-item-freed")]
+        "board_down",
+        [pytest.param(False, id="board-readable"), pytest.param(True, id="board-unreadable")],
     )
     def test_a_card_ruled_by_aco_rule_ends_it_at_the_next_signal_poll_naming_the_line(
         self,
@@ -138,41 +160,36 @@ class TestWaitingOnTheBoard:
         capsys: pytest.CaptureFixture[str],
         probe: FakeBoardProbe,
         as_json: bool,
-        freed: bool,
+        board_down: bool,
     ) -> None:
-        """Spec: WAIT-14 to WAIT-17 -- the real write signals; no probe moved; an action named by
-        the same read comes first."""
+        """Spec: WAIT-14 to WAIT-17 -- the real write signals; no probe moved; only the ruled
+        item is read again, so a board that cannot be read does not hold the ruling back."""
         raw = group_body()
         client = serve_forge(
             monkeypatch,
-            FakeForge(
+            UnreadableBoardForge(
                 board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
             ),
         )
         ticks = install(monkeypatch, lambda: 0)
 
         def rule() -> None:
-            assert run_cli(["rule", str(ITEM), *decide("A", "chat")], capsys).status == 0
-            written = client.body_writes[-1][1]
-            client.board_issues = (card_issue(written), *((free_item(),) if freed else ()))
+            if board_down:
+                client.board_failure = forge.ForgeTransientError(DOWN)
+            rule_through_aco(client, capsys)
 
         ticks.afterwards[3] = rule
         result = run_cli(["wait", *(["--json"] if as_json else [])], capsys)
         assert (result.status, result.stderr, len(ticks.pauses)) == (0, "", 3)
         assert probe.tokens == {forge.ProbeTarget(REPOSITORY): "first"}
-        action = f"ACTIONABLE #{BLOCKED}\n" if freed else ""
         if as_json:
             envelope = json.loads(result.stdout)
             line = envelope["lines"][0]
-            assert (envelope["reason"], envelope.get("item")) == (
-                "actionable" if freed else "changed",
-                BLOCKED if freed else None,
-            )
+            assert (envelope["reason"], envelope.get("item")) == ("changed", None)
             assert (line["item"], line["index"]) == (ITEM, 2)
             assert re.fullmatch(r"ruled A \d{4}-\d{2}-\d{2}", line["state"])
         else:
-            assert result.stdout.startswith(action)
-            assert CHANGED_LINE.fullmatch(result.stdout.removeprefix(action))
+            assert CHANGED_LINE.fullmatch(result.stdout)
 
     def test_a_change_the_probes_do_not_see_is_read_at_the_hour(
         self,
@@ -245,6 +262,118 @@ class TestWaitingOnTheBoard:
         assert (result.status, result.stdout) == (0, ACTIONABLE_AFTER_THE_BLOCKER)
         assert len(ticks.pauses) == 10
 
+    def test_a_ruling_during_the_first_read_is_seen_by_the_next_tick(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-17 -- a card ruled after its lines were read but before its signal was
+        first looked at ends the wait with the next tick, not with the hourly read."""
+        raw = group_body()
+        client = serve_forge(
+            monkeypatch,
+            FakeForge(
+                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+        read_board = board_wait.read_board
+
+        def read_then_rule(context: session.RunContext) -> board_wait.BoardReading:
+            reading = read_board(context)
+            monkeypatch.setattr(board_wait, "read_board", read_board)
+            rule_through_aco(client, capsys)
+            return reading
+
+        monkeypatch.setattr(board_wait, "read_board", read_then_rule)
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stderr, len(ticks.pauses)) == (0, "", 1)
+        assert CHANGED_LINE.fullmatch(result.stdout)
+
+    def test_a_blocker_that_closes_before_its_first_probe_wakes_it_at_once(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-14, WAIT-18 -- the token a blocker takes at its first probe is of a
+        blocker the read found open, so a read follows that probe."""
+        client = serve_forge(monkeypatch, blocked_board(closed=False))
+        ticks = install(monkeypatch, lambda: 0)
+        ask = probe.changed_since
+
+        def close_when_first_asked(
+            target: forge.ProbeTarget, token: str | None
+        ) -> forge.ProbeAnswer:
+            if target.number is not None and token is None:
+                client.board_dependencies = blocked_board(closed=True).board_dependencies
+            return ask(target, token)
+
+        monkeypatch.setattr(probe, "changed_since", close_when_first_asked)
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stderr, result.stdout) == (
+            0,
+            "",
+            ACTIONABLE_AFTER_THE_BLOCKER,
+        )
+        assert ticks.pauses == []
+
+    def test_a_ruled_card_whose_item_no_longer_reads_as_one_is_left_to_the_board_read(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-17 -- an item that is not readable as a card is no refusal of the wait;
+        the board read decides."""
+        raw = group_body()
+        client = serve_forge(
+            monkeypatch,
+            FakeForge(
+                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+
+        def rule_and_garble_the_item() -> None:
+            written = rule_through_aco(client, capsys)
+            client.board_issues = (card_issue(written),)
+            client.issue_references[ITEM] = open_reference("no aco block here")
+
+        ticks.afterwards[3] = rule_and_garble_the_item
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stderr, len(ticks.pauses)) == (0, "", 3)
+        assert CHANGED_LINE.fullmatch(result.stdout)
+
+    def test_a_ruled_item_that_is_closed_is_not_reported(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-14 -- a line of an item that is no longer open is not reported."""
+        raw = group_body()
+        client = serve_forge(
+            monkeypatch,
+            FakeForge(
+                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+
+        def rule_and_close() -> None:
+            rule_through_aco(client, capsys)
+            client.issue_references[ITEM] = replace(
+                client.issue_references[ITEM], state=forge.ItemState.CLOSED
+            )
+
+        ticks.afterwards[3] = rule_and_close
+        ticks.afterwards[10] = lambda: setattr(client, "board_issues", (free_item(),))
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stdout) == (0, ACTIONABLE_AFTER_THE_BLOCKER)
+        assert len(ticks.pauses) == POLLS_PER_HOUR
+
 
 class TestFailingWhileItWaits:
     def test_a_transient_failure_is_said_once_per_run_of_failures_and_the_wait_goes_on(
@@ -266,6 +395,57 @@ class TestFailingWhileItWaits:
         result = run_cli(["wait"], capsys)
         assert (result.status, result.stdout) == (0, ACTIONABLE_AFTER_THE_BLOCKER)
         assert result.stderr == f"{STILL_WAITING}{DOWN}\n" * 2
+
+    def test_a_read_that_keeps_failing_while_the_probes_answer_is_said_once(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-20 -- a run of failed reads warns once, though the probes between the
+        retries answer; the read that answers decides."""
+        client = serve_forge(monkeypatch, blocked_board(closed=False))
+        ticks = install(monkeypatch, lambda: 0)
+
+        def the_board_changes_but_cannot_be_read() -> None:
+            client.board_failure = forge.ForgeTransientError(DOWN)
+            probe.change(forge.ProbeTarget(FOREIGN, 3))
+
+        def the_board_is_readable_and_the_blocker_closed() -> None:
+            client.board_failure = None
+            client.board_dependencies = blocked_board(closed=True).board_dependencies
+
+        ticks.afterwards[10] = the_board_changes_but_cannot_be_read
+        ticks.afterwards[130] = the_board_is_readable_and_the_blocker_closed
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stdout) == (0, ACTIONABLE_AFTER_THE_BLOCKER)
+        assert result.stderr == f"{STILL_WAITING}{DOWN}\n"
+
+    def test_a_ruled_item_that_cannot_be_read_is_tried_again_after_the_minute_and_said_once(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-17, WAIT-20 -- the moved signal stays owed through the retry pause."""
+        raw = group_body()
+        client = serve_forge(
+            monkeypatch,
+            FakeForge(
+                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+
+        def rule_while_the_item_cannot_be_read() -> None:
+            rule_through_aco(client, capsys)
+            client.scripted_item_reads = [forge.ForgeTransientError(DOWN)]
+
+        ticks.afterwards[3] = rule_while_the_item_cannot_be_read
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stderr) == (0, f"{STILL_WAITING}{DOWN}\n")
+        assert CHANGED_LINE.fullmatch(result.stdout)
+        assert len(ticks.pauses) == 3 + POLLS_PER_PROBE
 
     def test_a_state_ref_that_cannot_be_reached_is_said_like_a_transient_failure(
         self,

@@ -69,11 +69,14 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 - [ ] [WAIT-15] It prints `ACTIONABLE <label>` for the item `aco next` names, then `CHANGED <label> line <k>: <state>` (the WAIT-01 shape) for each changed line, in board order (see E-WAIT-05, E-WAIT-06).
 - [ ] [WAIT-16] `--json` prints `reason: "actionable"` with `"item": <n>` when an action is named, else `reason: "changed"`, and `"lines": [{"item": <n>, "index": <k>, "state": "<state>"}, …]` (see E-WAIT-05).
   - An `actionable` envelope carries `lines` only when lines changed too; a `changed` one always does (see E-WAIT-06).
-- [ ] [WAIT-17] Every two seconds it looks at the signal (WAIT-12) of each item with a line that waited on the operator at its last read, and reads the board when one moved (see E-WAIT-05).
-  - A ruling through the board, `record_answer` or `aco rule` thus ends it in about two seconds.
+- [ ] [WAIT-17] Every two seconds it looks at the signal (WAIT-12) of each item with a line that waited on the operator at its last read, and reads only that item again when its signal moved (see E-WAIT-05).
+  - A ruling through the board, `record_answer` or `aco rule` thus ends it in about two seconds, with the lines of that item that no longer wait; the board read is not needed and `aco next` is not asked.
+  - A signal is first looked at after the read that found its item, so the item is read once more then: a ruling in between is not lost.
+  - An item that is closed is not reported; one that no longer reads as an item is left to the next board read.
 - [ ] [WAIT-18] Every minute it checks whether the board changed, and reads it when it did:
   - under `storage = "github"`: one conditional request each for the repository's most recently updated issue and for each open blocker in another repository
   - under either storage: a read of the state ref's tip; under `state-ref` it is the only check
+  - an open blocker in another repository that a read found for the first time is read once more after its first probe, for it may have closed in between
 - [ ] [WAIT-19] It reads the board every hour, and on the first tick on or after 00:00 UTC of the earliest `until` date still ahead; the date is compared on each tick and found again after each read.
 - [ ] [WAIT-20] A forge answer "not modified" means unchanged, whatever the exit status of the call; "modified" means changed and its tag is sent back as it came (see E-WAIT-08):
   - a transient forge failure, or a failed read of the state ref's tip, prints one `WARNING: the board could not be read, still waiting: <sentence>` to stderr per run of failures; the wait goes on

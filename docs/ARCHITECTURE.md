@@ -213,11 +213,12 @@ An idle head starts `aco wait` without an item and watches its own board
 (`board_wait.py`); no service stands behind it, because one head waits per
 repository and a service would save no request. The same signal files, one per
 item with a line that waits on the operator, wake it about two seconds after a
-ruling. A cheap check decides when to read the rest: every minute the state
+ruling: only the item whose signal moved is read again. A cheap check decides when
+to read the rest: every minute the state
 ref's tip and, under GitHub storage, one conditional request (`BoardProbe`) for
 the repository's newest updated issue and for each open blocker in another
 repository. A full read runs on a change, every hour and on the day of the
-earliest `until` date. The read alone decides: the command ends when `aco next`
+earliest `until` date. The reads alone decide: the command ends when `aco next`
 would name an action or a line that waited on the operator stopped waiting.
 
 ### Proof strategy

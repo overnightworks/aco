@@ -23,6 +23,10 @@ def reading(
     return board_wait.BoardReading(actionable_item, lines, (), None)
 
 
+def until_on(day: date) -> item_wait.UntilWait:
+    return item_wait.UntilWait(day, TODAY)
+
+
 def ended(end: board_wait.BoardEnd | None) -> tuple[int | None, list[tuple[int, int, str]]] | None:
     """The action and the changed lines' item, index and state of an end, `None` for none."""
     if end is None:
@@ -83,10 +87,10 @@ def test_the_lines_that_wait_are_the_ones_the_reading_marks() -> None:
     ("untils", "expected"),
     [
         pytest.param([], None, id="no-wait"),
-        pytest.param([item_wait.UntilWait(TODAY, TODAY)], None, id="reached-today"),
+        pytest.param([until_on(TODAY)], None, id="reached-today"),
         pytest.param(
-            [item_wait.UntilWait(date(2026, 12, 1), TODAY), item_wait.UntilWait(TOMORROW, TODAY)],
-            TOMORROW,
+            [until_on(date(2026, 12, 1)), until_on(TOMORROW), until_on(TODAY)],
+            until_on(TOMORROW),
             id="the-earliest-still-ahead",
         ),
         pytest.param(
@@ -97,7 +101,7 @@ def test_the_lines_that_wait_are_the_ones_the_reading_marks() -> None:
     ],
 )
 def test_the_earliest_until_is_one_that_lies_after_today(
-    untils: list[item_wait.ItemWait | None], expected: date | None
+    untils: list[item_wait.ItemWait | None], expected: item_wait.UntilWait | None
 ) -> None:
     """Spec: WAIT-19 -- the date a read is due on, recomputed after each read."""
     assert board_wait.earliest_pending_until(untils, TODAY) == expected
@@ -127,10 +131,22 @@ def test_the_forge_is_probed_every_minute(now: float, last_probe: float, due: bo
             2 * HOUR - 1, board_wait.Schedule(0.0, HOUR), False, TODAY, None, False, id="last-read"
         ),
         pytest.param(
-            5.0, board_wait.Schedule(0.0, 0.0), False, TOMORROW, TOMORROW, True, id="until-reached"
+            5.0,
+            board_wait.Schedule(0.0, 0.0),
+            False,
+            TOMORROW,
+            until_on(TOMORROW),
+            True,
+            id="until-reached",
         ),
         pytest.param(
-            5.0, board_wait.Schedule(0.0, 0.0), False, TODAY, TOMORROW, False, id="until-ahead"
+            5.0,
+            board_wait.Schedule(0.0, 0.0),
+            False,
+            TODAY,
+            until_on(TOMORROW),
+            False,
+            id="until-ahead",
         ),
         pytest.param(
             5.0,
@@ -148,7 +164,7 @@ def test_the_board_is_read_when_asked_hourly_or_on_the_until_date(
     schedule: board_wait.Schedule,
     pending: bool,
     today: date,
-    until: date | None,
+    until: item_wait.UntilWait | None,
     due: bool,
 ) -> None:
     """Spec: WAIT-19 -- hourly, on the first tick on or after the date, never in a retry pause."""

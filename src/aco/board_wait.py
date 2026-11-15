@@ -3,12 +3,12 @@ when `aco next` names an action or a line that waited on the operator no longer 
 
 A cheap check only decides when to read: the signal files of items with a waiting line
 (`decide.item_signal_path`), the forge's conditional probes, a `ls-remote` of the state ref,
-the hour and the earliest `until` date. What the read means is `board_read.observed_board`
-and `workboard.next_action`'s alone."""
+the hour and the earliest `until` date; a moved signal rereads that item alone. What the
+board read means is `board_read.observed_board` and `workboard.next_action`'s alone."""
 
 import os
 import sys
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
@@ -27,6 +27,9 @@ from . import (
 )
 from .session import RunContext
 
+# No file time is this, so an item first watched reads as moved and its next tick reads it again:
+# a ruling between the read of its lines and the first look at its signal is then still seen.
+_UNSEEN = -1
 PROBE_SECONDS = 60.0
 FULL_READ_SECONDS = 3600.0
 
@@ -45,12 +48,12 @@ class LineStatus:
 class BoardReading:
     """What one read of the board tells: the item `aco next` names, every line of
     the open items, the foreign blockers still open, and the earliest `until`
-    date still ahead."""
+    wait still ahead."""
 
     actionable_item: int | None
     lines: tuple[LineStatus, ...]
     foreign_blockers: tuple[forge.ProbeTarget, ...]
-    earliest_until: date | None
+    earliest_until: item_wait.UntilWait | None
 
 
 @dataclass(frozen=True)
@@ -116,13 +119,17 @@ def waiting_lines(reading: BoardReading) -> frozenset[tuple[int, int]]:
     return frozenset((line.item, line.index) for line in reading.lines if line.waiting)
 
 
-def earliest_pending_until(waits: Iterable[item_wait.ItemWait | None], today: date) -> date | None:
-    """The earliest `until` date among `waits` that lies after `today`: one that is
-    reached already frees its item in the read that found it."""
+def earliest_pending_until(
+    waits: Iterable[item_wait.ItemWait | None], today: date
+) -> item_wait.UntilWait | None:
+    """The `until` wait among `waits` with the earliest date that `today` has not reached:
+    one that is over already frees its item in the read that found it."""
     pending = [
-        wait.until for wait in waits if isinstance(wait, item_wait.UntilWait) and wait.until > today
+        wait
+        for wait in waits
+        if isinstance(wait, item_wait.UntilWait) and not item_wait.is_over(wait, today)
     ]
-    return min(pending, default=None)
+    return min(pending, key=lambda wait: wait.until, default=None)
 
 
 def probe_due(now: float, schedule: Schedule) -> bool:
@@ -135,13 +142,13 @@ def read_due(
     *,
     pending: bool,
     today: date,
-    earliest_until: date | None,
+    earliest_until: item_wait.UntilWait | None,
 ) -> bool:
     """Whether the board is read now: a signal or probe asked for it, an hour passed since
     the last read, or `today` reached the earliest `until` date. Never before `retry_after`."""
     if now < schedule.retry_after:
         return False
-    until_reached = earliest_until is not None and today >= earliest_until
+    until_reached = earliest_until is not None and item_wait.is_over(earliest_until, today)
     return pending or until_reached or now - schedule.last_read >= FULL_READ_SECONDS
 
 
@@ -152,18 +159,27 @@ def probe_targets(
     return (forge.ProbeTarget(repository), *foreign_blockers)
 
 
-def _line_statuses(
-    issues: Iterable[workboard.Issue], storage: body.Storage
+def _item_line_statuses(
+    number: int, item_body: str, storage: body.Storage
 ) -> tuple[LineStatus, ...]:
     return tuple(
         LineStatus(
-            issue.number,
+            number,
             line.index,
             expectations.expectation_line_state(line),
             waits_on_the_operator(line),
         )
+        for line in expectations.expectation_lines(item_body, storage=storage)
+    )
+
+
+def _line_statuses(
+    issues: Iterable[workboard.Issue], storage: body.Storage
+) -> tuple[LineStatus, ...]:
+    return tuple(
+        status
         for issue in issues
-        for line in expectations.expectation_lines(issue.body, storage=storage)
+        for status in _item_line_statuses(issue.number, issue.body, storage)
     )
 
 
@@ -218,7 +234,7 @@ class _BoardWatch:
         self._blockers: tuple[forge.ProbeTarget, ...] = ()
         self._waiting: frozenset[tuple[int, int]] = frozenset()
         self._signals: dict[int, int | None] = {}
-        self._until: date | None = None
+        self._until: item_wait.UntilWait | None = None
         self._schedule = Schedule(clock.now(), clock.now())
         self._pending = False
         self._failing = False
@@ -243,20 +259,32 @@ class _BoardWatch:
             return None
 
     def _tick(self, now: float) -> BoardEnd | None:
-        self._pending = self._pending or self._a_signal_moved()
-        if probe_due(now, self._schedule):
+        moved = self._moved_items()
+        probed = probe_due(now, self._schedule)
+        if probed:
             self._schedule = replace(self._schedule, last_probe=now)
             self._probe_the_forge()
             self._probe_the_state_ref()
+        if now >= self._schedule.retry_after:
+            end = self._reread_items(moved) if moved else None
+            if end is not None:
+                return end
+            if self._read_due(now, self._schedule):
+                return self._read(now)
+            probed, moved = probed or bool(moved), []
+        owed = bool(moved) or self._read_due(now, replace(self._schedule, retry_after=0.0))
+        if probed and not owed:
             self._failing = False
-        due = read_due(
+        return None
+
+    def _read_due(self, now: float, schedule: Schedule) -> bool:
+        return read_due(
             now,
-            self._schedule,
+            schedule,
             pending=self._pending,
             today=self._context.today(),
             earliest_until=self._until,
         )
-        return self._read(now) if due else None
 
     def _fail(self, failure: forge.ForgeTransientError, now: float) -> None:
         if not self._failing:
@@ -267,8 +295,8 @@ class _BoardWatch:
     def _modified(self, item: int) -> int | None:
         return signal_modified(decide.item_signal_path(self._context, item, self._state))
 
-    def _a_signal_moved(self) -> bool:
-        return any(self._modified(item) != seen for item, seen in self._signals.items())
+    def _moved_items(self) -> list[int]:
+        return [item for item, seen in self._signals.items() if self._modified(item) != seen]
 
     def _tip_of_the_state_ref(self) -> protocol.ObjectId | None:
         try:
@@ -283,24 +311,53 @@ class _BoardWatch:
         self._pending = self._pending or tip != self._tip
         self._tip = tip
 
-    def _probe_the_forge(self) -> None:
+    def _probe_the_forge(self) -> bool:
         """Under `github` storage one conditional question per target; a target seen the
-        first time only takes its token."""
+        first time only takes its token. Whether a blocker was seen the first time, which
+        may have closed since the read that found it."""
         if not self._github:
-            return
+            return False
         targets = probe_targets(self._context.repository_id.path, self._blockers)
         self._tokens = {
             target: token for target, token in self._tokens.items() if target in targets
         }
+        first_blocker = False
         for target in targets:
             known = self._tokens.get(target)
             answer = self._context.board_probe.changed_since(target, known)
             self._tokens[target] = answer.token
             self._pending = self._pending or (answer.changed and known is not None)
+            first_blocker = first_blocker or (known is None and target.number is not None)
+        return first_blocker
+
+    def _reread_items(self, items: Sequence[int]) -> BoardEnd | None:
+        """Only the items whose signal moved are read again; the signals' times are taken
+        before the read, so a ruling during it moves them once more."""
+        context = self._context.observed_afresh()
+        taken = {item: self._modified(item) for item in items}
+        lines = tuple(status for item in items for status in self._lines_of(context, item))
+        end = ending(self._waiting, BoardReading(None, lines, (), None))
+        if end is None:
+            self._signals.update(taken)
+        return end
+
+    def _lines_of(self, context: RunContext, item: int) -> tuple[LineStatus, ...]:
+        """The item's lines now; none for an item that is closed, and for one that no
+        longer reads as an item the board's own read decides."""
+        try:
+            fresh = decide.fresh_item(context, item, command="wait")
+        except decide.InvalidTargetError:
+            self._pending = True
+            return ()
+        if fresh.state is not forge.ItemState.OPEN:
+            return ()
+        return _item_line_statuses(item, fresh.body, fresh.storage)
 
     def _read(self, now: float) -> BoardEnd | None:
         """A fresh read; the signals' times are taken before it, so a ruling during
-        it moves them again. It ends the wait or becomes what the next ticks compare to."""
+        it moves them again, and an item first watched reads as moved. It ends the wait or
+        becomes what the next ticks compare to; a blocker first probed after it is read
+        for once more."""
         before = {item: self._modified(item) for item in self._signals}
         context = self._context.observed_afresh() if self._read_before else self._context
         reading = read_board(context)
@@ -312,14 +369,11 @@ class _BoardWatch:
         self._blockers = reading.foreign_blockers
         self._until = reading.earliest_until
         watched = sorted({item for item, _index in self._waiting})
-        self._signals = {
-            item: before[item] if item in before else self._modified(item) for item in watched
-        }
+        self._signals = {item: before.get(item, _UNSEEN) for item in watched}
         self._pending = False
         self._failing = False
         self._schedule = Schedule(now, now)
-        self._probe_the_forge()
-        return None
+        return self._read(now) if self._probe_the_forge() else None
 
 
 def wait_for_board(context: RunContext, clock: WaitClock) -> BoardEnd:
