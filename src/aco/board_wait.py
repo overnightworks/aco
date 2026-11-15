@@ -332,13 +332,19 @@ class _BoardWatch:
 
     def _reread_items(self, items: Sequence[int]) -> BoardEnd | None:
         """Only the items whose signal moved are read again; the signals' times are taken
-        before the read, so a ruling during it moves them once more."""
+        before the read, so a ruling during it moves them once more, and the lines that wait
+        are those the read found; an item it could not read keeps its lines."""
         context = self._context.observed_afresh()
         taken = {item: self._modified(item) for item in items}
         lines = tuple(status for item in items for status in self._lines_of(context, item))
-        end = ending(self._waiting, BoardReading(None, lines, (), None))
+        reading = BoardReading(None, lines, (), None)
+        end = ending(self._waiting, reading)
         if end is None:
             self._signals.update(taken)
+            read = {status.item for status in lines}
+            self._waiting = frozenset(
+                line for line in self._waiting if line[0] not in read
+            ) | waiting_lines(reading)
         return end
 
     def _lines_of(self, context: RunContext, item: int) -> tuple[LineStatus, ...]:

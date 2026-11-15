@@ -22,7 +22,7 @@ from board_fixtures import (
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, set_git_identity
 from cli_fixtures import track_board_config as pin_board_config
 from github_fixtures import FakeForge, serve_forge
-from option_cards import decide, group_body, open_option_entry
+from option_cards import card, decide, group_body, open_option_entry, ruled_card
 from store_fixtures import (
     claim_intent,
     item_record,
@@ -103,9 +103,10 @@ def probe(monkeypatch: pytest.MonkeyPatch) -> FakeBoardProbe:
     return serve_board_probe(monkeypatch, FakeBoardProbe())
 
 
-def rule_through_aco(client: FakeForge, capsys: pytest.CaptureFixture[str]) -> str:
-    """`aco rule` on line 2 of item 7, which the forge then serves as the item's body."""
-    assert run_cli(["rule", str(ITEM), *decide("A", "chat")], capsys).status == 0
+def rule_through_aco(client: FakeForge, capsys: pytest.CaptureFixture[str], line: int = 2) -> str:
+    """`aco rule` on a line (2 by default) of item 7, which the forge then serves as the
+    item's body."""
+    assert run_cli(["rule", str(ITEM), *decide("A", "chat", line=line)], capsys).status == 0
     written = client.body_writes[-1][1]
     client.issue_references[ITEM] = open_reference(written)
     return written
@@ -297,6 +298,28 @@ class TestWaitingOnTheBoard:
         result = run_cli(["wait"], capsys)
         assert (result.status, result.stderr, len(ticks.pauses)) == (0, "", 1)
         assert CHANGED_LINE.fullmatch(result.stdout)
+
+    def test_a_line_first_seen_by_a_reread_wakes_the_wait_when_it_is_ruled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-14, WAIT-17 -- a line the board read did not find waiting but the
+        reread of its item did is a line that waited at its previous read."""
+        client = serve_forge(
+            monkeypatch,
+            FakeForge(
+                board_issues=(card_issue(group_body(ruled_card())),),
+                issue_references={ITEM: open_reference(group_body(card()))},
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+        ticks.afterwards[3] = lambda: rule_through_aco(client, capsys, line=3)
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stderr) == (0, "")
+        assert re.fullmatch(r"CHANGED #7 line 3: ruled A \d{4}-\d{2}-\d{2}\n", result.stdout)
+        assert len(ticks.pauses) == 3
 
     def test_a_blocker_that_closes_before_its_first_probe_wakes_it_at_once(
         self,
