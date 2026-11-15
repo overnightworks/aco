@@ -108,40 +108,29 @@ def test_item_new_writes_the_state_ref_item_of_the_discovered_repository(
     assert state_ref_tip(bare_remote) == own_tip
 
 
+@pytest.mark.parametrize("flags", [[], ["--json"]])
 def test_item_new_in_an_undiscovered_repository_refuses_by_name_and_writes_nothing(
+    flags: list[str],
     root: Path,
     other_bare: Path,
     own_checkout: Path,
     built_for: list[tuple[str, FakeForge]],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: ITEM-68."""
+    """Spec: ITEM-68. The refusal names the repository; under `--json` it is
+    ITEM-25's precondition_failed."""
     discovered_checkout(root / "other", OTHER_URL, other_bare, "")
 
     result = run_cli(
-        ["--repo", "example/absent", "item", "new", "--title", "Friction"], capsys, stdin=BODY
-    )
-
-    assert (result.status, result.stderr) == (2, "ERROR: no repository example/absent found\n")
-    assert built_for == []
-
-
-def test_item_new_refuses_a_discovered_checkout_whose_remote_is_another_repository(
-    root: Path,
-    other_bare: Path,
-    own_checkout: Path,
-    built_for: list[tuple[str, FakeForge]],
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Spec: ITEM-67, PIN-53. The target is the resolved checkout's own
-    remote; a label a checkout does not carry is no repository."""
-    discovered_checkout(root / "other", OTHER_URL, other_bare, "")
-
-    result = run_cli(
-        ["--repo", "example/renamed", "item", "new", "--title", "Friction"], capsys, stdin=BODY
+        ["--repo", "example/absent", "item", "new", "--title", "Friction", *flags],
+        capsys,
+        stdin=BODY,
     )
 
     assert result.status == 2
+    assert "no repository example/absent found" in result.stderr + result.stdout
+    if flags:
+        assert json.loads(result.stdout)["reason"] == "precondition_failed"
     assert built_for == []
 
 
