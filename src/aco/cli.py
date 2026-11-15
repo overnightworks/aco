@@ -75,9 +75,8 @@ START_DESCRIPTION = (
     "when neither exists yet, then claims it exactly as aco claim would; a second call "
     "against the same worktree only claims, or reports the live claim."
 )
-# Shared by `claim` and `start`: CLM-09's own contract, spelled
-# once so `start`'s pass-through help text can never drift from what `claim` itself does with
-# the flag -- specs/claim.spec.md:62's "the reason is never stored" holds for both.
+# Shared by `claim` and `start`: CLM-09's own contract, spelled once so `start`'s pass-through
+# help text can never drift from what `claim` does with the flag (the reason is never stored).
 OUT_OF_ORDER_HELP = (
     "refuses a claim without a reason when a higher-priority actionable item is free or "
     "an open blocker remains; the reason is never stored, only downgrading the check"
@@ -792,13 +791,12 @@ def _run_repository_command(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    # Every refusal the parse itself raises -- argparse's own usage errors,
-    # and `workboard.parse_item_reference`, an argparse `type=` whose refusal is
-    # a `ClaimError` -- fires before any namespace carries `--json`, so the
-    # mode is read back off the parsers this parse reached.
-    # Both report `invalid_usage` through the one envelope. Past the parse
-    # the plain sentence alone still stands: a refusal a command raises
-    # outside its own reported vocabulary must not be dressed as one.
+    # Every refusal the parse itself raises -- argparse's own usage errors, and
+    # `workboard.parse_item_reference`, an argparse `type=` whose refusal is a `ClaimError` --
+    # fires before any namespace carries `--json`, so the mode is read back off the parsers this
+    # parse reached. Both report `invalid_usage` through the one envelope. Past the parse the
+    # plain sentence alone still stands: a refusal a command raises outside its own reported
+    # vocabulary must not be dressed as one.
     given = sys.argv[1:] if arguments is None else arguments
     parser = _parser()
     try:
