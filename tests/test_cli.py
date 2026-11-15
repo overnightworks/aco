@@ -856,6 +856,7 @@ _OPERATOR_HELD_CONTAINERS = (
         442, complete_contract("Check it.", wait=TRIGGER_WAIT), labels=(NEEDS_OPERATOR_LABEL,)
     ),
     _childless_container(443, complete_contract("keiner"), labels=(NEEDS_OPERATOR_LABEL,)),
+    _childless_container(444, complete_contract("Check it.", wait=TRIGGER_WAIT)),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
@@ -1022,7 +1023,8 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
             "Run: aco claim 11 --scope <paths>\n"
             + _SCOPE_UNKNOWN_NOTE_LINE
             + "parallel: unknown (first action names no scope)\nclose: #443\n"
-            + "waiting on operator: #441, #442\n",
+            + "waiting on operator: #441, #442\n"
+            + f"\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
             id="never_cuts_or_checks_a_container_the_operator_holds_but_still_closes_one",
         ),
         pytest.param(
@@ -1039,7 +1041,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
                 "next": "Claim #11.",
                 "command": "aco claim 11 --scope <paths>",
                 "recovery": [],
-                "skipped": [],
+                "skipped": [{"number": 444, "reason": f"waiting: {WAIT_TRIGGER}"}],
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
