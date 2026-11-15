@@ -23,7 +23,8 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | `N` out of range | WAIT-05 | WAIT-11 |
 | item does not exist, is a pull request, is closed, or its body is malformed | WAIT-04 | WAIT-11 |
 | `--repo` given, `storage = "state-ref"` | WAIT-06 | WAIT-11 |
-| a forge failure, at the start or while it waits | WAIT-10 | WAIT-10 |
+| a forge failure at the start, a forge failure that is not transient while it waits, or a signal that cannot be read | WAIT-10 | WAIT-10 |
+| a transient forge failure while it waits | WAIT-10 | — |
 | a ruling, return or withdrawal written by aco | WAIT-12 | — |
 | the signal cannot be touched | WAIT-13 | — |
 
@@ -42,8 +43,9 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01; every read is fresh from the store, under `state-ref` a new fetch of the state ref.
 - [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too.
 - [ ] [WAIT-09] The command has no timeout and no other end of its own; the session that started it stops it.
-- [ ] [WAIT-10] Every forge failure, at the start or on a later read, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; so does a signal file that cannot be read:
+- [ ] [WAIT-10] A forge failure at the start refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, so do an unreadable signal file and a later read's forge failure that is not transient:
   - `cannot watch the item's signal at <signal path>: <detail>`, before the item is read
+  - a later read that fails transiently prints one `WARNING: the item could not be read, still waiting: <sentence>` to stderr for a run of failed reads; the wait goes on and the next read that answers decides (WAIT-01, WAIT-04)
 - [ ] [WAIT-11] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
 - [ ] [WAIT-12] Every write of a ruled, returned or withdrawn line that aco makes touches one file per item, after the write has been verified (see E-WAIT-04):
   - the writers are `aco rule`, `aco withdraw`, the board's decision and the `record_answer` tool
@@ -61,7 +63,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | WAIT-04 (missing item, pull request, closed item, malformed body) | `invalid_item` |
 | WAIT-05 (out of range) | `line_out_of_range` |
 | WAIT-06 (`--repo` under `storage = state-ref`), the parser's own refusals | `invalid_usage` |
-| WAIT-10 (a forge failure) | `unavailable` |
+| WAIT-10 (a forge failure at the start, a signal that cannot be read) | `unavailable` |
 
 ## Never
 

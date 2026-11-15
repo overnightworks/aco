@@ -20,6 +20,7 @@ from aco import body, cmd_wait, forge, github, store
 
 WITHDRAWN_LINE = '[[expectation]]\ntext = "Zurück"\nwithdrawn_on = 2026-08-01\n'
 DATE = r"\d{4}-\d{2}-\d{2}"
+SLOW_READS_PAUSES = int(cmd_wait.ITEM_READ_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
 
 
 def open_reference(raw: str, *, is_landing: bool = False) -> forge.ItemReference:
@@ -141,21 +142,100 @@ class TestWaiting:
         assert ticks.now >= cmd_wait.ITEM_READ_SECONDS
         assert store.reads() == 2
 
-    def test_a_forge_failure_while_it_waits_refuses_unavailable(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        ("reads_after_the_first", "warnings"),
+        [
+            pytest.param(["down", "down"], 1, id="failures-one-after-the-other"),
+            pytest.param(["down", None, "down"], 2, id="a-read-that-answers-between"),
+        ],
+    )
+    def test_a_forge_failure_while_it_waits_is_said_once_per_run_of_failures_and_the_wait_goes_on(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        reads_after_the_first: list[str | None],
+        warnings: int,
     ) -> None:
-        """Spec: WAIT-10 -- a later read that fails ends the command loudly."""
+        """Spec: WAIT-10 -- reads that fail one after the other warn once, a read
+        that answers in between makes the next failure warn again, and a later
+        read that answers with a ruling ends the wait by WAIT-01."""
         client = serve_item(monkeypatch, open_reference(group_body()))
-        client.scripted_item_reads.extend([None, forge.ForgeError("the forge is down")])
+        ruled_body = group_body(ruled_card())
+        client.scripted_item_reads.extend(
+            [None]
+            + [
+                forge.ForgeTransientError("the forge is down") if read else None
+                for read in reads_after_the_first
+            ]
+            + [ruled_body]
+        )
         install(monkeypatch, reads_of(client))
-        result = run_cli(["wait", "7", "--line", "2", "--json"], capsys)
-        message = "the forge is down"
-        assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
-        assert json.loads(result.stdout) == {
-            "ok": False,
-            "reason": "unavailable",
-            "message": message,
-        }
+        result = run_cli(["wait", "7", "--line", "3"], capsys)
+        warning = "WARNING: the item could not be read, still waiting: the forge is down\n"
+        assert (result.status, result.stderr) == (0, warning * warnings)
+        assert re.fullmatch(rf"CHANGED #7 line 3: ruled A {DATE}\n", result.stdout)
+
+    @pytest.mark.parametrize(
+        ("scripted_reads", "replacement", "sentence"),
+        [
+            pytest.param(
+                [],
+                forge.ItemReference(forge.ItemState.CLOSED, "Karte", group_body()),
+                "ERROR: #7 is closed; there is nothing to wait for\n",
+                id="closed-while-it-waits",
+            ),
+            pytest.param(
+                [None, forge.ForgeTransientError("the forge is down")],
+                forge.ItemReference(forge.ItemState.MISSING),
+                "ERROR: #7 does not exist\n",
+                id="gone-after-a-forge-failure",
+            ),
+        ],
+    )
+    def test_a_later_read_that_answers_ends_the_wait_refusing_invalid_item(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        scripted_reads: list[str | forge.ForgeError | None],
+        replacement: forge.ItemReference,
+        sentence: str,
+    ) -> None:
+        """Spec: WAIT-10, WAIT-04 -- a later read that answers decides, also after
+        a failed read: a closed or missing item ends the wait, exit 2."""
+        client = serve_item(monkeypatch, open_reference(group_body()))
+        client.scripted_item_reads.extend(scripted_reads)
+        ticks = install(monkeypatch, reads_of(client))
+        ticks.afterwards[SLOW_READS_PAUSES + 10] = lambda: client.issue_references.update(
+            {ITEM: replacement}
+        )
+        result = run_cli(["wait", "7", "--line", "3", "--json"], capsys)
+        assert result.status == 2
+        assert result.stderr.endswith(sentence)
+        assert json.loads(result.stdout)["reason"] == "invalid_item"
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            pytest.param(forge.ForgePermissionDeniedError("denied"), id="permission-denied"),
+            pytest.param(forge.ForgeUnsupportedError("unsupported"), id="unsupported"),
+            pytest.param(forge.ForgeMalformedResponseError("malformed"), id="malformed-response"),
+        ],
+    )
+    def test_a_failure_that_is_not_transient_on_a_later_read_ends_the_wait_unavailable(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        failure: forge.ForgeError,
+    ) -> None:
+        """Spec: WAIT-10 -- only a transient forge failure on a later read keeps
+        the wait going; any other ends it like a failure at the start."""
+        client = serve_item(monkeypatch, open_reference(group_body()))
+        client.scripted_item_reads.extend([None, failure])
+        install(monkeypatch, reads_of(client))
+        result = run_cli(["wait", "7", "--line", "3", "--json"], capsys)
+        assert result.status == 2
+        assert result.stderr.endswith(f"ERROR: {failure}\n")
+        assert json.loads(result.stdout)["reason"] == "unavailable"
 
 
 @pytest.mark.usefixtures("github_world")

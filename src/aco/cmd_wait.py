@@ -5,6 +5,7 @@ background and waking when it ends."""
 
 import argparse
 import os
+import sys
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -26,7 +27,7 @@ clock = time.monotonic
 
 
 add_parser = partial(
-    decide.add_lines_command_parser,
+    report.add_lines_command_parser,
     help="wait until an expectation line is ruled, returned or withdrawn",
     item_help="the item whose lines are waited on",
     lines_help="the 1-based expectation line index, as rulings prints it; "
@@ -118,6 +119,22 @@ def _emit_changed(
         print(f"CHANGED {label} line {line.index}: {line.state}")
 
 
+def _reread_or_failure(
+    context: RunContext, number: int
+) -> decide.FreshItem | forge.ForgeTransientError:
+    """A later read of the item, fresh from the store; a transient forge failure
+    is returned, every other refusal raised."""
+    try:
+        return decide.fresh_item(context.observed_afresh(), number, command="wait")
+    except forge.ForgeTransientError as error:
+        return error
+
+
+def _say_still_waiting(failure: forge.ForgeTransientError) -> None:
+    sys.stderr.write(f"WARNING: the item could not be read, still waiting: {failure}\n")
+    sys.stderr.flush()
+
+
 def _wait_for_lines(
     parsed: argparse.Namespace,
     context: RunContext,
@@ -140,21 +157,28 @@ def _wait_for_lines(
     _refuse_a_closed_item(fresh)
     changed = _changed_lines(fresh, named)
     last_read = now()
+    failing = False
     while not changed:
         pause(SIGNAL_POLL_SECONDS)
         moved = _modified(signal)
         if moved == watched and now() - last_read < ITEM_READ_SECONDS:
             continue
         watched, last_read = moved, now()
-        reread = decide.fresh_item(context.observed_afresh(), number, command="wait")
+        reread = _reread_or_failure(context, number)
+        if isinstance(reread, forge.ForgeTransientError):
+            if not failing:
+                _say_still_waiting(reread)
+            failing = True
+            continue
+        failing = False
+        _refuse_a_closed_item(reread)
         changed = _changed_lines(reread, named)
     _emit_changed(changed, number, fresh.storage, as_json=parsed.json)
     return 0
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`wait` with its own `--json` refusals for the whole command, every forge
-    failure of a later read included."""
+    """`wait` with its own `--json` refusals for the whole command."""
     return report.refusing_by_type(
         partial(_wait_for_lines, parsed, context, pause_between_checks, clock),
         _REFUSAL_REASONS,

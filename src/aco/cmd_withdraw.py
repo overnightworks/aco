@@ -10,12 +10,12 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import body, decide, expectations, protocol, report, repositories, workboard
+from . import body, decide, expectations, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 # No `--via` and no `--card-hash`: withdrawing decides nothing for the operator.
 add_parser = partial(
-    decide.add_lines_command_parser,
+    report.add_lines_command_parser,
     help="withdraw an expectation line of your own that nobody has ruled",
     item_help="the item whose expectation line is withdrawn",
     lines_help="the 1-based expectation line index, as rulings prints it; "
@@ -105,7 +105,7 @@ def _withdraw_lines(parsed: argparse.Namespace, context: RunContext) -> int:
             fresh,
             indexes,
             today,
-            state=repositories.state_directory(os.environ, Path.home()),
+            state=fresh.state_directory,
         )
     _emit_withdrawn(committed, indexes, today, fresh.storage, as_json=parsed.json)
     return 0

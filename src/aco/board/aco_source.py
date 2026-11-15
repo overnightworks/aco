@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .. import decide, expectations, forge, inbox, protocol, repositories, session
+from .. import decide, expectations, forge, inbox, protocol, session
 from .ports import (
     CardAnswer,
     CardChanged,
@@ -83,7 +83,7 @@ def _checked_and_written(
 
 
 def _checked_and_written_in_turn(
-    context: session.RunContext, fresh: decide.FreshItem, check: CardCheck
+    context: session.RunContext, fresh: decide.HeldItem, check: CardCheck
 ) -> DecisionResult | CardChanged:
     if fresh.state is not forge.ItemState.OPEN:
         return CardChanged()
@@ -98,7 +98,7 @@ def _checked_and_written_in_turn(
             fresh,
             _line_outcomes(decision),
             context.today(),
-            state=repositories.state_directory(os.environ, Path.home()),
+            state=fresh.state_directory,
         )
     except forge.ForgeBodyOverwrittenError as error:
         if not error.kept:

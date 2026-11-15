@@ -1,4 +1,4 @@
-"""The CLI's `--json` flag, output envelope, refusal rendering
+"""The CLI's `--json` flag, the shared `--line` parser, output envelope, refusal rendering
 (`specs/output.spec.md`) and the piped-body reader every stdin-fed command
 shares."""
 # ruff: noqa: T201 - the one owner of the JSON envelope and the error line
@@ -11,7 +11,7 @@ import sys
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 
-from . import forge, protocol
+from . import forge, protocol, usage, workboard
 
 CLI_ERROR_PREFIX = "ERROR: "
 REFUSAL_LINE_LENGTH_LIMIT = 200
@@ -27,6 +27,25 @@ def add_json_flag(parser: argparse.ArgumentParser, help_text: str = _JSON_HELP) 
     argparse refuses before any namespace is filled, so the flag needs a
     single owner. A command with no human output passes its own `help_text`."""
     parser.add_argument(JSON_FLAG, action="store_true", help=help_text)
+
+
+def add_lines_command_parser(
+    commands: usage.Subcommands, name: str, *, help: str, item_help: str, lines_help: str
+) -> None:
+    """The parser of a command that names option lines of one item (`withdraw`,
+    `wait`): the item, the repeatable `--line N` and `--json`."""
+    parser = commands.add_parser(name, help=help)
+    parser.add_argument("item", type=workboard.parse_item_reference, help=item_help)
+    parser.add_argument(
+        "--line",
+        dest="lines",
+        action="append",
+        type=int,
+        required=True,
+        metavar="N",
+        help=lines_help,
+    )
+    add_json_flag(parser)
 
 
 def _stdin_file_mode() -> int | None:
