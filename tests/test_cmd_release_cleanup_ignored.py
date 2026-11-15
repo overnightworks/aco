@@ -4,16 +4,13 @@ from dataclasses import replace
 from functools import partial
 
 import pytest
-import test_cmd_release_cleanup
-from test_cmd_release_cleanup import (
+from release_cleanup_world import (
     MERGED,
     CleanupCase,
     CleanupCheck,
     CleanupIntervention,
     rendered,
 )
-
-cleanup_check = test_cmd_release_cleanup.cleanup_check
 
 
 class OnlyAnIgnoredFile:
