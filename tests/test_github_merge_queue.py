@@ -228,6 +228,7 @@ def test_merge_queue_state_of_a_missing_pull_request_is_not_found() -> None:
             id="removal-time-not-a-time",
         ),
         pytest.param(removal_is([a_removal()], [{"createdAt": 5}]), id="addition-time-not-text"),
+        pytest.param(removal_is([{"reason": "a"}]), id="removal-without-a-time-and-no-addition"),
     ],
 )
 def test_merge_queue_state_refuses_an_answer_it_cannot_read(answer: object) -> None:

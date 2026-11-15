@@ -139,8 +139,9 @@ def _removal_reason(pull_request: Mapping[str, object]) -> str | None:
     removal = _latest_event(pull_request, "removals")
     if removal is None:
         return None
+    removed_at = _created_at(removal)
     addition = _latest_event(pull_request, "additions")
-    if addition is not None and _created_at(removal) <= _created_at(addition):
+    if addition is not None and removed_at <= _created_at(addition):
         return None
     reason = removal.get("reason")
     if reason is not None and not isinstance(reason, str):
