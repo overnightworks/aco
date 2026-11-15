@@ -57,6 +57,21 @@ class UnreadableBoardForge(FakeForge):
         return super().list_open_board_issues()
 
 
+@dataclass
+class RulingDuringTheReadForge(FakeForge):
+    """A forge that runs `during_the_read` once, after the board read has taken its
+    snapshot and before it returns it."""
+
+    during_the_read: Callable[[], None] | None = None
+
+    def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
+        snapshot = super().list_open_board_issues()
+        happening, self.during_the_read = self.during_the_read, None
+        if happening is not None:
+            happening()
+        return snapshot
+
+
 def blocked_board(*, closed: bool) -> UnreadableBoardForge:
     """Item 50, blocked by an issue of another repository, closed or not."""
     state = workboard.BlockerState.CLOSED if closed else workboard.BlockerState.OPEN
@@ -273,20 +288,12 @@ class TestWaitingOnTheBoard:
         raw = group_body()
         client = serve_forge(
             monkeypatch,
-            FakeForge(
+            RulingDuringTheReadForge(
                 board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
             ),
         )
+        client.during_the_read = lambda: rule_through_aco(client, capsys)
         ticks = install(monkeypatch, lambda: 0)
-        read_board = board_wait.read_board
-
-        def read_then_rule(context: session.RunContext) -> board_wait.BoardReading:
-            reading = read_board(context)
-            monkeypatch.setattr(board_wait, "read_board", read_board)
-            rule_through_aco(client, capsys)
-            return reading
-
-        monkeypatch.setattr(board_wait, "read_board", read_then_rule)
         result = run_cli(["wait"], capsys)
         assert (result.status, result.stderr, len(ticks.pauses)) == (0, "", 1)
         assert CHANGED_LINE.fullmatch(result.stdout)
