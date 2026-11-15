@@ -1024,7 +1024,7 @@ def _read_merge_settings(client: GitHubForge) -> object:
 
 
 def _read_main_merge_rules(client: GitHubForge) -> object:
-    return client.branch_merge_rules("main")
+    return client.merge_rules("main").merge_methods
 
 
 def _pull_request_rule(allowed_merge_methods: object) -> str:
@@ -1115,7 +1115,7 @@ def test_github_adapter_reads_no_merge_rules_on_a_plan_without_rulesets() -> Non
     no rule narrows the settings."""
     client = _branch_rules_refused_with(_RULESETS_UPGRADE_MESSAGE)
 
-    assert client.branch_merge_rules("main") == ()
+    assert client.merge_rules("main").merge_methods == ()
 
 
 @pytest.mark.parametrize(
@@ -1134,7 +1134,7 @@ def test_github_adapter_fails_loud_on_any_other_branch_rules_refusal(
     client = _branch_rules_refused_with(message, status)
 
     with pytest.raises(forge.ForgePermissionDeniedError, match=f"HTTP {status}"):
-        client.branch_merge_rules("main")
+        client.merge_rules("main")
 
 
 @pytest.mark.parametrize(
@@ -1170,7 +1170,7 @@ def test_github_adapter_fails_loud_on_any_other_branch_rules_refusal(
 def test_github_adapter_reads_the_default_branchs_merge_rules(
     answer: str, rules: tuple[frozenset[workboard.MergeMethod], ...]
 ) -> None:
-    """`branch_merge_rules` reads every rule on
+    """`merge_rules` reads every rule on
     the branch through the branch-rules endpoint, one method set per
     `pull_request` rule carrying a method list and per
     `required_linear_history` rule, and an empty tuple where no rule
@@ -1183,7 +1183,7 @@ def test_github_adapter_reads_the_default_branchs_merge_rules(
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
 
-    assert client.branch_merge_rules("main") == rules
+    assert client.merge_rules("main").merge_methods == rules
     assert observed == [
         [
             "api",
