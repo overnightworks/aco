@@ -159,7 +159,7 @@ def run_context(repo: forge.RepositoryId | None) -> RunContext:
         repo,
         build_forge=_build_forge,
         ruling_search=github_search.GitHubRulingSearch(github.bounded_command),
-        board_probe=github_probe.GitHubBoardProbe(),
+        board_probe=github_probe.GitHubBoardProbe(github.response_command),
     )
 
 

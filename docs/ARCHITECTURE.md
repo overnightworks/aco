@@ -95,8 +95,9 @@ flowchart LR
   has ended.
 - The **board probe** (`forge.BoardProbe`) is a third port of its own: whether an
   issue, or a repository's newest one, changed since an opaque token. Its GitHub
-  adapter (`github_probe.py`) sends the token as `If-None-Match` and reads the
-  status line, because `gh` exits non-zero on the 304 that means unchanged.
+  adapter (`github_probe.py`) takes the response runner of `github.py`, sends the
+  token as `If-None-Match` and reads the status line, because `gh` exits
+  non-zero on the 304 that means unchanged.
   `aco wait` without an item asks it.
 
 ## Runtime View

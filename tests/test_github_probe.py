@@ -3,7 +3,7 @@ driven with a fake `gh` process."""
 
 import pytest
 
-from aco import forge, github_probe, process, protocol
+from aco import forge, github, github_probe, process, protocol
 
 REPOSITORY_TARGET = forge.ProbeTarget("owner/repo")
 ISSUE_TARGET = forge.ProbeTarget("owner/other", 8)
@@ -38,14 +38,18 @@ def test_a_200_is_changed_and_carries_the_etag_as_it_came(monkeypatch: pytest.Mo
     """Spec: WAIT-20 -- a 200 means changed, its ETag is sent back as-is."""
     head = f"HTTP/2.0 200 OK\r\nContent-Type: text/plain\r\nEtag: {ETAG}\r\n\r\n[]"
     _serve(monkeypatch, _answer(0, head))
-    answer = github_probe.GitHubBoardProbe().changed_since(REPOSITORY_TARGET, None)
+    answer = github_probe.GitHubBoardProbe(github.response_command).changed_since(
+        REPOSITORY_TARGET, None
+    )
     assert answer == forge.ProbeAnswer(changed=True, token=ETAG)
 
 
 def test_a_304_is_unchanged_whatever_the_exit_status(monkeypatch: pytest.MonkeyPatch) -> None:
     """Spec: WAIT-20 -- `gh` exits 1 on a 304; the status line decides."""
     _serve(monkeypatch, _answer(1, f"HTTP/2.0 304 Not Modified\r\nEtag: {ETAG}\r\n\r\n"))
-    answer = github_probe.GitHubBoardProbe().changed_since(REPOSITORY_TARGET, ETAG)
+    answer = github_probe.GitHubBoardProbe(github.response_command).changed_since(
+        REPOSITORY_TARGET, ETAG
+    )
     assert answer == forge.ProbeAnswer(changed=False, token=ETAG)
 
 
@@ -71,7 +75,7 @@ def test_the_request_is_conditional_on_the_token_it_is_given(
 ) -> None:
     """Spec: WAIT-18 -- one conditional request for the newest updated issue, one per blocker."""
     gh = _serve(monkeypatch, _answer(0, f"HTTP/2.0 200 OK\nEtag: {ETAG}\n\n[]"))
-    github_probe.GitHubBoardProbe().changed_since(target, token)
+    github_probe.GitHubBoardProbe(github.response_command).changed_since(target, token)
     assert gh.commands == [["gh", "api", "-i", *conditional, path]]
 
 
@@ -117,7 +121,7 @@ def test_any_other_answer_fails_as_a_failed_gh_call_does(
 ) -> None:
     """Spec: WAIT-20 -- a status line that is neither 200 nor 304, or none, is classified."""
     _serve(monkeypatch, _answer(exit_status, text))
-    probe = github_probe.GitHubBoardProbe()
+    probe = github_probe.GitHubBoardProbe(github.response_command)
     with pytest.raises(failure):
         probe.changed_since(REPOSITORY_TARGET, token)
 
@@ -134,7 +138,7 @@ def test_a_gh_that_cannot_run_to_the_end_fails_by_kind(
 ) -> None:
     """Spec: WAIT-20 -- a timeout is transient; a missing `gh` is not."""
     _serve(monkeypatch, failing)
-    probe = github_probe.GitHubBoardProbe()
+    probe = github_probe.GitHubBoardProbe(github.response_command)
     with pytest.raises(protocol.ClaimError) as raised:
         probe.changed_since(REPOSITORY_TARGET, None)
     assert type(raised.value) is failure

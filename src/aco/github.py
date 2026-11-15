@@ -129,9 +129,7 @@ def landing_comment(pull_request: int) -> str:
 
 
 def command_environment() -> dict[str, str]:
-    environment = os.environ.copy()
-    environment.update(GH_QUIET_ENVIRONMENT)
-    return environment
+    return {**os.environ, **GH_QUIET_ENVIRONMENT}
 
 
 # GitHub reserves these as repository names; as a path segment they name the
@@ -212,14 +210,14 @@ def _query_days(start: date, end: date) -> tuple[date, ...]:
     return tuple(start + timedelta(days=offset) for offset in range((end - start).days + 1))
 
 
-def decoded_output(result: process.BoundedResult, purpose: str) -> str:
+def _decoded(result: process.BoundedResult, purpose: str) -> str:
     try:
         return strip_ansi(result.output.decode("utf-8")).strip()
     except UnicodeDecodeError as error:
         raise forge.ForgeMalformedResponseError(f"{purpose} returned non-UTF-8 output") from error
 
 
-def forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeError:
+def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeError:
     """Translate a process failure that reached no forge response into a typed one.
 
     An isinstance chain, not a dict keyed by `type(error)`: only the chain lets
@@ -240,10 +238,6 @@ def forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeError
     raise AssertionError(f"unhandled process failure type: {type(error).__name__}")
 
 
-def _is_transient_signal(decoded: str) -> bool:
-    return _TRANSIENT_PATTERN.search(decoded) is not None
-
-
 def nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
     """Classify a nonzero `gh` exit from its decoded combined output.
 
@@ -255,12 +249,14 @@ def nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.
         return forge.ForgeNotFoundError(decoded)
     if "HTTP 401" in decoded or "HTTP 403" in decoded:
         return forge.ForgePermissionDeniedError(decoded)
-    if _is_transient_signal(decoded):
+    if _TRANSIENT_PATTERN.search(decoded):
         return forge.ForgeTransientError(decoded)
     return forge.ForgeError(decoded or f"{purpose} failed with exit {return_code}")
 
 
-def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
+def response_command(
+    command: list[str], *, purpose: str, input_data: bytes | None = None
+) -> tuple[str, int]:
     try:
         result = process.run_bounded(
             command,
@@ -273,10 +269,14 @@ def bounded_command(command: list[str], *, purpose: str, input_data: bytes | Non
     except process.ProcessStartFailedError as error:
         raise ClaimError(f"cannot start {purpose}: {error.detail}") from error
     except process.ProcessError as error:
-        raise forge_failure(error, purpose) from error
-    decoded = decoded_output(result, purpose)
-    if result.exit_status != 0:
-        raise nonzero_exit_failure(decoded, result.exit_status, purpose)
+        raise _forge_failure(error, purpose) from error
+    return _decoded(result, purpose), result.exit_status
+
+
+def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
+    decoded, exit_status = response_command(command, purpose=purpose, input_data=input_data)
+    if exit_status != 0:
+        raise nonzero_exit_failure(decoded, exit_status, purpose)
     return decoded
 
 

@@ -243,7 +243,6 @@ allow_indirect_imports = true
 as_packages = false
 ignore_imports = [
     "aco.github -> aco.process",
-    "aco.github_probe -> aco.process",
     "aco.checkout -> aco.process",
     "aco.store -> aco.process",
 ]

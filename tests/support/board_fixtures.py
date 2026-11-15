@@ -76,7 +76,7 @@ class FakeBoardProbe:
 
 def serve_board_probe(monkeypatch: pytest.MonkeyPatch, probe: FakeBoardProbe) -> FakeBoardProbe:
     """Installs one arranged probe as GitHub's board probe."""
-    monkeypatch.setattr(github_probe, "GitHubBoardProbe", lambda: probe)
+    monkeypatch.setattr(github_probe, "GitHubBoardProbe", lambda _run: probe)
     return probe
 
 
