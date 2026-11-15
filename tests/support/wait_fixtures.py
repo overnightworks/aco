@@ -90,3 +90,7 @@ def install(monkeypatch: pytest.MonkeyPatch, reads: Callable[[], int]) -> Ticks:
     monkeypatch.setattr(cmd_wait, "pause_between_checks", ticks.pause)
     monkeypatch.setattr(cmd_wait, "clock", ticks.clock)
     return ticks
+
+
+def open_reference(raw: str, *, is_landing: bool = False) -> forge.ItemReference:
+    return forge.ItemReference(forge.ItemState.OPEN, "Karte", raw, is_landing)
