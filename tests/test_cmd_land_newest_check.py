@@ -28,6 +28,8 @@ OLD_GREEN = pr_check(OLD_RUN, "success")
 NEW_GREEN = pr_check(NEW_RUN, "success")
 NEW_RED = pr_check(NEW_RUN, "failure")
 NEW_PENDING = pr_check(NEW_RUN, None)
+NEW_SKIPPED = pr_check(NEW_RUN, "skipped")
+NEW_NEUTRAL = pr_check(NEW_RUN, "neutral")
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,17 @@ def checks_read_from(runs: list[dict[str, object]]) -> tuple[forge.CheckRun, ...
     "case",
     [
         pytest.param(RunsCase([OLD_RED, NEW_GREEN], 0, RELEASED), id="old-red-new-green-lands"),
+        pytest.param(RunsCase([NEW_SKIPPED], 0, RELEASED), id="skipped-only-lands"),
+        pytest.param(
+            RunsCase(
+                [NEW_NEUTRAL],
+                2,
+                "",
+                "ERROR: pull request #12 has non-successful checks: pr-check (neutral); land "
+                "only after every check succeeds\n",
+            ),
+            id="neutral-refuses",
+        ),
         pytest.param(
             RunsCase(
                 [OLD_GREEN, NEW_RED],

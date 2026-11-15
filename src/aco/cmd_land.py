@@ -98,7 +98,9 @@ def _land_failed_check(checks: tuple[forge.CheckRun, ...]) -> forge.CheckRun | N
         (
             check
             for check in checks
-            if check.conclusion is not None and check.conclusion != forge.CHECK_CONCLUSION_SUCCESS
+            if check.conclusion is not None
+            and check.conclusion
+            not in {forge.CHECK_CONCLUSION_SUCCESS, forge.CHECK_CONCLUSION_SKIPPED}
         ),
         None,
     )
