@@ -7,12 +7,15 @@ tests/ on sys.path, so import board_fixtures resolves here.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
 from types import MappingProxyType
 
-from aco import forge, protocol, workboard
+import pytest
+
+from aco import forge, github_probe, protocol, workboard
 from aco.body import (
     BLOCK_FENCE_INFO,
     ItemKind,
@@ -48,6 +51,35 @@ class NoBoardProbe:
 searchless = partial(RunContext, ruling_search=_NoRulingSearch(), board_probe=NoBoardProbe())
 """A `RunContext` whose test never searches rulings and never probes the board: either fails
 the test."""
+
+
+@dataclass
+class FakeBoardProbe:
+    """A board probe whose targets stand for the tokens in `tokens` (the first one a
+    target is asked about is `"first"`); a `failure` set answers every question."""
+
+    tokens: dict[forge.ProbeTarget, str] = field(default_factory=dict)
+    failure: forge.ForgeError | None = None
+    asked: list[forge.ProbeTarget] = field(default_factory=list)
+
+    def changed_since(self, target: forge.ProbeTarget, token: str | None) -> forge.ProbeAnswer:
+        self.asked.append(target)
+        if self.failure is not None:
+            raise self.failure
+        current = self.tokens.setdefault(target, "first")
+        return forge.ProbeAnswer(changed=current != token, token=current)
+
+    def change(self, target: forge.ProbeTarget) -> None:
+        """What the forge answers for `target` from now on differs from what it answered."""
+        self.tokens[target] = f"{self.tokens.get(target, 'first')}+"
+
+
+def serve_board_probe(monkeypatch: pytest.MonkeyPatch, probe: FakeBoardProbe) -> FakeBoardProbe:
+    """Installs one arranged probe as GitHub's board probe."""
+    monkeypatch.setattr(github_probe, "GitHubBoardProbe", lambda: probe)
+    return probe
+
+
 REPOSITORY = "example/agent-coordination"
 
 

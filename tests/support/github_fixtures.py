@@ -28,7 +28,7 @@ from store_fixtures import (
     state_ref_tip,
 )
 
-from aco import body, cmd_land, forge, github, github_probe, protocol, store, workboard
+from aco import body, cmd_land, forge, github, protocol, store, workboard
 from aco.workboard import IssueDependency, MergeMethod
 
 WORK_ITEM_ISSUE = 72
@@ -82,33 +82,6 @@ def serve_forge[ServedForge: "FakeForge | github.GitHubForge"](
     """Installs one arranged forge, a fake or an adapter over a fake transport, as GitHub's."""
     monkeypatch.setattr(github, "GitHubForge", lambda repository: forge)
     return forge
-
-
-@dataclass
-class FakeBoardProbe:
-    """A board probe whose targets stand for the tokens in `tokens` (the first one a
-    target is asked about is `"first"`); a `failure` set answers every question."""
-
-    tokens: dict[forge.ProbeTarget, str] = field(default_factory=dict)
-    failure: forge.ForgeError | None = None
-    asked: list[forge.ProbeTarget] = field(default_factory=list)
-
-    def changed_since(self, target: forge.ProbeTarget, token: str | None) -> forge.ProbeAnswer:
-        self.asked.append(target)
-        if self.failure is not None:
-            raise self.failure
-        current = self.tokens.setdefault(target, "first")
-        return forge.ProbeAnswer(changed=current != token, token=current)
-
-    def change(self, target: forge.ProbeTarget) -> None:
-        """What the forge answers for `target` from now on differs from what it answered."""
-        self.tokens[target] = f"{self.tokens.get(target, 'first')}+"
-
-
-def serve_board_probe(monkeypatch: pytest.MonkeyPatch, probe: FakeBoardProbe) -> FakeBoardProbe:
-    """Installs one arranged probe as GitHub's board probe."""
-    monkeypatch.setattr(github_probe, "GitHubBoardProbe", lambda: probe)
-    return probe
 
 
 def merge_on_the_forge(

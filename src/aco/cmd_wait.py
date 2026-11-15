@@ -46,22 +46,13 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         help="wait until an expectation line is ruled, returned or withdrawn, "
         "or, with no item, until the board has something to do",
     )
-    parser.add_argument(
-        "item",
-        nargs="?",
-        type=workboard.parse_item_reference,
-        help="the item whose lines are waited on; leave it out to wait on the board",
-    )
-    parser.add_argument(
-        "--line",
-        dest="lines",
-        action="append",
-        type=int,
-        metavar="N",
-        help="the 1-based expectation line index, as rulings prints it; "
+    report.add_lines_arguments(
+        parser,
+        item_help="the item whose lines are waited on; leave it out to wait on the board",
+        lines_help="the 1-based expectation line index, as rulings prints it; "
         "repeat it to wait on several lines of the item",
+        optional=True,
     )
-    report.add_json_flag(parser)
 
 
 class _WaitReason(StrEnum):

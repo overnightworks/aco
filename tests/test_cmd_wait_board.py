@@ -11,14 +11,16 @@ from pathlib import Path
 import pytest
 from board_fixtures import (
     REPOSITORY,
+    FakeBoardProbe,
     block_dependency,
     blocked_issue,
     board_issue,
     complete_contract,
+    serve_board_probe,
 )
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, set_git_identity
 from cli_fixtures import track_board_config as pin_board_config
-from github_fixtures import FakeBoardProbe, FakeForge, serve_board_probe, serve_forge
+from github_fixtures import FakeForge, serve_forge
 from option_cards import decide, group_body, open_option_entry
 from store_fixtures import (
     claim_intent,
