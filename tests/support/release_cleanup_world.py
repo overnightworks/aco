@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from functools import partial
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from cli_fixtures import (
@@ -67,6 +68,10 @@ class JsonOutput:
             "worktree": self.worktree_text.format(**values),
         }
         return json.dumps(envelope) + "\n"
+
+
+class InstallsIntervention(Protocol):
+    def install(self, target: CleanupIntervention) -> None: ...
 
 
 class Intervention(Enum):
@@ -143,7 +148,7 @@ LISTING_ARGUMENTS = ("config", "--local", "--null", "--name-only", "--get-regexp
 
 @dataclass(frozen=True)
 class CleanupCase:
-    intervention: Intervention | LaunchIntervention = Intervention.NONE
+    intervention: InstallsIntervention = Intervention.NONE
     command: tuple[str, ...] = ("land", "12")
     premerge: workboard.MergeMethod | None = None
     stdout: str | JsonOutput = PREFIX + "worktree: removed\n"
