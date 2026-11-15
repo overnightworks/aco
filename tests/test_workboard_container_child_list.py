@@ -229,7 +229,7 @@ def test_a_container_is_named_closable_only_while_no_child_in_another_repository
 
 
 def test_a_container_with_an_unreadable_and_a_foreign_open_child_names_both() -> None:
-    """Spec: NEXT-38"""
+    """Spec: NEXT-38, NEXT-60"""
     unreadable = workboard.ChildItem(244, workboard.ChildState.OPEN)
     foreign = workboard.IssueReference("other/repo", 954)
     progress = ContainerProgress(
