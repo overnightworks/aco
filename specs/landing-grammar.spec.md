@@ -211,7 +211,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-54] `board --json`'s `"landings"` rows each carry `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null`.
 
 - LAND-46 (retired).
-- [ ] [LAND-83] A trunk commit ending in the classification paragraph, then only a paragraph of `Co-authored-by:` lines (a hyphen line may precede it), reads that classification like LAND-01/LAND-48.
+- [ ] [LAND-83] A trunk commit ending in the classification paragraph, then only a paragraph of `Co-authored-by:` lines (key in any letter case; a hyphen line may precede it), reads that classification as LAND-01.
 - [ ] [LAND-84] Any other text after the classification paragraph, or another kind of line among the `Co-authored-by:` lines, leaves the commit unclassified; LAND-60/LAND-61 still refuse a doubled one.
 
 ## Never

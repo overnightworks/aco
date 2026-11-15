@@ -101,6 +101,8 @@ def arrange_trailer_read(
                 return process.CapturedResult(128, b"", b"fatal: bad trailer\n")
             if case.trailer_read is GitTrailerRead.TIMES_OUT:
                 raise process.ProcessTimedOutError()
+        if arguments[0] == "interpret-trailers" and directory is None:
+            return run_git(arguments, directory=github_clone.parent)
         return run_git(arguments, directory=directory)
 
     monkeypatch.setattr(process, "run_git", read)

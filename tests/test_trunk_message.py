@@ -27,6 +27,11 @@ COAUTHORS = "Co-authored-by: Alice Example <alice@example.invalid>\n"
             id="key-case",
         ),
         pytest.param(
+            f"{CLASSIFIED}\nco-authored-by: Bob <bob@example.invalid>\n",
+            CLASSIFIED,
+            id="lowercase-key",
+        ),
+        pytest.param(
             f"{CLASSIFIED}\nThanks.\n\n{COAUTHORS}", f"{CLASSIFIED}\nThanks.\n", id="prose"
         ),
         pytest.param(
