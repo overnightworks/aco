@@ -289,6 +289,7 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
                 "name": DEFAULT_LABEL,
                 "error": "no forge adapter for host",
                 "items": [],
+                "progress": None,
             }
         ],
     }
@@ -318,6 +319,7 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
         "name": "b",
         "error": "no forge adapter for host",
         "items": [],
+        "progress": None,
     }
 
 
@@ -335,8 +337,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
     assert response.json() == {
         "root": "/",
         "repos": [
-            {"name": "a", "error": "a is down", "items": []},
-            {"name": "b", "error": "b is down", "items": []},
+            {"name": "a", "error": "a is down", "items": [], "progress": None},
+            {"name": "b", "error": "b is down", "items": [], "progress": None},
         ],
     }
 
@@ -442,10 +444,10 @@ def test_a_cross_origin_preflight_is_granted_nothing(
     _assert_no_call(port, repository)
 
 
-def test_a_repo_lists_only_its_name_error_and_items(
+def test_a_repo_lists_only_its_name_error_items_and_progress(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-08: no key beside `name`, `error` and `items`, even for an item
+    """ABRD-08: no key beside `name`, `error`, `items` and `progress`, even for an item
     labelled for the operator."""
     repository.put_item(42, _OPEN_CARD, title="Share page")
     repository.put_item(
@@ -458,7 +460,7 @@ def test_a_repo_lists_only_its_name_error_and_items(
     [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
 
     assert (set(repo), [item["number"] for item in repo["items"]]) == (
-        {"name", "error", "items"},
+        {"name", "error", "items", "progress"},
         [42],
     )
 

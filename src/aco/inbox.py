@@ -19,7 +19,17 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import body, expectations, forge, protocol, repositories, rulings, session, workboard
+from . import (
+    body,
+    expectations,
+    forge,
+    progress,
+    protocol,
+    repositories,
+    rulings,
+    session,
+    workboard,
+)
 
 
 def rows(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[rulings.Row, ...]:
@@ -110,6 +120,8 @@ class Reading:
     rows: tuple[rulings.Row, ...]
     steps: tuple[Step, ...]
     plans: tuple[Plan, ...] = ()
+    progress: progress.Progress | progress.ProgressUnavailable | None = None
+    """The repository's progress view; `None` unless the read asked for it."""
 
 
 def read_issues(
@@ -123,15 +135,27 @@ def read_issues(
     return Reading(rows(listed, storage=storage), steps(listed, storage=storage), plans)
 
 
-def read_context(context: session.RunContext) -> Reading:
+def read_context(context: session.RunContext, *, with_progress: bool = False) -> Reading:
     """The rows, the steps and the plans of the checkout `context` is bound to,
-    from one listing of its open items."""
+    from one listing of its open items; with `with_progress`, also the progress
+    view, which reads each container's parent."""
     listed = tuple(context.forge.list_open_board_issues())
     storage = context.config.storage
-    return read_issues(
+    reading = read_issues(
         listed,
         storage=storage,
         plans=plans(listed, repository=context.forge.repository, storage=storage),
+    )
+    if not with_progress:
+        return reading
+    return replace(
+        reading,
+        progress=progress.of(
+            listed,
+            storage=storage,
+            waiting=len(reading.steps),
+            parent_of=context.forge.parent_issue,
+        ),
     )
 
 

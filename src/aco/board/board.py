@@ -17,7 +17,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 
-from .. import expectations, inbox, rulings
+from .. import expectations, inbox, progress, rulings
 from .ports import (
     CardChanged,
     CardDecision,
@@ -49,6 +49,8 @@ class RepoSnapshot:
     name: str
     rows: tuple[rulings.Row, ...]
     """This repo's open items with expectation lines, in RUL-03's order."""
+    progress: progress.Progress | progress.ProgressUnavailable | None = None
+    """This repo's progress view; `None` when the source gave none."""
 
 
 @dataclass(frozen=True)
@@ -218,6 +220,6 @@ class Boards:
 def _reading(label: str, future: Future[inbox.Reading]) -> RepoReading:
     try:
         reading = future.result()
-        return RepoSnapshot(label, reading.rows)
+        return RepoSnapshot(label, reading.rows, reading.progress)
     except DecisionSourceUnavailableError as error:
         return RepoUnavailable(label, str(error))
