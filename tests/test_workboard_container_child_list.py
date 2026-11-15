@@ -226,3 +226,18 @@ def test_a_container_is_named_closable_only_while_no_child_in_another_repository
     )
 
     assert workboard.closable_container_number(parent, children, Storage.GITHUB) == closable
+
+
+def test_a_container_with_an_unreadable_and_a_foreign_open_child_names_both() -> None:
+    """Spec: NEXT-38"""
+    unreadable = workboard.ChildItem(244, workboard.ChildState.OPEN)
+    foreign = workboard.IssueReference("other/repo", 954)
+    progress = ContainerProgress(
+        closed=1, total=3, open_children=(unreadable,), foreign_children=(foreign,)
+    )
+
+    reason = workboard._held_children_reason(
+        progress, frozenset({unreadable.number}), Storage.GITHUB
+    )
+
+    assert reason == "container; its open children do not read: #244; waiting on other/repo#954"
