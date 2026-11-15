@@ -1,8 +1,0 @@
-claim_id = "96fdad6351504532a6db8f59f2d3b91e"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "042532b30f999c172f5100c5ed9fd7c90ac41b26"
-branch = "claude/issue-878-trunk-trailer-reading-runs-in-the-reposi"
-scope = ["quality/baseline.toml", "specs/landing-grammar.spec.md", "src/aco/checkout.py", "src/aco/cmd_land.py", "tests/test_checkout.py", "tests/test_checkout_trunk_trailers.py", "tests/test_cmd_land_merge_message.py", "tests/test_trunk_message.py"]
-opened_commit = "8fbacaf2d022cb7e72b59e0e1b5aaf9fe7e7b30f"
-whole_reason = "One trailer-reading theme across its owner, its one other caller, its spec and their tests."
