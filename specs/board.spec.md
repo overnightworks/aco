@@ -41,6 +41,7 @@ reason text.
 | an item carries the idea label | — | BOARD-57 |
 | a container whose child-count summary disagrees with its sub-issue list | — | BOARD-58 |
 | a container with a sub-issue in another repository | — | BOARD-59, BOARD-60 |
+| a container whose only open child is in another repository | — | BOARD-61 |
 
 ## No `--json`
 
@@ -90,6 +91,7 @@ does, before either reads a single issue -- cited there, not restated.
 - [ ] [BOARD-58] A container whose summary counts a child takes its `container` closed and total counts and open children from its sub-issue list; a summary that disagrees refuses nothing, exit `0`.
 - [ ] [BOARD-59] A container's sub-issue in another repository counts in its `container` `closed` and `total`; an open one is only in a sibling `foreign_children` list of `"<repository>#<n>"`, never `open_children`.
 - [ ] [BOARD-60] A sub-issue in another repository is never listed, ranked, claimed or `next`'s pick; while one is open its container is never offered for closing.
+- [ ] [BOARD-61] A container whose only open children are in other repositories carries `"actionable": false` and `"actionable_reason": "container; waiting on <owner>/<repo>#<n>, ..."` (NEXT-60).
 
 ## Never
 

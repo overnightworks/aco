@@ -186,9 +186,8 @@ class ChildItem:
 
 @dataclass(frozen=True)
 class ForeignChild:
-    """One sub-issue recorded in another repository: it counts toward its
-    container's progress and keeps it open, but this repository can neither
-    list, rank nor claim it."""
+    """One sub-issue recorded in another repository: it counts toward its container's
+    progress and keeps it open, but this repository can neither list, rank nor claim it."""
 
     reference: IssueReference
     state: ChildState
@@ -1642,7 +1641,7 @@ def _board_item(
             issue.number, childless_verdict, parsed, config.storage
         ),
         childless_verdict=childless_verdict,
-        unreadable_container_reason=_unreadable_children_reason(
+        held_container_reason=_held_children_reason(
             container_progress, context.unreadable_numbers, config.storage
         ),
     )
@@ -2394,7 +2393,7 @@ class _ActionabilityFacts:
     malformed_defect: ContractDefect | None = None
     childless_container_reason: str | None = None
     childless_verdict: ChildlessContainerVerdict | None = None
-    unreadable_container_reason: str | None = None
+    held_container_reason: str | None = None
 
 
 # `next`'s own words for a childless container whose `Next` line still names
@@ -2638,25 +2637,26 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
-            or facts.unreadable_container_reason
+            or facts.held_container_reason
             or "container; claim a child"
         )
     return _claim_or_completeness_reason(facts)
 
 
-def _unreadable_children_reason(
+def _held_children_reason(
     progress: ContainerProgress | None, unreadable_numbers: frozenset[int], storage: Storage
 ) -> str | None:
-    """What holds a container whose every open child is an item that does
-    not read (ITEM-54): no child is there to claim, and its
-    close refuses by them, so `next` names them instead."""
-    if progress is None or not progress.open_children:
+    """What holds a container whose open children do not read (ITEM-54) or live elsewhere."""
+    numbers = [child.number for child in progress.open_children] if progress else []
+    if progress is None or not unreadable_numbers.issuperset(numbers):
         return None
-    numbers = [child.number for child in progress.open_children]
-    if not unreadable_numbers.issuperset(numbers):
-        return None
+    foreign = ", ".join(map(str, progress.foreign_children))
     labels = ", ".join(item_label(number, storage) for number in numbers)
-    return f"container; its open children do not read: {labels}"
+    held = (
+        f"its open children do not read: {labels}" if numbers else "",
+        f"waiting on {foreign}" if foreign else "",
+    )
+    return "; ".join(("container", *filter(None, held))) if any(held) else None
 
 
 def holder_subject(holder: int | str, storage: Storage) -> str:

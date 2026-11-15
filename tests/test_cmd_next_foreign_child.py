@@ -1,12 +1,12 @@
 """`aco next` reads a container whose sub-issues include one from another
 repository, as GitHub reports them, and never offers that child (BOARD-60)."""
 
-import json
+from dataclasses import dataclass
 
 import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract, container_with_children
 from cli_fixtures import freeze_cli_now, run_cli
-from github_fixtures import FakeForge, serve_forge
+from github_fixtures import FakeForge, scripted_gh, serve_forge, sub_issue_row
 
 from aco import workboard
 from aco.github import GitHubForge, repository_id
@@ -15,38 +15,23 @@ CONTAINER = 243
 LOCAL_CHILD = 244
 FOREIGN_REPOSITORY = "other/repo"
 FOREIGN_NUMBER = 954
+FOREIGN_LABEL = f"{FOREIGN_REPOSITORY}#{FOREIGN_NUMBER}"
+FOREIGN_ROW = sub_issue_row(FOREIGN_REPOSITORY, FOREIGN_NUMBER, "open")
+CLOSED_ROW = sub_issue_row(REPOSITORY, 1000, "closed")
+LOCAL_ROW = sub_issue_row(REPOSITORY, LOCAL_CHILD, "open")
 
 
-def sub_issue_row(repository: str, number: int, state: str) -> str:
-    return json.dumps(
-        {
-            "number": number,
-            "repository": f"https://api.github.com/repos/{repository}",
-            "state": state,
-        }
-    )
-
-
-SUB_ISSUES = "\n".join(
-    (
-        sub_issue_row(REPOSITORY, LOCAL_CHILD, "open"),
-        sub_issue_row(FOREIGN_REPOSITORY, FOREIGN_NUMBER, "open"),
-        sub_issue_row(REPOSITORY, 1000, "closed"),
-    )
-)
-
-
-def scripted_gh(arguments: list[str], *, input_data: bytes | None = None) -> str:
-    """`gh` answering the repository lookup and the one sub-issue listing."""
-    return REPOSITORY if arguments[-2:] == ["--jq", ".full_name"] else SUB_ISSUES
-
-
+@dataclass
 class ForgeListingSubIssuesFromGitHub(FakeForge):
     """The board's forge, except that a container's children are the `gh`
     sub-issue rows `GitHubForge` parses."""
 
+    rows: tuple[str, ...] = ()
+
     def list_children(self, number: int) -> workboard.ChildList:
-        return GitHubForge(repository_id(REPOSITORY), run=scripted_gh).list_children(number)
+        return GitHubForge(repository_id(REPOSITORY), run=scripted_gh(*self.rows)).list_children(
+            number
+        )
 
 
 @pytest.mark.usefixtures("github_world")
@@ -63,7 +48,10 @@ def test_next_offers_the_local_child_of_a_container_that_also_has_a_foreign_one(
     )
     local_child = board_issue(LOCAL_CHILD, "Local child", complete_contract("Ship it."))
     freeze_cli_now(monkeypatch)
-    serve_forge(monkeypatch, ForgeListingSubIssuesFromGitHub(board_issues=(container, local_child)))
+    forge = ForgeListingSubIssuesFromGitHub(
+        board_issues=(container, local_child), rows=(LOCAL_ROW, FOREIGN_ROW, CLOSED_ROW)
+    )
+    serve_forge(monkeypatch, forge)
 
     result = run_cli(["next"], capsys)
 
@@ -76,3 +64,21 @@ def test_next_offers_the_local_child_of_a_container_that_also_has_a_foreign_one(
         True,
         False,
     )
+
+
+@pytest.mark.usefixtures("github_world")
+def test_next_reads_a_container_whose_only_open_child_is_foreign_as_waiting_on_it(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: NEXT-60"""
+    container, _ = container_with_children(CONTAINER, closed=1, body=complete_contract("Wait."))
+    freeze_cli_now(monkeypatch)
+    forge = ForgeListingSubIssuesFromGitHub(
+        board_issues=(container,), rows=(FOREIGN_ROW, CLOSED_ROW)
+    )
+    serve_forge(monkeypatch, forge)
+
+    result = run_cli(["next"], capsys)
+
+    waiting_line = f"#{CONTAINER}: container; waiting on {FOREIGN_LABEL}"
+    assert (result.status, waiting_line in result.stdout.splitlines()) == (3, True)

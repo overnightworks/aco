@@ -1,5 +1,6 @@
 """Pull-request scenario values and the fake forge."""
 
+import json
 import os
 import re
 import shutil
@@ -7,7 +8,6 @@ import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 
 import pytest
@@ -82,6 +82,27 @@ def serve_forge[ServedForge: "FakeForge | github.GitHubForge"](
     """Installs one arranged forge, a fake or an adapter over a fake transport, as GitHub's."""
     monkeypatch.setattr(github, "GitHubForge", lambda repository: forge)
     return forge
+
+
+def sub_issue_row(repository: str, number: int, state: str = "open") -> str:
+    """One line of the `gh` sub-issue listing, recorded in `repository`."""
+    return json.dumps(
+        {
+            "number": number,
+            "repository": f"https://api.github.com/repos/{repository}",
+            "state": state,
+        }
+    )
+
+
+def scripted_gh(*rows: str) -> Callable[..., str]:
+    """`gh` answering the repository lookup with `REPOSITORY` and any listing with `rows`."""
+    listing = "\n".join(rows)
+
+    def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
+        return REPOSITORY if arguments[-2:] == ["--jq", ".full_name"] else listing
+
+    return run
 
 
 def merge_on_the_forge(
@@ -786,45 +807,3 @@ def landed_observations(
         {key: actual for key, (actual, _) in comparisons.items()},
         {key: wanted for key, (_, wanted) in comparisons.items()},
     )
-
-
-@dataclass(frozen=True)
-class ParserExit:
-    exited: bool
-    usage_prefix: str
-
-
-class RefusalLength(Enum):
-    UNCHECKED = "unchecked"
-    WITHIN_LIMIT = "within-limit"
-    EXACTLY_LIMIT = "exactly-limit"
-
-
-def refusal_observations(
-    world: LandingWorld,
-    result: CliRun,
-    sentence: str,
-    *,
-    length: RefusalLength = RefusalLength.UNCHECKED,
-    parser_exit: ParserExit | None = None,
-) -> tuple[dict[str, object], dict[str, object]]:
-    observed = {"exit": result.status, "out": result.stdout, **landing_effects(world)}
-    expected = {"exit": 2, "out": "", **world.unchanged}
-    if parser_exit is not None:
-        observed.update(
-            {
-                "exception": parser_exit.exited,
-                "usage": result.stderr.startswith(parser_exit.usage_prefix),
-                "last": result.stderr.splitlines()[-1] if result.stderr else "",
-            }
-        )
-        expected.update({"exception": True, "usage": True, "last": sentence})
-    else:
-        observed["err"] = result.stderr
-        expected["err"] = "ERROR: " + sentence + "\n"
-    if length is not RefusalLength.UNCHECKED:
-        actual_length = len(result.stderr.rstrip("\n"))
-        exact = length is RefusalLength.EXACTLY_LIMIT
-        observed["length"] = actual_length if exact else actual_length <= 200
-        expected["length"] = 200 if exact else True
-    return observed, expected

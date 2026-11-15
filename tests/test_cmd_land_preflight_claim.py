@@ -20,14 +20,13 @@ from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
     LandingWorld,
-    RefusalLength,
     assert_github_world,
     landing_pull_request,
     landing_readiness,
     landing_world,
-    refusal_observations,
     serve_forge,
 )
+from landing_refusals import RefusalLength, refusal_observations
 from store_fixtures import (
     claim_intent,
     lineage_observation,

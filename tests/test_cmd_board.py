@@ -61,3 +61,26 @@ def test_board_json_counts_a_child_in_another_repository_and_names_it_only_while
         [child["number"] for child in open_children],
         shown["foreign_children"],
     ) == (expected_closed, 3, [LOCAL_CHILD], expected_foreign_children)
+
+
+def test_board_json_reads_a_container_with_only_a_foreign_open_child_as_waiting_on_it() -> None:
+    """Spec: BOARD-61"""
+    listed, _ = container_with_children(CONTAINER, closed=1, body=complete_contract("Cut it."))
+    projected = projected_board(
+        (listed,),
+        (),
+        (),
+        (),
+        BoardConfig(),
+        now=datetime(2026, 8, 21, tzinfo=UTC),
+        children={CONTAINER: (workboard.ForeignChild(FOREIGN_CHILD, workboard.ChildState.OPEN),)},
+    )
+
+    payload = cmd_board.board_payload(projected)
+
+    items = cast("list[dict[str, object]]", payload["items"])
+    container = next(item for item in items if item["number"] == CONTAINER)
+    assert (container["actionable"], container["actionable_reason"]) == (
+        False,
+        f"container; waiting on {FOREIGN_CHILD}",
+    )
