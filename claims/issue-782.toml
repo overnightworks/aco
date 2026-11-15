@@ -1,8 +1,0 @@
-claim_id = "ead21a38d48143ff8cea2c327f59fba0"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "42222ea8b13952fb6be629bc7887bb4955ea1473"
-branch = "claude/issue-782-aco-wait-follow-ups"
-scope = ["quality/baseline.toml", "specs/bootstrap.spec.md", "specs/check.spec.md", "specs/output.spec.md", "specs/rule.spec.md", "specs/serve.spec.md", "specs/wait.spec.md", "src/aco/board/aco_source.py", "src/aco/cli.py", "src/aco/cmd_mcp.py", "src/aco/cmd_rule.py", "src/aco/cmd_rulings.py", "src/aco/cmd_wait.py", "src/aco/cmd_withdraw.py", "src/aco/decide.py", "src/aco/report.py", "src/aco/workboard.py", "tests"]
-opened_commit = "66596717d5cb1beef778765607286487307eba1f"
-whole_reason = "four small follow-ups touch the decide.turn callers, the line parser's users and the usage lines across specs"
