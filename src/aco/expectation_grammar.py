@@ -17,8 +17,8 @@ from datetime import date
 from enum import StrEnum
 from typing import NamedTuple, cast
 
-from . import protocol
 from .card_rules import card_rule_defects
+from .toml_text import toml_multiline_string, toml_string
 
 
 class FieldDefect(NamedTuple):
@@ -739,12 +739,12 @@ def card_hash(entry: Mapping[str, object]) -> str:
 
 def _rendered_value(key: str, value: object) -> str:
     if key == _PICTURE:
-        return f"{key} = {protocol.toml_multiline_string(cast(str, value))}"
+        return f"{key} = {toml_multiline_string(cast(str, value))}"
     if isinstance(value, date):
         return f"{key} = {value.isoformat()}"
     if value is True:
         return f"{key} = true"
-    return f"{key} = {protocol.toml_string(value)}"
+    return f"{key} = {toml_string(value)}"
 
 
 def _rendered_present(table: Mapping[str, object], keys: tuple[str, ...]) -> list[str]:

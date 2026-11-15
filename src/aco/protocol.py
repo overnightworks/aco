@@ -9,7 +9,9 @@ from enum import StrEnum
 from functools import partial
 from pathlib import PurePosixPath, PureWindowsPath
 from types import MappingProxyType
-from typing import Protocol, cast
+from typing import Protocol
+
+from .toml_text import toml_string
 
 # Named refusal when a write-path command would otherwise create
 # `refs/aco/state` as a side effect. One owner so
@@ -55,11 +57,6 @@ WIDE_SCOPE_SHARE_FLOOR = 12
 # the dirty-tree refusal's and the claim overlap notice's shared shape for a
 # list too long to print whole.
 NAMED_PATH_OVERFLOW_LIMIT = 3
-# The first printable ASCII code point (space) and DEL bound the control
-# characters a claim marker field, scope path, or outbound text may never
-# contain -- each is meant to read as a single printable line.
-ASCII_PRINTABLE_MIN = 0x20
-ASCII_DEL = 0x7F
 
 
 ItemLabel = Callable[[int], str]
@@ -278,12 +275,6 @@ def has_line_control(text: str) -> bool:
     """Whether `text` holds what a one-line field refuses: TAB or any
     `is_display_control` character (CLAIM-20, CLAIM-58)."""
     return any(character == "\t" or is_display_control(character) for character in text)
-
-
-def has_control_character(text: str) -> bool:
-    return any(
-        ord(character) < ASCII_PRINTABLE_MIN or ord(character) == ASCII_DEL for character in text
-    )
 
 
 def _is_bounded_line(value: str, maximum: int) -> bool:
@@ -1086,6 +1077,17 @@ class RescopeIntent:
 
 
 @dataclass(frozen=True)
+class HandoverIntent:
+    """Makes `agent` the holder of the live claim `previous_agent` holds; role, id,
+    branch and scope stay."""
+
+    claim_id: ClaimId
+    previous_agent: str
+    agent: str
+    operation_id: str
+
+
+@dataclass(frozen=True)
 class ReleaseIntent:
     """Deletes `claims/<key>.toml`; `ids/` and `resources/` are unchanged (a
     released claim id and a released resource value are both terminal:
@@ -1185,7 +1187,13 @@ class LandingIntent:
 
 
 ClaimTransitionIntent = (
-    ClaimIntent | RescopeIntent | ReleaseIntent | ItemWriteIntent | ItemCloseIntent | LandingIntent
+    ClaimIntent
+    | RescopeIntent
+    | HandoverIntent
+    | ReleaseIntent
+    | ItemWriteIntent
+    | ItemCloseIntent
+    | LandingIntent
 )
 
 
@@ -1381,6 +1389,23 @@ def _apply_rescope_intent(state: ClaimState, intent: RescopeIntent) -> ClaimStat
     )
 
 
+def _apply_handover_intent(state: ClaimState, intent: HandoverIntent) -> ClaimState:
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(
+            f"claim id {intent.claim_id!r} has no active claim to hand over"
+        )
+    key, current = found
+    if current.agent != intent.previous_agent:
+        raise ClaimUnavailableError(
+            f"the claim is held by {current.agent!r}, not by {intent.previous_agent!r}"
+        )
+    return replace(  # NOSONAR(S5886) pyright types replace()
+        state,
+        claims=MappingProxyType({**state.claims, key: replace(current, agent=intent.agent)}),
+    )
+
+
 def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingIntent) -> None:
     """Raises unless `intent` may release `current`: the original claimant,
     or an explicit coordinator override by role coordinator. Shared by
@@ -1512,75 +1537,23 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
     `state.tip` is already real -- `store.py` never calls this against
     `EMPTY_STATE`."""
     if isinstance(intent, ClaimIntent):
-        return _apply_claim_intent(state, intent)
-    if isinstance(intent, RescopeIntent):
-        return _apply_rescope_intent(state, intent)
-    if isinstance(intent, ReleaseIntent):
-        return _apply_release_intent(state, intent)
-    if isinstance(intent, LandingIntent):
-        return _apply_landing_intent(state, intent)
-    if isinstance(intent, ItemCloseIntent):
-        return _apply_item_close_intent(state, intent)
-    return _apply_item_write_intent(state, intent)
+        applied = _apply_claim_intent(state, intent)
+    elif isinstance(intent, RescopeIntent):
+        applied = _apply_rescope_intent(state, intent)
+    elif isinstance(intent, HandoverIntent):
+        applied = _apply_handover_intent(state, intent)
+    elif isinstance(intent, ReleaseIntent):
+        applied = _apply_release_intent(state, intent)
+    elif isinstance(intent, LandingIntent):
+        applied = _apply_landing_intent(state, intent)
+    elif isinstance(intent, ItemCloseIntent):
+        applied = _apply_item_close_intent(state, intent)
+    else:
+        applied = _apply_item_write_intent(state, intent)
+    return applied
 
 
 # --- `claims/<key>.toml` and `resources/<name>.toml` codecs -----------------
-#
-# Hand-written, not a TOML-writing library: `toml_string` is this
-# repository's one TOML basic-string writer, living here
-# because this module sits below `workboard` in the Layers contract --
-# `workboard.py`'s renderers import it rather than keeping a second escape
-# table and drifting from what `tomllib.loads` (the reader) accepts back.
-# It escapes every control character TOML's basic-string grammar forbids
-# unescaped (U+0000-U+001F and U+007F) and the line separators U+0085, U+2028
-# and U+2029, which `str.splitlines` ends a line at, so a raw one would split a
-# value in the body's line-wise fence walk: the short escapes where TOML has
-# one, `\uXXXX` for the rest.
-
-_TOML_STRING_ESCAPES = {
-    "\\": "\\\\",
-    '"': '\\"',
-    "\b": "\\b",
-    "\t": "\\t",
-    "\n": "\\n",
-    "\f": "\\f",
-    "\r": "\\r",
-}
-
-
-def toml_string(value: object) -> str:
-    """A TOML basic string for `value` -- the writer's one escaping path,
-    matching what `tomllib.loads` (the reader) accepts back unchanged."""
-    escaped = "".join(_toml_string_escape(char) for char in cast(str, value))
-    return f'"{escaped}"'
-
-
-# A multi-line basic string keeps a newline and a tab literally.
-_TOML_MULTILINE_LITERALS = frozenset("\n\t")
-_FENCE_CHARACTERS = frozenset("`~")
-
-
-def toml_multiline_string(value: str) -> str:
-    """A TOML multi-line basic string for `value` -- a `picture`'s inline SVG.
-    The text stands inside a fenced block, so a raw run of backticks or tildes
-    could end it: each is written as `\\uXXXX`, every other character as
-    `toml_string` does. `tomllib.loads` reads it back to `value` unchanged."""
-    escaped = "".join(_multiline_escape(char) for char in value)
-    return f'"""\n{escaped}"""'
-
-
-def _multiline_escape(char: str) -> str:
-    if char in _FENCE_CHARACTERS:
-        return f"\\u{ord(char):04X}"
-    return char if char in _TOML_MULTILINE_LITERALS else _toml_string_escape(char)
-
-
-def _toml_string_escape(char: str) -> str:
-    if char in _TOML_STRING_ESCAPES:
-        return _TOML_STRING_ESCAPES[char]
-    if has_control_character(char) or char.splitlines() != [char]:
-        return f"\\u{ord(char):04X}"
-    return char
 
 
 def _toml_string_array(values: tuple[str, ...]) -> str:

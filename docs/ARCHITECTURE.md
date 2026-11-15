@@ -173,7 +173,7 @@ an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file pe
 item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
-decision, `aco item edit --size/--whole`, `aco rescope` (through its claim
+decision, `aco item edit --size/--whole`, `aco rescope` and `aco handover` (each through its claim
 transition) and the `ask`, `record_answer` and `step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
@@ -226,6 +226,8 @@ but not grow.
 - The state ref advances by a plain fast-forward push. A push already accepts
   fast-forwards and rejects the rest, which is the serialization needed; a
   matching `--force-with-lease` can replace history, so it is not used.
+- A claim's holder changes only through `aco handover`, which records the takeover on
+  the item and in the transition's commit trailers.
 - A released claim is absent from the tree and readable at the parent commit.
   The commit message names the transition, so the parent commit is the whole
   history.

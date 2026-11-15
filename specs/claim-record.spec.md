@@ -25,6 +25,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 | lane claim beside an issue claim | CLAIM-10 | — | — |
 | `aco adopt`'s exclusive claim on a held branch | CLAIM-71 | — | — |
 | `aco adopt`'s exclusive claim replayed | CLAIM-72 | — | — |
+| a live item claim taken over by `aco handover` | CLAIM-76 | CLAIM-76 | CLAIM-37, CLAIM-38 |
 | scope path outside the repository | CLAIM-19 | — | — |
 | scope path not canonical | CLAIM-20, CLAIM-21 | — | — |
 | scope empty, or over 256 entries | CLAIM-22, CLAIM-23 | — | — |
@@ -53,6 +54,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 - [ ] [CLAIM-04] The two key prefixes never collide: a lane branch literally named `issue-1` is stored as `claims/lane-issue-1.toml`, never as the entry of issue `#1`.
 - [ ] [CLAIM-05] A claim file carries `claim_id`, `agent`, `role`, `base`, `branch`, `scope`, `opened_commit`, and only then the optional `whole_reason`, `resource_name`, `resource_value`.
 - [ ] [CLAIM-75] Without `--agent`, the agent is `$ACO_AGENT`, else `Grok $GROK_SESSION_ID`, else `Claude $CLAUDE_CODE_SESSION_ID`, the first of them non-empty; none refuses as OUT-05.
+- [ ] [CLAIM-76] `aco handover` (`specs/handover.spec.md`) replaces a live item claim's agent with the acting one; the role, id, branch and scope stay, and the new agent is the holder CLAIM-37 and CLAIM-38 judge.
 - [ ] [CLAIM-10] A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both; only CLAIM-71 refuses that.
 - [ ] [CLAIM-57] A branch that is not a safe Git ref — a leading `-`, `..`, `//`, `@{`, a `.lock` suffix, a dot-segment — refuses `claim marker branch is not a safe Git ref: '<branch>'`, exit `2`.
 - [ ] [CLAIM-58] An agent or role that is blank, padded, holds a control character or display control (NEXT-37) or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before any write.
@@ -119,8 +121,8 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 ## Roles
 
 - [ ] [CLAIM-36] An omitted `--role` makes the record a `builder`, and `aco status` prints `<agent> (builder)`.
-- [ ] [CLAIM-37] A rescope by a different agent refuses `only the original claimant may rescope (holder='Ada (builder)', this session='Bob (builder)')`, exit `2`; `rescope` has no `--role` flag.
-- [ ] [CLAIM-38] A release by a different agent or role refuses, exit `2`, naming holder and session, the holder's repeat before the coordinator override (`specs/release.spec.md` REL-12, REL-41).
+- [ ] [CLAIM-37] A rescope by a different agent refuses `only the original claimant may rescope`, REL-41's route, `(holder='Ada (builder)', this session='Bob (builder)')`, exit `2`.
+- [ ] [CLAIM-38] A release by a different agent or role refuses, exit `2`, naming holder and session and, for another agent, the `aco handover` route before the override (REL-12, REL-41).
 - [ ] [CLAIM-39] `--coordinator-override` without `--role coordinator` refuses `a coordinator override requires --role coordinator`, exit `2`.
 - [ ] [CLAIM-40] `--coordinator-override --role coordinator` releases a foreign live claim and removes its record, so `aco status` prints `UNCLAIMED issue #42`, exit `0`.
 

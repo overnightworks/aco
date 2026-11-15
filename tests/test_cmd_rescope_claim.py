@@ -201,7 +201,8 @@ def test_a_rescope_by_another_agent_than_the_claimant_refuses_and_changes_nothin
     assert (result.status, result.stdout, result.stderr) == (
         2,
         "",
-        "ERROR: only the original claimant may rescope "
+        "ERROR: only the original claimant may rescope; take the claim over with "
+        f"`aco handover {ISSUE} --from Ada --reason <text>` "
         "(holder='Ada (builder)', this session='Grok 4.6 (builder)')\n",
     )
     assert state_ref_tip(bare_remote) == tip

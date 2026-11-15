@@ -47,6 +47,7 @@ from .protocol import (
     ClaimState,
     ClaimTransitionIntent,
     ClaimUnavailableError,
+    HandoverIntent,
     ItemCloseIntent,
     ItemWriteIntent,
     LandingIntent,
@@ -102,25 +103,24 @@ _STATE_TOP_LEVEL_NAMES = frozenset(
 
 class TransitionIntent(StrEnum):
     """The commit message's own `intent:` trailer label (ref-store-cas.spec.md, CAS-06), the house
-    `StrEnum` protocol-token type used everywhere else in the package -- a loose
-    string here would let a typo in `_transition_message` pass unnoticed."""
+    `StrEnum` protocol-token type: a loose string would let a typo in `_transition_message` pass."""
 
     CLAIM = "claim"
     RESCOPE = "rescope"
+    HANDOVER = "handover"
     RELEASE = "release"
     ITEM_WRITE = "item_write"
     LANDING = "landing"
 
 
-# ref-store-cas.spec.md, CAS-06: `intent: claim` / `rescope` / `release` / `item_write`
-# / `landing` (`LandingIntent`'s atomic close-and-release).
+# ref-store-cas.spec.md, CAS-06: one `intent:` trailer label per transition intent.
 _TRANSITION_LABELS: dict[type[ClaimTransitionIntent], TransitionIntent] = {
     ClaimIntent: TransitionIntent.CLAIM,
     RescopeIntent: TransitionIntent.RESCOPE,
+    HandoverIntent: TransitionIntent.HANDOVER,
     ReleaseIntent: TransitionIntent.RELEASE,
     ItemWriteIntent: TransitionIntent.ITEM_WRITE,
-    # A close commits as the item write it is; its live-claim check is a
-    # precondition of `apply`, not a trailer of its own.
+    # A close commits as an item write; its live-claim check is a precondition of `apply`.
     ItemCloseIntent: TransitionIntent.ITEM_WRITE,
     LandingIntent: TransitionIntent.LANDING,
 }

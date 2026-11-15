@@ -22,7 +22,9 @@ from typing import TypeGuard, cast
 from . import expectation_grammar, protocol
 from .body_fence import walk_fences
 from .expectation_grammar import block_expectation_defects, render_expectations
+from .item_handover import handover_defects, render_handover
 from .item_wait import ItemWait, parse_wait, render_wait, wait_defects
+from .toml_text import toml_string
 
 # A fresh container carries no automatic parent-provenance the way `cut`
 # gives a fresh child one, so `item new` with nothing piped states the prose
@@ -42,6 +44,7 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "next",
         "done_when",
         "wait",
+        "handover",
         "scope",
         "size",
         "whole",
@@ -532,6 +535,7 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
         defects.append(version_defect)
     defects.extend(_block_projection_defects(data))
     defects.extend(ContractDefect(*defect) for defect in wait_defects(data))
+    defects.extend(ContractDefect(*defect) for defect in handover_defects(data))
     defects.extend(_block_scope_defects(data))
     size_defect = _block_size_defect(data)
     if size_defect is not None:
@@ -848,11 +852,6 @@ _JsonObject = dict[str, object]
 # `cast` names a real type instead of repeating the string.
 _JsonRows = list[_JsonObject]
 
-# `protocol.toml_string` is this repository's one TOML basic-string writer:
-# it lives below this module in the Layers contract, so it is
-# imported rather than kept as a second escape table here, and so is its
-# multi-line twin `protocol.toml_multiline_string`.
-
 
 def _render_scope_array(values: object) -> str:
     """`values`'s scope entries as a canonical TOML array: the one rendering
@@ -862,7 +861,7 @@ def _render_scope_array(values: object) -> str:
     here. Callable only once a schema check has already proven `values`
     valid, so this never itself refuses a duplicate."""
     entries = protocol.valid_scope(values)
-    return "[" + ", ".join(protocol.toml_string(value) for value in entries) + "]"
+    return "[" + ", ".join(toml_string(value) for value in entries) + "]"
 
 
 def _render_scope(data: Mapping[str, object]) -> list[str]:
@@ -874,13 +873,13 @@ def _render_scope(data: Mapping[str, object]) -> list[str]:
 def _render_size(data: Mapping[str, object]) -> list[str]:
     if "size" not in data:
         return []
-    return ["", f"size = {protocol.toml_string(data['size'])}"]
+    return ["", f"size = {toml_string(data['size'])}"]
 
 
 def _render_whole(data: Mapping[str, object]) -> list[str]:
     if "whole" not in data:
         return []
-    return ["", f"whole = {protocol.toml_string(data['whole'])}"]
+    return ["", f"whole = {toml_string(data['whole'])}"]
 
 
 def _render_empty_slice_table(data: Mapping[str, object]) -> list[str]:
@@ -900,11 +899,11 @@ def _render_slices(data: Mapping[str, object]) -> list[str]:
                 "",
                 "[[slice]]",
                 f"index = {entry['index']}",
-                f"title = {protocol.toml_string(entry['title'])}",
+                f"title = {toml_string(entry['title'])}",
             )
         )
         if "done_when" in entry:
-            lines.append(f"done_when = {protocol.toml_string(entry['done_when'])}")
+            lines.append(f"done_when = {toml_string(entry['done_when'])}")
         if "scope" in entry:
             lines.append(f"scope = {_render_scope_array(entry['scope'])}")
     return lines
@@ -912,7 +911,7 @@ def _render_slices(data: Mapping[str, object]) -> list[str]:
 
 def _render_record_array(values: object) -> str:
     entries = cast("list[str]", values)
-    return "[" + ", ".join(protocol.toml_string(value) for value in entries) + "]"
+    return "[" + ", ".join(toml_string(value) for value in entries) + "]"
 
 
 def _render_record(data: Mapping[str, object]) -> list[str]:
@@ -927,21 +926,21 @@ def _render_record(data: Mapping[str, object]) -> list[str]:
     lines = [
         "",
         f"[{RECORD_KEY}]",
-        f"title = {protocol.toml_string(record['title'])}",
-        f"state = {protocol.toml_string(record['state'])}",
+        f"title = {toml_string(record['title'])}",
+        f"state = {toml_string(record['state'])}",
     ]
     if record.get("kind") is not None:
-        lines.append(f"kind = {protocol.toml_string(record['kind'])}")
+        lines.append(f"kind = {toml_string(record['kind'])}")
     lines.append(f"labels = {_render_record_array(record.get('labels', []))}")
     lines.append(f"blocked_by = {_render_record_array(record.get('blocked_by', []))}")
     if record.get("parent") is not None:
-        lines.append(f"parent = {protocol.toml_string(record['parent'])}")
+        lines.append(f"parent = {toml_string(record['parent'])}")
     if record.get("origin") is not None:
-        lines.append(f"origin = {protocol.toml_string(record['origin'])}")
-    lines.append(f"created_at = {protocol.toml_string(record['created_at'])}")
-    lines.append(f"updated_at = {protocol.toml_string(record['updated_at'])}")
+        lines.append(f"origin = {toml_string(record['origin'])}")
+    lines.append(f"created_at = {toml_string(record['created_at'])}")
+    lines.append(f"updated_at = {toml_string(record['updated_at'])}")
     if record.get("closed_at") is not None:
-        lines.append(f"closed_at = {protocol.toml_string(record['closed_at'])}")
+        lines.append(f"closed_at = {toml_string(record['closed_at'])}")
     return lines
 
 
@@ -951,10 +950,9 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     `newline` so a following fence line starts clean. Callers: `replace_block`,
     `prose_above_fresh_block`; there is no standalone validator."""
     lines = [f"version = {data['version']}"]
-    lines.extend(
-        f"{key} = {protocol.toml_string(data[key])}" for key in ("now", "next", "done_when")
-    )
+    lines.extend(f"{key} = {toml_string(data[key])}" for key in ("now", "next", "done_when"))
     lines.extend(render_wait(data))
+    lines.extend(render_handover(data))
     lines.extend(_render_scope(data))
     lines.extend(_render_size(data))
     lines.extend(_render_whole(data))
@@ -1026,7 +1024,7 @@ def body_with_block_fields(body: str, fields: Mapping[str, object]) -> str:
 
 def _block_field_text(key: str, value: object) -> str:
     """One block field's value as `render_block` writes it, scope canonical."""
-    return _render_scope_array(value) if key == "scope" else protocol.toml_string(value)
+    return _render_scope_array(value) if key == "scope" else toml_string(value)
 
 
 def block_field_conflicts(body: str, fields: Mapping[str, object]) -> tuple[str, ...]:

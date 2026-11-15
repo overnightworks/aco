@@ -288,7 +288,7 @@ def test_render_block_round_trips_question_example_and_a_multiline_picture() -> 
     SVG with embedded quotes and a backslash, a literal `\"\"\"` run that
     must not be mistaken for the closing delimiter, and a value ending in a
     trailing `"` right before the writer's own closing `\"\"\"` -- only a
-    TOML multi-line basic string (`protocol.toml_multiline_string`), not the
+    TOML multi-line basic string (`toml_text.toml_multiline_string`), not the
     single-line `toml_string` every other field uses, can carry this
     byte-exact."""
     picture = (
