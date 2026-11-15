@@ -20,6 +20,7 @@ from aco import body, cmd_wait, forge, github, store
 
 WITHDRAWN_LINE = '[[expectation]]\ntext = "Zurück"\nwithdrawn_on = 2026-08-01\n'
 DATE = r"\d{4}-\d{2}-\d{2}"
+SLOW_READS_PAUSES = int(cmd_wait.ITEM_READ_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
 
 
 def open_reference(raw: str, *, is_landing: bool = False) -> forge.ItemReference:
@@ -141,21 +142,39 @@ class TestWaiting:
         assert ticks.now >= cmd_wait.ITEM_READ_SECONDS
         assert store.reads() == 2
 
-    def test_a_forge_failure_while_it_waits_refuses_unavailable(
+    def test_a_forge_failure_while_it_waits_is_said_once_and_the_wait_goes_on(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: WAIT-10 -- a later read that fails ends the command loudly."""
+        """Spec: WAIT-10 -- reads that fail one after the other warn once, and a
+        later read that answers ends the wait by WAIT-01."""
+        client = serve_item(monkeypatch, open_reference(group_body()))
+        client.scripted_item_reads.extend([None, *[forge.ForgeError("the forge is down")] * 2])
+        ticks = install(monkeypatch, reads_of(client))
+        ruled = open_reference(group_body(ruled_card()))
+        ticks.afterwards[SLOW_READS_PAUSES * 2 + 10] = lambda: client.issue_references.update(
+            {ITEM: ruled}
+        )
+        result = run_cli(["wait", "7", "--line", "3"], capsys)
+        warning = "WARNING: the item could not be read, still waiting: the forge is down\n"
+        assert (result.status, result.stderr) == (0, warning)
+        assert re.fullmatch(rf"CHANGED #7 line 3: ruled A {DATE}\n", result.stdout)
+
+    def test_an_item_that_is_gone_after_a_forge_failure_refuses_invalid_item(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: WAIT-10, WAIT-04 -- the wait that went on through a failure still
+        ends, exit 2, once the item is gone."""
         client = serve_item(monkeypatch, open_reference(group_body()))
         client.scripted_item_reads.extend([None, forge.ForgeError("the forge is down")])
-        install(monkeypatch, reads_of(client))
-        result = run_cli(["wait", "7", "--line", "2", "--json"], capsys)
-        message = "the forge is down"
-        assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
-        assert json.loads(result.stdout) == {
-            "ok": False,
-            "reason": "unavailable",
-            "message": message,
-        }
+        ticks = install(monkeypatch, reads_of(client))
+        missing = forge.ItemReference(forge.ItemState.MISSING)
+        ticks.afterwards[SLOW_READS_PAUSES + 10] = lambda: client.issue_references.update(
+            {ITEM: missing}
+        )
+        result = run_cli(["wait", "7", "--line", "3", "--json"], capsys)
+        assert result.status == 2
+        assert result.stderr.endswith("ERROR: #7 does not exist\n")
+        assert json.loads(result.stdout)["reason"] == "invalid_item"
 
 
 @pytest.mark.usefixtures("github_world")
