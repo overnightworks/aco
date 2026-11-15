@@ -1,8 +1,0 @@
-claim_id = "98d28925469a4fe1812a355c00367931"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "6ae2513ad83038e80fb3c651af315cd04e7ff8b8"
-branch = "claude/issue-872-a-container-whose-only-open-children-liv"
-scope = ["quality/baseline.toml", "specs/board.spec.md", "specs/next.spec.md", "src/aco/cmd_board.py", "src/aco/workboard.py", "tests/support/board_fixtures.py", "tests/support/github_fixtures.py", "tests/support/landing_refusals.py", "tests/test_cmd_board.py", "tests/test_cmd_cut_foreign_child.py", "tests/test_cmd_land_head_safety.py", "tests/test_cmd_land_merge.py", "tests/test_cmd_land_merge_message.py", "tests/test_cmd_land_preflight.py", "tests/test_cmd_land_preflight_claim.py", "tests/test_cmd_land_read_failure.py", "tests/test_cmd_next_foreign_child.py", "tests/test_github_sub_issues.py", "tests/test_workboard_container_child_list.py"]
-opened_commit = "d19885dcc4ae15f0ee683b5eb1b71f57d6361501"
-whole_reason = "one reading of foreign open children in next and board, plus moving its duplicated test arrangement into shared fixtures"
