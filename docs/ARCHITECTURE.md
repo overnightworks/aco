@@ -93,6 +93,11 @@ flowchart LR
   `ask` tool of `aco mcp` builds the query and keeps the ruled lines from the
   hits with the pure `earlier_rulings.py`; the search runs once the item's turn
   has ended.
+- The **board probe** (`forge.BoardProbe`) is a third port of its own: whether an
+  issue, or a repository's newest one, changed since an opaque token. Its GitHub
+  adapter (`github_probe.py`) sends the token as `If-None-Match` and reads the
+  status line, because `gh` exits non-zero on the 304 that means unchanged.
+  `aco wait` without an item asks it.
 
 ## Runtime View
 
@@ -203,6 +208,17 @@ when it moves, and a slow read every ten minutes catches a line changed outside
 aco. The command ends when a named line is no longer open, which wakes the
 session. The signal carries no content, names no asker and never fails a write
 (`specs/wait.spec.md`).
+
+An idle head starts `aco wait` without an item and watches its own board
+(`board_wait.py`); no service stands behind it, because one head waits per
+repository and a service would save no request. The same signal files, one per
+item with a line that waits on the operator, wake it about two seconds after a
+ruling. A cheap check decides when to read the rest: every minute the state
+ref's tip and, under GitHub storage, one conditional request (`BoardProbe`) for
+the repository's newest updated issue and for each open blocker in another
+repository. A full read runs on a change, every hour and on the day of the
+earliest `until` date. The read alone decides: the command ends when `aco next`
+would name an action or a line that waited on the operator stopped waiting.
 
 ### Proof strategy
 
