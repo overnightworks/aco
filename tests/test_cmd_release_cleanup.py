@@ -80,6 +80,7 @@ class Intervention(Enum):
     DOTTED = auto()
     LATIN1 = auto()
     DIRTY = auto()
+    IGNORED_FILE = auto()
     CHECKED_ELSEWHERE = auto()
     GIT_FAILURE = auto()
     FOREIGN_COMMIT_READ_FAILS = auto()
@@ -98,6 +99,7 @@ class Intervention(Enum):
             Intervention.DOTTED: (target.window, target.dotted),
             Intervention.LATIN1: (target.window, target.latin1),
             Intervention.DIRTY: (target.before, target.dirty),
+            Intervention.IGNORED_FILE: (target.before, target.ignored_file),
             Intervention.CHECKED_ELSEWHERE: (target.before, target.check_out_elsewhere),
             Intervention.GIT_FAILURE: (target.before, target.fail_worktree_resolution),
             Intervention.FOREIGN_COMMIT_READ_FAILS: (
@@ -275,6 +277,14 @@ class CleanupIntervention:
 
     def dirty(self) -> None:
         (self.world.lane / "scratch.txt").write_text("uncommitted\n")
+
+    def ignored_file(self) -> None:
+        exclude = real_git(
+            self.clone, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude"
+        ).stdout.strip()
+        Path(exclude).parent.mkdir(exist_ok=True)
+        Path(exclude).write_text("*.cache\n")
+        (self.world.lane / "notes.cache").write_text("only in the worktree\n")
 
     def check_out_elsewhere(self) -> None:
         real_git(self.clone, "worktree", "remove", str(self.world.lane))
@@ -571,6 +581,11 @@ def rendered(identifier: str, worktree_text: str, case: CleanupCase) -> tuple[ob
     "case",
     [
         *rendered("clean", "removed", MERGED),
+        *rendered(
+            "only-an-ignored-file",
+            "removed",
+            replace(MERGED, intervention=Intervention.IGNORED_FILE),
+        ),
         *rendered(
             "branch-deletion-refused",
             "removed; branch kept -- git failure: error: branch not fully merged",
