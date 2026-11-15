@@ -108,7 +108,7 @@ them.
 
 ## `storage = "state-ref"` is forge-free
 
-- [ ] [PIN-04] Under `storage = "state-ref"`, a command resolving the item forge refuses an OWNER/REPO `--repo` with `--repo is meaningless under storage = state-ref`, except `item new` naming another discovered repository (PIN-57); any other `--repo` refuses first (OUT-08).
+- [ ] [PIN-04] Under `storage = "state-ref"`, a forge command refuses an OWNER/REPO `--repo` with `--repo is meaningless under storage = state-ref`, bar PIN-57's `item new`; other `--repo`s refuse first (OUT-08).
 - [ ] [PIN-05] Under `storage = "state-ref"`, that command without a resolvable canonical `<remote>/HEAD` refuses `cannot resolve the default branch; run aco from a checkout with <remote>/HEAD set`.
 
 ## Item identity: `aco-xxxxxx` versus `#n`
