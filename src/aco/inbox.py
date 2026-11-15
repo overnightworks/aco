@@ -149,9 +149,11 @@ def read_context(context: session.RunContext, *, with_progress: bool = False) ->
     )
     if not with_progress:
         return reading
-    return replace(
-        reading,
-        progress=progress.of(
+    return Reading(
+        reading.rows,
+        reading.steps,
+        reading.plans,
+        progress.of(
             listed,
             storage=storage,
             waiting=len(reading.steps),
