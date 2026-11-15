@@ -9,15 +9,13 @@ from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
     LandingWorld,
-    ParserExit,
-    RefusalLength,
     assert_github_world,
     landing_pull_request,
     landing_readiness,
     landing_world,
-    refusal_observations,
     serve_forge,
 )
+from landing_refusals import ParserExit, RefusalLength, refusal_observations
 
 from aco import cli, cmd_land, forge
 

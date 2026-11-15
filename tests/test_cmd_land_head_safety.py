@@ -8,10 +8,9 @@ from cli_fixtures import run_cli
 from github_fixtures import (
     MERGE_COMMIT_SHA,
     LaneLandingWorld,
-    RefusalLength,
     landed_world,
-    refusal_observations,
 )
+from landing_refusals import RefusalLength, refusal_observations
 
 from aco import github, report
 

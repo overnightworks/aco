@@ -11,12 +11,11 @@ from github_fixtures import (
     LANDING_BRANCH,
     FakeForge,
     LaneLandingWorld,
-    RefusalLength,
     assert_github_world,
     landed_observations,
     lane_landing_world,
-    refusal_observations,
 )
+from landing_refusals import RefusalLength, refusal_observations
 
 from aco import forge, process, protocol, workboard
 

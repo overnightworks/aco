@@ -25,14 +25,14 @@
 "src/aco/store.py" = 1742
 "src/aco/workboard.py" = 2786
 "tests/support/cli_fixtures.py" = 888
-"tests/support/github_fixtures.py" = 830
+"tests/support/github_fixtures.py" = 809
 "tests/test_board.py" = 3582
 "tests/test_checkout.py" = 2037
 "tests/test_cli.py" = 12071
 "tests/test_cmd_adopt.py" = 1427
 "tests/test_cmd_cut.py" = 1067
 "tests/test_cmd_land_after_merge_rerun.py" = 862
-"tests/test_cmd_land_preflight_claim.py" = 852
+"tests/test_cmd_land_preflight_claim.py" = 851
 "tests/test_cmd_release_cleanup.py" = 802
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950

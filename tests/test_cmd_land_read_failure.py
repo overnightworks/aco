@@ -9,10 +9,9 @@ from github_fixtures import (
     MERGE_COMMIT_SHA,
     FakeForge,
     LaneLandingWorld,
-    RefusalLength,
     landed_world,
-    refusal_observations,
 )
+from landing_refusals import RefusalLength, refusal_observations
 
 from aco import forge
 
