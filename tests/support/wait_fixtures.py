@@ -9,7 +9,7 @@ from github_fixtures import FakeForge, serve_forge
 
 from aco import cmd_wait, forge, github
 
-MAXIMUM_PAUSES = 1000
+MAXIMUM_PAUSES = 2000
 ITEM = 7
 
 

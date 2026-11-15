@@ -169,6 +169,7 @@ def _wait_for_lines(
             failing = True
             continue
         failing = False
+        _refuse_a_closed_item(reread)
         changed = _changed_lines(reread, named)
     _emit_changed(changed, number, fresh.storage, as_json=parsed.json)
     return 0
