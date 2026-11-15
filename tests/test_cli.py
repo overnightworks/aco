@@ -7009,20 +7009,24 @@ def test_release_merged_under_state_ref_commits_once_then_refuses_a_replay_whose
 
 
 @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
-@pytest.mark.parametrize("branch_here", [True, False], ids=["branch-here", "no-branch"])
+@pytest.mark.parametrize(
+    ("branch_here", "flags"),
+    [(True, []), (False, []), (False, ["--keep-worktree"])],
+    ids=["branch-here", "no-branch", "no-branch-keep-worktree"],
+)
 def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_rerun(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     as_json: bool,
     branch_here: bool,
+    flags: list[str],
 ) -> None:
-    """Under `storage = "state-ref"`: a release
-    whose lane worktree lives elsewhere names the line that repeats its
-    cleanup there; run as printed once the claim is gone, it verifies the
-    trunk commit, closes nothing, moves `refs/aco/state` not at all, and
-    reports only the cleanup -- none when no local branch of the lane exists
-    (REL-47, REL-49, REL-51, REL-52)."""
+    """Under `storage = "state-ref"`: a release whose lane worktree lives elsewhere
+    names the line that repeats its cleanup there; run as printed once the claim is
+    gone, it verifies the trunk commit, closes nothing, moves `refs/aco/state` not at
+    all, and reports only the cleanup, none without a local branch
+    (REL-47, REL-49, REL-51, REL-52, REL-65)."""
     repo, remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
     sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
     branch = "codex/issue-10-claims"
@@ -7031,24 +7035,18 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
         f"kept -- no linked worktree on {branch} in this checkout; "
         f"run {rerun} in the checkout that holds it"
     )
-    assert (
-        issue_claim.main(
-            ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
-        )
-        == 0
-    )
+    release = ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
+    assert issue_claim.main(release) == 0
     assert capsys.readouterr().out.splitlines()[-1] == f"worktree: {kept}"
     tip_after_release = _state_ref_tip(repo, remote)
     set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
     if branch_here:
         real_git(repo, "branch", branch, "main")
-    reported_worktree = kept if branch_here else None
 
-    status = issue_claim.main([*shlex.split(rerun)[1:], *(["--json"] if as_json else [])])
+    status = issue_claim.main([*shlex.split(rerun)[1:], *flags, *(["--json"] if as_json else [])])
 
     output = capsys.readouterr().out
     reported = json.loads(output) if as_json else output
-    text_worktree = "" if reported_worktree is None else f"worktree: {reported_worktree}\n"
     assert (status, reported) == (
         0,
         {
@@ -7058,44 +7056,13 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
             "issue": 10,
             "lane": None,
             "branch": branch,
-            "worktree": reported_worktree,
+            "worktree": kept if branch_here else None,
         }
         if as_json
-        else f"LANDED commit {sha} already; nothing left to release\n{text_worktree}",
+        else f"LANDED commit {sha} already; nothing left to release\n"
+        + (f"worktree: {kept}\n" if branch_here else ""),
     )
     assert _state_ref_tip(repo, remote) == tip_after_release
-
-
-@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
-def test_release_merged_rerun_with_keep_worktree_and_no_local_branch_reports_no_cleanup(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-    as_json: bool,
-) -> None:
-    """REL-65: the flag keeps a worktree this checkout does not hold, so the rerun
-    of a lane with no claim and no local branch has no `worktree` to report either."""
-    repo, _remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
-    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
-    branch = "codex/issue-10-claims"
-    assert (
-        issue_claim.main(
-            ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
-        )
-        == 0
-    )
-    capsys.readouterr()
-    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
-    rerun = ["release", "10", "--merged", sha, "--branch", branch, "--keep-worktree"]
-
-    status = issue_claim.main([*rerun, *(["--json"] if as_json else [])])
-
-    output = capsys.readouterr().out
-    reported = json.loads(output)["worktree"] if as_json else output
-    assert (status, reported) == (
-        0,
-        None if as_json else f"LANDED commit {sha} already; nothing left to release\n",
-    )
 
 
 def _state_ref_landing_with_its_lane_worktree(

@@ -103,7 +103,7 @@ GitHub closes the item at merge time through `Closes #<n>`.
 - [ ] [REL-49] Its text is `LANDED <landing> already; nothing left to release`, `<landing>` `pull request #<n>` or, under `storage = "state-ref"`, `commit <sha>`, then its `worktree:` line (REL-65).
 - [ ] [REL-50] Its cleanup (REL-25..REL-34) acts on the pull request's own source branch, or under `storage = "state-ref"` on the release's own branch (REL-04, REL-06).
 - [ ] [REL-51] Its `--json` prints `specs/output.spec.md`'s envelope, `reason` `merged`, then `outcome` `"nothing left to release"`, `issue`, `lane`, `branch`, `worktree` (REL-65).
-- [ ] [REL-65] A rerun whose lane has no claim and no local branch in this checkout has no cleanup to report: no `worktree:` line, `worktree` `null`; with the branch but no linked worktree REL-30 stands; `--keep-worktree` does not change the no-branch case.
+- [ ] [REL-65] A rerun with no claim and no local branch of its lane here prints no `worktree:` line and `worktree` is `null`, with or without `--keep-worktree`; with the branch but no linked worktree REL-30 stands.
 - [ ] [REL-55] It reads the claim state afresh right before that cleanup; a claim on the identity found then keeps both: `worktree: kept -- claimed again while this release ran`.
 - [ ] [REL-59] That rerun reads the claim state afresh right before its cleanup (REL-55): any live claim then on the branch, issue or lane, keeps both: `worktree: kept -- claimed again while this release ran`.
 
