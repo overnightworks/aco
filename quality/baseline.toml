@@ -41,7 +41,7 @@
 "tests/test_store.py" = 5103
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 82
+"build_board" = 80
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 84

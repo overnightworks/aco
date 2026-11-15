@@ -2151,18 +2151,15 @@ def closable_container_number(
 
 
 def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
-    """The action a childless container qualifies for, read off its one
-    `childless_verdict`, or `None` to skip it: a non-`VALID` body names its
-    own finding elsewhere and is never guessed through, a
-    `NestedRepairVerdict` names its repair under `SKIPPED` instead of a `cut`
-    that `cut` refuses, a container waiting on the operator or carrying a
-    `wait` that still holds is only ever closed, never cut or checked, and an
-    open blocker bars the check (NEXT-47). An idea container is none of these."""
+    """The action a childless container qualifies for, read off its one `childless_verdict`, or
+    `None` to skip it: a non-`VALID` body names its own finding elsewhere and is never guessed
+    through, a `NestedRepairVerdict` names its repair under `SKIPPED`, not a `cut` that `cut`
+    refuses, a container waiting on the operator or on a `wait` is only ever closed, never cut
+    or checked, and an open blocker bars the check (NEXT-47). An idea container is none of these."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
-    held = item.waits_on_operator or item.wait is not None
-    if held and not isinstance(verdict, CloseVerdict):
+    if (item.waits_on_operator or item.wait is not None) and not isinstance(verdict, CloseVerdict):
         return None
     match verdict:
         case CutVerdict(title=cut_title):
@@ -2715,9 +2712,8 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        if facts.wait is not None or _check_barred(
-            facts.childless_verdict, bool(facts.open_blockers)
-        ):
+        blocked = bool(facts.open_blockers)
+        if facts.wait is not None or _check_barred(facts.childless_verdict, blocked):
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason

@@ -843,20 +843,17 @@ def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...]
     )
 
 
-# Containers the operator holds -- one labelled with an
-# uncut row, one frozen whose `Next` still names work, one labelled but
-# closable -- beside one pullable item.
+# Containers the operator holds -- one labelled with an uncut row, one labelled with a `wait`, one
+# labelled but closable -- beside one unlabelled with a `wait` and one pullable item.
+_CHECK_WHILE_WAITING = complete_contract("Check it.", wait=TRIGGER_WAIT)
+_HELD_LABELS = (NEEDS_OPERATOR_LABEL,)
 _OPERATOR_HELD_CONTAINERS = (
     _childless_container(
-        441,
-        complete_contract("Cut it.", slice=slice_entries("Scheibe A")),
-        labels=(NEEDS_OPERATOR_LABEL,),
+        441, complete_contract("Cut it.", slice=slice_entries("Scheibe A")), labels=_HELD_LABELS
     ),
-    _childless_container(
-        442, complete_contract("Check it.", wait=TRIGGER_WAIT), labels=(NEEDS_OPERATOR_LABEL,)
-    ),
-    _childless_container(443, complete_contract("keiner"), labels=(NEEDS_OPERATOR_LABEL,)),
-    _childless_container(444, complete_contract("Check it.", wait=TRIGGER_WAIT)),
+    _childless_container(442, _CHECK_WHILE_WAITING, labels=_HELD_LABELS),
+    _childless_container(443, complete_contract("keiner"), labels=_HELD_LABELS),
+    _childless_container(444, _CHECK_WHILE_WAITING),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
@@ -1023,8 +1020,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
             "Run: aco claim 11 --scope <paths>\n"
             + _SCOPE_UNKNOWN_NOTE_LINE
             + "parallel: unknown (first action names no scope)\nclose: #443\n"
-            + "waiting on operator: #441, #442\n"
-            + f"\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
+            + f"waiting on operator: #441, #442\n\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
             id="never_cuts_or_checks_a_container_the_operator_holds_but_still_closes_one",
         ),
         pytest.param(
