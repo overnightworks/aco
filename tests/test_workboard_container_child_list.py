@@ -179,7 +179,7 @@ def test_an_open_child_in_another_repository_keeps_its_container_from_closing() 
 @pytest.mark.parametrize(
     ("foreign_open", "offered"), [((FOREIGN_CHILD,), False), ((), True)], ids=["open", "none"]
 )
-def test_a_landed_container_is_offered_for_closing_only_while_no_child_in_another_repository_is_open(
+def test_a_landed_container_is_offered_for_closing_only_while_no_foreign_child_is_open(
     foreign_open: tuple[workboard.IssueReference, ...], offered: bool
 ) -> None:
     """Spec: BOARD-60"""
@@ -191,7 +191,13 @@ def test_a_landed_container_is_offered_for_closing_only_while_no_child_in_anothe
     )
 
     projected = projected_board(
-        (listed,), (), (declaring_merge,), (), BoardConfig(), now=NOW, children={CONTAINER: children}
+        (listed,),
+        (),
+        (declaring_merge,),
+        (),
+        BoardConfig(),
+        now=NOW,
+        children={CONTAINER: children},
     )
 
     assert (

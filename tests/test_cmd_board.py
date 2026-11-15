@@ -54,7 +54,7 @@ def test_board_json_names_an_open_child_in_another_repository_apart_from_open_ch
     ) == (1, 3, [LOCAL_CHILD], [str(FOREIGN_CHILD)])
 
 
-def test_board_json_counts_a_closed_child_in_another_repository_apart_from_both_open_lists() -> None:
+def test_board_json_counts_a_closed_foreign_child_apart_from_both_open_lists() -> None:
     """Spec: BOARD-59"""
     listed, children = container_with_children(
         CONTAINER, closed=1, open_children=(LOCAL_CHILD,), body=complete_contract("Cut it.")
