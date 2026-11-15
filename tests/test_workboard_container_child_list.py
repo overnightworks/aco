@@ -177,6 +177,30 @@ def test_an_open_child_in_another_repository_keeps_its_container_from_closing() 
 
 
 @pytest.mark.parametrize(
+    ("foreign_open", "offered"), [((FOREIGN_CHILD,), False), ((), True)], ids=["open", "none"]
+)
+def test_a_landed_container_is_offered_for_closing_only_while_no_child_in_another_repository_is_open(
+    foreign_open: tuple[workboard.IssueReference, ...], offered: bool
+) -> None:
+    """Spec: BOARD-60"""
+    listed, children = container_with_children(
+        CONTAINER, closed=1, foreign_open=foreign_open, body=complete_contract("keiner")
+    )
+    declaring_merge = workboard.PullRequest(
+        1, "Lands it", f"Work-Item: #{CONTAINER}", "branch", "2026-08-20T00:00:00Z"
+    )
+
+    projected = projected_board(
+        (listed,), (), (declaring_merge,), (), BoardConfig(), now=NOW, children={CONTAINER: children}
+    )
+
+    assert (
+        CONTAINER in workboard.zero_cost_closes(projected),
+        CONTAINER in [item.number for item in projected.recovery],
+    ) == (offered, offered)
+
+
+@pytest.mark.parametrize(
     ("foreign_state", "closable"),
     [(workboard.ChildState.OPEN, None), (workboard.ChildState.CLOSED, CONTAINER)],
     ids=["open", "closed"],

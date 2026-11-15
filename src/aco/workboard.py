@@ -1110,8 +1110,11 @@ def _is_recovery(
     reopened_at: Mapping[int, datetime | None],
 ) -> bool:
     """Whether `item` is landed but open: declared by a merged pull request and
-    not reopened after the last such merge (LAND-81)."""
+    not reopened after the last such merge (LAND-81), unless a sub-issue in another
+    repository is still open (BOARD-60)."""
     if item.idea or item.number not in declared_merges:
+        return False
+    if item.container is not None and item.container.foreign_children:
         return False
     merged, reopened = declared_merges[item.number], reopened_at.get(item.number)
     return merged is None or reopened is None or reopened <= merged
