@@ -137,6 +137,27 @@ def close_the_blocker(client: FakeForge, probe: FakeBoardProbe) -> Callable[[], 
     return close
 
 
+def serve_the_card_board(
+    monkeypatch: pytest.MonkeyPatch, probe: FakeBoardProbe
+) -> tuple[UnreadableBoardForge, Callable[[], None]]:
+    """A board of item 7 alone, and the change that adds the item blocked by an open blocker."""
+    raw = group_body()
+    client = serve_forge(
+        monkeypatch,
+        UnreadableBoardForge(
+            board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+        ),
+    )
+    blocked = blocked_board(closed=False)
+
+    def gain_a_blocked_item() -> None:
+        client.board_issues = (card_issue(raw), *blocked.board_issues)
+        client.board_dependencies = blocked.board_dependencies
+        probe.change(forge.ProbeTarget(REPOSITORY))
+
+    return client, gain_a_blocked_item
+
+
 class TestWaitingOnTheBoard:
     @pytest.mark.parametrize(
         ("flags", "printed"),
@@ -377,23 +398,11 @@ class TestWaitingOnTheBoard:
     ) -> None:
         """Spec: WAIT-14, WAIT-18, WAIT-20 -- the read that follows a blocker's first probe
         stays owed while it fails, though the probes after it find nothing moved."""
-        raw = group_body()
-        client = serve_forge(
-            monkeypatch,
-            UnreadableBoardForge(
-                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
-            ),
-        )
+        client, the_board_gains_a_blocked_item = serve_the_card_board(monkeypatch, probe)
         ticks = install(monkeypatch, lambda: 0)
-        blocked = blocked_board(closed=False)
 
         def the_board_cannot_be_read_again() -> None:
             client.board_failure = forge.ForgeTransientError(DOWN)
-
-        def the_board_gains_a_blocked_item() -> None:
-            client.board_issues = (card_issue(raw), *blocked.board_issues)
-            client.board_dependencies = blocked.board_dependencies
-            probe.change(forge.ProbeTarget(REPOSITORY))
 
         def the_board_is_readable_and_the_blocker_closed() -> None:
             client.board_failure = None
@@ -415,23 +424,11 @@ class TestWaitingOnTheBoard:
     ) -> None:
         """Spec: WAIT-14, WAIT-18, WAIT-20 -- a blocker the read found open but whose first
         probe failed is read for once more at its first probe that answers, not at the hour."""
-        raw = group_body()
-        client = serve_forge(
-            monkeypatch,
-            UnreadableBoardForge(
-                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
-            ),
-        )
+        client, the_board_gains_a_blocked_item = serve_the_card_board(monkeypatch, probe)
         ticks = install(monkeypatch, lambda: 0)
-        blocked = blocked_board(closed=False)
 
         def the_probe_fails() -> None:
             raise forge.ForgeTransientError(DOWN)
-
-        def the_board_gains_a_blocked_item() -> None:
-            client.board_issues = (card_issue(raw), *blocked.board_issues)
-            client.board_dependencies = blocked.board_dependencies
-            probe.change(forge.ProbeTarget(REPOSITORY))
 
         probe.at_the_first_sighting = the_probe_fails
         ticks.afterwards[3] = the_board_gains_a_blocked_item
