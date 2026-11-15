@@ -242,8 +242,7 @@ def build_board(
     # Open and recently-merged pull requests and each container's children are
     # independent reads once `since` is known, so fetching them on separate
     # threads instead of one after another overlaps their `gh` subprocess wait
-    # time. Children get
-    # their own executor (`_fetch_children`) so their concurrency stays
+    # time. Children get their own executor (`_fetch_children`) so their concurrency stays
     # capped at `BOARD_CHILD_FETCH_CONCURRENCY` even once these two base
     # reads finish and free their own pool's workers. The dependency wave
     # runs afterward instead (below), so it never overlaps them. The readers in

@@ -13,11 +13,11 @@ from typing import cast
 
 import pytest
 from board_fixtures import (
-    WAIT_TRIGGER,
-    TRIGGER_WAIT,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
     RULED_ON,
+    TRIGGER_WAIT,
+    WAIT_TRIGGER,
     block_body,
     block_dependency,
     blocked_issue,

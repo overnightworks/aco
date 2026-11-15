@@ -1,5 +1,6 @@
-"""A waiting item is never ready (`specs/next.spec.md`): the wait the block carries, today's date."""
+"""A waiting item is never ready (`specs/next.spec.md`), by its `wait` and today's date."""
 
+from collections.abc import Mapping
 from datetime import date
 
 import pytest
@@ -12,11 +13,9 @@ NUMBER = 301
 STEP = "Rotate the deploy key."
 
 
-def _item(wait: dict[str, object] | None, today: date, labels: tuple[str, ...] = ()):
-    entries: dict[str, object] = {"scope": ["src/widget.py"]}
-    if wait is not None:
-        entries["wait"] = wait
-    issue = board_issue(NUMBER, "Held", complete_contract("Claim it.", **entries), labels=labels)
+def _item(wait: Mapping[str, object], today: date, labels: tuple[str, ...] = ()):
+    contract = complete_contract("Claim it.", scope=["src/widget.py"], wait=wait)
+    issue = board_issue(NUMBER, "Held", contract, labels=labels)
     board = projected_board((issue,), (), (), (), BoardConfig(), today=today)
     return board, board.items[0]
 
@@ -51,7 +50,7 @@ def _item(wait: dict[str, object] | None, today: date, labels: tuple[str, ...] =
     ],
 )
 def test_a_waiting_item_is_never_ready_and_never_named_first(
-    wait: dict[str, object], labels: tuple[str, ...], reason: str
+    wait: Mapping[str, object], labels: tuple[str, ...], reason: str
 ) -> None:
     board, item = _item(wait, date(2026, 11, 15), labels)
 

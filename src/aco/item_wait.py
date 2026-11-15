@@ -101,13 +101,11 @@ def is_over(wait: ItemWait, today: date) -> bool:
 
 def wait_text(wait: ItemWait) -> str:
     """What the wait waits for, in the words `next` prints."""
-    match wait:
-        case OperatorWait(step=step):
-            return step
-        case UntilWait(until=until):
-            return f"until {until.isoformat()}"
-        case TriggerWait(trigger=trigger):
-            return trigger
+    if isinstance(wait, OperatorWait):
+        return wait.step
+    if isinstance(wait, UntilWait):
+        return f"until {wait.until.isoformat()}"
+    return wait.trigger
 
 
 def operator_wait_table(
@@ -126,13 +124,12 @@ def render_wait(data: Mapping[str, object]) -> list[str]:
     if wait is None:
         return []
     since = f"{SINCE_KEY} = {wait.since.isoformat()}"
-    match wait:
-        case OperatorWait(step=step):
-            kind = f"{OPERATOR_KEY} = {protocol.toml_string(step)}"
-        case UntilWait(until=until):
-            kind = f"{UNTIL_KEY} = {until.isoformat()}"
-        case TriggerWait(trigger=trigger):
-            kind = f"{TRIGGER_KEY} = {protocol.toml_string(trigger)}"
+    if isinstance(wait, OperatorWait):
+        kind = f"{OPERATOR_KEY} = {protocol.toml_string(wait.step)}"
+    elif isinstance(wait, UntilWait):
+        kind = f"{UNTIL_KEY} = {wait.until.isoformat()}"
+    else:
+        kind = f"{TRIGGER_KEY} = {protocol.toml_string(wait.trigger)}"
     return ["", f"{WAIT_KEY} = {{ {kind}, {since} }}"]
 
 

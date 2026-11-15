@@ -23,10 +23,10 @@ import pytest
 from board_fixtures import (
     BASE,
     BIDI_AND_ZERO_WIDTH_CONTROLS,
-    WAIT_TRIGGER,
-    TRIGGER_WAIT,
     MINIMAL_BLOCK_TOML,
     REPOSITORY,
+    TRIGGER_WAIT,
+    WAIT_TRIGGER,
     block_body,
     block_dependency,
     blocked_issue,

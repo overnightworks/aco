@@ -1570,7 +1570,6 @@ def _board_item(
 ) -> BoardItem:
     contract = context.contracts[issue.number]
     parsed = context.parsed_bodies[issue.number]
-    active_wait = active_wait_text(parsed.wait, context.today)
     freed_at = context.freed_on[issue.number]
     ruling_landings, ruling_old = _ruling_freshness_from(parsed.ruling_date, context.trunk_landings)
     claim = context.claims_by_issue.get(issue.number)
@@ -1598,7 +1597,7 @@ def _board_item(
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
-        wait=active_wait,
+        wait=active_wait_text(parsed.wait, context.today),
         active_claim=active_claim,
         open_blockers=open_blockers,
         repository=context.repository,
@@ -1640,7 +1639,7 @@ def _board_item(
         expectation_progress=parsed.expectation_progress,
         ruling_landings=ruling_landings,
         ruling_old=ruling_old,
-        wait=active_wait,
+        wait=actionability.wait,
         open_blockers=open_blockers,
         freed_on=freed_at,
         freed_days=(None if freed_at is None else max(0, (observed_at - freed_at).days)),
