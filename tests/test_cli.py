@@ -7066,6 +7066,38 @@ def test_release_merged_rerun_under_state_ref_writes_nothing_and_names_its_own_r
     assert _state_ref_tip(repo, remote) == tip_after_release
 
 
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+def test_release_merged_rerun_with_keep_worktree_and_no_local_branch_reports_no_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    as_json: bool,
+) -> None:
+    """REL-65: the flag keeps a worktree this checkout does not hold, so the rerun
+    of a lane with no claim and no local branch has no `worktree` to report either."""
+    repo, _remote = _real_landing_scenario(monkeypatch, tmp_path, numbers=(10,))
+    sha = real_git(repo, "rev-parse", "main~2").stdout.strip()
+    branch = "codex/issue-10-claims"
+    assert (
+        issue_claim.main(
+            ["release", "10", "--agent", "Codex Sol", "--claim-id", "claim-10", "--merged", sha]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    set_agent_identity_env(monkeypatch, {checkout.ACO_AGENT_ENV: "Codex Sol"})
+    rerun = ["release", "10", "--merged", sha, "--branch", branch, "--keep-worktree"]
+
+    status = issue_claim.main([*rerun, *(["--json"] if as_json else [])])
+
+    output = capsys.readouterr().out
+    reported = json.loads(output)["worktree"] if as_json else output
+    assert (status, reported) == (
+        0,
+        None if as_json else f"LANDED commit {sha} already; nothing left to release\n",
+    )
+
+
 def _state_ref_landing_with_its_lane_worktree(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> tuple[Path, Path, Path, list[str]]:

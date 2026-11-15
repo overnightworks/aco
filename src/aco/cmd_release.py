@@ -613,8 +613,8 @@ def _cleanup_unless_claimed_again(
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:
             return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_CLAIMED_AGAIN_REASON)
-        if not checkout.branch_exists(lane.branch):
-            return None
+    if not checkout.branch_exists(lane.branch):
+        return None
     return _cleanup_landed_worktree(parsed, lane, context, fetched_trunk_ref)
 
 
