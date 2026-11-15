@@ -73,6 +73,7 @@ through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 | other open children, parent `Next` non-empty, parent also named for closing | — | LAND-19, LAND-79 | — | — |
 | other open children, no `Next` line | — | LAND-24 | — | — |
 | other open children, `Next` names work | — | LAND-25 | — | — |
+| an open sub-issue in another repository | — | LAND-86 | — | — |
 | malformed/wrong-kind/foreign parent | — | LAND-26, LAND-27, LAND-28 | — | — |
 | pull request not merged | — | — | LAND-30 | — |
 | PR names a different item / kind mismatch | — | — | LAND-62, LAND-64, LAND-66, LAND-67, LAND-85 | — |
@@ -160,6 +161,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-79] A landing closing a parent that still holds an uncut `[[slice]]` row refuses `closes parent <ref> although its body still holds an uncut slice row; cut it or delete the row first`, exit `2`.
 - [ ] [LAND-24] A landing leaving other open children behind, with no parent `Next` line, refuses `leaves parent <ref> open with <n> other open child/children, whose body carries no Next line`, exit `2`.
 - [ ] [LAND-25] The same landing, when the parent's `Next` line names work, passes without closing the parent: exit `0`.
+- [ ] [LAND-86] An open sub-issue of the parent in another repository counts as another open child: closing the last local child is no last-child landing (LAND-21 does not fire) and LAND-24 applies.
 - [ ] [LAND-26] A parent whose own body reads as malformed refuses `has parent <ref> with a <body defect sentence>`, exit `2`, before the last-child rule runs; a valid but incomplete parent proceeds to it.
 - [ ] [LAND-27] A recorded parent whose own kind is not `container` refuses `has parent <ref> of kind <kind>, which is not a container; only a container holds children`, exit `2`.
 - [ ] [LAND-28] A recorded parent living in another repository refuses `has parent <ref> in another repository, whose children this check cannot read`, exit `2`.

@@ -89,7 +89,7 @@ class CutCase:
     linked_children: tuple[tuple[int, int], ...] = ()
     closed_issue_cutoffs: tuple[datetime, ...] = ()
     parents: Mapping[int, ParentIssue] = field(default_factory=dict)
-    children: Mapping[int, tuple[workboard.ChildItem, ...]] = field(default_factory=dict)
+    children: Mapping[int, workboard.ChildList] = field(default_factory=dict)
     references: Mapping[int, forge.ItemReference] = field(default_factory=dict)
     recently_closed: tuple[forge.ClosedIssue, ...] = ()
     events: tuple[ForgeEvent, ...] = ()

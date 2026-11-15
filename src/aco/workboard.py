@@ -5,13 +5,13 @@ import shlex
 import tomllib
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass, field, fields, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import NoReturn, TypeGuard, cast
+from typing import NoReturn, TypeGuard
 
 from . import items, protocol
 
@@ -185,10 +185,32 @@ class ChildItem:
 
 
 @dataclass(frozen=True)
+class ForeignChild:
+    """One sub-issue recorded in another repository: it counts toward its
+    container's progress and keeps it open, but this repository can neither
+    list, rank nor claim it."""
+
+    reference: IssueReference
+    state: ChildState
+
+
+ChildList = tuple[ChildItem | ForeignChild, ...]
+
+
+def local_children(children: ChildList) -> tuple[ChildItem, ...]:
+    return tuple(child for child in children if isinstance(child, ChildItem))
+
+
+@dataclass(frozen=True)
 class ContainerProgress:
     closed: int
     total: int
     open_children: tuple[ChildItem, ...]
+    foreign_children: tuple[IssueReference, ...] = ()
+
+    @property
+    def open_count(self) -> int:
+        return len(self.open_children) + len(self.foreign_children)
 
 
 @dataclass(frozen=True)
@@ -1088,8 +1110,11 @@ def _is_recovery(
     reopened_at: Mapping[int, datetime | None],
 ) -> bool:
     """Whether `item` is landed but open: declared by a merged pull request and
-    not reopened after the last such merge (LAND-81)."""
+    not reopened after the last such merge (LAND-81), unless a sub-issue in another
+    repository is still open (BOARD-60)."""
     if item.idea or item.number not in declared_merges:
+        return False
+    if item.container is not None and item.container.foreign_children:
         return False
     merged, reopened = declared_merges[item.number], reopened_at.get(item.number)
     return merged is None or reopened is None or reopened <= merged
@@ -1520,13 +1545,13 @@ def _board_score(stage: Stage, unblocks_count: int, single_next: bool) -> int:
     return score
 
 
-def _open_children(children: Iterable[ChildItem]) -> tuple[ChildItem, ...]:
+def _open_children(children: ChildList) -> ChildList:
     return tuple(child for child in children if child.state is ChildState.OPEN)
 
 
 def _container_progress(
     issue: Issue,
-    children: Mapping[int, tuple[ChildItem, ...]],
+    children: Mapping[int, ChildList],
     blockers: dict[int, tuple[IssueReference, ...]],
 ) -> ContainerProgress | None:
     """`issue`'s own container progress, or `None` when it isn't a container
@@ -1545,10 +1570,13 @@ def _container_progress(
     ):
         return None
     listed = children.get(issue.number, ())
+    open_listed = _open_children(listed)
     open_children = tuple(
-        replace(item, blocked_by=blockers.get(item.number, ())) for item in _open_children(listed)
+        replace(item, blocked_by=blockers.get(item.number, ()))
+        for item in local_children(open_listed)
     )
-    return ContainerProgress(len(listed) - len(open_children), len(listed), open_children)
+    foreign = tuple(child.reference for child in open_listed if isinstance(child, ForeignChild))
+    return ContainerProgress(len(listed) - len(open_listed), len(listed), open_children, foreign)
 
 
 def _completes_container(
@@ -1562,7 +1590,7 @@ def _completes_container(
     if container_number is None:
         return False
     progress = container_progress[container_number]
-    return progress.closed >= 1 and len(progress.open_children) == 1
+    return progress.closed >= 1 and progress.open_count == 1
 
 
 def _board_item(
@@ -1590,7 +1618,7 @@ def _board_item(
     container_progress = context.container_progress.get(issue.number)
     childless_verdict = (
         None
-        if container_progress is None or container_progress.open_children
+        if container_progress is None or container_progress.open_count
         else _childless_container_verdict(
             parsed.slices, contract.next, context.nesting_parents.get(issue.number)
         )
@@ -1679,7 +1707,7 @@ class BoardBuildInputs:
     # source of `landing_rows` and of the items trunk already lands, while
     # `trunk_landings` carries only timestamps, for ruling-freshness.
     trunk_landing_items: tuple[TrunkLandingItem, ...] = ()
-    children: Mapping[int, tuple[ChildItem, ...]] = field(default_factory=dict)
+    children: Mapping[int, ChildList] = field(default_factory=dict)
     # The forge parent of each `childless_containers_with_uncut_rows` container
     # that has one, read through the `parent_issue` relation `cut` refuses a
     # nested container on (CUT-03), whatever that parent's type or state.
@@ -1973,7 +2001,7 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
             yield WorkItemAction(item, _work_item_scope(item.scope, rows))
             continue
         container = item.container
-        if item.kind is not ItemKind.CONTAINER or container is None or container.open_children:
+        if item.kind is not ItemKind.CONTAINER or container is None or container.open_count:
             continue
         action = _container_next_action(item, container)
         if action is not None:
@@ -2122,7 +2150,7 @@ def zero_cost_closes(board: Board) -> tuple[int, ...]:
 
 
 def closable_container_number(
-    parent: ParentIssue, children: tuple[ChildItem, ...], storage: Storage
+    parent: ParentIssue, children: ChildList, storage: Storage
 ) -> int | None:
     """The container `release --merged`/`item close` should name as freshly
     closable once one of its children just landed: `parent`'s
@@ -2172,113 +2200,6 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
             return CloseContainerAction(item, container)
         case _:
             return None
-
-
-# The shape one decoded JSON object takes -- one alias so `cast` names a
-# real type instead of repeating the `"dict[str, object]"` string literal
-# (python:S1192). `board_payload`'s own JSON-projection concern, unrelated
-# to `body.py`'s identically-shaped alias for its TOML rendering -- kept
-# local rather than shared across that boundary for two unrelated readers.
-_JsonObject = dict[str, object]
-
-# The shape a decoded homogeneous array of tables, or an `asdict`'d list of
-# dataclasses, takes -- one alias so `cast` names a real type instead of
-# repeating the string.
-_JsonRows = list[_JsonObject]
-
-
-def _project_blocker_references(entry: dict[str, object], key: str, repository: str) -> None:
-    """Rewrite `entry[key]` (a list of `asdict`'d `IssueReference`s) into the
-    earlier local-int list plus a sibling `foreign_blockers` key (A2) -- the
-    one projector `board_payload` uses for both `BoardItem.open_blockers`
-    and each open child's `ChildItem.blocked_by`, never a mixed `int | str`
-    list and never re-parsed from a label."""
-    references = cast(_JsonRows, entry.pop(key))
-    entry[key] = [
-        reference["number"] for reference in references if reference["repository"] == repository
-    ]
-    entry["foreign_blockers"] = [
-        f"{reference['repository']}#{reference['number']}"
-        for reference in references
-        if reference["repository"] != repository
-    ]
-
-
-def _project_uncut_row_scope(finding: dict[str, object]) -> None:
-    """Drop a `None` `scope` from one uncut row's JSON dict rather than
-    printing it: the public shape is
-    `{"index", "title"}` with no third key, and `board --json` owes
-    that to a row that names no scope of its own -- only a row that
-    actually carries one gains the extra `"scope"` key, canonical and
-    non-empty. A row's `done_when` is `cut`'s to read, never
-    part of `board --json`'s row shape (BOARD-14)."""
-    for row in cast(_JsonRows, finding["rows"]):
-        del row["done_when"]
-        if row["scope"] is None:
-            del row["scope"]
-
-
-def _project_landing_row(row: dict[str, object]) -> None:
-    """One `LandingRow`'s JSON shape: `committed_at` turned to
-    ISO text like every other board timestamp, and `evidence` -- a nested
-    `TrunkLandingEvidence`/`PullRequestLandingEvidence` dict after `asdict`
-    -- flattened into `sha`/`pull_request`, exactly one of which is ever
-    non-`null`, so a consumer never has to branch on which evidence
-    dataclass produced a row."""
-    row["committed_at"] = cast(datetime, row["committed_at"]).astimezone(UTC).isoformat()
-    evidence = cast(_JsonObject, row.pop("evidence"))
-    row["sha"] = evidence.get("sha")
-    row["pull_request"] = evidence.get("number")
-
-
-def _tuples_to_lists(value: object) -> object:
-    """`asdict(board)` preserves every tuple-typed dataclass field as a
-    tuple; a JSON array carries no such distinction, so `board_payload`
-    walks the finished payload once more here and turns every tuple into a
-    list -- the one place this module guarantees its own return is
-    genuinely JSON-shaped, the same way every other command's hand-built
-    `--json` payload in the `cmd_*` modules already is."""
-    if isinstance(value, dict):
-        return {key: _tuples_to_lists(item) for key, item in value.items()}
-    if isinstance(value, tuple | list):
-        return [_tuples_to_lists(item) for item in value]
-    return value
-
-
-def board_payload(board: Board) -> dict[str, object]:
-    """`board`'s own `--json`/envelope payload: every value
-    already JSON-primitive -- dates and datetimes turned to ISO text,
-    blocker references split and re-keyed, every tuple turned into a list
-    -- so `report.emit_json` can serialize it with a plain `json.dumps`,
-    with no `default=` fallback of its own. The one owner both `board
-    --json` and a future embedded read share."""
-    payload = asdict(board)
-    repository = payload.pop("repository")
-    for group in ("items", "ready_now", "stale", "recovery"):
-        for item in payload[group]:
-            freed_on = item["freed_on"]
-            item["freed_on"] = (
-                None if freed_on is None else freed_on.astimezone(UTC).date().isoformat()
-            )
-            item.pop("terminal_actionable_reason")
-            item.pop("read_state")
-            item.pop("childless_verdict")
-            # `whole` feeds `next`'s advice only; board.spec
-            # names no such `--json` key.
-            item.pop("whole")
-            # `waiting_on_operator` is `next`'s own projection;
-            # board.spec names no such per-item `--json` key.
-            item.pop("waits_on_operator")
-            _project_blocker_references(item, "open_blockers", repository)
-            container = item["container"]
-            if container is not None:
-                for child in container["open_children"]:
-                    _project_blocker_references(child, "blocked_by", repository)
-    for row in cast(_JsonRows, payload["landings"]):
-        _project_landing_row(row)
-    for finding in cast(_JsonRows, payload["uncut"]):
-        _project_uncut_row_scope(finding)
-    return cast(_JsonObject, _tuples_to_lists(payload))
 
 
 # The forge form an item takes under `GITHUB`: text for a label or a
@@ -2580,7 +2501,7 @@ def parent_completion(parsed: ParsedBody) -> ParentCompletion:
 
 def childless_containers_with_uncut_rows(
     issues: Iterable[Issue],
-    children: Mapping[int, tuple[ChildItem, ...]],
+    children: Mapping[int, ChildList],
     storage: Storage,
 ) -> tuple[int, ...]:
     """The containers whose forge parent can change their verdict:

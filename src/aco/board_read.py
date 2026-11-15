@@ -131,7 +131,7 @@ BOARD_CHILD_FETCH_CONCURRENCY = 4
 
 def _fetch_children(
     client: forge.BoardSource, container_numbers: tuple[int, ...]
-) -> dict[int, tuple[workboard.ChildItem, ...]]:
+) -> dict[int, workboard.ChildList]:
     """Every container's children, at most `BOARD_CHILD_FETCH_CONCURRENCY`
     `gh` subprocesses at a time; excess containers queue behind it."""
     if not container_numbers:

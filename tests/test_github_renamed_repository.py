@@ -167,14 +167,14 @@ def test_a_fork_branch_is_read_as_its_own_repository_after_one_agreeing_lookup()
     assert (source_repository, gh.lookups) == (github.repository_id("fork/agent-providers"), 1)
 
 
-def test_a_sub_issue_from_another_repository_is_still_refused_after_one_agreeing_lookup() -> None:
+def test_a_foreign_sub_issue_is_returned_as_foreign_after_one_agreeing_lookup() -> None:
     gh = ScriptedGitHub(STALE, SITES["sub-issue"].reply(OTHER))
     client = GitHubForge(github.repository_id(STALE), run=gh)
 
-    with pytest.raises(forge.ForgeMalformedResponseError, match="sub-issue from another repo"):
-        client.list_children(79)
+    children = client.list_children(79)
 
-    assert gh.lookups == 1
+    foreign = [child for child in children if isinstance(child, workboard.ForeignChild)]
+    assert ([str(child.reference) for child in foreign], gh.lookups) == ([f"{OTHER}#72"], 1)
 
 
 def test_a_lookup_answer_that_names_no_repository_becomes_the_board_read_hint() -> None:

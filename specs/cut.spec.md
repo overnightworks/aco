@@ -48,6 +48,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | a closed child matches, none open | CUT-14 | — | — | CUT-14 |
 | two or more open matches | CUT-15 | — | — | CUT-15 |
 | an orphan shares the title, wrong shape | CUT-16 | — | — | — |
+| a sub-issue of the container in another repository shares the title | CUT-44 | — | — | — |
 | an open or recently closed look-alike title | CUT-29, CUT-30 | CUT-29, CUT-30 | — | CUT-30 |
 | `--not-a-twin` given | CUT-31 | CUT-31 | CUT-31 | CUT-31 |
 | GitHub's own relation write fails | CUT-17 | — | — | CUT-28 |
@@ -103,6 +104,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-14] A closed child already bearing the child's title, with no open match, refuses `#<n> already has a closed child #<child> titled '<title>'; reopen it or remove the row by hand`, exit `2`.
 - [ ] [CUT-15] Two or more open matches refuses `#<n>'s row '<title>' matches more than one open issue (#a, #b); adopt the right one by hand and remove the row`, exit `2`, naming every match.
 - [ ] [CUT-16] An open issue sharing the child's title is adopted only in CUT-13's recovery shape -- never the container itself, idea-labelled, non-`task`, or naming a different `Parent:` (see E-CUT-05).
+- [ ] [CUT-44] A sub-issue in another repository is never adopted, whatever its title: `cut` creates the child as if it were absent (CUT-13).
 
 ## The twin search
 
