@@ -4,7 +4,8 @@
 `state_board.StateRefBoard` both implement. An adapter that cannot perform an
 operation raises `ForgeUnsupportedError`. `RulingSearch` is a port apart from
 them: it searches ruling items across the owners a query names, where they are
-bound to one repository. `cmd_land` depends on `GitHubForge`
+bound to one repository. `BoardProbe` is the other: it tells whether an issue,
+or a repository's newest one, changed since a token. `cmd_land` depends on `GitHubForge`
 directly, `cmd_item` on `StateRefBoard`, and `cmd_release` on both, so a
 further forge needs its own contract for them first.
 """
@@ -285,6 +286,34 @@ class RulingSearch(Protocol):
     def search(self, query: str) -> RulingSearchResult:
         """Every page of the forge's answer to `query`. Raises `ForgeError`
         when the forge cannot answer."""
+        ...
+
+
+@dataclass(frozen=True)
+class ProbeTarget:
+    """What `BoardProbe` asks about: issue `number` of `repository` (`OWNER/REPO`),
+    or, with no `number`, the repository's most recently updated issue."""
+
+    repository: str
+    number: int | None = None
+
+
+@dataclass(frozen=True)
+class ProbeAnswer:
+    """`changed` is whether the target differs from the one `token` stood for;
+    `token` stands for the target as it is now, to hand back as it is."""
+
+    changed: bool
+    token: str
+
+
+class BoardProbe(Protocol):
+    """A cheap question whether anything changed since a token, apart from
+    `ForgeReader`: it spans the repositories a board's items are blocked by."""
+
+    def changed_since(self, target: ProbeTarget, token: str | None) -> ProbeAnswer:
+        """The forge's answer for `target`; without a `token` the answer is
+        changed. Raises `ForgeError` when the forge cannot answer."""
         ...
 
 

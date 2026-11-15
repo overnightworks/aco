@@ -77,7 +77,7 @@ _HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
 _TRANSIENT_PATTERN = re.compile(
     _HTTP_SERVER_ERROR_PATTERN.pattern + r"|connection reset|timeout|error connecting to|dial tcp"
 )
-# `merge_landing`'s own signals, none a 4xx `_nonzero_exit_failure` classifies.
+# `merge_landing`'s own signals, none a 4xx `nonzero_exit_failure` classifies.
 # GitHub's REST reference for the merge endpoint: 409 "if sha was provided and
 # pull request head did not match", 405 "if merge cannot be performed" -- a
 # rule, a required review, an unmergeable state: no re-run repairs it, but
@@ -212,14 +212,14 @@ def _query_days(start: date, end: date) -> tuple[date, ...]:
     return tuple(start + timedelta(days=offset) for offset in range((end - start).days + 1))
 
 
-def _decoded(result: process.BoundedResult, purpose: str) -> str:
+def decoded_output(result: process.BoundedResult, purpose: str) -> str:
     try:
         return strip_ansi(result.output.decode("utf-8")).strip()
     except UnicodeDecodeError as error:
         raise forge.ForgeMalformedResponseError(f"{purpose} returned non-UTF-8 output") from error
 
 
-def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeError:
+def forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeError:
     """Translate a process failure that reached no forge response into a typed one.
 
     An isinstance chain, not a dict keyed by `type(error)`: only the chain lets
@@ -244,7 +244,7 @@ def _is_transient_signal(decoded: str) -> bool:
     return _TRANSIENT_PATTERN.search(decoded) is not None
 
 
-def _nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
+def nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
     """Classify a nonzero `gh` exit from its decoded combined output.
 
     `gh`'s own exit code never carries the HTTP status, so this reads the
@@ -273,10 +273,10 @@ def bounded_command(command: list[str], *, purpose: str, input_data: bytes | Non
     except process.ProcessStartFailedError as error:
         raise ClaimError(f"cannot start {purpose}: {error.detail}") from error
     except process.ProcessError as error:
-        raise _forge_failure(error, purpose) from error
-    decoded = _decoded(result, purpose)
+        raise forge_failure(error, purpose) from error
+    decoded = decoded_output(result, purpose)
     if result.exit_status != 0:
-        raise _nonzero_exit_failure(decoded, result.exit_status, purpose)
+        raise nonzero_exit_failure(decoded, result.exit_status, purpose)
     return decoded
 
 

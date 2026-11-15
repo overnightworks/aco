@@ -202,7 +202,7 @@ class _AlwaysRacingTransport:
 
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
         self._rivals += 1
-        current = store._ls_remote_state(worktree, remote)
+        current = store.ls_remote_state(worktree, remote)
         rival_commit = store._commit_tree(
             worktree,
             tree_oid=store._write_bootstrap_tree(worktree),
@@ -226,7 +226,7 @@ class _MovesOnceThenSticksTransport:
     def push(self, *, worktree: Path, remote: str, ref: str, new_oid: protocol.ObjectId) -> None:
         self._calls += 1
         if self._calls == 1:
-            current = store._ls_remote_state(worktree, remote)
+            current = store.ls_remote_state(worktree, remote)
             rival_commit = store._commit_tree(
                 worktree,
                 tree_oid=store._write_bootstrap_tree(worktree),
@@ -355,7 +355,7 @@ def test_fetch_state_anchors_the_tip_without_creating_the_shared_state_ref(
 def test_peek_state_reads_the_current_tip_without_touching_the_anchor_or_lineage_stamp(
     bare_remote: Path, worktree: Path
 ) -> None:
-    """`store.peek_state`: the tip comes from `_ls_remote_state`'s own
+    """`store.peek_state`: the tip comes from `ls_remote_state`'s own
     answer and reads whatever tip is on the remote right now -- even one
     another writer landed after this worktree's own last observation --
     without ever anchoring it or stamping its own lineage, unlike
@@ -391,7 +391,7 @@ def test_peek_state_ignores_a_foreign_fetch_that_wins_the_fetch_head_race(
     `FETCH_HEAD` pointing at that branch's own tip, an ordinary commit whose
     tree carries no `schema.toml` at all: read as the state tip, it would fail
     with `MalformedStateTreeError`. `peek_state` reads the tip from
-    `_ls_remote_state`'s own answer instead, so a foreign fetch racing it
+    `ls_remote_state`'s own answer instead, so a foreign fetch racing it
     this way cannot change what it observes.
     """
     created = store.bootstrap(worktree=worktree, remote=str(bare_remote))

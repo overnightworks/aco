@@ -20,7 +20,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import NoReturn
 
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body, board_issue
+from board_fixtures import MINIMAL_BLOCK_TOML, NoBoardProbe, block_body, board_issue
 
 from aco import body, expectation_grammar, forge, repositories, session, workboard
 from aco.body import ItemKind
@@ -516,7 +516,11 @@ def run_context(repo: forge.RepositoryId | None) -> session.RunContext:
     """`session.run_context` over the checkout's own `BoardForge`, ruling on
     `RULING_DAY`, searching rulings in `search_index`."""
     return session.RunContext(
-        repo, build_forge=_forge_of, today=lambda: RULING_DAY, ruling_search=search_index()
+        repo,
+        build_forge=_forge_of,
+        today=lambda: RULING_DAY,
+        ruling_search=search_index(),
+        board_probe=NoBoardProbe(),
     )
 
 

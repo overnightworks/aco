@@ -40,8 +40,14 @@ class _NoRulingSearch:
         raise AssertionError(f"this test searches no rulings, yet {query!r} was searched")
 
 
-searchless = partial(RunContext, ruling_search=_NoRulingSearch())
-"""A `RunContext` whose test never searches rulings: any search fails the test."""
+class NoBoardProbe:
+    def changed_since(self, target: forge.ProbeTarget, token: str | None) -> forge.ProbeAnswer:
+        raise AssertionError(f"this test probes no board, yet {target!r} was probed")
+
+
+searchless = partial(RunContext, ruling_search=_NoRulingSearch(), board_probe=NoBoardProbe())
+"""A `RunContext` whose test never searches rulings and never probes the board: either fails
+the test."""
 REPOSITORY = "example/agent-coordination"
 
 
