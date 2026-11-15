@@ -45,6 +45,8 @@ scope, `aco brief <n>` prints what a builder starts from, and
 merges a green pull request pinned to the head the
 reviewers saw and releases the claim (`specs/start.spec.md`,
 `specs/brief.spec.md`, `specs/land.spec.md`).
+A head with nothing to do runs `aco wait` in the background; it ends when `aco next`
+names something to do or a card is ruled (`specs/wait.spec.md`).
 
 ## Other modes
 

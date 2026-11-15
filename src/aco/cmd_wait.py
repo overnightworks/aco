@@ -1,6 +1,7 @@
 """The `wait` command (`specs/wait.spec.md`): a session that asked the operator a
-card learns the answer when it is recorded, by running this command in the
-background and waking when it ends."""
+card learns the answer when it is recorded, and an idle head learns that its board
+has something to do, by running this command in the background and waking when it
+ends."""
 # ruff: noqa: T201 - the wait command writes its result lines to stdout
 
 import argparse
@@ -13,7 +14,18 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import body, decide, expectations, forge, protocol, report, repositories, workboard
+from . import (
+    board_wait,
+    body,
+    decide,
+    expectations,
+    forge,
+    protocol,
+    report,
+    repositories,
+    usage,
+    workboard,
+)
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 # How often the item's signal file is looked at, and how often the item is read
@@ -26,20 +38,29 @@ pause_between_checks = time.sleep
 clock = time.monotonic
 
 
-add_parser = partial(
-    report.add_lines_command_parser,
-    help="wait until an expectation line is ruled, returned or withdrawn",
-    item_help="the item whose lines are waited on",
-    lines_help="the 1-based expectation line index, as rulings prints it; "
-    "repeat it to wait on several lines of the item",
-)
+def add_parser(commands: usage.Subcommands, name: str) -> None:
+    """`wait`'s parser: the item with its repeatable `--line N`, or neither of them
+    to wait on the repository's board."""
+    parser = commands.add_parser(
+        name,
+        help="wait until an expectation line is ruled, returned or withdrawn, "
+        "or, with no item, until the board has something to do",
+    )
+    report.add_lines_arguments(
+        parser,
+        item_help="the item whose lines are waited on; leave it out to wait on the board",
+        lines_help="the 1-based expectation line index, as rulings prints it; "
+        "repeat it to wait on several lines of the item",
+        optional=True,
+    )
 
 
 class _WaitReason(StrEnum):
     """`aco wait`'s own `--json` `reason` vocabulary (`specs/wait.spec.md`):
-    `changed` is the success."""
+    `changed` and `actionable` are the successes."""
 
     CHANGED = "changed"
+    ACTIONABLE = "actionable"
     INVALID_ITEM = "invalid_item"
     LINE_OUT_OF_RANGE = "line_out_of_range"
     INVALID_USAGE = "invalid_usage"
@@ -50,6 +71,10 @@ class ItemClosedError(protocol.ClaimError):
     """WAIT-04: a closed item has nothing left to wait for."""
 
 
+class HalfATargetError(protocol.ClaimError):
+    """WAIT-21: `--line` without an item, or an item without `--line`."""
+
+
 # Each refusal's `--json` `reason`, by its type; any other refusal is a forge
 # that failed, `unavailable`.
 _REFUSAL_REASONS: report.RefusalReasons[_WaitReason] = (
@@ -57,6 +82,7 @@ _REFUSAL_REASONS: report.RefusalReasons[_WaitReason] = (
     (ItemClosedError, _WaitReason.INVALID_ITEM),
     (expectations.ExpectationOutOfRangeError, _WaitReason.LINE_OUT_OF_RANGE),
     (RepoMeaninglessUnderStateRefError, _WaitReason.INVALID_USAGE),
+    (HalfATargetError, _WaitReason.INVALID_USAGE),
 )
 
 
@@ -66,11 +92,6 @@ class ChangedLine:
 
     index: int
     state: str
-
-
-def _waits_on_the_operator(line: expectations.ExpectationLine) -> bool:
-    """An option line neither ruled nor returned to its head."""
-    return expectations.is_open(line) and line.returned is None
 
 
 def _changed_lines(fresh: decide.FreshItem, named: Sequence[int]) -> tuple[ChangedLine, ...]:
@@ -85,7 +106,7 @@ def _changed_lines(fresh: decide.FreshItem, named: Sequence[int]) -> tuple[Chang
     return tuple(
         ChangedLine(index, expectations.expectation_line_state(lines[index - 1]))
         for index in sorted(named)
-        if not _waits_on_the_operator(lines[index - 1])
+        if not board_wait.waits_on_the_operator(lines[index - 1])
     )
 
 
@@ -93,18 +114,6 @@ def _refuse_a_closed_item(fresh: decide.FreshItem) -> None:
     if fresh.state is not forge.ItemState.OPEN:
         label = workboard.item_label(fresh.number, fresh.storage)
         raise ItemClosedError(f"{label} is closed; there is nothing to wait for")
-
-
-def _modified(signal: Path) -> int | None:
-    """The signal's modification time, `None` while no ruling has touched it."""
-    try:
-        return signal.stat().st_mtime_ns
-    except FileNotFoundError:
-        return None
-    except OSError as error:
-        raise protocol.ClaimUnavailableError(
-            f"cannot watch the item's signal at {signal}: {error.strerror or str(error)}"
-        ) from error
 
 
 def _emit_changed(
@@ -152,7 +161,7 @@ def _wait_for_lines(
     _ = context.repository_id
     state = repositories.state_directory(os.environ, Path.home())
     signal = decide.item_signal_path(context, number, state)
-    watched = _modified(signal)
+    watched = board_wait.signal_modified(signal)
     fresh = decide.fresh_item(context, number, command="wait")
     _refuse_a_closed_item(fresh)
     changed = _changed_lines(fresh, named)
@@ -160,7 +169,7 @@ def _wait_for_lines(
     failing = False
     while not changed:
         pause(SIGNAL_POLL_SECONDS)
-        moved = _modified(signal)
+        moved = board_wait.signal_modified(signal)
         if moved == watched and now() - last_read < ITEM_READ_SECONDS:
             continue
         watched, last_read = moved, now()
@@ -177,10 +186,60 @@ def _wait_for_lines(
     return 0
 
 
+def _emit_board_end(end: board_wait.BoardEnd, storage: body.Storage, *, as_json: bool) -> None:
+    changed = [
+        {
+            "item": workboard.item_json_reference(line.item, storage),
+            "index": line.index,
+            "state": line.state,
+        }
+        for line in end.changed
+    ]
+    if as_json:
+        if end.actionable_item is None:
+            report.emit_json(True, _WaitReason.CHANGED, lines=changed)
+        else:
+            item = workboard.item_json_reference(end.actionable_item, storage)
+            lines = {"lines": changed} if changed else {}
+            report.emit_json(True, _WaitReason.ACTIONABLE, item=item, **lines)
+        return
+    if end.actionable_item is not None:
+        print(f"ACTIONABLE {workboard.item_label(end.actionable_item, storage)}")
+    for line in end.changed:
+        print(f"CHANGED {workboard.item_label(line.item, storage)} line {line.index}: {line.state}")
+
+
+def _wait_on_the_board(
+    parsed: argparse.Namespace,
+    context: RunContext,
+    pause: Callable[[float], None],
+    now: Callable[[], float],
+) -> int:
+    """WAIT-14: the repository's board, until `aco next` names an action or a line
+    that waited on the operator stops."""
+    end = board_wait.wait_for_board(context, board_wait.WaitClock(pause, now, SIGNAL_POLL_SECONDS))
+    _emit_board_end(end, context.config.storage, as_json=parsed.json)
+    return 0
+
+
+def _wait(
+    parsed: argparse.Namespace,
+    context: RunContext,
+    pause: Callable[[float], None],
+    now: Callable[[], float],
+) -> int:
+    """The board without an item, the item's lines with one; either without the other refuses."""
+    if (parsed.item is None) != (parsed.lines is None):
+        raise HalfATargetError("wait needs an item together with --line, or neither of them")
+    if parsed.item is None:
+        return _wait_on_the_board(parsed, context, pause, now)
+    return _wait_for_lines(parsed, context, pause, now)
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     """`wait` with its own `--json` refusals for the whole command."""
     return report.refusing_by_type(
-        partial(_wait_for_lines, parsed, context, pause_between_checks, clock),
+        partial(_wait, parsed, context, pause_between_checks, clock),
         _REFUSAL_REASONS,
         _WaitReason.UNAVAILABLE,
         as_json=parsed.json,

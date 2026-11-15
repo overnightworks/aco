@@ -14,17 +14,13 @@ from option_cards import (
     ruled_card,
     unclear,
 )
-from wait_fixtures import ITEM, install, reads_of, serve_item, serve_snapshots
+from wait_fixtures import ITEM, install, open_reference, reads_of, serve_item, serve_snapshots
 
 from aco import body, cmd_wait, forge, github, store
 
 WITHDRAWN_LINE = '[[expectation]]\ntext = "Zurück"\nwithdrawn_on = 2026-08-01\n'
 DATE = r"\d{4}-\d{2}-\d{2}"
 SLOW_READS_PAUSES = int(cmd_wait.ITEM_READ_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
-
-
-def open_reference(raw: str, *, is_landing: bool = False) -> forge.ItemReference:
-    return forge.ItemReference(forge.ItemState.OPEN, "Karte", raw, is_landing)
 
 
 @pytest.mark.usefixtures("github_world")
@@ -335,28 +331,11 @@ def test_repo_under_state_ref_refuses_before_the_forge(
     assert json.loads(result.stdout) == {"ok": False, "reason": "invalid_usage", "message": message}
 
 
-@pytest.mark.parametrize(
-    ("arguments", "sentence"),
-    [
-        pytest.param(
-            ["wait", "7"],
-            "aco wait: error: the following arguments are required: --line",
-            id="no-line",
-        ),
-        pytest.param(
-            ["wait", "7", "--line", "2", "--timeout", "5"],
-            "aco: error: unrecognized arguments: --timeout 5",
-            id="no-timeout",
-        ),
-    ],
-)
-def test_the_parser_refuses_a_missing_line_and_a_timeout(
-    capsys: pytest.CaptureFixture[str], arguments: list[str], sentence: str
-) -> None:
-    """Spec: WAIT-09, Never 2 -- `--line` is required and the command has no timeout flag."""
-    result = run_cli(arguments, capsys)
+def test_the_parser_refuses_a_timeout(capsys: pytest.CaptureFixture[str]) -> None:
+    """Spec: WAIT-09, Never 2 -- the command has no timeout flag."""
+    result = run_cli(["wait", "7", "--line", "2", "--timeout", "5"], capsys)
     assert (result.status, result.stdout) == (2, "")
-    assert sentence in result.stderr
+    assert "aco: error: unrecognized arguments: --timeout 5" in result.stderr
 
 
 def test_help_lists_the_flags_each_with_a_help_line(capsys: pytest.CaptureFixture[str]) -> None:

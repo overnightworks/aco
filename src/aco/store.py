@@ -190,7 +190,7 @@ _STATE_FETCH_OPTIONS = (
 # `export_state_bundle` below has its own, separate ref in the same private
 # namespace (`EXPORT_BUNDLE_REF`), never this one, and `peek_state` never
 # writes here at all: its read comes from
-# `_ls_remote_state`'s own answer, since a dry run, a live-claim refusal, or
+# `ls_remote_state`'s own answer, since a dry run, a live-claim refusal, or
 # a failed export must change nothing durable.
 _FETCH_ANCHOR_REF = "refs/worktree/aco/state"
 
@@ -398,7 +398,7 @@ def claim_ages(
     return ages
 
 
-def _ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
+def ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
     """Probe `STATE_REF` on `remote` without fetching it.
 
     Only `_LS_REMOTE_EXIT_NO_MATCH` (2, "no matching refs") is ever read as
@@ -448,7 +448,7 @@ def _fetch_ref_objects(worktree: Path, remote: str) -> None:
     without creating any local ref for it -- production never creates the
     shared `refs/aco/state` locally. `_peek_tip`, this function's only
     caller and the shared read behind `peek_state` and
-    `peek_state_for_reset`, already knows the tip from `_ls_remote_state`'s
+    `peek_state_for_reset`, already knows the tip from `ls_remote_state`'s
     own answer, so no destination ref is needed here.
     `--no-write-fetch-head` keeps this from even landing the tip in
     `FETCH_HEAD` (neither peek reads it
@@ -786,7 +786,7 @@ def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
     """
     stamp_directory = _stamp_directory(worktree)
     with lineage_stamp.locked(stamp_directory):
-        probed = _ls_remote_state(worktree, remote)
+        probed = ls_remote_state(worktree, remote)
         if probed is None:
             stamp = lineage_stamp.read(stamp_directory)
             if stamp is not None:
@@ -808,7 +808,7 @@ def peek_state(*, worktree: Path, remote: str) -> ClaimState:
     preflight): one of the two peeks in this module, with `peek_state_for_reset`, that read
     through `_peek_tip` and so skip `fetch_state`'s own lineage guard, anchor, and stamp.
 
-    The tip is `_ls_remote_state`'s own answer: the fetch that follows (`_fetch_ref_objects`)
+    The tip is `ls_remote_state`'s own answer: the fetch that follows (`_fetch_ref_objects`)
     only brings the objects into this worktree's local store so `_parse_state_tree` can read
     them -- it writes no destination ref, and `--no-write-fetch-head` keeps it from even landing
     the tip in `FETCH_HEAD`, so a concurrent `git fetch` anywhere else in this same worktree can
@@ -858,7 +858,7 @@ def _peek_tip(worktree: Path, remote: str) -> ObjectId | None:
     """`STATE_REF`'s tip on `remote` with its objects in this worktree's
     store, or `None` for a proven-absent ref -- `peek_state`'s write-free
     read, shared by both peeks."""
-    probed = _ls_remote_state(worktree, remote)
+    probed = ls_remote_state(worktree, remote)
     if probed is not None:
         _fetch_ref_objects(worktree, remote)
     return probed
@@ -1659,7 +1659,7 @@ def _repair_after_failed_remote_delete(
     against whatever it finds.
     """
     try:
-        current = _ls_remote_state(worktree, remote)
+        current = ls_remote_state(worktree, remote)
     except ClaimError as error:
         raise ClaimError(
             f"cannot delete {STATE_REF} on {remote} (lease {expected_remote_tip}): "

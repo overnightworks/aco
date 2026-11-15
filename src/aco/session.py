@@ -29,7 +29,18 @@ from functools import cached_property
 from pathlib import Path
 from typing import cast
 
-from . import body, checkout, forge, github, github_search, protocol, state_board, store, workboard
+from . import (
+    body,
+    checkout,
+    forge,
+    github,
+    github_probe,
+    github_search,
+    protocol,
+    state_board,
+    store,
+    workboard,
+)
 
 ForgeBuilder = Callable[["RunContext"], forge.ForgeReader]
 
@@ -148,6 +159,7 @@ def run_context(repo: forge.RepositoryId | None) -> RunContext:
         repo,
         build_forge=_build_forge,
         ruling_search=github_search.GitHubRulingSearch(github.bounded_command),
+        board_probe=github_probe.GitHubBoardProbe(github.response_command),
     )
 
 
@@ -378,14 +390,16 @@ class RunContext:
     into the storage pin's forge adapter; the context holds what it builds.
     `today` is the run's clock; `rule` reads its one date from it.
     `ruling_search` is the forge's search for rulings, which `ask` reads.
+    `board_probe` is the forge's cheap change check, which `aco wait` reads.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - one port per reach of the forge; a record would only wrap them
         self,
         repo: forge.RepositoryId | None,
         *,
         build_forge: ForgeBuilder,
         ruling_search: forge.RulingSearch,
+        board_probe: forge.BoardProbe,
         directory: Path | None = None,
         today: Callable[[], date] = utc_today,
     ) -> None:
@@ -393,6 +407,7 @@ class RunContext:
         self.directory = directory
         self.today = today
         self.ruling_search = ruling_search
+        self.board_probe = board_probe
         self._build_forge = build_forge
         self._fetched_trunk_remote: str | None = None
 
@@ -408,6 +423,7 @@ class RunContext:
             directory=directory,
             today=self.today,
             ruling_search=self.ruling_search,
+            board_probe=self.board_probe,
         )
         if is_toplevel:
             child.toplevel = directory
@@ -426,6 +442,7 @@ class RunContext:
             directory=self.directory,
             today=self.today,
             ruling_search=self.ruling_search,
+            board_probe=self.board_probe,
         )
         child._fetched_trunk_remote = self._fetched_trunk_remote
         return child

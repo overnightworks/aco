@@ -77,7 +77,7 @@ _HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
 _TRANSIENT_PATTERN = re.compile(
     _HTTP_SERVER_ERROR_PATTERN.pattern + r"|connection reset|timeout|error connecting to|dial tcp"
 )
-# `merge_landing`'s own signals, none a 4xx `_nonzero_exit_failure` classifies.
+# `merge_landing`'s own signals, none a 4xx `nonzero_exit_failure` classifies.
 # GitHub's REST reference for the merge endpoint: 409 "if sha was provided and
 # pull request head did not match", 405 "if merge cannot be performed" -- a
 # rule, a required review, an unmergeable state: no re-run repairs it, but
@@ -129,9 +129,7 @@ def landing_comment(pull_request: int) -> str:
 
 
 def command_environment() -> dict[str, str]:
-    environment = os.environ.copy()
-    environment.update(GH_QUIET_ENVIRONMENT)
-    return environment
+    return {**os.environ, **GH_QUIET_ENVIRONMENT}
 
 
 # GitHub reserves these as repository names; as a path segment they name the
@@ -240,11 +238,7 @@ def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeErro
     raise AssertionError(f"unhandled process failure type: {type(error).__name__}")
 
 
-def _is_transient_signal(decoded: str) -> bool:
-    return _TRANSIENT_PATTERN.search(decoded) is not None
-
-
-def _nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
+def nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
     """Classify a nonzero `gh` exit from its decoded combined output.
 
     `gh`'s own exit code never carries the HTTP status, so this reads the
@@ -255,12 +249,14 @@ def _nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge
         return forge.ForgeNotFoundError(decoded)
     if "HTTP 401" in decoded or "HTTP 403" in decoded:
         return forge.ForgePermissionDeniedError(decoded)
-    if _is_transient_signal(decoded):
+    if _TRANSIENT_PATTERN.search(decoded):
         return forge.ForgeTransientError(decoded)
     return forge.ForgeError(decoded or f"{purpose} failed with exit {return_code}")
 
 
-def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
+def response_command(
+    command: list[str], *, purpose: str, input_data: bytes | None = None
+) -> tuple[str, int]:
     try:
         result = process.run_bounded(
             command,
@@ -274,9 +270,13 @@ def bounded_command(command: list[str], *, purpose: str, input_data: bytes | Non
         raise ClaimError(f"cannot start {purpose}: {error.detail}") from error
     except process.ProcessError as error:
         raise _forge_failure(error, purpose) from error
-    decoded = _decoded(result, purpose)
-    if result.exit_status != 0:
-        raise _nonzero_exit_failure(decoded, result.exit_status, purpose)
+    return _decoded(result, purpose), result.exit_status
+
+
+def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
+    decoded, exit_status = response_command(command, purpose=purpose, input_data=input_data)
+    if exit_status != 0:
+        raise nonzero_exit_failure(decoded, exit_status, purpose)
     return decoded
 
 
