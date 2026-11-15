@@ -3,11 +3,12 @@
 Only isolation fixtures live here -- the autouse ones and the isolation more
 than one module asks for by name -- plus `github_world`, the GitHub-checkout
 world check many modules share; everything else stays local to its test
-module. The one exception is registration: `cli_fixtures` and `adoption_world`
-are loaded as pytest plugins (`pytest_plugins` below). `cli_fixtures` gives every
-test module its `bare_remote` and `worktree` fixtures by name, and its autouse
-`_isolate_agent_identity` applies to every test; `adoption_world` gives every
-module its `world` fixture.
+module. The one exception is registration: `cli_fixtures`, `adoption_world` and
+`release_cleanup_world` are loaded as pytest plugins (`pytest_plugins` below).
+`cli_fixtures` gives every test module its `bare_remote` and `worktree` fixtures
+by name, and its autouse `_isolate_agent_identity` applies to every test;
+`adoption_world` gives every module its `world` fixture, and
+`release_cleanup_world` gives the release cleanup modules their `cleanup_check`.
 """
 
 from pathlib import Path
@@ -15,9 +16,10 @@ from pathlib import Path
 import pytest
 
 # Registers `cli_fixtures` (`bare_remote`, `worktree`, the autouse identity
-# isolation) and `adoption_world` (`world`) for every module by name: an import
+# isolation), `adoption_world` (`world`) and `release_cleanup_world`
+# (`cleanup_check`) for every module by name: an import
 # of a fixture only to receive it as a parameter reads as unused to ruff.
-pytest_plugins = ["cli_fixtures", "adoption_world"]
+pytest_plugins = ["cli_fixtures", "adoption_world", "release_cleanup_world"]
 
 
 @pytest.fixture(autouse=True)
