@@ -2,9 +2,8 @@
 # ruff: noqa: T201 - the release command writes its result lines to stdout
 
 import argparse
-import shlex
 import uuid
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
@@ -15,6 +14,7 @@ from . import (
     checkout,
     forge,
     github,
+    item_handover,
     lane_record,
     protocol,
     report,
@@ -252,7 +252,7 @@ def _resolve_release_claimant(
     storage: body.Storage,
 ) -> _ResolvedRelease:
     selected = select_release_claim(parsed, observed, identity, release_branch, storage)
-    return authorize_releaser(parsed, selected, _release_repeat_command(parsed))
+    return authorize_releaser(parsed, selected)
 
 
 def _is_adopted_lane(identity: protocol.ClaimIdentity, branch: str) -> bool:
@@ -345,59 +345,26 @@ def select_release_claim(
 
 
 def authorize_releaser(
-    parsed: argparse.Namespace, selected: protocol.ActiveClaim, repeat: Sequence[str]
+    parsed: argparse.Namespace, selected: protocol.ActiveClaim
 ) -> _ResolvedRelease:
     """This session's right to release `selected`: its own claimant, or an
-    explicit coordinator override. `repeat` is the refused command without
-    its identity flags, which the refusal names run as the holder."""
+    explicit coordinator override. An item's claim held by another session
+    names `aco handover` as the successor's route before the override."""
     role = parsed.role
     if not parsed.coordinator_override:
         if role is None:
             role = selected.role
         if (parsed.agent, role) != (selected.agent, selected.role):
+            route = item_handover.handover_route(selected.identity, selected.agent)
+            takeover = "use" if route is None else f"take the claim over with `{route}`, or use"
             raise protocol.ClaimUnavailableError(
-                "only the original claimant may release; repeat as the holder with "
-                f"`{_holder_repeat_command(repeat, selected, role)}`, or use an explicit "
+                f"only the original claimant may release; {takeover} an explicit "
                 "coordinator override "
                 f"(holder={protocol.claimant_text(selected.agent, selected.role)!r}, "
                 f"this session={protocol.claimant_text(parsed.agent, role)!r})"
             )
     resolved_role = role if role is not None else selected.role
     return _ResolvedRelease(selected, resolved_role)
-
-
-def _holder_repeat_command(
-    repeat: Sequence[str], holder: protocol.ActiveClaim, session_role: str
-) -> str:
-    """`repeat` -- the refused command, without its identity flags -- run
-    as `holder` instead: a claim taken under an explicit
-    `--agent` releases from the same session only when it names that agent
-    again, so the refusal spells out that one repeat before any override."""
-    identity = ["--agent", holder.agent]
-    if session_role != holder.role:
-        identity += ["--role", holder.role]
-    return shlex.join([*repeat, *identity])
-
-
-def _release_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
-    """The `aco release` command line `parsed` came from, without its
-    identity flags, for `_holder_repeat_command`."""
-    command = ["aco", "release"]
-    if parsed.issue is not None:
-        command.append(str(protocol.optional_issue_number(parsed.issue)))
-    if parsed.branch is not None:
-        command += ["--branch", parsed.branch]
-    if parsed.claim_id is not None:
-        command += ["--claim-id", parsed.claim_id]
-    if parsed.merged is None:
-        command += ["--abandoned", parsed.abandoned]
-    else:
-        command += ["--merged", parsed.merged] if parsed.merged else ["--merged"]
-    if parsed.keep_worktree:
-        command.append(KEEP_WORKTREE_FLAG)
-    if parsed.json:
-        command.append(report.JSON_FLAG)
-    return tuple(command)
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:

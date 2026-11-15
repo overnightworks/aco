@@ -683,9 +683,9 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; repeat as the "
-                    "holder with `aco land 12 --agent Grok`, or use an "
-                    "explicit coordinator override (holder='Grok "
+                    "only the original claimant may release; take the claim over "
+                    "with `aco handover 72 --from Grok --reason <text>`, or use "
+                    "an explicit coordinator override (holder='Grok "
                     "(builder)', this session='Ada (builder)')",
                     intents=(
                         claim_intent(
@@ -698,11 +698,10 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; repeat as the "
-                    "holder with `aco land 12 --keep-worktree --agent "
-                    "Grok`, or use an explicit coordinator override "
-                    "(holder='Grok (builder)', this session='Ada "
-                    "(builder)')",
+                    "only the original claimant may release; take the claim over "
+                    "with `aco handover 72 --from Grok --reason <text>`, or use "
+                    "an explicit coordinator override (holder='Grok "
+                    "(builder)', this session='Ada (builder)')",
                     intents=(
                         claim_intent(
                             identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
@@ -714,11 +713,10 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; repeat as the "
-                    "holder with `aco land 12 --head a1b2c3d "
-                    "--keep-worktree --agent Grok`, or use an explicit "
-                    "coordinator override (holder='Grok (builder)', this "
-                    "session='Ada (builder)')",
+                    "only the original claimant may release; take the claim over "
+                    "with `aco handover 72 --from Grok --reason <text>`, or use "
+                    "an explicit coordinator override (holder='Grok "
+                    "(builder)', this session='Ada (builder)')",
                     intents=(
                         claim_intent(
                             identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
@@ -730,11 +728,10 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; repeat as the "
-                    "holder with `aco land 12 --agent Ada --role "
-                    "coordinator`, or use an explicit coordinator override "
-                    "(holder='Ada (coordinator)', this session='Ada "
-                    "(builder)')",
+                    "only the original claimant may release; take the claim over "
+                    "with `aco handover 72 --from Ada --reason <text>`, or use "
+                    "an explicit coordinator override (holder='Ada "
+                    "(coordinator)', this session='Ada (builder)')",
                     intents=(
                         claim_intent(
                             identity=protocol.IssueIdentity(72),
@@ -748,9 +745,9 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; repeat as the "
-                    "holder with `aco land 12 --agent Grok`, or use an "
-                    "explicit coordinator override (holder='Grok "
+                    "only the original claimant may release; take the claim over "
+                    "with `aco handover 72 --from Grok --reason <text>`, or use "
+                    "an explicit coordinator override (holder='Grok "
                     "(builder)', this session='Ada (builder)')",
                     intents=(
                         claim_intent(

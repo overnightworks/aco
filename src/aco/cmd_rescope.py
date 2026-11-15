@@ -15,6 +15,7 @@ from . import (
     checkout,
     decide,
     forge,
+    item_handover,
     policy,
     protocol,
     report,
@@ -339,8 +340,10 @@ def _judged_selection(
     except protocol.ClaimError as error:
         raise _RescopePreconditionError(str(error)) from error
     if requested.agent != selected.agent:
+        route = item_handover.handover_route(selected.identity, selected.agent)
+        takeover = "" if route is None else f"; take the claim over with `{route}`"
         raise _RescopePreconditionError(
-            "only the original claimant may rescope "
+            f"only the original claimant may rescope{takeover} "
             f"(holder={protocol.claimant_text(selected.agent, selected.role)!r}, "
             f"this session={protocol.claimant_text(requested.agent, selected.role)!r})"
         )

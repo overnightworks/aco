@@ -32,19 +32,6 @@ _LAND_SELF_PACKAGE_NAME = "overnightworks-aco"
 _LAND_REINSTALL_LINE = f"reinstall: uv tool install --force --from . {_LAND_SELF_PACKAGE_NAME}"
 
 
-def _land_repeat_command(parsed: argparse.Namespace) -> tuple[str, ...]:
-    """The `aco land` command line `parsed` came from, without its identity
-    flags, for `cmd_release._holder_repeat_command`: `--head` and `--keep-worktree`
-    stay, since a repeat without them would land an unreviewed head or
-    remove the worktree the operator kept."""
-    command = ["aco", "land", str(parsed.pull_request)]
-    if parsed.head is not None:
-        command.extend(["--head", parsed.head])
-    if parsed.keep_worktree:
-        command.append(cmd_release.KEEP_WORKTREE_FLAG)
-    return tuple(command)
-
-
 # GitHub answers `mergeable_state = unknown` while it recomputes a pull
 # request's state after a push or a base change, and settles within about
 # half a minute. Bounded by a count of reads, so only the pause needs a seam.
@@ -333,7 +320,7 @@ def _land_preflight(
         detail.source_branch,
         context.storage,
     )
-    cmd_release.authorize_releaser(parsed, selected, _land_repeat_command(parsed))
+    cmd_release.authorize_releaser(parsed, selected)
     return detail, structural, readiness
 
 

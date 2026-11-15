@@ -22,11 +22,16 @@ from claim_worktrees import (
     serve_body,
     standing_claims,
 )
-from cli_fixtures import run_cli
-from github_fixtures import FakeForge
+from cli_fixtures import real_git, run_cli
+from github_fixtures import (
+    LANDING_BRANCH,
+    FakeForge,
+    assert_github_world,
+    lane_landing_world,
+)
 from store_fixtures import fail_every_state_ref_push, state_ref_tip
 
-from aco import body, item_handover
+from aco import body, cmd_land, forge, item_handover, protocol, store
 from aco.protocol import ClaimError
 
 TRUNK_FILES = ("src/widget.py",)
@@ -90,6 +95,22 @@ def test_a_handover_makes_the_acting_session_the_holder_and_records_it_on_the_it
     record = recorded_handover(served)
     assert record is not None
     assert (record.from_agent, record.to_agent, record.reason) == (PREDECESSOR, SUCCESSOR, REASON)
+
+
+def test_the_state_ref_commit_names_both_agents_and_the_reason(
+    monkeypatch: pytest.MonkeyPatch,
+    stand_in: StandIn,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: HANDOVER-03."""
+    stand_in(standing=held_by_the_predecessor())
+    serve_body(monkeypatch, complete_contract("Build it."))
+
+    run_cli(handover_arguments(), capsys)
+
+    message = real_git(bare_remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
+    assert f"intent: handover\nfrom: {PREDECESSOR}\nto: {SUCCESSOR}\nreason: {REASON}\n" in message
 
 
 def test_the_new_holder_rescopes_and_releases_without_an_override(
@@ -272,3 +293,66 @@ def test_a_json_refusal_is_a_failed_precondition(
 
     assert result.status == 2
     assert_json_refusal_object(result.stderr, result.stdout, reason="precondition_failed")
+
+
+def test_the_new_holder_lands_the_pull_request_the_predecessor_left(
+    monkeypatch: pytest.MonkeyPatch,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: HANDOVER-04, LANDCMD-10."""
+    monkeypatch.setattr(cmd_land, "pause_between_reads", lambda _seconds: None)
+    assert_github_world(github_clone, bare_remote)
+
+    def serve_the_item(client: FakeForge, _head: str) -> None:
+        client.issue_references[ISSUE] = forge.ItemReference(
+            forge.ItemState.OPEN, "Claims", complete_contract("Build it.")
+        )
+
+    lane_landing_world(
+        github_clone,
+        bare_remote,
+        monkeypatch,
+        identity=protocol.IssueIdentity(ISSUE),
+        branch=LANDING_BRANCH,
+        body=f"Work-Item: #{ISSUE}\n\nCloses #{ISSUE}",
+        methods=None,
+        holder=PREDECESSOR,
+        arrange=serve_the_item,
+    )
+    refused = run_cli(["land", "12"], capsys)
+
+    taken = run_cli(handover_arguments(), capsys)
+    landed = run_cli(["land", "12"], capsys)
+
+    assert (refused.status, taken.status, landed.status) == (2, 0, 0)
+    assert f"aco handover {ISSUE} --from '{PREDECESSOR}' --reason <text>" in refused.stderr
+    assert f"RELEASED issue #{ISSUE}" in landed.stdout
+
+
+def test_a_handover_under_state_ref_storage_records_on_the_item_and_repeats(
+    stand_in: StandIn, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: HANDOVER-02, HANDOVER-04, HANDOVER-07 under `storage = "state-ref"`."""
+    stand_in(board_config=f'storage = "{body.Storage.STATE_REF.value}"\n')
+    minted = run_cli(
+        ["item", "new", "--title", "Takeover"],
+        capsys,
+        stdin=complete_contract("Build it.", scope=["src"], whole="the scenario claims it as one"),
+    )
+    item = minted.stdout.strip()
+    run_cli(["claim", item, "--agent", PREDECESSOR, "--scope", "src"], capsys)
+    handover = ["handover", item, "--from", PREDECESSOR, "--reason", REASON]
+
+    taken = run_cli(handover, capsys)
+    repeated = run_cli(handover, capsys)
+    rescoped = run_cli(["rescope", item, "--add", NEW_FILE], capsys)
+    shown = run_cli(["item", "show", item], capsys)
+
+    assert (taken.status, repeated.status, rescoped.status) == (0, 0, 0)
+    assert taken.stdout == f"HANDED OVER {item}: {PREDECESSOR} -> {SUCCESSOR}\n"
+    assert repeated.stdout == f"ALREADY HANDED OVER {item}: {PREDECESSOR} -> {SUCCESSOR}\n"
+    record = item_handover.parse_handover(body.locate_block(shown.stdout).data)
+    assert record is not None
+    assert (record.from_agent, record.to_agent, record.reason) == (PREDECESSOR, SUCCESSOR, REASON)

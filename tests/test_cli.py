@@ -7723,7 +7723,7 @@ def test_cli_release_omitted_claim_id_releases_when_foreign_peer_exists_on_issue
             "Other",
             ("--abandoned", "stopped"),
             "reviewer",
-            "aco release 72 --abandoned stopped --agent Ada",
+            "aco handover 72 --from Ada --reason <text>",
             id="abandoned",
         ),
         pytest.param(
@@ -7731,7 +7731,7 @@ def test_cli_release_omitted_claim_id_releases_when_foreign_peer_exists_on_issue
             "Claude s-1",
             ("--merged", "12"),
             "reviewer",
-            "aco release 72 --merged 12 --agent claude-head",
+            "aco handover 72 --from claude-head --reason <text>",
             id="merged-by-an-explicit-agent",
         ),
         pytest.param(
@@ -7739,7 +7739,7 @@ def test_cli_release_omitted_claim_id_releases_when_foreign_peer_exists_on_issue
             "Other",
             ("--merged", "12", "--role", "builder"),
             "builder",
-            "aco release 72 --merged 12 --agent 'Claude s-1' --role reviewer",
+            "aco handover 72 --from 'Claude s-1' --reason <text>",
             id="other-role-and-a-quoted-agent",
         ),
         pytest.param(
@@ -7747,12 +7747,12 @@ def test_cli_release_omitted_claim_id_releases_when_foreign_peer_exists_on_issue
             "Other",
             ("--merged", "12", "--keep-worktree", "--json"),
             "reviewer",
-            "aco release 72 --merged 12 --keep-worktree --json --agent Ada",
+            "aco handover 72 --from Ada --reason <text>",
             id="keeps-the-worktree-and-json-flags",
         ),
     ],
 )
-def test_cli_release_by_another_claimant_names_the_holders_repeat_without_a_write(
+def test_cli_release_by_another_claimant_names_the_handover_route_without_a_write(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     holder: str,
@@ -7761,8 +7761,8 @@ def test_cli_release_by_another_claimant_names_the_holders_repeat_without_a_writ
     session_role: str,
     repeat: str,
 ) -> None:
-    """REL-12: a release by another agent or role names
-    the exact repeat as the holder before it mentions the coordinator
+    """REL-12: a release by another agent or role names the handover
+    command as the successor's route before it mentions the coordinator
     override -- the songmaker case is a claim taken with `--agent
     claude-head` whose session later falls back to its session id."""
     standing = request("mine", holder, issue=72, role="reviewer", branch="lane-72", scope=("src",))
@@ -7773,7 +7773,7 @@ def test_cli_release_by_another_claimant_names_the_holders_repeat_without_a_writ
 
     assert (released, captured.out == "") == (2, "--json" not in arguments)
     assert captured.err == (
-        f"ERROR: only the original claimant may release; repeat as the holder with `{repeat}`, "
+        f"ERROR: only the original claimant may release; take the claim over with `{repeat}`, "
         f"or use an explicit coordinator override (holder='{holder} (reviewer)', "
         f"this session='{session} ({session_role})')\n"
     )
