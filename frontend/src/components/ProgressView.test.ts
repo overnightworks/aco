@@ -1,0 +1,62 @@
+import { render, screen, within } from '@testing-library/svelte';
+import { expect, test } from 'vitest';
+import { progressContainer, progressRead, repo } from '../test-support/board';
+import ProgressView from './ProgressView.svelte';
+
+test('[ABRD-135] a repo shows its figure, bar, counts and each top-level container', () => {
+	render(ProgressView, {
+		repos: [repo({ name: 'songmaker', progress: progressRead() })]
+	});
+
+	const article = screen.getByRole('article');
+	expect(within(article).getAllByText('7/48 · 14 %')).toHaveLength(2);
+	expect(within(article).getByText(/^Open/)).toHaveTextContent('Open 31');
+	expect(within(article).getByText(/^Uncut/)).toHaveTextContent('Uncut 10');
+	expect(within(article).getByText(/^Waiting/)).toHaveTextContent('Waiting 2');
+	expect(within(article).getByText('#10')).toBeInTheDocument();
+	expect(screen.getAllByRole('progressbar')).toHaveLength(2);
+	expect(screen.getAllByRole('progressbar')[1]).toHaveAttribute('aria-valuetext', '7/48 · 14 %');
+});
+
+test('[ABRD-135] a repo with no container says so and shows no percent', () => {
+	render(ProgressView, {
+		repos: [
+			repo({
+				progress: progressRead({
+					closed: 0,
+					planned: 0,
+					open: 0,
+					uncut: 0,
+					percent: null,
+					waiting: 0,
+					containers: []
+				})
+			})
+		]
+	});
+
+	expect(screen.getByText('0/0')).toBeInTheDocument();
+	expect(screen.getByText('No container is open.')).toBeInTheDocument();
+});
+
+test('[ABRD-135] a container at one hundred percent is marked done', () => {
+	const done = progressContainer({ closed: 5, planned: 5, open: 0, uncut: 0, percent: 100 });
+	render(ProgressView, { repos: [repo({ progress: progressRead({ containers: [done] }) })] });
+
+	expect(screen.getAllByRole('progressbar')[1]).toHaveClass('done');
+});
+
+test('[ABRD-134] a progress that could not be read shows its sentence and no figure', () => {
+	render(ProgressView, { repos: [repo({ progress: { error: 'GitHub is down' } })] });
+
+	expect(screen.getByRole('alert')).toHaveTextContent('Progress unknown');
+	expect(screen.getByRole('alert')).toHaveTextContent('GitHub is down');
+	expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+});
+
+test('[ABRD-135] a repo that was not read shows its sentence', () => {
+	render(ProgressView, { repos: [repo({ error: 'git refused the read', progress: null })] });
+
+	expect(screen.getByRole('alert')).toHaveTextContent('Not read');
+	expect(screen.getByRole('alert')).toHaveTextContent('git refused the read');
+});

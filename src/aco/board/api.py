@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .. import expectation_grammar, expectations, rulings
+from .. import expectation_grammar, expectations, progress, rulings
 from .board import BoardReading, RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
@@ -56,12 +56,43 @@ def board_json(reading: BoardReading) -> str:
 
 def _repo_json(reading: RepoReading) -> dict[str, object]:
     if isinstance(reading, RepoUnavailable):
-        return {"name": reading.name, "error": reading.reason, "items": []}
+        return {"name": reading.name, "error": reading.reason, "items": [], "progress": None}
     items = (_item_json(row, reading.name) for row in reading.rows)
     return {
         "name": reading.name,
         "error": None,
         "items": [item for item in items if item is not None],
+        "progress": _progress_json(reading.progress),
+    }
+
+
+def _progress_json(
+    read: progress.Progress | progress.ProgressUnavailable | None,
+) -> dict[str, object] | None:
+    """The repo's progress line and its top-level containers; `error` is the
+    sentence of a read that left it unknown, and only then are the counts absent."""
+    if read is None:
+        return None
+    if isinstance(read, progress.ProgressUnavailable):
+        return {"error": read.reason}
+    return {
+        "error": None,
+        **_counts_json(read),
+        "waiting": read.waiting,
+        "containers": [
+            {"number": container.number, "title": container.title, **_counts_json(container)}
+            for container in read.containers
+        ],
+    }
+
+
+def _counts_json(counts: progress.Progress | progress.Container) -> dict[str, object]:
+    return {
+        "closed": counts.closed,
+        "planned": counts.planned,
+        "open": counts.open,
+        "uncut": counts.uncut,
+        "percent": counts.percent,
     }
 
 

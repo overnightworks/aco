@@ -189,6 +189,8 @@ def board_issue(
     blocked_by_count: int = 0,
     kind: ItemKind | None = None,
     author_is_member: bool = True,
+    children_closed: int | None = None,
+    children_total: int | None = None,
 ) -> workboard.Issue:
     return workboard.Issue(
         number,
@@ -200,6 +202,8 @@ def board_issue(
         kind=kind,
         blocked_by_count=blocked_by_count,
         author_is_member=author_is_member,
+        children_closed=children_closed,
+        children_total=children_total,
     )
 
 

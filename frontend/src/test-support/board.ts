@@ -12,6 +12,8 @@ import type {
 	CardOption,
 	DecisionResult,
 	OptionLine,
+	ProgressContainer,
+	ProgressRead,
 	RepoReading,
 	RuledOptionLine,
 	YesNoLine
@@ -131,6 +133,7 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 		name: 'repo',
 		error: null,
 		items: [item()],
+		progress: null,
 		...overrides
 	};
 }
@@ -189,4 +192,31 @@ export function heldReads() {
  * re-read that does nothing unless given, and an apply that shows nothing. */
 export function inertBoard(reload: () => Promise<void> = async () => {}): DecisionBoard {
 	return { reload, applyItem: () => {} };
+}
+
+export function progressContainer(overrides: Partial<ProgressContainer> = {}): ProgressContainer {
+	return {
+		number: 10,
+		title: 'Epic',
+		closed: 7,
+		planned: 48,
+		open: 31,
+		uncut: 10,
+		percent: 14,
+		...overrides
+	};
+}
+
+export function progressRead(overrides: Partial<ProgressRead> = {}): ProgressRead {
+	return {
+		error: null,
+		closed: 7,
+		planned: 48,
+		open: 31,
+		uncut: 10,
+		percent: 14,
+		waiting: 2,
+		containers: [progressContainer()],
+		...overrides
+	};
 }

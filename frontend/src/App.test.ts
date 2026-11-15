@@ -24,7 +24,7 @@ test('the shell names the board in its heading, whatever the state', () => {
 	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Entscheidungs-Board');
 });
 
-test('[ABRD-51] a ready board offers the Open and Decided tabs in that order with their counts, the current one marked', async () => {
+test('[ABRD-51] a ready board offers the Open, Decided and Progress tabs in that order with their counts, the current one marked', async () => {
 	const repos = [
 		repo({
 			items: [
@@ -50,7 +50,7 @@ test('[ABRD-51] a ready board offers the Open and Decided tabs in that order wit
 		within(views)
 			.getAllByRole('button')
 			.map((tab) => tab.textContent)
-	).toEqual(['Open 2', 'Decided 1']);
+	).toEqual(['Open 2', 'Decided 1', 'Progress']);
 	expect(open).toHaveAttribute('aria-current', 'page');
 	expect(decided).not.toHaveAttribute('aria-current');
 

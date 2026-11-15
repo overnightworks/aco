@@ -134,6 +134,9 @@ type OrderedRowState = OpenRowState | 'done';
 /** The header's views: the two tabs that list rows. */
 export type ListView = 'open' | 'decided';
 
+/** The header's views: the list views and the progress view. */
+export type BoardView = ListView | 'progress';
+
 /** How a waiting decision's strip reads: `done` for a ruling, `back` for a card
  * on its way to its head. */
 export type StripState = Extract<RowState, 'done' | 'back'>;

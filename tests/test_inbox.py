@@ -6,7 +6,7 @@ import threading
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, get_type_hints
 
 import pytest
 from aco_board_fixtures import board_checkout
@@ -20,6 +20,7 @@ from github_pages import (
 from option_cards import card, card_body, open_option_entry
 
 from aco import body, forge, inbox, repositories, rulings, workboard
+from aco.board import board
 
 _CARD = card_body(card())
 
@@ -312,3 +313,8 @@ def test_one_read_of_a_checkout_lists_its_open_items_once_for_its_rows_and_its_s
         if request.operation is ForgeOperation.LIST_OPEN_ISSUES
     ]
     assert len(listings) == 1
+
+
+@pytest.mark.parametrize("record", [inbox.Reading, board.RepoSnapshot])
+def test_record_annotations_resolve_at_runtime(record: type) -> None:
+    assert "progress" in get_type_hints(record)
