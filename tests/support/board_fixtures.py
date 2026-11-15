@@ -98,7 +98,7 @@ def projected_board(
     today: date | None = None,
     trunk_landings: tuple[datetime, ...] = (),
     trunk_landing_items: tuple[workboard.TrunkLandingItem, ...] = (),
-    children: Mapping[int, workboard.ChildList] = (MappingProxyType({})),
+    children: Mapping[int, workboard.ChildList] = MappingProxyType({}),
     dependencies: Mapping[int, tuple[workboard.IssueDependency, ...]] = MappingProxyType({}),
     open_pull_requests_supported: bool = True,
 ) -> workboard.Board:
