@@ -34,9 +34,19 @@ def _serve(monkeypatch: pytest.MonkeyPatch, answer: process.BoundedResult | Exce
     return gh
 
 
-def test_a_200_is_changed_and_carries_the_etag_as_it_came(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    "header",
+    [
+        pytest.param(f"Etag: {ETAG}", id="canonical"),
+        pytest.param(f"ETAG:  {ETAG} \t", id="upper-case-and-padded"),
+        pytest.param(f"etag:{ETAG}", id="without-a-space"),
+    ],
+)
+def test_a_200_is_changed_and_carries_the_etag_as_it_came(
+    monkeypatch: pytest.MonkeyPatch, header: str
+) -> None:
     """Spec: WAIT-20 -- a 200 means changed, its ETag is sent back as-is."""
-    head = f"HTTP/2.0 200 OK\r\nContent-Type: text/plain\r\nEtag: {ETAG}\r\n\r\n[]"
+    head = f"HTTP/2.0 200 OK\r\nContent-Type: text/plain\r\n{header}\r\n\r\n[]"
     _serve(monkeypatch, _answer(0, head))
     answer = github_probe.GitHubBoardProbe(github.response_command).changed_since(
         REPOSITORY_TARGET, None
@@ -109,6 +119,13 @@ def test_the_request_is_conditional_on_the_token_it_is_given(
             None,
             forge.ForgeMalformedResponseError,
             id="200-without-an-etag",
+        ),
+        pytest.param(
+            0,
+            "HTTP/2.0 200 OK\nEtag:  \n\n[]",
+            None,
+            forge.ForgeMalformedResponseError,
+            id="200-with-a-blank-etag",
         ),
     ],
 )

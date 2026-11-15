@@ -13,7 +13,6 @@ its decoded output and exit status, whatever that status is."""
 
 _PURPOSE = "GitHub board probe"
 _STATUS_LINE = re.compile(r"HTTP/\S+\s+(\d{3})")
-_ETAG_HEADER = re.compile(r"etag:\s*(\S.*?)\s*", re.IGNORECASE)
 _CHANGED = 200
 _NOT_MODIFIED = 304
 _NEWEST_UPDATED = "issues?state=all&sort=updated&direction=desc&per_page=1"
@@ -37,8 +36,9 @@ def _status(lines: list[str]) -> int | None:
 def _etag(lines: list[str]) -> str | None:
     """The ETag header of the response head, which ends at its first blank line."""
     head = lines[: lines.index("")] if "" in lines else lines
-    found = (_ETAG_HEADER.fullmatch(line) for line in head)
-    return next((match.group(1) for match in found if match is not None), None)
+    headers = (line.partition(":") for line in head)
+    values = (value.strip() for name, _colon, value in headers if name.lower() == "etag")
+    return next((value for value in values if value), None)
 
 
 class GitHubBoardProbe:
