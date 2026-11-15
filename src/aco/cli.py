@@ -792,10 +792,13 @@ def _run_repository_command(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    # A parse refusal (argparse's own, or `workboard.parse_item_reference`'s `ClaimError`)
-    # fires before any namespace carries `--json`, so the mode is read back off the parsers
-    # this parse reached. Both report `invalid_usage` through the one envelope; past the
-    # parse the plain sentence alone stands, never dressed as a reason outside a command's own.
+    # Every refusal the parse itself raises -- argparse's own usage errors,
+    # and `workboard.parse_item_reference`, an argparse `type=` whose refusal is
+    # a `ClaimError` -- fires before any namespace carries `--json`, so the
+    # mode is read back off the parsers this parse reached.
+    # Both report `invalid_usage` through the one envelope. Past the parse
+    # the plain sentence alone still stands: a refusal a command raises
+    # outside its own reported vocabulary must not be dressed as one.
     given = sys.argv[1:] if arguments is None else arguments
     parser = _parser()
     try:

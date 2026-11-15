@@ -102,7 +102,9 @@ _STATE_TOP_LEVEL_NAMES = frozenset(
 
 
 class TransitionIntent(StrEnum):
-    """The commit message's own `intent:` trailer label (ref-store-cas.spec.md, CAS-06)."""
+    """The commit message's own `intent:` trailer label (ref-store-cas.spec.md, CAS-06), the house
+    `StrEnum` protocol-token type used everywhere else in the package -- a loose
+    string here would let a typo in `_transition_message` pass unnoticed."""
 
     CLAIM = "claim"
     RESCOPE = "rescope"
@@ -112,7 +114,8 @@ class TransitionIntent(StrEnum):
     LANDING = "landing"
 
 
-# `LandingIntent` is the atomic close-and-release.
+# ref-store-cas.spec.md, CAS-06: `intent: claim` / `rescope` / `release` / `item_write`
+# / `landing` (`LandingIntent`'s atomic close-and-release).
 _TRANSITION_LABELS: dict[type[ClaimTransitionIntent], TransitionIntent] = {
     ClaimIntent: TransitionIntent.CLAIM,
     RescopeIntent: TransitionIntent.RESCOPE,

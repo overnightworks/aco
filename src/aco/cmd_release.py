@@ -355,7 +355,11 @@ def authorize_releaser(
         if role is None:
             role = selected.role
         if (parsed.agent, role) != (selected.agent, selected.role):
-            route = item_handover.handover_route(selected.identity, selected.agent, item_label)
+            route = (
+                item_handover.handover_route(selected.identity, selected.agent, item_label)
+                if parsed.agent != selected.agent
+                else None
+            )
             takeover = "use" if route is None else f"take the claim over with `{route}`, or use"
             raise protocol.ClaimUnavailableError(
                 f"only the original claimant may release; {takeover} an explicit "

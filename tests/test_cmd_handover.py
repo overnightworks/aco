@@ -31,7 +31,7 @@ from github_fixtures import (
 )
 from store_fixtures import fail_every_state_ref_push, state_ref_tip
 
-from aco import body, cmd_land, forge, item_handover, protocol, store
+from aco import body, forge, item_handover, protocol, store
 from aco.protocol import ClaimError
 
 TRUNK_FILES = ("src/widget.py",)
@@ -302,7 +302,6 @@ def test_the_new_holder_lands_the_pull_request_the_predecessor_left(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Spec: HANDOVER-05, LANDCMD-10."""
-    monkeypatch.setattr(cmd_land, "pause_between_reads", lambda _seconds: None)
     assert_github_world(github_clone, bare_remote)
 
     def serve_the_item(client: FakeForge, _head: str) -> None:

@@ -728,9 +728,8 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; take the claim over "
-                    "with `aco handover 72 --from Ada --reason <text>`, or use "
-                    "an explicit coordinator override (holder='Ada "
+                    "only the original claimant may release; use an explicit "
+                    "coordinator override (holder='Ada "
                     "(coordinator)', this session='Ada (builder)')",
                     intents=(
                         claim_intent(
