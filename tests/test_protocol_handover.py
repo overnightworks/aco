@@ -1,7 +1,6 @@
 """`protocol.apply` of a `HandoverIntent`: the holder changes, nothing else does, and a
 claim that is not there or not held by the named agent is refused before any change."""
 
-from dataclasses import replace
 from types import MappingProxyType
 
 import pytest
@@ -14,6 +13,10 @@ STATE = protocol.ClaimState(
     tip=protocol.ObjectId("a" * 40),
     claims=MappingProxyType({protocol.claim_key(HELD.identity, HELD.branch): HELD}),
 )
+
+
+def _held(claim: protocol.ActiveClaim) -> tuple[object, ...]:
+    return (claim.agent, claim.role, claim.claim_id, claim.branch, claim.scope, claim.opened_commit)
 
 
 def _handover(*, claim_id: str = "held", previous_agent: str = "Ada") -> protocol.HandoverIntent:
@@ -29,7 +32,7 @@ def test_a_handover_changes_the_holder_and_nothing_else_of_the_claim() -> None:
     applied = protocol.apply(STATE, _handover())
 
     [claim] = applied.claims.values()
-    assert claim == replace(HELD, agent="Grace")
+    assert _held(claim) == ("Grace", *_held(HELD)[1:])
 
 
 @pytest.mark.parametrize(
