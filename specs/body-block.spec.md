@@ -32,6 +32,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 | `[record]` under `storage = "github"` | BODY-15 | BODY-50 | BODY-52 |
 | `[record]` under `storage = "state-ref"` | BODY-16..BODY-20 | — | — |
 | `wait` defective | BODY-21..BODY-24, BODY-112, BODY-113 | BODY-50 | BODY-52 |
+| `handover` defective | BODY-114..BODY-117 | BODY-50 | BODY-52 |
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
@@ -75,7 +76,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-10] A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
 - [ ] [BODY-11] A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
 - [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
-- [ ] [BODY-13] A top-level key outside `version`, `now`, `next`, `done_when`, `wait`, `scope`, `size`, `whole`, `expectation`, `slice` prints `body malformed: <key>: unknown top-level key <key>`, exit `2`.
+- [ ] [BODY-13] Any top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `scope`, `size`, `whole`, `expectation`, `slice` prints `body malformed: <key>: unknown top-level key <key>`, exit `2`.
 - [ ] [BODY-14] A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
 
 ## `[record]`, the state-ref item identity
@@ -95,6 +96,13 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-24] A `wait` key outside `operator`, `until`, `trigger` and `since` prints `body malformed: wait.<key>: unknown key wait.<key>` on stderr, exit `2`.
 - [ ] [BODY-112] A blank or non-string `wait.operator` or `wait.trigger` prints `body malformed: wait.<key>: wait.<key> must be a non-empty string`, exit `2`.
 - [ ] [BODY-113] A `wait.until` that is not a TOML local date prints `body malformed: wait.until: wait.until must be a TOML local date`, exit `2`.
+
+## `handover`
+
+- [ ] [BODY-114] A `handover` that is not a table prints `body malformed: handover: handover must be a table` on stderr, exit `2`; the table is `aco handover`'s record (see HANDOVER-04).
+- [ ] [BODY-115] A blank, non-string or multi-line `handover.from`, `handover.to` or `handover.reason` prints `body malformed: handover.<key>: handover.<key> must be a non-empty one-line string`, exit `2`.
+- [ ] [BODY-116] A `handover.on` that is missing or not a TOML local date prints `body malformed: handover.on: handover.on must be a TOML local date`, exit `2`.
+- [ ] [BODY-117] A `handover` key outside `from`, `to`, `reason` and `on` prints `body malformed: handover.<key>: unknown key handover.<key>` on stderr, exit `2`.
 
 ## `[[expectation]]`
 

@@ -75,7 +75,7 @@ def recorded_handover(served: FakeForge) -> item_handover.ItemHandover | None:
 def test_a_handover_makes_the_acting_session_the_holder_and_records_it_on_the_item(
     monkeypatch: pytest.MonkeyPatch, stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: HANDOVER-01, HANDOVER-02, HANDOVER-03."""
+    """Spec: HANDOVER-01, HANDOVER-02, HANDOVER-04."""
     standpoint = stand_in(standing=held_by_the_predecessor())
     served = serve_body(monkeypatch, complete_contract("Build it."))
     before = claimed_here(standpoint)
@@ -116,7 +116,7 @@ def test_the_state_ref_commit_names_both_agents_and_the_reason(
 def test_the_new_holder_rescopes_and_releases_without_an_override(
     monkeypatch: pytest.MonkeyPatch, stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: HANDOVER-04."""
+    """Spec: HANDOVER-05."""
     standpoint = stand_in(standing=held_by_the_predecessor())
     serve_body(monkeypatch, complete_contract("Build it."))
     taken = run_cli(handover_arguments(), capsys)
@@ -133,7 +133,7 @@ def test_the_new_holder_rescopes_and_releases_without_an_override(
 def test_the_predecessor_is_refused_once_the_claim_has_moved(
     monkeypatch: pytest.MonkeyPatch, stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: HANDOVER-04, HANDOVER-09."""
+    """Spec: HANDOVER-05."""
     stand_in(standing=held_by_the_predecessor())
     serve_body(monkeypatch, complete_contract("Build it."))
     run_cli(handover_arguments(), capsys)
@@ -153,7 +153,7 @@ def test_a_repeat_changes_nothing_and_succeeds(
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: HANDOVER-07."""
+    """Spec: HANDOVER-10."""
     stand_in(standing=held_by_the_predecessor())
     served = serve_body(monkeypatch, complete_contract("Build it."))
     first = run_cli(handover_arguments(), capsys)
@@ -172,7 +172,7 @@ def test_a_failed_claim_write_leaves_the_record_and_the_same_command_finishes_it
     stand_in: StandIn,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: HANDOVER-06."""
+    """Spec: HANDOVER-11."""
     standpoint = stand_in(standing=held_by_the_predecessor())
     served = serve_body(monkeypatch, complete_contract("Build it."))
     with monkeypatch.context() as failing:
@@ -211,7 +211,7 @@ def test_a_refused_handover_writes_nothing(
     flags: tuple[str, ...],
     sentence: str,
 ) -> None:
-    """Spec: HANDOVER-05, HANDOVER-08."""
+    """Spec: HANDOVER-06, HANDOVER-09."""
     standpoint = stand_in(standing=held_by_the_predecessor())
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
@@ -234,7 +234,7 @@ def test_a_session_that_holds_the_claim_refuses_a_handover_nobody_recorded(
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: HANDOVER-05."""
+    """Spec: HANDOVER-07."""
     stand_in(standing=held_by_ada(HELD_SCOPE))
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
@@ -252,7 +252,7 @@ def test_a_handover_of_an_item_nobody_claims_is_refused(
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: HANDOVER-05."""
+    """Spec: HANDOVER-08."""
     stand_in()
     served = serve_body(monkeypatch, complete_contract("Build it."))
     tip = state_ref_tip(bare_remote)
@@ -267,7 +267,7 @@ def test_a_handover_of_an_item_nobody_claims_is_refused(
 def test_a_json_handover_reports_both_agents(
     monkeypatch: pytest.MonkeyPatch, stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: HANDOVER-10."""
+    """Spec: HANDOVER-12."""
     stand_in(standing=held_by_the_predecessor())
     serve_body(monkeypatch, complete_contract("Build it."))
 
@@ -285,7 +285,7 @@ def test_a_json_handover_reports_both_agents(
 def test_a_json_refusal_is_a_failed_precondition(
     monkeypatch: pytest.MonkeyPatch, stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: HANDOVER-10."""
+    """Spec: HANDOVER-13."""
     stand_in()
     serve_body(monkeypatch, complete_contract("Build it."))
 
@@ -301,7 +301,7 @@ def test_the_new_holder_lands_the_pull_request_the_predecessor_left(
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: HANDOVER-04, LANDCMD-10."""
+    """Spec: HANDOVER-05, LANDCMD-10."""
     monkeypatch.setattr(cmd_land, "pause_between_reads", lambda _seconds: None)
     assert_github_world(github_clone, bare_remote)
 
@@ -334,7 +334,7 @@ def test_the_new_holder_lands_the_pull_request_the_predecessor_left(
 def test_a_handover_under_state_ref_storage_records_on_the_item_and_repeats(
     stand_in: StandIn, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: HANDOVER-02, HANDOVER-04, HANDOVER-07 under `storage = "state-ref"`."""
+    """Spec: HANDOVER-04, HANDOVER-05, HANDOVER-10 under `storage = "state-ref"`."""
     stand_in(board_config=f'storage = "{body.Storage.STATE_REF.value}"\n')
     minted = run_cli(
         ["item", "new", "--title", "Takeover"],
@@ -356,3 +356,19 @@ def test_a_handover_under_state_ref_storage_records_on_the_item_and_repeats(
     record = item_handover.parse_handover(body.locate_block(shown.stdout).data)
     assert record is not None
     assert (record.from_agent, record.to_agent, record.reason) == (PREDECESSOR, SUCCESSOR, REASON)
+
+
+def test_the_repo_flag_under_state_ref_storage_is_refused_as_invalid_usage(
+    stand_in: StandIn, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: HANDOVER-14."""
+    stand_in(board_config=f'storage = "{body.Storage.STATE_REF.value}"\n')
+
+    result = run_cli(
+        ["--repo", REPOSITORY, "handover", "aco-000001", "--from", "A", "--reason", "R", "--json"],
+        capsys,
+    )
+
+    message = "--repo is meaningless under storage = state-ref"
+    assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
+    assert json.loads(result.stdout) == {"ok": False, "reason": "invalid_usage", "message": message}
