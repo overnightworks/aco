@@ -105,11 +105,9 @@ def git_output(
         result = _git_run(arguments, directory=directory)
     if result.exit_status != 0:
         raise GitExitError(result)
-    # Trailing-only: every caller wants the one newline `git` appends after its
-    # output trimmed, but `git status --porcelain`'s short format is
-    # significant in its *leading* column (` M path` names a modified file by
-    # a leading space before the path) -- a leading strip silently turned that
-    # into `M path` and `_dirty_paths` then sliced into the filename itself.
+    # Trailing-only: `git status --porcelain` is significant in its leading column
+    # (` M path` names a modified file by a leading space), so only the newline git
+    # appends is trimmed.
     return result.stdout.decode(errors="replace" if lossy else "strict").rstrip("\n")
 
 
@@ -1194,7 +1192,7 @@ def _trailer_values(field: str) -> tuple[str, ...]:
     return tuple(field.split(_TRUNK_LANDING_TRAILER_VALUE_SEPARATOR)) if field else ()
 
 
-def _parsed_trunk_landing(fields: tuple[str, ...]) -> TrunkLanding:
+def _parsed_trunk_landing(fields: tuple[str, ...], *, directory: Path) -> TrunkLanding:
     sha, raw_committed_at, work_item_field, no_item_field, message = fields
     try:
         committed_at = datetime.fromisoformat(raw_committed_at)
@@ -1206,7 +1204,7 @@ def _parsed_trunk_landing(fields: tuple[str, ...]) -> TrunkLanding:
     no_item_values = _trailer_values(no_item_field)
     unappended = trunk_message.without_appended_coauthors(message)
     if unappended and not (work_item_values or no_item_values):
-        trailers = message_trailers(unappended)
+        trailers = message_trailers(unappended, directory=directory)
         work_item_values = trunk_message.trailer_values(trailers, _WORK_ITEM_TRAILER)
         no_item_values = trunk_message.trailer_values(trailers, _NO_ITEM_TRAILER)
     classification = workboard.trunk_commit_classification(work_item_values, no_item_values)
@@ -1248,21 +1246,23 @@ def trunk_landings(trunk: str, depth: int, *, directory: Path) -> tuple[TrunkLan
     if fields[-1] != "" or len(fields) % width != 1:
         raise ClaimError("git returned a malformed trunk landing log")
     return tuple(
-        _parsed_trunk_landing(tuple(fields[index : index + width]))
+        _parsed_trunk_landing(tuple(fields[index : index + width]), directory=directory)
         for index in range(0, len(fields) - 1, width)
     )
 
 
-def message_trailers(message: str) -> tuple[str, ...]:
-    """The trailers git's own parsing reads in commit message `message`,
-    one `Token: value` line each -- the same block `trunk_landings` reads
-    through `%(trailers)`, so `--no-divider` keeps a Markdown `---` rule
-    prose. Only git's stdout is the answer: a warning or trace
-    git writes to stderr while exiting 0 is never a trailer."""
+def message_trailers(message: str, *, directory: Path) -> tuple[str, ...]:
+    """The trailers git reads in commit message `message` under the configuration of the
+    repository in `directory`, one `Token: value` line each -- the block `trunk_landings`
+    reads through `%(trailers)`, so `--no-divider` keeps a Markdown `---` rule prose. Only
+    git's stdout is the answer: a warning git writes to stderr while exiting 0 is no trailer."""
     with tempfile.TemporaryDirectory(prefix="aco-trailers-") as scratch:
         message_path = Path(scratch) / "message"
         message_path.write_text(message, encoding="utf-8")
-        parsed = git_output(["interpret-trailers", "--parse", "--no-divider", str(message_path)])
+        parsed = git_output(
+            ["interpret-trailers", "--parse", "--no-divider", str(message_path)],
+            directory=directory,
+        )
     return tuple(parsed.split("\n")) if parsed else ()
 
 
