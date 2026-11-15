@@ -119,16 +119,18 @@ def _emit_changed(
         print(f"CHANGED {label} line {line.index}: {line.state}")
 
 
-def _reread_or_failure(context: RunContext, number: int) -> decide.FreshItem | forge.ForgeError:
-    """A later read of the item, fresh from the store; a forge that failed to
-    answer is returned, every other refusal raised."""
+def _reread_or_failure(
+    context: RunContext, number: int
+) -> decide.FreshItem | forge.ForgeTransientError:
+    """A later read of the item, fresh from the store; a transient forge failure
+    is returned, every other refusal raised."""
     try:
         return decide.fresh_item(context.observed_afresh(), number, command="wait")
-    except forge.ForgeError as error:
+    except forge.ForgeTransientError as error:
         return error
 
 
-def _say_still_waiting(failure: forge.ForgeError) -> None:
+def _say_still_waiting(failure: forge.ForgeTransientError) -> None:
     sys.stderr.write(f"WARNING: the item could not be read, still waiting: {failure}\n")
     sys.stderr.flush()
 
@@ -163,7 +165,7 @@ def _wait_for_lines(
             continue
         watched, last_read = moved, now()
         reread = _reread_or_failure(context, number)
-        if isinstance(reread, forge.ForgeError):
+        if isinstance(reread, forge.ForgeTransientError):
             if not failing:
                 _say_still_waiting(reread)
             failing = True
