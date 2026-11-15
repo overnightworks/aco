@@ -573,13 +573,11 @@ def _cleanup_unless_claimed_again(
     lane: _LandedLane,
     fetched_trunk_ref: Callable[[], str],
 ) -> checkout.WorktreeCleanupOutcome | None:
-    """REL-55: the missing claim REL-47 acts on was read before
-    the landing's verification; a claim taken meanwhile -- `start` reopening
-    the lane on its clean worktree (START-11) -- would lose that worktree to
-    this cleanup, so the claim state is read afresh right before it; on a
-    foreign branch (REL-59) any claim then on the branch, issue or lane,
-    keeps both. A claim taken after that read is the accepted residual: `start` builds the clean
-    merged worktree again. `None`: no local branch or the default branch (REL-65)."""
+    """REL-55: the missing claim REL-47 acts on was read before the landing's
+    verification, so the claim state is read afresh right before this cleanup:
+    one taken meanwhile -- `start` reopening the lane on its clean worktree
+    (START-11) -- keeps both, and on a foreign branch (REL-59) so does any claim
+    on the branch, issue or lane. `None`: no local branch or the default branch."""
     if checkout.is_default_branch(lane.branch, context.recorded_default_branch):
         return None
     if not parsed.keep_worktree:
