@@ -11,7 +11,7 @@ import hashlib
 import sys
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import date
 from pathlib import Path
 from typing import cast
@@ -186,7 +186,8 @@ def turn(
     with item_lock(context, number, environment=environment, home=home):
         fresh = fresh_item(context, number, command=command)
         yield HeldItem(
-            **vars(fresh), state_directory=repositories.state_directory(environment, home)
+            **{field.name: getattr(fresh, field.name) for field in fields(fresh)},
+            state_directory=repositories.state_directory(environment, home),
         )
 
 
