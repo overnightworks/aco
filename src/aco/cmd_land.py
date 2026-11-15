@@ -324,7 +324,9 @@ def _land_preflight(
     return detail, structural, readiness
 
 
-def _land_merge_body(title: str, body: str, classification: workboard.Classification) -> str:
+def _land_merge_body(
+    title: str, body: str, classification: workboard.Classification, *, directory: Path
+) -> str:
     """The merge commit message `aco land` composes itself: the pull request's own body with its
     classification
     line removed, then that classification, in the trunk's own trailer
@@ -344,11 +346,15 @@ def _land_merge_body(title: str, body: str, classification: workboard.Classifica
     if not without_classification:
         return f"{trailer}\n"
     joined = f"{without_classification}\n{trailer}"
-    body_trailers = checkout.message_trailers(f"{title}\n\n{without_classification}\n")
+    body_trailers = checkout.message_trailers(
+        f"{title}\n\n{without_classification}\n", directory=directory
+    )
     # Read as git reads it: a configured `trailer.<token>.key` renames it.
-    classification_trailers = checkout.message_trailers(f"{title}\n\n{trailer}\n")
+    classification_trailers = checkout.message_trailers(
+        f"{title}\n\n{trailer}\n", directory=directory
+    )
     joined_keeps_every_trailer = bool(body_trailers) and checkout.message_trailers(
-        f"{title}\n\n{joined}\n"
+        f"{title}\n\n{joined}\n", directory=directory
     ) == (*body_trailers, *classification_trailers)
     if joined_keeps_every_trailer:
         return f"{joined}\n"
@@ -414,17 +420,16 @@ def _land_merge(
     client: github.GitHubForge,
     detail: forge.Landing,
     readiness: forge.LandingReadiness,
-    classification: workboard.Classification,
     method: workboard.MergeMethod,
+    body: str,
 ) -> str:
-    title = _land_merge_title(method, detail)
     try:
         return client.merge_landing(
             detail.number,
             head_sha=readiness.head_sha,
             method=method,
-            title=title,
-            body=_land_merge_body(title, detail.body, classification),
+            title=_land_merge_title(method, detail),
+            body=body,
         )
     except forge.ForgeMergeConflictError as error:
         raise cmd_land_queue.head_moved_refusal(detail.number) from error
@@ -726,13 +731,18 @@ def _land_merge_unmerged(
         method = _land_merge_method(
             context.config.merge_method, client, number, context.default_branch
         )
-        return (
-            detail,
+        body = _land_merge_body(
+            _land_merge_title(method, detail),
+            detail.body,
             classification,
-            _land_merge(client, detail, readiness, classification, method),
+            directory=context.toplevel,
         )
+        return detail, classification, _land_merge(client, detail, readiness, method, body)
     message = _land_merge_body(
-        _land_merge_title(workboard.MergeMethod.SQUASH, detail), detail.body, classification
+        _land_merge_title(workboard.MergeMethod.SQUASH, detail),
+        detail.body,
+        classification,
+        directory=context.toplevel,
     )
     cmd_land_queue.enqueue(client, detail, readiness.head_sha, message)
     queued = forge.QueuedPullRequest()
