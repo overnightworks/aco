@@ -1,8 +1,0 @@
-claim_id = "d4e8e65824534a8a864011a738444953"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "3885f591399babfca90525297eb248680c12b707"
-branch = "claude/issue-879-aco-land-reads-the-branch-rules-and-the"
-scope = ["quality/baseline.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_merge_queue.py", "tests/support/github_fixtures.py", "tests/support/queue_forge.py", "tests/test_cmd_land_merge.py", "tests/test_cmd_land_queue.py", "tests/test_cmd_land_read_failure.py", "tests/test_github.py", "tests/test_github_merge_queue.py"]
-opened_commit = "83767f79725532003f657bcd1759dea42560016b"
-whole_reason = "One theme, the queue and branch-rule reads of aco land, across the adapter, its port, the command, their spec, tests and fakes."
