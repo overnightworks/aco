@@ -51,7 +51,7 @@ class AcoSource:
     def reading(self) -> inbox.Reading:
         context = self._context()
         try:
-            return inbox.read_context(context)
+            return inbox.read_context(context, with_progress=True)
         except protocol.ClaimError as error:
             raise DecisionSourceUnavailableError(str(error)) from error
 

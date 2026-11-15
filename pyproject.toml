@@ -78,6 +78,7 @@ layers = [
     "board | mcp_server",
     "decide",
     "inbox",
+    "progress",
     "lane_measure",
     "board_read | policy | report | lane_record",
     "repositories",

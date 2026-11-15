@@ -242,8 +242,11 @@ but not grow.
 - `.aco/board.toml` gains a setting only when that setting has a caller,
   because an option without one is upkeep with no user.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
-  decision surface: only his questions, from every repository under one root
+  decision surface: his questions, from every repository under one root
   (`repositories.py`, `specs/serve.spec.md` ABRD-14), in use and growing.
+  Its Progress view is derived from the same listing: `progress.py` counts each
+  top-level container's closed and planned work (ABRD-131); it keeps no state
+  and adds no store.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
   the item commands still carries both storage paths. It is known and
