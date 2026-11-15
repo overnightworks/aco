@@ -99,7 +99,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 - [ ] [ITEM-67] `aco --repo OWNER/NAME item new` naming another repository creates the item in its checkout, found by MCP-19's scan, under its own storage, rules and canonical remote (PIN-57).
 - [ ] [ITEM-68] A `--repo` no discovered repository carries refuses `no repository <OWNER/NAME> found`, exit `2`, under `--json` as ITEM-25's `precondition_failed`, and writes nothing.
-- [ ] [ITEM-69] A `--repo` naming this checkout's own repository (its canonical remote's) creates the item here without any scan, so a checkout outside the configured root works.
+- [ ] [ITEM-69] A `--repo` naming this checkout's own repository (its canonical remote's) creates the item here without any scan, so a checkout outside the configured root works; under `state-ref` PIN-04 refuses it.
 
 ## The body `item new` stores
 
