@@ -3,6 +3,6 @@ agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
 role = "builder"
 base = "0da09989c9e502563f9b072d7cb57ac2c9b869fc"
 branch = "claude/issue-862-one-typed-wait-replaces-frozen-until"
-scope = ["quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/body-block.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/body.py", "src/aco/cli.py", "src/aco/cmd_claim.py", "src/aco/decide.py", "src/aco/item_wait.py", "src/aco/workboard.py", "tests"]
+scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/body-block.spec.md", "specs/mcp.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/body.py", "src/aco/cli.py", "src/aco/cmd_claim.py", "src/aco/decide.py", "src/aco/item_wait.py", "src/aco/workboard.py", "tests"]
 opened_commit = "782ffc1662d1676db120f722af51d07cbca34c03"
 whole_reason = "one wait field crosses the block parser, readiness, the step writer and their specs, as the approved #859 plan cuts it"
