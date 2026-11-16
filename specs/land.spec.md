@@ -573,6 +573,7 @@ Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check g
 
 ```console
 $ aco land 57
+2> waiting for pull request #57 in the merge queue
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -608,6 +609,7 @@ Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the queue removing the entry for
 
 ```console
 $ aco land 57
+2> waiting for pull request #57 in the merge queue
 2> ERROR: pull request #57 was removed from the merge queue (failed_checks); re-run aco land 57
 exit 2
 ```
@@ -620,6 +622,7 @@ Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the queue removing the entry for
 
 ```console
 $ aco land 57
+2> waiting for pull request #57 in the merge queue
 2> ERROR: pull request #57 was removed from the merge queue and closed (failed_checks)
 exit 2
 ```
@@ -630,6 +633,7 @@ Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the second queue state read answ
 
 ```console
 $ aco land 57
+2> waiting for pull request #57 in the merge queue
 2> ERROR: reading the merge queue state of pull request #57 failed (HTTP 502); re-run aco land 57
 exit 2
 ```
@@ -640,6 +644,7 @@ Setup: bare-remote, fake `gh`, pull request `#57` already queued with its body h
 
 ```console
 $ aco land 57
+2> waiting for pull request #57 in the merge queue
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
