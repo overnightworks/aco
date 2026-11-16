@@ -549,8 +549,18 @@ def _report_nothing_left_to_release(
     fetched_trunk_ref: Callable[[], str],
 ) -> None:
     """REL-49/REL-51: a verified landing whose release already happened closes nothing and writes
-    no claim state; reports that, then its lane's cleanup (none without a local branch, REL-65)."""
-    cleanup = _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
+    no claim state; reports that, then its lane's cleanup (none without a local branch, REL-65).
+    The default branch is no lane branch: it is neither cleaned up nor printed as `branch`."""
+    lane_branch = (
+        None
+        if checkout.is_default_branch(lane.branch, context.recorded_default_branch)
+        else lane.branch
+    )
+    cleanup = (
+        None
+        if lane_branch is None
+        else _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
+    )
     worktree = None if cleanup is None else _worktree_cleanup_outcome_text(cleanup)
     if parsed.json:
         report.emit_json(
@@ -558,7 +568,7 @@ def _report_nothing_left_to_release(
             _ReleaseReason.MERGED,
             outcome=_NOTHING_LEFT_TO_RELEASE,
             **protocol.identity_json(lane.identity),
-            branch=lane.branch,
+            branch=lane_branch,
             worktree=worktree,
         )
         return
@@ -577,9 +587,7 @@ def _cleanup_unless_claimed_again(
     verification, so the claim state is read afresh right before this cleanup:
     one taken meanwhile -- `start` reopening the lane on its clean worktree
     (START-11) -- keeps both, and on a foreign branch (REL-59) so does any claim
-    on the branch, issue or lane. `None`: no local branch or the default branch."""
-    if checkout.is_default_branch(lane.branch, context.recorded_default_branch):
-        return None
+    on the branch, issue or lane. `None`: no local branch."""
     if not parsed.keep_worktree:
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:

@@ -51,10 +51,10 @@ def test_a_merged_rerun_from_the_trunk_leaves_the_lane_worktree_alone(
     output_flags: tuple[str, ...],
     branch_flags: tuple[str, ...],
 ) -> None:
-    """Spec: REL-47, REL-50, REL-65. A rerun with no claim, run from the
+    """Spec: REL-47, REL-50, REL-65, REL-66. A rerun with no claim, run from the
     default branch with or without `--branch` naming it, has no lane branch: it
-    prints no `worktree:` line and removes nothing, the lane's worktree and
-    branch included."""
+    prints no `worktree:` line and `--json` `branch` `null`, and removes nothing, the
+    lane's worktree and branch included."""
     landing = arrange_merged_pull_request(
         monkeypatch,
         github_clone,
@@ -86,8 +86,13 @@ def test_a_merged_rerun_from_the_trunk_leaves_the_lane_worktree_alone(
     )
 
     assert (result.status, result.stderr) == (0, "")
-    assert (json.loads(result.stdout)["worktree"] if output_flags else result.stdout) in (
-        None,
+    printed = (
+        {field: json.loads(result.stdout)[field] for field in ("branch", "worktree")}
+        if output_flags
+        else result.stdout
+    )
+    assert printed in (
+        {"branch": None, "worktree": None},
         f"LANDED commit {landing.merge_commit} already; nothing left to release\n",
     )
     assert state_ref_tip(bare_remote) == tip_before
