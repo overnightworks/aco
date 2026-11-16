@@ -510,13 +510,11 @@ def _report_merged_pull_request_left_nothing(
     merged: protocol.MergedRelease,
     unclaimed_branch: str,
 ) -> None:
-    """REL-47 under `storage = "github"`: the merge verifies
-    exactly as a release's would, then only its lane is cleaned up -- on
-    the pull request's own source branch, the one fact the forge records
-    about where the lane lived (REL-50). An issue-less lane's claim is keyed
-    by its branch, so `unclaimed_branch` -- the branch found unclaimed --
-    says nothing about another lane's claim unless the pull request came
-    from it: otherwise REL-09 refuses as before, and that lane is never
+    """REL-47 under `storage = "github"`: the merge verifies exactly as a release's would, then only
+    its lane is cleaned up -- on the pull request's own source branch, the one fact the forge
+    records about where the lane lived (REL-50). An issue-less lane's claim is keyed by its branch,
+    so `unclaimed_branch` -- the branch found unclaimed -- says nothing about another lane's claim
+    unless the pull request came from it: otherwise REL-09 refuses as before, and that lane is never
     cleaned up behind its live claim."""
     client = cast(github.GitHubForge, context.forge)
     storage = context.config.storage
@@ -548,17 +546,12 @@ def _report_nothing_left_to_release(
     lane: _LandedLane,
     fetched_trunk_ref: Callable[[], str],
 ) -> None:
-    """REL-49/REL-51: a verified landing whose release already happened closes nothing and writes
-    no claim state; reports that, then its lane's cleanup (none without a local branch, REL-65).
-    The default branch is no lane branch: it is neither cleaned up nor printed as `branch`."""
-    lane_branch = (
-        None
-        if checkout.is_default_branch(lane.branch, context.recorded_default_branch)
-        else lane.branch
-    )
+    """REL-49/REL-51: a verified landing already released closes nothing, writes no claim state;
+    reports that and its lane's cleanup, none on the default branch or without one (REL-65/66)."""
+    on_trunk = checkout.is_default_branch(lane.branch, context.recorded_default_branch)
     cleanup = (
         None
-        if lane_branch is None
+        if on_trunk
         else _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
     )
     worktree = None if cleanup is None else _worktree_cleanup_outcome_text(cleanup)
@@ -568,7 +561,7 @@ def _report_nothing_left_to_release(
             _ReleaseReason.MERGED,
             outcome=_NOTHING_LEFT_TO_RELEASE,
             **protocol.identity_json(lane.identity),
-            branch=lane_branch,
+            branch=None if on_trunk else lane.branch,
             worktree=worktree,
         )
         return
@@ -583,11 +576,10 @@ def _cleanup_unless_claimed_again(
     lane: _LandedLane,
     fetched_trunk_ref: Callable[[], str],
 ) -> checkout.WorktreeCleanupOutcome | None:
-    """REL-55: the missing claim REL-47 acts on was read before the landing's
-    verification, so the claim state is read afresh right before this cleanup:
-    one taken meanwhile -- `start` reopening the lane on its clean worktree
-    (START-11) -- keeps both, and on a foreign branch (REL-59) so does any claim
-    on the branch, issue or lane. `None`: no local branch."""
+    """REL-55: the missing claim REL-47 acts on was read before the landing's verification, so the
+    claim state is read afresh right before this cleanup: one taken meanwhile -- `start` reopening
+    the lane on its clean worktree (START-11) -- keeps both, and on a foreign branch (REL-59) so
+    does any claim on the branch, issue or lane. `None`: no local branch."""
     if not parsed.keep_worktree:
         fresh = context.observed_afresh().observation
         if _unclaimed_rerun_branch(parsed, fresh, lane.identity, lane.branch) is None:
