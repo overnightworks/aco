@@ -162,7 +162,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-66] An open pull request the queue removed after its latest addition, or absent twice in a row, refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n>`, exit `2`.
 - [ ] [LANDCMD-67] A pull request closed after such a removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's or `no reason recorded`.
 - [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n>`, exit `2`, claim kept.
-- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits again (LANDCMD-65), writing and enqueueing nothing; merged, it releases (LANDCMD-18); else it starts at the preflight.
+- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits again (LANDCMD-65) unless LANDCMD-76 refuses, writing and enqueueing nothing; merged, it releases (LANDCMD-18); else it starts at the preflight.
 - [ ] [LANDCMD-76] A rerun that finds the pull request queued (LANDCMD-69) with a `--head` that is no prefix of its head refuses `pull request #<n> is queued at head <queued>, not the pinned <pinned>; the queue lands the queued head`, exit `2`, before the wait; the same head waits.
 - [ ] [LANDCMD-70] LANDCMD-60's preflight follows LANDCMD-69's reads; the branch rules are read once, serving LANDCMD-42 without a queue; a failed read refuses as LANDCMD-46 (`its merge rules`, `its merge queue state`).
 
