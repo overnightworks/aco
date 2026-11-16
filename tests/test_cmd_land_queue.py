@@ -3,6 +3,7 @@ into the pull request, one enqueue pinned to the preflight head, the wait for th
 verdict and the re-run that picks it up again, against a fake forge that expresses the queue."""
 
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,22 @@ def not_queued(cause: str, failure: str) -> str:
     )
 
 
+class Pin(StrEnum):
+    NONE = "none"
+    QUEUED_HEAD = "queued head"
+    OTHER_HEAD = "other head"
+
+
+OTHER_HEAD = "abcdef0"
+
+
+def pinned_other_head(queued_head: str) -> str:
+    return (
+        f"ERROR: pull request #{NUMBER} is queued at head {queued_head}, "
+        f"not the pinned {OTHER_HEAD}; the queue lands the queued head\n"
+    )
+
+
 @dataclass(frozen=True)
 class QueueCase:
     """What the forge says, in the order it says it, and what `land` makes of it. The
@@ -57,6 +74,7 @@ class QueueCase:
     untracked_file: bool = False
     head_repository: str | None = None
     head_moved: bool = False
+    pin: Pin = Pin.NONE
     enqueue_error: forge.ForgeError | None = None
     rules_error: forge.ForgeError | None = None
     body_error: protocol.ClaimError | None = None
@@ -133,7 +151,9 @@ def observations(world: QueueWorld, result: CliRun) -> tuple[dict[str, object], 
     }
     expected: dict[str, object] = {
         "exit": case.status,
-        "stderr": (WAITING if case.waits else "") + case.stderr,
+        "stderr": (WAITING if case.waits else "")
+        + case.stderr
+        + (pinned_other_head(landing.head) if case.pin is Pin.OTHER_HEAD else ""),
         "released": case.status == 0,
         "merged line": case.status == 0,
         "claim kept": case.status != 0,
@@ -190,6 +210,30 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                 ),
                 id="a-re-run-finds-it-removed-and-queues-it-again",
+            ),
+            pytest.param(
+                QueueCase(
+                    reads=(QUEUED, LANDS),
+                    body=COMPOSED,
+                    pin=Pin.QUEUED_HEAD,
+                    written=(),
+                    enqueues=0,
+                    pauses=1,
+                ),
+                id="a-re-run-pinned-to-the-queued-head-waits-again",
+            ),
+            pytest.param(
+                QueueCase(
+                    reads=(QUEUED, LANDS),
+                    body=COMPOSED,
+                    pin=Pin.OTHER_HEAD,
+                    status=2,
+                    written=(),
+                    enqueues=0,
+                    pauses=0,
+                    waits=False,
+                ),
+                id="a-re-run-pinned-to-another-head-refuses-naming-both-before-waiting",
             ),
             pytest.param(
                 QueueCase(
@@ -369,7 +413,12 @@ class TestLandThroughTheMergeQueue:
         self, world: QueueWorld, capsys: pytest.CaptureFixture[str]
     ) -> None:
         capsys.readouterr()
-        result = run_cli(["land", str(NUMBER)], capsys)
+        pin = {
+            Pin.NONE: [],
+            Pin.QUEUED_HEAD: ["--head", world.landed.landing.head],
+            Pin.OTHER_HEAD: ["--head", OTHER_HEAD],
+        }[world.case.pin]
+        result = run_cli(["land", str(NUMBER), *pin], capsys)
 
         observed, expected = observations(world, result)
 

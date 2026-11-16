@@ -720,6 +720,8 @@ def _land_merge_unmerged(
         if defect is not None:
             raise _land_head_refusal(number, defect)
         checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
+        if isinstance(standing, forge.QueuedPullRequest):
+            cmd_land_queue.refuse_other_pinned_head(number, detail.head_sha, parsed.head)
         return detail, None, cmd_land_queue.await_merge(client, number, standing, pause)
     check_context = policy.LandingCheckContext(
         context, client.repository.path, context.config.storage
