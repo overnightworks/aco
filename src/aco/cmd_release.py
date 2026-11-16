@@ -4,7 +4,7 @@
 import argparse
 import uuid
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
 
@@ -500,7 +500,14 @@ def _verify_and_close_merged_release(
     if _is_adopted_lane(selected.identity, selected.branch):
         tips += (selected.base,)
     lane = _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
-    return replace(lane, merge_commit=verified.merge_commit, item=item)
+    return _LandedLane(
+        lane.identity,
+        lane.branch,
+        lane.proven_tips,
+        lane.rerun,
+        merge_commit=verified.merge_commit,
+        item=item,
+    )
 
 
 def _report_merged_pull_request_left_nothing(
