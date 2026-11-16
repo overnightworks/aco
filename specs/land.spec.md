@@ -103,7 +103,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
-- [ ] [LANDCMD-32] Without `--head`, `aco land` pins whatever head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) of a merged pull request never compares `--head`, since its merge already happened; a queued one compares it (LANDCMD-76).
+- [ ] [LANDCMD-32] Without `--head`, `aco land` pins the head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) of a merged pull request never compares `--head`; a queued one does (LANDCMD-76).
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
 - [ ] [LANDCMD-74] A draft pull request refuses `pull request #<n> is a draft; mark it ready with gh pr ready <n>`, exit `2`, after LANDCMD-02 and before LANDCMD-43, on the queue path (LANDCMD-60) too (E-LANDCMD-74).
 - [ ] [LANDCMD-43] If `<branch>`'s config has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
@@ -162,8 +162,8 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-66] An open pull request the queue removed after its latest addition, or absent twice in a row, refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n>`, exit `2`.
 - [ ] [LANDCMD-67] A pull request closed after such a removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's or `no reason recorded`.
 - [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n>`, exit `2`, claim kept.
-- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits again (LANDCMD-65) unless LANDCMD-76 refuses, writing and enqueueing nothing; merged, it releases (LANDCMD-18); else it starts at the preflight.
-- [ ] [LANDCMD-76] A rerun that finds the pull request queued (LANDCMD-69) with a `--head` that is no prefix of its head refuses `pull request #<n> is queued at head <queued>, not the pinned <pinned>; the queue lands the queued head`, exit `2`, before the wait; the same head waits.
+- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits (LANDCMD-65) unless LANDCMD-76 refuses, writing nothing; merged, it releases (LANDCMD-18); else it preflights.
+- [ ] [LANDCMD-76] A queued rerun (LANDCMD-69) whose `--head` is no prefix of its head refuses `pull request #<n> is queued at head <queued>, not the pinned <pinned>; the queue lands the queued head`, exit `2`.
 - [ ] [LANDCMD-70] LANDCMD-60's preflight follows LANDCMD-69's reads; the branch rules are read once, serving LANDCMD-42 without a queue; a failed read refuses as LANDCMD-46 (`its merge rules`, `its merge queue state`).
 
 ## After the merge
