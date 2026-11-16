@@ -11,6 +11,7 @@ it, so the board's aco source reaches this forge and never GitHub.
 import fcntl
 import json
 import os
+import shutil
 import subprocess
 import threading
 import tomllib
@@ -606,24 +607,32 @@ class ReleasedItem:
 
 
 def seed_lane_records(repository: BoardForge, releases: Sequence[ReleasedItem]) -> None:
-    """Give the checkout a state ref holding `releases`, oldest first. The ref lives in a bare
-    repository the checkout's GitHub origin is rewritten to for git's own reads, so the board
-    reads it through the real store while the forge identity stays the GitHub one."""
+    """Give the checkout a state ref holding exactly `releases`, oldest first, replacing any
+    earlier one. The ref lives in a bare repository the checkout's GitHub origin is rewritten
+    to for git's own reads, so the board reads it through the real store while the forge
+    identity stays the GitHub one; a scratch clone writes it, so the checkout keeps no lineage
+    of a ref that is replaced."""
     directory = repository.directory
     bare = directory.parent / f"{directory.name}.state.git"
+    scratch = directory.parent / f"{directory.name}.state-writer"
+    for stale in (bare, scratch):
+        shutil.rmtree(stale, ignore_errors=True)
     real_git(directory.parent, "init", "--bare", "--quiet", str(bare))
+    real_git(directory.parent, "init", "--quiet", str(scratch))
+    real_git(scratch, "config", "user.name", "Board")
+    real_git(scratch, "config", "user.email", "board@example.com")
     real_git(
         directory, "config", f"url.{bare}.insteadOf", f"https://github.com/{repository.repository}"
     )
-    tip = str(store.bootstrap(worktree=directory, remote=str(bare)))
+    tip = str(store.bootstrap(worktree=scratch, remote=str(bare)))
     for release in releases:
         committed = subprocess.run(
             ["git", "commit-tree", f"{tip}^{{tree}}", "-p", tip, "-m", release.message],
-            cwd=directory,
+            cwd=scratch,
             env=sealed_git_environment() | {"GIT_COMMITTER_DATE": f"@{release.released_at} +0000"},
             check=True,
             capture_output=True,
             text=True,
         )
         tip = committed.stdout.strip()
-    real_git(directory, "push", "--quiet", str(bare), f"{tip}:{store.STATE_REF}", "--force")
+    real_git(scratch, "push", "--quiet", str(bare), f"{tip}:{store.STATE_REF}", "--force")

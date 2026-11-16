@@ -117,11 +117,39 @@ export interface ProgressCounts {
 	percent: number | null;
 }
 
+/** One size class of the lanes left: `size` is `null` for lanes with no declared size, and
+ * `basis` says whether the class was priced from its own finished items or pooled (ABRD-143). */
+interface PricedClass {
+	size: 'S' | 'M' | 'L' | null;
+	lanes: number;
+	basis: 'measured' | 'pooled';
+	samples: number;
+}
+
+/** The agent work left as a range in whole seconds; `samples` counts the pooled finished
+ * items (ABRD-145). */
+export interface WorkRange {
+	error: null;
+	low_seconds: number;
+	high_seconds: number;
+	samples: number;
+	classes: PricedClass[];
+}
+
+/** Why a container has no range: the sentence, and no figures (ABRD-144). */
+export interface NoWorkRange {
+	error: string;
+}
+
 export interface ProgressContainer extends ProgressCounts {
 	number: number;
 	title: string;
 	/** The container's open children that wait on the operator (ABRD-137). */
 	waiting: number;
+	/** The open children not waiting on the operator plus the uncut rows (ABRD-140). */
+	lanes_left: number;
+	/** `null` while no lane is left. */
+	estimate: WorkRange | NoWorkRange | null;
 }
 
 /** A repo's progress read (ABRD-132): the sum of its top-level containers. */

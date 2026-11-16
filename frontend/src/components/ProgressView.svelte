@@ -9,6 +9,7 @@
 		PROGRESS_REGION_LABEL,
 		PROGRESS_UNKNOWN_LABEL,
 		progressFigure,
+		remainingFigure,
 		UNCUT_COUNT_LABEL,
 		WAITING_COUNT_LABEL
 	} from '../app/model/progress';
@@ -93,6 +94,11 @@
 									</span>
 								</div>
 								{@render bar(container, container.title)}
+								{#if container.estimate !== null}
+									<p class="remaining">
+										{remainingFigure(container.lanes_left, container.estimate)}
+									</p>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -201,6 +207,11 @@
 	}
 	.number {
 		color: var(--fg-3);
+	}
+	.remaining {
+		margin: 6px 0 0;
+		font-size: 13px;
+		color: var(--fg-2);
 	}
 	.quiet {
 		margin: 12px 0 0;

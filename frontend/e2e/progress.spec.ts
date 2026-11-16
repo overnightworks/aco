@@ -1,10 +1,16 @@
 import { expect, test } from './consoleGuard';
-import { arrange, container, item } from './itemFixture';
+import { arrange, container, item, type FinishedItem } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
+
+/** Six finished items whose lanes took 1 to 6 hours: pooled median 3.5 h, 80th percentile 5 h. */
+const FINISHED: FinishedItem[] = [1, 2, 3, 4, 5, 6].map((hours) => ({
+	issue: hours,
+	wall_seconds: hours * 3600
+}));
 
 for (const viewport of [
 	{ width: 1280, height: 900 },
@@ -103,6 +109,66 @@ for (const viewport of [
 
 			await expect(page.getByText('0/0', { exact: true }).first()).toBeVisible();
 			await expect(page.getByText('No container is open.')).toBeVisible();
+		});
+
+		test('[ABRD-146] a container shows its lanes left and the agent-work range from the lane records', async ({
+			page
+		}, testInfo) => {
+			await arrange(
+				[
+					container(10, 'Song jump', { closed: [101], open: [20, 21] }),
+					container(12, 'Share page', { closed: [301] }),
+					{ ...item(21, 'Pick a key'), waiting: true }
+				],
+				{ laneRecords: FINISHED }
+			);
+			const { appUrl, token } = readBoardRuntime();
+			await page.goto(`${appUrl}#t=${token}`);
+			await page
+				.getByRole('navigation', { name: 'Views' })
+				.getByRole('button', { name: 'Progress' })
+				.click();
+
+			const region = page.getByRole('region', { name: 'Progress per repository' });
+			await expect(
+				region.getByText('1 lane left · about 4 to 5 h agent work · from 6 finished items')
+			).toBeVisible();
+			await expect(region.getByText(/lanes? left/)).toHaveCount(1);
+			await expect(region.locator('.chip')).toHaveText(['Waiting 1']);
+			expect(
+				await page.evaluate(
+					() => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+				)
+			).toBe(true);
+			await page.screenshot({ path: testInfo.outputPath('progress-range.png') });
+		});
+
+		test('[ABRD-144] a container without enough lane records says so beside its lanes left', async ({
+			page
+		}) => {
+			await arrange([container(10, 'Song jump', { closed: [101], open: [20, 21] })], {
+				laneRecords: FINISHED.slice(0, 3)
+			});
+			const { appUrl, token } = readBoardRuntime();
+			await page.goto(`${appUrl}#t=${token}`);
+			await page
+				.getByRole('navigation', { name: 'Views' })
+				.getByRole('button', { name: 'Progress' })
+				.click();
+
+			await expect(page.getByText('2 lanes left · not enough lane records yet')).toBeVisible();
+		});
+
+		test('[ABRD-144] a container with no lane records at all says so', async ({ page }) => {
+			await arrange([container(10, 'Song jump', { closed: [101], open: [20] })]);
+			const { appUrl, token } = readBoardRuntime();
+			await page.goto(`${appUrl}#t=${token}`);
+			await page
+				.getByRole('navigation', { name: 'Views' })
+				.getByRole('button', { name: 'Progress' })
+				.click();
+
+			await expect(page.getByText('1 lane left · no lane records')).toBeVisible();
 		});
 	});
 }

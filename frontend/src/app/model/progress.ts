@@ -1,4 +1,4 @@
-import type { ProgressCounts } from '../../types';
+import type { NoWorkRange, ProgressCounts, WorkRange } from '../../types';
 
 export const PROGRESS_TAB_LABEL = 'Progress';
 export const PROGRESS_REGION_LABEL = 'Progress per repository';
@@ -25,4 +25,31 @@ export function barShares({ closed, landed, planned }: ProgressCounts): {
 	otherClosed: number;
 } {
 	return { landed: (100 * landed) / planned, otherClosed: (100 * (closed - landed)) / planned };
+}
+
+const SECONDS_PER_HOUR = 3600;
+
+function plural(count: number, noun: string): string {
+	return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function hoursOf({ low_seconds, high_seconds }: WorkRange): string {
+	if (high_seconds < SECONDS_PER_HOUR) return 'under 1 h';
+	const high = Math.round(high_seconds / SECONDS_PER_HOUR);
+	const low = Math.round(low_seconds / SECONDS_PER_HOUR);
+	if (low === high) return `about ${high} h`;
+	return low < 1 ? `under 1 to ${high} h` : `about ${low} to ${high} h`;
+}
+
+/** The agent work left in a container, never a date (ABRD-146): its lanes left and the range
+ * in whole hours with the finished items it is measured from, or the sentence of why there is
+ * no range; `null` while no lane is left. */
+export function remainingFigure(
+	lanesLeft: number,
+	estimate: WorkRange | NoWorkRange | null
+): string | null {
+	if (estimate === null) return null;
+	const lanes = `${plural(lanesLeft, 'lane')} left`;
+	if (estimate.error !== null) return `${lanes} · ${estimate.error}`;
+	return `${lanes} · ${hoursOf(estimate)} agent work · from ${plural(estimate.samples, 'finished item')}`;
 }

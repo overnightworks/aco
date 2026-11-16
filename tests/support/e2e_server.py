@@ -14,7 +14,8 @@ file, which the board finds by the production discovery.
 A second server beside the board, the control endpoint, arranges that
 forge: `PUT /board` stores the items a spec names, rendered by aco and
 refused when aco's grammar refuses them, and `GET /items/<n>/lines` reads an
-item's stored lines back in aco's own line JSON.
+item's stored lines back in aco's own line JSON. An arrangement's `lane_records` are the
+finished items whose release commits the state ref holds.
 
 One line of JSON on stdout once both servers listen:
 `{"host", "port", "token", "control_url", "repository"}`. Stops on SIGTERM or SIGINT,
@@ -47,12 +48,13 @@ from aco_board_fixtures import (
     land_item,
     rulings_lines,
 )
-from board_forge import BoardForge, StoredItem, child_list
+from board_forge import BoardForge, ReleasedItem, StoredItem, child_list, seed_lane_records
 
 from aco import body, expectation_grammar, session, workboard
 from aco.board.board import Boards
 from aco.board.cli import discovered_boards
 from aco.board.server import start_board
+from aco.lane_record import LaneOutcome, LaneRecord
 
 _DATE_KEYS = (
     expectation_grammar.ASKED_ON,
@@ -60,6 +62,7 @@ _DATE_KEYS = (
     expectation_grammar.RETURNED_ON,
     expectation_grammar.WITHDRAWN_ON,
 )
+_FIRST_RELEASE = 1_700_000_000
 _ITEM_LINES_PATH = re.compile(r"/items/(?P<number>\d+)/lines")
 
 
@@ -108,6 +111,20 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     )
 
 
+def _released_items(arranged: object) -> list[ReleasedItem]:
+    """The finished items an arrangement names, each `{"issue", "wall_seconds"}`, as release
+    commits dated one second apart."""
+    assert isinstance(arranged, list)
+    return [
+        ReleasedItem(
+            int(entry["issue"]),
+            LaneRecord(LaneOutcome.LANDED, wall_seconds=int(entry["wall_seconds"])),
+            _FIRST_RELEASE + position,
+        )
+        for position, entry in enumerate(arranged)
+    ]
+
+
 def arrange_board(repository: BoardForge, arrangement: Mapping[str, object]) -> None:
     """The forge holds exactly the arranged items, checked whole before any
     is stored, and fails its listing when the arrangement says so."""
@@ -119,6 +136,7 @@ def arrange_board(repository: BoardForge, arrangement: Mapping[str, object]) -> 
     assert isinstance(landed, list)
     for number in landed:
         land_item(repository, int(number))
+    seed_lane_records(repository, _released_items(arrangement.get("lane_records", [])))
     listing_failure = arrangement.get("listing_failure")
     if listing_failure is not None:
         repository.fail_listing(str(listing_failure))
