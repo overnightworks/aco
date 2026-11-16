@@ -11,7 +11,15 @@ from typing import Any, cast, get_type_hints
 import pytest
 from aco_board_fixtures import board_checkout, land_item
 from board_fixtures import board_issue, complete_contract
-from board_forge import BoardForge, ForgeOperation, child_list, item_body, run_context
+from board_forge import (
+    BoardForge,
+    ForgeOperation,
+    ReleasedItem,
+    child_list,
+    item_body,
+    run_context,
+    seed_lane_records,
+)
 from cli_fixtures import real_git
 from github_pages import (
     board_issue_page_client,
@@ -20,9 +28,10 @@ from github_pages import (
 )
 from option_cards import card, card_body, open_option_entry
 
-from aco import body, forge, inbox, progress, repositories, rulings, workboard
+from aco import body, forge, inbox, lane_measure, progress, repositories, rulings, workboard
 from aco.board import board
 from aco.body import ItemKind
+from aco.lane_record import LaneOutcome, LaneRecord
 
 _CARD = card_body(card())
 
@@ -358,6 +367,83 @@ def test_an_unreadable_trunk_leaves_the_progress_unknown_and_the_items_listed(
 
     assert isinstance(reading.progress, progress.ProgressUnavailable)
     assert [row.number for row in reading.rows] == [5]
+
+
+def _finished_items(*wall_seconds: int) -> list[ReleasedItem]:
+    return [
+        ReleasedItem(
+            number, LaneRecord(LaneOutcome.LANDED, wall_seconds=seconds), 1_700_000_000 + number
+        )
+        for number, seconds in enumerate(wall_seconds, start=1)
+    ]
+
+
+def _container_estimate(repository: BoardForge) -> object:
+    shown = _progress_read(repository).progress
+    assert isinstance(shown, progress.Progress)
+    [container] = shown.containers
+    return container.estimate
+
+
+def test_the_progress_read_prices_the_lanes_left_from_the_state_ref_lane_records(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    """Spec: ABRD-139."""
+    del isolated_global_git_config
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(
+        10,
+        complete_contract("Build."),
+        kind=ItemKind.CONTAINER,
+        children=child_list(open=[7, 8]),
+    )
+    seed_lane_records(repository, _finished_items(100, 200, 300, 400, 500))
+
+    estimate = _container_estimate(repository)
+
+    assert estimate == lane_measure.RemainingWork(
+        low_seconds=600,
+        high_seconds=800,
+        items=5,
+        classes=(lane_measure.PricedClass(None, 2, lane_measure.Basis.POOLED, 5),),
+    )
+
+
+def test_a_state_ref_without_lane_records_leaves_the_range_unknown_by_name(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    """Spec: ABRD-141."""
+    del isolated_global_git_config
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(
+        10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(open=[7])
+    )
+    seed_lane_records(repository, [])
+
+    estimate = _container_estimate(repository)
+
+    assert estimate is lane_measure.NoRange.NO_RECORDS
+
+
+def test_an_unreadable_state_ref_leaves_only_the_range_unknown_and_the_counts_shown(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    """Spec: ABRD-142."""
+    del isolated_global_git_config
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(
+        10,
+        complete_contract("Build."),
+        kind=ItemKind.CONTAINER,
+        children=child_list(closed=[1], open=[7]),
+    )
+
+    shown = _progress_read(repository).progress
+
+    assert isinstance(shown, progress.Progress)
+    assert [(c.estimate, c.closed, c.open) for c in shown.containers] == [
+        (lane_measure.NoRange.UNREADABLE, 1, 1)
+    ]
 
 
 def test_a_read_without_progress_reads_neither_the_sub_issues_nor_the_trunk(

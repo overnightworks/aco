@@ -11,9 +11,10 @@ it, so the board's aco source reaches this forge and never GitHub.
 import fcntl
 import json
 import os
+import subprocess
 import threading
 import tomllib
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from enum import StrEnum
@@ -21,9 +22,11 @@ from pathlib import Path
 from typing import Any, NoReturn, cast
 
 from board_fixtures import MINIMAL_BLOCK_TOML, NoBoardProbe, block_body, board_issue
+from cli_fixtures import real_git, sealed_git_environment
 
-from aco import body, expectation_grammar, forge, repositories, session, workboard
+from aco import body, expectation_grammar, forge, repositories, session, store, workboard
 from aco.body import ItemKind
+from aco.lane_record import LaneRecord
 
 _STATE_FILE = "board-forge.json"
 _SEARCH_INDEX = "board-forge-search.json"
@@ -587,3 +590,40 @@ def _with_card_hash(entry: Mapping[str, object]) -> dict[str, object]:
     if "ruling" in entry and "card_hash" not in entry and expectation_grammar.is_option_line(entry):
         return {**entry, "card_hash": expectation_grammar.card_hash(entry)}
     return dict(entry)
+
+
+@dataclass(frozen=True)
+class ReleasedItem:
+    """One finished work item's release commit on the state ref: `record` is what its lane left."""
+
+    issue: int
+    record: LaneRecord
+    released_at: int
+
+    @property
+    def message(self) -> str:
+        return "\n".join([f"release issue {self.issue}", "", *self.record.trailers()])
+
+
+def seed_lane_records(repository: BoardForge, releases: Sequence[ReleasedItem]) -> None:
+    """Give the checkout a state ref holding `releases`, oldest first. The ref lives in a bare
+    repository the checkout's GitHub origin is rewritten to for git's own reads, so the board
+    reads it through the real store while the forge identity stays the GitHub one."""
+    directory = repository.directory
+    bare = directory.parent / f"{directory.name}.state.git"
+    real_git(directory.parent, "init", "--bare", "--quiet", str(bare))
+    real_git(
+        directory, "config", f"url.{bare}.insteadOf", f"https://github.com/{repository.repository}"
+    )
+    tip = str(store.bootstrap(worktree=directory, remote=str(bare)))
+    for release in releases:
+        committed = subprocess.run(
+            ["git", "commit-tree", f"{tip}^{{tree}}", "-p", tip, "-m", release.message],
+            cwd=directory,
+            env=sealed_git_environment() | {"GIT_COMMITTER_DATE": f"@{release.released_at} +0000"},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        tip = committed.stdout.strip()
+    real_git(directory, "push", "--quiet", str(bare), f"{tip}:{store.STATE_REF}", "--force")

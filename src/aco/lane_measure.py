@@ -192,6 +192,7 @@ _UPPER_PERCENT = 80
 class NoRange(StrEnum):
     """Why remaining work has no range, as its sentence."""
 
+    UNREADABLE = "lane records unreadable"
     NO_RECORDS = "no lane records"
     TOO_FEW = "not enough lane records yet"
 
@@ -291,10 +292,15 @@ def lane_prices(lanes: Iterable[RecordedLane]) -> LanePrices:
     return LanePrices(len(recorded), by_size, _lane_time([item.wall_seconds for item in items]))
 
 
-def remaining_work(prices: LanePrices, sizes: Iterable[Size | None]) -> RemainingWork | NoRange:
+def remaining_work(
+    prices: LanePrices | None, sizes: Iterable[Size | None]
+) -> RemainingWork | NoRange:
     """The range for one lane per entry of `sizes`: each lane at its class's median to 80th
-    percentile, or the pooled one when its class has too few items. No range without records, or
-    while the pooled distribution is under `MINIMUM_ITEMS` items."""
+    percentile, or the pooled one when its class has too few items. No range when the lane
+    records could not be read (`prices` is `None`), without records, or while the pooled
+    distribution is under `MINIMUM_ITEMS` items."""
+    if prices is None:
+        return NoRange.UNREADABLE
     if prices.recorded == 0:
         return NoRange.NO_RECORDS
     if prices.pooled is None:

@@ -25,11 +25,14 @@ from . import (
     checkout,
     expectations,
     forge,
+    lane_measure,
+    lane_record,
     progress,
     protocol,
     repositories,
     rulings,
     session,
+    store,
     workboard,
 )
 from .progress import Progress, ProgressUnavailable
@@ -141,7 +144,8 @@ def read_issues(
 def read_context(context: session.RunContext, *, with_progress: bool = False) -> Reading:
     """The rows, the steps and the plans of the checkout `context` is bound to,
     from one listing of its open items; with `with_progress`, also the progress
-    view, which reads each container's parent and sub-issues and the trunk's trailers."""
+    view, which reads each container's parent and sub-issues, the trunk's trailers and the
+    state ref's lane records."""
     listed = tuple(context.forge.list_open_board_issues())
     storage = context.config.storage
     reading = read_issues(
@@ -178,10 +182,23 @@ def _progress(
         marks=progress.Marks(
             frozenset(step.number for step in operator_steps),
             frozenset(item.item for item in board_read.trunk_landing_items(landings)),
+            _lane_prices(context),
         ),
         parent_of=context.forge.parent_issue,
         children_of=context.forge.list_children,
     )
+
+
+def _lane_prices(context: session.RunContext) -> lane_measure.LanePrices | None:
+    """What a lane costs from the lane records on the state ref's tip; `None` when the ref
+    cannot be read, which leaves only the work-left ranges unknown."""
+    try:
+        observed = store.peek_state(
+            worktree=context.toplevel, remote=context.configured_canonical_remote
+        )
+        return lane_measure.lane_prices(lane_record.recorded_lanes(context.toplevel, observed.tip))
+    except protocol.ClaimError:
+        return None
 
 
 def read_repository(repository: repositories.Repository) -> Reading:
