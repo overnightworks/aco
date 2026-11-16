@@ -38,17 +38,21 @@ def seed_open_item(clone: Path, remote: Path) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "branch_flags", [(), ("--branch", "main")], ids=["no-branch", "trunk-branch"]
+)
 @pytest.mark.parametrize("output_flags", [(), ("--json",)], ids=["text", "json"])
-def test_a_merged_rerun_from_the_trunk_without_a_branch_leaves_the_lane_worktree_alone(
+def test_a_merged_rerun_from_the_trunk_leaves_the_lane_worktree_alone(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     github_clone: Path,
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
     output_flags: tuple[str, ...],
+    branch_flags: tuple[str, ...],
 ) -> None:
     """Spec: REL-47, REL-50, REL-65. A rerun with no claim, run from the
-    default branch without `--branch`, has no lane branch of its own: it
+    default branch with or without `--branch` naming it, has no lane branch: it
     prints no `worktree:` line and removes nothing, the lane's worktree and
     branch included."""
     landing = arrange_merged_pull_request(
@@ -75,6 +79,7 @@ def test_a_merged_rerun_from_the_trunk_without_a_branch_leaves_the_lane_worktree
             "Ada",
             "--merged",
             landing.merge_commit,
+            *branch_flags,
             *output_flags,
         ],
         capsys,

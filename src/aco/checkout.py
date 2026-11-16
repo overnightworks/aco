@@ -1025,10 +1025,10 @@ def is_default_branch(branch: str, default_branch: str | None) -> bool:
     `default_branch` -- `recorded_default_branch`'s answer -- or the
     `{"main", "master"}` fallback guess when none is recorded.
 
-    `claim`'s own worktree precondition (`_validate_worktree_branch`) alone,
-    since a fresh claim is created by literally standing in the worktree it
-    claims -- there is no attacker-reachable payload location to spoof
-    here, so the fallback guess stays an accepted risk.
+    The fallback guess is acceptable because every caller (`claim`'s worktree
+    precondition, `cmd_next`, `release`) only reads the answer to pick a
+    branch or a message, and none takes a payload from a location an attacker
+    could spoof.
     `rescope` denies outright when no default branch is recorded, rather than share this guess.
     """
     if default_branch is not None:
