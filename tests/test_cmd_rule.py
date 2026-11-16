@@ -311,7 +311,7 @@ class TestGithubRule:
                 (github, "GitHubForge"),
                 (board_read, "item_or_refuse"),
             ),
-            "this command reads the repository's body contract from .aco/board.toml and needs "
+            "this command reads the repository's configuration from .aco/board.toml and needs "
             "a checkout (a shallow one is enough): fatal: not a git repository "
             "(or any of the parent directories): .git",
             "unavailable",

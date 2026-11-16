@@ -582,7 +582,7 @@ def test_check_stdin_outside_a_checkout_refuses_before_reading_stdin(
         stdin=block_body(MINIMAL_BLOCK_TOML),
     )
     prefix = (
-        "ERROR: this command reads the repository's body contract from .aco/board.toml "
+        "ERROR: this command reads the repository's configuration from .aco/board.toml "
         "and needs a checkout (a shallow one is enough): "
     )
     assert (result.status, result.stderr.startswith(prefix)) == (2, True)

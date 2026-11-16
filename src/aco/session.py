@@ -475,7 +475,7 @@ class RunContext:
             )
         except protocol.ClaimError as error:
             raise protocol.ClaimUnavailableError(
-                "this command reads the repository's body contract from "
+                "this command reads the repository's configuration from "
                 f"{workboard.CONFIG_PATH} and needs a checkout (a shallow one is "
                 f"enough): {error}"
             ) from error

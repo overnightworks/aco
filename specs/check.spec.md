@@ -120,8 +120,8 @@ LAND-58, LAND-60, LAND-68).
 
 ## No checkout, no read
 
-`<no-checkout sentence>` is `this command reads the repository's body
-contract from .aco/board.toml and needs a checkout (a shallow one
+`<no-checkout sentence>` is `this command reads the repository's configuration
+from .aco/board.toml and needs a checkout (a shallow one
 is enough): <git detail>`.
 
 - [ ] [CHECK-10] `aco check <n>` outside a git checkout, or any other forge or store failure while reading, refuses `ERROR: <sentence>`, `--json` `reason: "unavailable"`, exit `2` (see E-CHECK-06).
@@ -150,7 +150,7 @@ owns only the CLI-level framing around it.
 
   ```console
   $ cd /tmp && printf 'x' | aco check -
-  2> ERROR: this command reads the repository's body contract from .aco/board.toml and needs a checkout (a shallow one is enough): <git detail>
+  2> ERROR: this command reads the repository's configuration from .aco/board.toml and needs a checkout (a shallow one is enough): <git detail>
   exit 2
   ```
 
@@ -259,7 +259,7 @@ Setup: a fresh repository outside any git checkout
 
 ```console
 $ aco check 12
-2> ERROR: this command reads the repository's body contract from .aco/board.toml and needs a checkout (a shallow one is enough): fatal: not a git repository (or any of the parent directories): .git
+2> ERROR: this command reads the repository's configuration from .aco/board.toml and needs a checkout (a shallow one is enough): fatal: not a git repository (or any of the parent directories): .git
 exit 2
 ```
 
