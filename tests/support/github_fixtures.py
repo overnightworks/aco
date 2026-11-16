@@ -91,6 +91,7 @@ def sub_issue_row(repository: str, number: int, state: str = "open") -> str:
             "number": number,
             "repository": f"https://api.github.com/repos/{repository}",
             "state": state,
+            "title": f"Child {number}",
         }
     )
 
