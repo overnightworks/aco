@@ -55,9 +55,9 @@ Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effo
 - [ ] [LANREC-16] The routing line is one line that starts `Routing: `; the stages `build`, `fix`, `review`, `test`, `gate` and `land` follow in that order, each as `<name> <model>/<effort>`, separated by `; `.
 - [ ] [LANREC-17] `<model>` is lowercase letters, digits, `.` and `-`, `<effort>` lowercase letters, digits and `-`; `fix`, `test`, `gate` may be `none`. A stage that does not fit has no trailer; the others still do.
 - [ ] [LANREC-18] `Fix rounds: <n>` takes `<n>` of one to three digits; any other value records no rounds. The text after `, hard:` is never read.
-- [ ] [LANREC-19] `Blocking:` is `none` (count `0`) or findings split by `; `, each ending one `→ <stage>`. `<n>× <text> → <stage>`, `<n>` 1 to 999, counts `<n>`; any other finding one; `0×` or no arrow: unknown.
+- [ ] [LANREC-19] `Blocking:` is `none` (count `0`) or findings split by `; `, each ending one `→ <stage>`. `<n>× <text> → <stage>`, `<n>` 1 to 999 followed by a space or the end of the finding's text, counts `<n>` (`3×3 matrix → ci` is one finding); any other finding one; `0×` or no arrow: unknown.
 - [ ] [LANREC-20] `Experiment: <tag>` takes `<tag>` of lowercase letters, digits and `-`, one to 40 characters, as a sentence of its own; any other value records no tag.
-- [ ] [LANREC-23] A doubled `Fix rounds:`, `Experiment:` or `Blocking:` sentence, `Blocking: none` plus more, or stages out of LANREC-16's order record that field as unknown; the others still read.
+- [ ] [LANREC-23] A doubled `Fix rounds:`, `Experiment:` or `Blocking:` sentence, `Blocking: none` plus more, or stages out of LANREC-16's order record that field as unknown; the others still read. Stages out of order leave all six stage fields unknown, those that stand in order included, while `Fix rounds:`, `Blocking:` and `Experiment:` are still recorded.
 - [ ] [LANREC-24] The word after a finding's `→` is never checked against the six stages: `ci`, `head` and any other word count the finding, because the line's writer owns the destinations.
 - [ ] [LANREC-25] `production_paths = []` is the key left unset: the three size figures have no line (LANREC-10), never a measured zero.
 
