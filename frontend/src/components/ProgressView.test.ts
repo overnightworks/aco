@@ -11,6 +11,7 @@ test('[ABRD-135] a repo shows its figure, bar, counts and each top-level contain
 	const article = screen.getByRole('article');
 	expect(within(article).getAllByText('7/48 · 14 %')).toHaveLength(2);
 	expect(within(article).getByText(/^Landed/)).toHaveTextContent('Landed 4');
+	expect(within(article).getByText(/^Closed otherwise/)).toHaveTextContent('Closed otherwise 3');
 	expect(within(article).getByText(/^Open/)).toHaveTextContent('Open 31');
 	expect(within(article).getByText(/^Uncut/)).toHaveTextContent('Uncut 10');
 	expect(within(article).getByText('Waiting')).toHaveTextContent('Waiting 2');

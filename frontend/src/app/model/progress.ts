@@ -3,6 +3,7 @@ import type { ProgressCounts } from '../../types';
 export const PROGRESS_TAB_LABEL = 'Progress';
 export const PROGRESS_REGION_LABEL = 'Progress per repository';
 export const LANDED_COUNT_LABEL = 'Landed';
+export const OTHER_CLOSED_COUNT_LABEL = 'Closed otherwise';
 export const OPEN_COUNT_LABEL = 'Open';
 export const UNCUT_COUNT_LABEL = 'Uncut';
 export const WAITING_COUNT_LABEL = 'Waiting';

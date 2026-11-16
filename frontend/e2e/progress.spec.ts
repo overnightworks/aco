@@ -44,6 +44,9 @@ for (const viewport of [
 			await expect(region.getByRole('listitem').filter({ hasText: /^Landed/ })).toHaveText(
 				'Landed 2'
 			);
+			await expect(
+				region.getByRole('listitem').filter({ hasText: /^Closed otherwise/ })
+			).toHaveText('Closed otherwise 1');
 			await expect(region.locator('.chip')).toHaveText(['Waiting 1']);
 			expect(
 				await page.evaluate(

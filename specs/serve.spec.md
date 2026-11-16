@@ -207,11 +207,11 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - [ ] [ABRD-132] `percent` (rounded down) is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line sums its top-level containers, a container with a parent anywhere has none.
 - [ ] [ABRD-133] `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
 - [ ] [ABRD-134] A failed read of a container's parent, sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).
-- [ ] [ABRD-135] The tab `Progress` lists per repo and top-level container a bar of landed and other closed children, `closed/planned · percent %` (`7/48 · 14 %`); an unknown progress shows its sentence.
+- [ ] [ABRD-135] The tab `Progress` lists per repo and top-level container a bar of landed and other closed children (its two parts named `Landed` and `Closed otherwise` by title), `closed/planned · percent %` (`7/48 · 14 %`); an unknown progress shows its sentence.
 - [ ] [ABRD-136] A closed child is `landed` when a trunk commit (the last `5000` first-parent) names it in a `Work-Item:` trailer; a child in another repository never is; `landed` is at most `closed`.
 - [ ] [ABRD-137] A container's `waiting` counts its open children in this repository that wait on the operator, `aco inbox`'s steps; `progress.waiting` stays the repo's total.
 - [ ] [ABRD-138] `closed` and `open` count the container's sub-issue list; a container that is unreadable, not a member's or without counts is neither listed nor summed.
-- [ ] [ABRD-139] The tab shows a repo's landed, open, uncut and waiting counts and a container's waiting count when not 0; with nothing planned it shows only `Nothing planned`, no bar.
+- [ ] [ABRD-139] The tab shows a repo's landed, closed otherwise, open, uncut and waiting counts (landed plus closed otherwise plus open plus uncut is planned) and a container's waiting count when not 0; with nothing planned it shows only `Nothing planned`, no bar.
 
 A closed child counts however it closed, not-planned included. A container whose own state is closed is not listed, so its children are not counted.
 

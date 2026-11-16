@@ -5,6 +5,7 @@
 		NO_CONTAINERS_TEXT,
 		NOTHING_PLANNED_TEXT,
 		OPEN_COUNT_LABEL,
+		OTHER_CLOSED_COUNT_LABEL,
 		PROGRESS_REGION_LABEL,
 		PROGRESS_UNKNOWN_LABEL,
 		progressFigure,
@@ -33,8 +34,9 @@
 			aria-valuenow={counts.closed}
 			aria-valuetext={progressFigure(counts)}
 		>
-			<span class="landed" style:width="{shares.landed}%"></span>
-			<span class="other" style:width="{shares.otherClosed}%"></span>
+			<span class="landed" title={LANDED_COUNT_LABEL} style:width="{shares.landed}%"></span>
+			<span class="other" title={OTHER_CLOSED_COUNT_LABEL} style:width="{shares.otherClosed}%"
+			></span>
 		</div>
 	{/if}
 {/snippet}
@@ -65,6 +67,7 @@
 				{@render bar(progress, repo.name)}
 				<ul class="counts">
 					<li>{LANDED_COUNT_LABEL} <b>{progress.landed}</b></li>
+					<li>{OTHER_CLOSED_COUNT_LABEL} <b>{progress.closed - progress.landed}</b></li>
 					<li>{OPEN_COUNT_LABEL} <b>{progress.open}</b></li>
 					<li>{UNCUT_COUNT_LABEL} <b>{progress.uncut}</b></li>
 					<li class:waiting={progress.waiting > 0}>
