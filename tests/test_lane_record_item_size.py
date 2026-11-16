@@ -116,7 +116,7 @@ def test_a_landed_release_records_the_size_its_item_declares(
         ),
     ],
 )
-def test_a_release_that_has_no_declared_size_records_none(
+def test_an_abandoned_release_or_one_without_a_declared_size_has_no_size_line(
     tmp_path: Path,
     outcome: protocol.ReleaseOutcome,
     item: forge.ItemReference | None,

@@ -86,7 +86,7 @@ with `main` at one commit, a git identity, `origin/HEAD` and `ACO_AGENT` set to 
 
 ### E-LANREC-01 — a landed lane leaves its record
 
-Setup: bare-remote, fake `gh`, `.aco/board.toml` naming `production_paths = ["src/"]`, issue `#42` claimed on `ada/issue-42`, pull request `#57` merged by `aco land`, its body `Routing: build sonnet-5.5/high; fix none; review opus-5.5/medium; test sonnet-5.5/medium; gate none; land haiku-5.5/low. Fix rounds: 0. Experiment: builder-sonnet. Blocking: none` and `Work-Item: #42`, changing `src/a.py` by 3 added lines
+Setup: bare-remote, fake `gh`, `.aco/board.toml` naming `production_paths = ["src/"]`, issue `#42`, whose body declares `size: M`, claimed on `ada/issue-42`, pull request `#57` merged by `aco land`, its body `Routing: build sonnet-5.5/high; fix none; review opus-5.5/medium; test sonnet-5.5/medium; gate none; land haiku-5.5/low. Fix rounds: 0. Experiment: builder-sonnet. Blocking: none` and `Work-Item: #42`, changing `src/a.py` by 3 added lines
 
 ```console
 $ git log -1 --format=%B refs/aco/state | grep '^lane_'
@@ -96,6 +96,7 @@ lane_wall_seconds: 1840
 lane_files: 1
 lane_added: 3
 lane_deleted: 0
+lane_size: M
 lane_build: sonnet-5.5/high
 lane_fix: none
 lane_review: opus-5.5/medium

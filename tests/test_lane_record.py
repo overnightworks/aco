@@ -5,8 +5,6 @@ real CLI against the real state ref, with the forge as the only fake."""
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
-from typing import cast
 
 import pytest
 from board_fixtures import REPOSITORY, standing_active_claim
@@ -22,6 +20,7 @@ from cli_fixtures import (
     track_board_config,
 )
 from github_fixtures import FakeForge
+from lane_record_fixtures import release_trailers_of
 from merged_release import arrange_merged_pull_request
 from store_fixtures import claim_intent
 
@@ -33,10 +32,8 @@ from aco.lane_record import (
     ReleasedLane,
     compute_record,
     parse_record,
-    release_subject,
 )
 from aco.routing_line import parse_routing_line
-from aco.session import RunContext
 
 LANE_BRANCH = "docs/tidy-readme"
 ROUTING = (
@@ -421,15 +418,16 @@ def test_an_abandoned_lane_counts_to_the_release_and_reads_its_routing_from_the_
 def release_trailers(
     history: LaneHistory, outcome: protocol.ReleaseOutcome, verified_merge: str | None = None
 ) -> tuple[str, ...]:
-    """The trailers `release_subject` puts on the release of a lane claimed in `history`; its
-    context holds no forge, so a read of one fails the test."""
-    observation = SimpleNamespace(tip=history.tip)
-    context = SimpleNamespace(
-        toplevel=history.path, config=CONFIG, observation=observation, now=lambda: FROZEN_CLI_NOW
+    """The trailers `release_subject` puts on the release of a lane claimed in `history`."""
+    return release_trailers_of(
+        toplevel=history.path,
+        config=CONFIG,
+        tip=history.tip,
+        now=FROZEN_CLI_NOW,
+        claim=standing_active_claim(lane=True, opened_commit=history.opened_commit),
+        outcome=outcome,
+        verified_merge=verified_merge,
     )
-    claim = standing_active_claim(lane=True, opened_commit=history.opened_commit)
-
-    return release_subject(cast(RunContext, context), claim, outcome, verified_merge).trailers
 
 
 def test_a_trunk_landing_names_its_commit_as_the_merge_without_asking_a_forge(
