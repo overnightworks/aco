@@ -10,8 +10,8 @@ from .session import RunContext
 
 _DESCRIPTION = (
     "Compare two groups of lanes by the records their releases left on refs/aco/state, "
-    "read-only. A group is FROM..TO (ISO days, by the release commit's date) or tag:NAME "
-    "(the lane's experiment tag)."
+    "read-only. A group is FROM..TO (YYYY-MM-DD days, both inclusive, a day being a UTC "
+    "calendar day of the release commit's date) or tag:NAME (the lane's experiment tag)."
 )
 _REPO_MESSAGE = "aco stats reads this checkout's own state ref; --repo does not apply to it"
 _SIDE_NAMES = ("A", "B")
@@ -73,7 +73,10 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
             side,
             type=lane_measure.parse_group,
             metavar=f"{side}_GROUP",
-            help="FROM..TO as YYYY-MM-DD days, both inclusive, or tag:NAME",
+            help=(
+                "FROM..TO as YYYY-MM-DD days, both inclusive, each a UTC calendar day, "
+                f"or tag:NAME where NAME is {lane_measure.TAG_GRAMMAR}"
+            ),
         )
     report.add_json_flag(stats)
 

@@ -6,14 +6,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from cli_fixtures import forbid_forge_resolution, real_git, run_cli
+from cli_fixtures import (
+    forbid_forge_resolution,
+    outside_a_checkout,  # noqa: F401 - a fixture
+    real_git,
+    run_cli,
+    track_board_config,
+)
 from store_fixtures import (
     lineage_observation,
     publish_claims_from_a_second_clone,
     state_ref_tip,
 )
 
-from aco import store
+from aco import lane_measure, store, workboard
 from aco.lane_record import LaneOutcome, LaneRecord, ProductionSize
 from aco.routing_line import RoutingLine, RoutingStage
 
@@ -347,3 +353,76 @@ def test_reading_the_lanes_changes_nothing_on_the_state_ref_or_the_checkout(
         tip_before,
         bookkeeping_before,
     )
+
+
+def test_a_group_with_a_newline_is_refused_on_one_line(
+    recorded: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-05."""
+    status, _stdout, stderr = stats(capsys, "2026-11-01\n..2026-11-07", UNUSED_TAG)
+
+    assert (status, stderr.count("\n")) == (2, 1)
+    assert stderr.startswith("ERROR: group ")
+
+
+def test_a_checkout_without_a_tracked_configuration_is_refused(
+    recorded: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-18, PIN-32."""
+    real_git(recorded, "rm", "-q", str(workboard.CONFIG_PATH))
+    real_git(recorded, "commit", "-q", "-m", "drop the board configuration")
+
+    status, stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG, "--json")
+
+    payload = json.loads(stdout)
+    assert (status, payload["reason"]) == (2, "unavailable")
+    assert stderr == f"ERROR: {payload['message']}\n"
+    assert payload["message"].startswith(f"{workboard.CONFIG_PATH} was removed on this branch")
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        pytest.param("production_paths = 'src/'", id="no-list"),
+        pytest.param("production_paths = ['/src/']", id="an-absolute-entry"),
+    ],
+)
+def test_a_malformed_production_paths_is_refused_although_stats_reads_no_size(
+    recorded: Path, capsys: pytest.CaptureFixture[str], entry: str
+) -> None:
+    """Spec: STATS-18, PIN-55, PIN-56."""
+    track_board_config(recorded, f"{entry}\n")
+
+    status, stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG, "--json")
+
+    payload = json.loads(stdout)
+    assert (status, payload["reason"]) == (2, "unavailable")
+    assert stderr == f"ERROR: {payload['message']}\n"
+    assert payload["message"].startswith("board configuration ")
+    assert " production_paths " in payload["message"]
+
+
+def test_stats_outside_a_checkout_says_it_reads_the_configuration(
+    outside_a_checkout: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-19."""
+    status, _stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG)
+
+    assert status == 2
+    assert stderr.startswith(
+        f"ERROR: this command reads the repository's configuration from {workboard.CONFIG_PATH} "
+        "and needs a checkout (a shallow one is enough): "
+    )
+    assert "body contract" not in stderr
+
+
+def test_the_help_says_a_day_is_a_utc_day_and_gives_the_tag_grammar(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: STATS-20."""
+    status, stdout, _stderr = stats(capsys, "--help")
+
+    flat = " ".join(stdout.split())
+    assert status == 0
+    assert "UTC calendar day" in flat
+    assert f"tag:NAME where NAME is {lane_measure.TAG_GRAMMAR}" in flat

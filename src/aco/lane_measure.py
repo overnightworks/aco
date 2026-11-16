@@ -16,6 +16,7 @@ from .routing_line import EXPERIMENT_TAG, RoutingStage
 
 TAG_PREFIX = "tag:"
 _RANGE_SEPARATOR = ".."
+TAG_GRAMMAR = "1 to 40 lowercase letters, digits or '-'"
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 
 
@@ -48,19 +49,17 @@ def parse_group(text: str) -> LaneGroup:
     if text.startswith(TAG_PREFIX):
         tag = text.removeprefix(TAG_PREFIX)
         if EXPERIMENT_TAG.fullmatch(tag) is None:
-            raise protocol.ClaimError(
-                f"group '{text}' names no tag: a tag is 1 to 40 lowercase letters, digits or '-'"
-            )
+            raise protocol.ClaimError(f"group {text!r} names no tag: a tag is {TAG_GRAMMAR}")
         return ExperimentTag(tag)
     first, separator, last = text.partition(_RANGE_SEPARATOR)
     if not separator or _DAY.fullmatch(first) is None or _DAY.fullmatch(last) is None:
-        raise protocol.ClaimError(f"group '{text}' must be FROM..TO as YYYY-MM-DD days or tag:NAME")
+        raise protocol.ClaimError(f"group {text!r} must be FROM..TO as YYYY-MM-DD days or tag:NAME")
     try:
         days = DateRange(date.fromisoformat(first), date.fromisoformat(last))
     except ValueError as error:
-        raise protocol.ClaimError(f"group '{text}' holds an impossible day") from error
+        raise protocol.ClaimError(f"group {text!r} holds an impossible day") from error
     if days.last < days.first:
-        raise protocol.ClaimError(f"group '{text}' ends before it starts")
+        raise protocol.ClaimError(f"group {text!r} ends before it starts")
     return days
 
 
