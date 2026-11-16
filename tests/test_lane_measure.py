@@ -10,14 +10,17 @@ from aco.lane_measure import (
     Basis,
     DateRange,
     FigureName,
+    ItemActuals,
     NoRange,
     RemainingWork,
+    item_actuals,
     lane_prices,
     measure,
     parse_group,
     remaining_work,
 )
 from aco.lane_record import LaneOutcome, LaneRecord, RecordedLane
+from aco.routing_line import RoutingLine
 
 NOVEMBER = DateRange(date(2026, 11, 1), date(2026, 11, 30))
 
@@ -196,3 +199,44 @@ def test_an_item_whose_time_is_not_fully_known_or_that_never_landed_is_no_sample
     lanes = items_of(None, [10, 20, 30, 40], first_issue=100) + unsampled
 
     assert priced(lanes, [None]) is NoRange.TOO_FEW
+
+
+def routed(issue: int, wall_seconds: int | None, fix_rounds: int | None) -> RecordedLane:
+    routing = RoutingLine(stages={}, fix_rounds=fix_rounds, blocking=None, experiment=None)
+    record = LaneRecord(LaneOutcome.LANDED, wall_seconds=wall_seconds, routing=routing)
+    return RecordedLane(RELEASED_AT, record, issue)
+
+
+def test_an_items_actuals_sum_the_wall_time_and_fix_rounds_of_all_its_records() -> None:
+    """Spec: ABRD-148."""
+    lanes = [routed(1, 100, 1), routed(1, 50, 2), routed(2, 7, 0)]
+
+    assert item_actuals(lanes) == {1: ItemActuals(150, 3), 2: ItemActuals(7, 0)}
+
+
+@pytest.mark.parametrize(
+    ("lanes", "expected"),
+    [
+        pytest.param(
+            [routed(1, None, 1), routed(1, 50, 1)], ItemActuals(None, 2), id="a-record-lacks-time"
+        ),
+        pytest.param(
+            [routed(1, 10, None), routed(1, 50, 1)],
+            ItemActuals(60, None),
+            id="a-record-lacks-rounds",
+        ),
+        pytest.param([finished(1, 10)], ItemActuals(10, None), id="a-record-without-routing"),
+    ],
+)
+def test_an_item_with_a_record_lacking_a_figure_has_that_figure_unknown(
+    lanes: list[RecordedLane], expected: ItemActuals
+) -> None:
+    """Spec: ABRD-148."""
+    assert item_actuals(lanes) == {1: expected}
+
+
+def test_a_lane_released_without_an_issue_belongs_to_no_item() -> None:
+    """Spec: ABRD-148."""
+    lane = RecordedLane(RELEASED_AT, LaneRecord(LaneOutcome.LANDED, wall_seconds=5))
+
+    assert item_actuals([lane]) == {}

@@ -14,6 +14,7 @@ type ParentOf = Callable[[int], workboard.ParentIssue | None]
 type Arranged = tuple[workboard.Issue, workboard.ChildList]
 
 NO_LANE_RECORDS = lane_measure.lane_prices(())
+NO_ACTUALS: Mapping[int, lane_measure.ItemActuals] = {}
 CLOSED_CHILD = 1000
 """The number `container_with_children` gives a container's first closed child."""
 
@@ -60,12 +61,13 @@ def _read(
     children_of: Callable[[int], workboard.ChildList] | None = None,
     open_items: tuple[workboard.Issue, ...] = (),
     prices: lane_measure.LanePrices | None = NO_LANE_RECORDS,
+    actuals: Mapping[int, lane_measure.ItemActuals] | None = NO_ACTUALS,
 ) -> progress.Progress | progress.ProgressUnavailable:
     listed = {issue.number: children for issue, children in arranged}
     return progress.of(
         [*(issue for issue, _children in arranged), *open_items],
         storage=body.Storage.GITHUB,
-        marks=progress.Marks(operator_steps, landed, prices),
+        marks=progress.Marks(operator_steps, landed, prices, actuals),
         parent_of=parent_of,
         children_of=children_of or listed.__getitem__,
     )
@@ -373,3 +375,48 @@ def test_a_container_without_a_range_says_why_and_keeps_its_counts(
     container = _container_of(_read(arranged, prices=prices))
 
     assert (str(container.estimate), container.lanes_left, container.planned) == (sentence, 2, 4)
+
+
+def test_a_container_lists_its_closed_children_in_number_order_with_their_actuals() -> None:
+    """Spec: ABRD-147, ABRD-148, ABRD-149."""
+    issue, children = _container(10, closed=0)
+    closed = tuple(
+        workboard.ChildItem(number, workboard.ChildState.CLOSED, f"Child {number}")
+        for number in (30, 20, 25)
+    )
+    actuals = {
+        20: lane_measure.ItemActuals(3600, 2),
+        25: lane_measure.ItemActuals(None, None),
+    }
+
+    shown = _container_of(_read([(issue, (*children, *closed))], actuals=actuals))
+
+    assert shown.closed_children == (
+        progress.ClosedChild(20, "Child 20", lane_measure.ItemActuals(3600, 2)),
+        progress.ClosedChild(25, "Child 25", lane_measure.ItemActuals(None, None)),
+        progress.ClosedChild(30, "Child 30", None),
+    )
+
+
+def test_an_open_child_and_a_foreign_child_are_no_closed_child() -> None:
+    """Spec: ABRD-147."""
+    issue, _children = _container(10, closed=0, open_count=1)
+    foreign = workboard.ForeignChild(
+        workboard.IssueReference("owner/other", 7), workboard.ChildState.CLOSED
+    )
+    open_child = workboard.ChildItem(1, workboard.ChildState.OPEN, "Open")
+
+    shown = _container_of(_read([(issue, (open_child, foreign))]))
+
+    assert shown.closed_children == ()
+
+
+def test_unreadable_lane_records_leave_the_actuals_of_every_closed_child_unknown() -> None:
+    """Spec: ABRD-150."""
+    arranged = [_container(10, closed=1)]
+
+    shown = _container_of(_read(arranged, prices=None, actuals=None))
+
+    assert [child.actuals for child in shown.closed_children] == [
+        lane_measure.ItemActuals(None, None)
+    ]

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { barShares, progressFigure, remainingFigure } from './progress';
-import type { WorkRange } from '../../types';
+import { barShares, closedChildFigure, progressFigure, remainingFigure } from './progress';
+import type { ClosedChild, WorkRange } from '../../types';
 
 test.each([
 	[{ closed: 7, landed: 0, planned: 48, open: 31, uncut: 10, percent: 14 }, '7/48 · 14 %'],
@@ -50,4 +50,26 @@ test.each([
 
 test('[ABRD-140] a container with no estimate has no remaining figure', () => {
 	expect(remainingFigure(0, null)).toBeNull();
+});
+
+function closed(overrides: Partial<ClosedChild>): ClosedChild {
+	return {
+		number: 12,
+		title: 'Title',
+		wall_seconds: 5400,
+		fix_rounds: 2,
+		recorded: true,
+		...overrides
+	};
+}
+
+test.each([
+	[closed({}), '#12 Title · 1.5 h · 2 fix rounds'],
+	[closed({ wall_seconds: 2700, fix_rounds: 1 }), '#12 Title · 45 min · 1 fix round'],
+	[closed({ wall_seconds: 7200, fix_rounds: 0 }), '#12 Title · 2 h · 0 fix rounds'],
+	[closed({ wall_seconds: null }), '#12 Title · time unknown · 2 fix rounds'],
+	[closed({ fix_rounds: null }), '#12 Title · 1.5 h · fix rounds unknown'],
+	[closed({ wall_seconds: null, fix_rounds: null, recorded: false }), '#12 Title · no record']
+])('[ABRD-151] %j reads %s', (child, figure) => {
+	expect(closedChildFigure(child)).toBe(figure);
 });

@@ -87,9 +87,25 @@ def _progress_json(
                 "waiting": container.waiting,
                 "lanes_left": container.lanes_left,
                 "estimate": _estimate_json(container.estimate),
+                "closed_children": [
+                    _closed_child_json(child) for child in container.closed_children
+                ],
             }
             for container in read.containers
         ],
+    }
+
+
+def _closed_child_json(child: progress.ClosedChild) -> dict[str, object]:
+    """A closed child's title and lane actuals in seconds and rounds; `recorded` is false when no
+    lane record names it, a figure `None` when its records do not state it."""
+    actuals = child.actuals or lane_measure.ItemActuals(None, None)
+    return {
+        "number": child.number,
+        "title": child.title,
+        "wall_seconds": actuals.wall_seconds,
+        "fix_rounds": actuals.fix_rounds,
+        "recorded": child.actuals is not None,
     }
 
 

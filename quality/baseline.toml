@@ -21,7 +21,7 @@
 "src/aco/cmd_release.py" = 885
 "src/aco/github.py" = 1441
 "src/aco/protocol.py" = 1837
-"src/aco/state_board.py" = 923
+"src/aco/state_board.py" = 922
 "src/aco/store.py" = 1739
 "src/aco/workboard.py" = 2786
 "tests/support/cli_fixtures.py" = 888
@@ -35,7 +35,7 @@
 "tests/test_cmd_land_preflight_claim.py" = 851
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2761
+"tests/test_github.py" = 2760
 "tests/test_state_board.py" = 5933
 "tests/test_store.py" = 5103
 

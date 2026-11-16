@@ -142,10 +142,12 @@ function dated(items: Item[]): Item[] {
 	});
 }
 
-/** A finished item the state ref's lane records hold: its issue and the seconds its lane took. */
+/** A finished item the state ref's lane records hold: its issue, the seconds its lane took and,
+ * when its record states them, its fix rounds. */
 export interface FinishedItem {
 	issue: number;
 	wall_seconds: number;
+	fix_rounds?: number;
 }
 
 /** The board holds exactly `items` from now on; `listingFailure` makes every

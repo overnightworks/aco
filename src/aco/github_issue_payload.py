@@ -119,6 +119,14 @@ def item_reference(value: object) -> forge.ItemReference:
     )
 
 
+def sub_issue_title(value: object) -> str:
+    """The title of one sub-issue object, refused by name when it is no text."""
+    title = value.get("title") if isinstance(value, dict) else None
+    if not isinstance(title, str):
+        raise forge.ForgeMalformedResponseError("GitHub returned a malformed sub-issue")
+    return title
+
+
 def require_label(raw: str, label: str) -> None:
     """Raises `forge.ForgeMalformedResponseError` unless `raw`, GitHub's answer to a
     label write, is the issue's label list and holds `label`."""

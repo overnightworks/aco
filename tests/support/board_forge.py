@@ -65,6 +65,8 @@ class ForgeRequest:
 class StoredChild:
     number: int
     closed: bool = False
+    title: str = ""
+    """What the sub-issue list reports; empty reports `Child <number>`."""
 
 
 def child_list(*, closed: Iterable[int] = (), open: Iterable[int] = ()) -> list[StoredChild]:
@@ -383,6 +385,7 @@ class BoardForge:
             workboard.ChildItem(
                 child.number,
                 workboard.ChildState.CLOSED if child.closed else workboard.ChildState.OPEN,
+                child.title or f"Child {child.number}",
             )
             for child in state.items[number].children or ()
         )

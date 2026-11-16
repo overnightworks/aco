@@ -511,24 +511,23 @@ class StateRefBoard:
         return () if item_id is None else self._children(item_id)
 
     def _children(self, item_id: str) -> tuple[workboard.ChildItem, ...]:
-        """`item_id`'s children, every unreadable item that may be one
-        counted open: its state may not read, so its
-        container never reads as childless past it, and the board offers no
-        close that `item close` would refuse by it (ITEM-54)."""
+        """`item_id`'s children, every unreadable item that may be one counted open: its state
+        may not read, so its container never reads as childless past it, and the board offers
+        no close that `item close` would refuse by it (ITEM-54). An unreadable child is titled
+        by its record's title when that still reads, else by its id."""
         decoded = self._items.get(item_id)
         kind = None if decoded is None else _item_kind(decoded.record.kind)
-        return (
-            *(
-                workboard.ChildItem(record.number, workboard.ChildState(record.state.value))
-                for record in (child.record for child in self._items.values())
-                if record.parent == item_id
-            ),
-            *(
-                workboard.ChildItem(items.item_number(child_id), workboard.ChildState.OPEN)
-                for child_id, child in self._malformed.items()
-                if child.may_be_child_of(item_id, kind)
-            ),
+        readable = (
+            (record.number, workboard.ChildState(record.state.value), record.title)
+            for record in (child.record for child in self._items.values())
+            if record.parent == item_id
         )
+        unreadable = (
+            (items.item_number(child_id), workboard.ChildState.OPEN, child.title or child_id)
+            for child_id, child in self._malformed.items()
+            if child.may_be_child_of(item_id, kind)
+        )
+        return tuple(workboard.ChildItem(*fields) for fields in (*readable, *unreadable))
 
     def default_branch(self) -> str:
         return self._default_branch

@@ -998,10 +998,9 @@ class GitHubForge:
     def list_children(self, number: int) -> workboard.ChildList:
         """Every sub-issue GitHub records under `number`, open or closed.
 
-        Every child's state is read here rather than filtered by `--jq`: a
-        state this adapter does not understand would otherwise vanish and make
-        a parent look childless, which is exactly the landing this check must
-        refuse. A child recorded in another repository is a `ForeignChild`.
+        Every child's state is read here rather than filtered by `--jq`: a state this adapter does
+        not understand would otherwise vanish and make a parent look childless, which is exactly the
+        landing this check must refuse. A child recorded in another repository is a `ForeignChild`.
         """
         raw = self._run(
             [
@@ -1009,7 +1008,7 @@ class GitHubForge:
                 "--paginate",
                 f"repos/{self.repository}/issues/{number}/sub_issues?per_page=100",
                 "--jq",
-                ".[] | {number,repository:.repository_url,state,type:(.type.name // null)}",
+                ".[] | {number,repository:.repository_url,state,title,type:(.type.name // null)}",
             ]
         )
         children: list[workboard.ChildItem | workboard.ForeignChild] = []
@@ -1017,7 +1016,8 @@ class GitHubForge:
             child = self._issue_reference(value, "sub-issue")
             state = workboard.ChildState(self._issue_state(value, "sub-issue").value)
             if child.repository == self.repository.path:
-                children.append(workboard.ChildItem(child.number, state))
+                title = github_issue_payload.sub_issue_title(value)
+                children.append(workboard.ChildItem(child.number, state, title))
             else:
                 children.append(workboard.ForeignChild(child, state))
         return tuple(children)

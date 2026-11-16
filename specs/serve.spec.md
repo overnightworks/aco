@@ -56,7 +56,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — |
 | no repository found, at start or on a later read | ABRD-109 | — |
 | a directory under the root that cannot be read | ABRD-110 | — |
-| a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139 | — |
+| a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139, ABRD-147, ABRD-148, ABRD-149, ABRD-150, ABRD-151 | — |
 
 ## Writing a decision
 
@@ -203,7 +203,7 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 
 ## Progress
 
-- [ ] [ABRD-131] A repo's `progress` lists top-level containers: `closed`, `landed` (ABRD-136), `planned`, `open`, `uncut`, `waiting` (ABRD-137), `percent`, `lanes_left`, `estimate` (ABRD-140 to ABRD-145; E-ABRD-20).
+- [ ] [ABRD-131] A repo's `progress` lists top-level containers with `closed`, `landed`, `planned`, `open`, `uncut`, `waiting`, `percent`, `lanes_left`, `estimate`, `closed_children` (ABRD-136 to ABRD-147; E-ABRD-20).
 - [ ] [ABRD-132] `percent` (rounded down) is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line sums its top-level containers, a container with a parent anywhere has none.
 - [ ] [ABRD-133] `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
 - [ ] [ABRD-134] A failed read of a container's parent, sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).
@@ -219,6 +219,11 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - [ ] [ABRD-144] Under `5` pooled samples `estimate` is `{"error": "not enough lane records yet"}`, with no lane records `"no lane records"`, with them unreadable `"lane records unreadable"`; the counts stay.
 - [ ] [ABRD-145] A range is `{"error": null, "low_seconds", "high_seconds", "samples", "classes"}` in whole seconds, `samples` being the pooled items; the tab rounds to hours and never shows a date.
 - [ ] [ABRD-146] The tab shows per container `5 lanes left · about 3 to 7 h agent work · from 31 finished items` (`under 1 h` below an hour), or the lanes left and the sentence; waiting stays its own chip.
+- [ ] [ABRD-147] A container's `closed_children` lists its closed children of this repository by number, each `{"number", "title", "wall_seconds", "fix_rounds", "recorded"}`; no other repository's child.
+- [ ] [ABRD-148] A closed child's `wall_seconds` and `fix_rounds` are the sums over all lane records that name it; either is `null` when any of those records lacks it.
+- [ ] [ABRD-149] A closed child that no lane record names has `recorded` false and both figures `null`, else `recorded` is true.
+- [ ] [ABRD-150] With the lane records unreadable every closed child has `recorded` true and both figures `null`; the counts stay.
+- [ ] [ABRD-151] The tab lists under a container its closed children as `#12 Title · 1.5 h · 2 fix rounds` (`45 min` below an hour, `time unknown` and `fix rounds unknown` for a `null`), or `#12 Title · no record`.
 
 A closed child counts however it closed, not-planned included. A container whose own state is closed is not listed, so its children are not counted. Landed plus closed otherwise plus open plus uncut is planned.
 

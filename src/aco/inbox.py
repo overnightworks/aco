@@ -176,27 +176,29 @@ def _progress(
         )
     except protocol.ClaimError as error:
         return ProgressUnavailable(str(error))
+    lanes = _recorded_lanes(context)
     return progress.of(
         listed,
         storage=context.config.storage,
         marks=progress.Marks(
             frozenset(step.number for step in operator_steps),
             frozenset(item.item for item in board_read.trunk_landing_items(landings)),
-            _lane_prices(context),
+            None if lanes is None else lane_measure.lane_prices(lanes),
+            None if lanes is None else lane_measure.item_actuals(lanes),
         ),
         parent_of=context.forge.parent_issue,
         children_of=context.forge.list_children,
     )
 
 
-def _lane_prices(context: session.RunContext) -> lane_measure.LanePrices | None:
-    """What a lane costs from the lane records on the state ref's tip; `None` when the ref
-    cannot be read, which leaves only the work-left ranges unknown."""
+def _recorded_lanes(context: session.RunContext) -> tuple[lane_record.RecordedLane, ...] | None:
+    """The lane records on the state ref's tip; `None` when the ref cannot be read, which
+    leaves only the work-left ranges and the closed children's actuals unknown."""
     try:
         observed = store.peek_state(
             worktree=context.toplevel, remote=context.configured_canonical_remote
         )
-        return lane_measure.lane_prices(lane_record.recorded_lanes(context.toplevel, observed.tip))
+        return lane_record.recorded_lanes(context.toplevel, observed.tip)
     except protocol.ClaimError:
         return None
 

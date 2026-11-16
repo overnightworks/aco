@@ -1,4 +1,4 @@
-import type { NoWorkRange, ProgressCounts, WorkRange } from '../../types';
+import type { ClosedChild, NoWorkRange, ProgressCounts, WorkRange } from '../../types';
 
 export const PROGRESS_TAB_LABEL = 'Progress';
 export const PROGRESS_REGION_LABEL = 'Progress per repository';
@@ -10,6 +10,7 @@ export const WAITING_COUNT_LABEL = 'Waiting';
 export const PROGRESS_UNKNOWN_LABEL = 'Progress unknown';
 export const NO_CONTAINERS_TEXT = 'No container is open.';
 export const NOTHING_PLANNED_TEXT = 'Nothing planned';
+export const CLOSED_CHILDREN_LABEL = 'Closed children';
 
 /** The figure beside a bar: closed over planned, and the whole percent once
  * something is planned, as in `7/48 · 14 %` (ABRD-131). */
@@ -52,4 +53,22 @@ export function remainingFigure(
 	const lanes = `${plural(lanesLeft, 'lane')} left`;
 	if (estimate.error !== null) return `${lanes} · ${estimate.error}`;
 	return `${lanes} · ${hoursOf(estimate)} agent work · from ${plural(estimate.samples, 'finished item')}`;
+}
+
+const SECONDS_PER_MINUTE = 60;
+
+function laneTime(seconds: number | null): string {
+	if (seconds === null) return 'time unknown';
+	if (seconds < SECONDS_PER_HOUR) return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min`;
+	return `${Number((seconds / SECONDS_PER_HOUR).toFixed(1))} h`;
+}
+
+/** A closed child as its title and what its lanes took, or `no record` when no lane record
+ * names it (ABRD-151). */
+export function closedChildFigure(child: ClosedChild): string {
+	const name = `#${child.number} ${child.title}`;
+	if (!child.recorded) return `${name} · no record`;
+	const rounds =
+		child.fix_rounds === null ? 'fix rounds unknown' : plural(child.fix_rounds, 'fix round');
+	return `${name} · ${laneTime(child.wall_seconds)} · ${rounds}`;
 }

@@ -91,6 +91,7 @@ def sub_issue_row(repository: str, number: int, state: str = "open") -> str:
             "number": number,
             "repository": f"https://api.github.com/repos/{repository}",
             "state": state,
+            "title": f"Child {number}",
         }
     )
 
@@ -231,15 +232,14 @@ class FakeForge:
         return number
 
     def link_child(self, parent: int, child: int) -> None:
-        """This fake's mirror of `GitHubForge.link_child`: records `child` as
-        `parent`'s open sub-issue; `fail_create_child_relation` simulates the
-        POST failing, leaving `child` the orphan a repeat `cut` must adopt."""
+        """This fake's mirror of `GitHubForge.link_child`: records `child` as `parent`'s open
+        sub-issue; `fail_create_child_relation` fails the POST, leaving the orphan `cut` adopts."""
         self.linked_children.append((parent, child))
         if self.fail_create_child_relation:
             raise protocol.ClaimError("relation POST failed (simulated)")
         self.children[parent] = (
             *self.children.get(parent, ()),
-            workboard.ChildItem(child, workboard.ChildState.OPEN),
+            workboard.ChildItem(child, workboard.ChildState.OPEN, f"Child {child}"),
         )
         self.parents[child] = workboard.ParentIssue(
             workboard.IssueReference(self.repository.path, parent), ""

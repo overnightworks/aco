@@ -70,7 +70,12 @@ def _blocker_reply(repository: str, number: int = 7) -> str:
 SITES = {
     "sub-issue": Site(
         lambda repository: json.dumps(
-            {"number": 72, "repository": _reference_url(repository), "state": "open"}
+            {
+                "number": 72,
+                "repository": _reference_url(repository),
+                "state": "open",
+                "title": "Child",
+            }
         ),
         lambda client: client.list_children(79),
     ),

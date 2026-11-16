@@ -141,6 +141,16 @@ export interface NoWorkRange {
 	error: string;
 }
 
+/** A closed child of the repository with the lane time and fix rounds its lane records state;
+ * `null` is unknown, `recorded` false that no lane record names it (ABRD-147 to ABRD-150). */
+export interface ClosedChild {
+	number: number;
+	title: string;
+	wall_seconds: number | null;
+	fix_rounds: number | null;
+	recorded: boolean;
+}
+
 export interface ProgressContainer extends ProgressCounts {
 	number: number;
 	title: string;
@@ -150,6 +160,8 @@ export interface ProgressContainer extends ProgressCounts {
 	lanes_left: number;
 	/** `null` while no lane is left. */
 	estimate: WorkRange | NoWorkRange | null;
+	/** The closed children of this repository by number (ABRD-147). */
+	closed_children: ClosedChild[];
 }
 
 /** A repo's progress read (ABRD-132): the sum of its top-level containers. */
