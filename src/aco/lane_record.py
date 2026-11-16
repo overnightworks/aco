@@ -263,13 +263,23 @@ def _line_count(numstat_field: str) -> int:
 @dataclass(frozen=True)
 class RecordedLane:
     """One released lane as its release commit records it; `released_at` is the commit's
-    committer date in Unix seconds."""
+    committer date in Unix seconds, `issue` the work item its subject names, `None` for a lane
+    released without one."""
 
     released_at: int
     record: LaneRecord
+    issue: int | None = None
 
 
 _WHOLE_NUMBER = re.compile(r"\d+", re.ASCII)
+_RELEASE_SUBJECT = re.compile(r"release issue (?P<issue>[1-9]\d*)", re.ASCII)
+
+
+def released_issue(subject: str) -> int | None:
+    """The issue number a release transition's subject (`store.transition_subject`) names;
+    `None` for a lane release and for any other transition."""
+    named = _RELEASE_SUBJECT.fullmatch(subject)
+    return None if named is None else int(named["issue"])
 
 
 def recorded_lanes(toplevel: Path, state_tip: str | None) -> tuple[RecordedLane, ...]:
@@ -288,7 +298,8 @@ def recorded_lanes(toplevel: Path, state_tip: str | None) -> tuple[RecordedLane,
         committed_at, _, message = entry.partition("\n")
         record = parse_record(message)
         if record is not None:
-            lanes.append(RecordedLane(int(committed_at), record))
+            subject = message.partition("\n")[0]
+            lanes.append(RecordedLane(int(committed_at), record, released_issue(subject)))
     return tuple(lanes)
 
 

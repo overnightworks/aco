@@ -76,3 +76,43 @@ test('[ABRD-135] a repo that was not read shows its sentence', () => {
 	expect(screen.getByRole('alert')).toHaveTextContent('Not read');
 	expect(screen.getByRole('alert')).toHaveTextContent('git refused the read');
 });
+
+test('[ABRD-146] a container shows its lanes left and range under its bar, none without a lane left', () => {
+	const ranged = progressContainer({
+		number: 11,
+		title: 'Ranged',
+		lanes_left: 5,
+		estimate: {
+			error: null,
+			low_seconds: 10800,
+			high_seconds: 25200,
+			samples: 31,
+			classes: [{ size: null, lanes: 5, basis: 'pooled', samples: 31 }]
+		}
+	});
+	const finished = progressContainer({
+		number: 12,
+		title: 'Finished',
+		lanes_left: 0,
+		estimate: null
+	});
+	render(ProgressView, {
+		repos: [repo({ progress: progressRead({ containers: [ranged, finished] }) })]
+	});
+
+	const article = screen.getByRole('article');
+	expect(
+		within(article).getByText('5 lanes left · about 3 to 7 h agent work · from 31 finished items')
+	).toBeInTheDocument();
+	expect(within(article).queryAllByText(/lanes? left/)).toHaveLength(1);
+});
+
+test('[ABRD-146] a container whose range is unknown shows the sentence beside its lanes left', () => {
+	render(ProgressView, {
+		repos: [repo({ progress: progressRead({ containers: [progressContainer()] }) })]
+	});
+
+	expect(
+		within(screen.getByRole('article')).getByText('40 lanes left · no lane records')
+	).toBeInTheDocument();
+});

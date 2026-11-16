@@ -142,18 +142,30 @@ function dated(items: Item[]): Item[] {
 	});
 }
 
+/** A finished item the state ref's lane records hold: its issue and the seconds its lane took. */
+export interface FinishedItem {
+	issue: number;
+	wall_seconds: number;
+}
+
 /** The board holds exactly `items` from now on; `listingFailure` makes every
- * listing fail with that message until the next arrangement, and `landed` are
- * the items a trunk commit's trailer names as landed. */
+ * listing fail with that message until the next arrangement, `landed` are
+ * the items a trunk commit's trailer names as landed, and `laneRecords` the
+ * finished items the state ref holds (none by default). */
 export async function arrange(
 	items: Item[],
-	{ listingFailure, landed }: { listingFailure?: string; landed?: number[] } = {}
+	{
+		listingFailure,
+		landed,
+		laneRecords
+	}: { listingFailure?: string; landed?: number[]; laneRecords?: FinishedItem[] } = {}
 ): Promise<void> {
 	const response = await fetch(`${readBoardRuntime().controlUrl}/board`, {
 		method: 'PUT',
 		body: JSON.stringify({
 			items: dated(items),
 			landed: landed ?? [],
+			lane_records: laneRecords ?? [],
 			listing_failure: listingFailure ?? null
 		})
 	});

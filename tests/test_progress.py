@@ -1,17 +1,19 @@
 """The progress view's numbers (specs/serve.spec.md, ABRD-131 to ABRD-137)."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 
 import pytest
 from board_fixtures import board_issue, complete_contract, container_with_children, slice_entries
 
-from aco import body, forge, progress, workboard
-from aco.body import ItemKind
+from aco import body, forge, lane_measure, progress, workboard
+from aco.body import ItemKind, Size
+from aco.lane_record import LaneOutcome, LaneRecord, RecordedLane
 
 type ParentOf = Callable[[int], workboard.ParentIssue | None]
 type Arranged = tuple[workboard.Issue, workboard.ChildList]
 
+NO_LANE_RECORDS = lane_measure.lane_prices(())
 CLOSED_CHILD = 1000
 """The number `container_with_children` gives a container's first closed child."""
 
@@ -56,12 +58,14 @@ def _read(
     operator_steps: frozenset[int] = frozenset(),
     landed: frozenset[int] = frozenset(),
     children_of: Callable[[int], workboard.ChildList] | None = None,
+    open_items: tuple[workboard.Issue, ...] = (),
+    prices: lane_measure.LanePrices | None = NO_LANE_RECORDS,
 ) -> progress.Progress | progress.ProgressUnavailable:
     listed = {issue.number: children for issue, children in arranged}
     return progress.of(
-        [issue for issue, _children in arranged],
+        [*(issue for issue, _children in arranged), *open_items],
         storage=body.Storage.GITHUB,
-        marks=progress.Marks(operator_steps, landed),
+        marks=progress.Marks(operator_steps, landed, prices),
         parent_of=parent_of,
         children_of=children_of or listed.__getitem__,
     )
@@ -262,3 +266,110 @@ def test_a_failed_child_read_is_a_visible_state_not_a_number() -> None:
     read = _read([_container(10, closed=1)], children_of=failing_children)
 
     assert read == progress.ProgressUnavailable("no children of #10")
+
+
+def _item(
+    number: int, size: Size | None = None, *, kind: ItemKind | None = None
+) -> workboard.Issue:
+    contract = (
+        complete_contract("Go.") if size is None else complete_contract("Go.", size=size.value)
+    )
+    return board_issue(number, f"Item {number}", contract, kind=kind)
+
+
+def _history(sizes: Mapping[Size | None, list[int]]) -> lane_measure.LanePrices:
+    """The prices of finished items: each size's wall seconds, one item per entry."""
+    lanes = [
+        RecordedLane(
+            1_000_000 + number,
+            LaneRecord(LaneOutcome.LANDED, wall_seconds=seconds, item_size=size),
+            number,
+        )
+        for number, (size, seconds) in enumerate(
+            (size, seconds) for size, listed in sizes.items() for seconds in listed
+        )
+    ]
+    return lane_measure.lane_prices(lanes)
+
+
+FIVE_SMALL: dict[Size | None, list[int]] = {Size.SMALL: [100, 200, 300, 400, 500]}
+
+
+def _container_of(read: progress.Progress | progress.ProgressUnavailable) -> progress.Container:
+    [only] = _shown(read).containers
+    return only
+
+
+def test_a_container_prices_each_open_child_at_its_declared_size_and_the_rest_pooled() -> None:
+    """Spec: ABRD-141, ABRD-143."""
+    arranged = [_container(10, closed=0, open_count=3, uncut=1)]
+    open_items = (_item(1, Size.SMALL), _item(2, Size.SMALL), _item(3, None))
+
+    container = _container_of(_read(arranged, open_items=open_items, prices=_history(FIVE_SMALL)))
+
+    assert container.lanes_left == 4
+    assert container.estimate == lane_measure.RemainingWork(
+        low_seconds=4 * 300,
+        high_seconds=4 * 400,
+        items=5,
+        classes=(
+            lane_measure.PricedClass(Size.SMALL, 2, lane_measure.Basis.MEASURED, 5),
+            lane_measure.PricedClass(None, 2, lane_measure.Basis.POOLED, 5),
+        ),
+    )
+
+
+def test_an_open_child_that_waits_on_the_operator_is_no_lane_left() -> None:
+    """Spec: ABRD-140."""
+    arranged = [_container(10, closed=0, open_count=2)]
+    open_items = (_item(1, Size.SMALL), _item(2, Size.SMALL))
+
+    container = _container_of(
+        _read(
+            arranged,
+            open_items=open_items,
+            operator_steps=frozenset({2}),
+            prices=_history(FIVE_SMALL),
+        )
+    )
+
+    assert (container.lanes_left, container.waiting) == (1, 1)
+
+
+def test_a_nested_container_and_a_foreign_child_each_count_as_one_pooled_lane() -> None:
+    """Spec: ABRD-141."""
+    foreign = workboard.IssueReference("owner/other", 5)
+    arranged = [_container(10, closed=0, open_count=1, foreign_open=(foreign,))]
+    open_items = (_item(1, Size.SMALL, kind=ItemKind.CONTAINER),)
+
+    container = _container_of(_read(arranged, open_items=open_items, prices=_history(FIVE_SMALL)))
+
+    assert container.lanes_left == 2
+    assert isinstance(container.estimate, lane_measure.RemainingWork)
+    assert [(entry.size, entry.lanes) for entry in container.estimate.classes] == [(None, 2)]
+
+
+def test_a_container_with_no_lane_left_has_no_estimate() -> None:
+    """Spec: ABRD-140."""
+    container = _container_of(_read([_container(10, closed=3)], prices=_history(FIVE_SMALL)))
+
+    assert (container.lanes_left, container.estimate) == (0, None)
+
+
+@pytest.mark.parametrize(
+    ("prices", "sentence"),
+    [
+        pytest.param(NO_LANE_RECORDS, "no lane records", id="no-records"),
+        pytest.param(_history({Size.SMALL: [1, 2]}), "not enough lane records yet", id="too-few"),
+        pytest.param(None, "lane records unreadable", id="unreadable"),
+    ],
+)
+def test_a_container_without_a_range_says_why_and_keeps_its_counts(
+    prices: lane_measure.LanePrices | None, sentence: str
+) -> None:
+    """Spec: ABRD-144."""
+    arranged = [_container(10, closed=2, open_count=1, uncut=1)]
+
+    container = _container_of(_read(arranged, prices=prices))
+
+    assert (str(container.estimate), container.lanes_left, container.planned) == (sentence, 2, 4)

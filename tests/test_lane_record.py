@@ -32,6 +32,7 @@ from aco.lane_record import (
     ReleasedLane,
     compute_record,
     parse_record,
+    released_issue,
 )
 from aco.routing_line import parse_routing_line
 
@@ -196,6 +197,30 @@ def test_a_figure_whose_line_is_repeated_or_malformed_is_unknown(
 def test_a_message_without_exactly_one_valid_outcome_records_no_lane(message: str) -> None:
     """Spec: STATS-12."""
     assert parse_record(message) is None
+
+
+@pytest.mark.parametrize(
+    ("identity", "branch", "issue"),
+    [
+        pytest.param(protocol.IssueIdentity(42), "claude/issue-42-cut", 42, id="an-issue-release"),
+        pytest.param(protocol.LaneIdentity(), "docs/lane-cleanup", None, id="a-lane-release"),
+    ],
+)
+def test_a_release_subject_names_the_issue_it_releases_and_a_lane_subject_none(
+    identity: protocol.ClaimIdentity, branch: str, issue: int | None
+) -> None:
+    """Spec: LANREC-29."""
+    subject = store.transition_subject("release", identity, branch)
+
+    assert released_issue(subject.text) == issue
+
+
+@pytest.mark.parametrize("action", ["claim", "rescope"])
+def test_a_transition_other_than_a_release_names_no_issue(action: str) -> None:
+    """Spec: LANREC-29."""
+    subject = store.transition_subject(action, protocol.IssueIdentity(42), "claude/issue-42-cut")
+
+    assert released_issue(subject.text) is None
 
 
 class LaneHistory:
