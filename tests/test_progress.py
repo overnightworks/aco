@@ -301,7 +301,7 @@ def _container_of(read: progress.Progress | progress.ProgressUnavailable) -> pro
 
 
 def test_a_container_prices_each_open_child_at_its_declared_size_and_the_rest_pooled() -> None:
-    """Spec: ABRD-141."""
+    """Spec: ABRD-141, ABRD-143."""
     arranged = [_container(10, closed=0, open_count=3, uncut=1)]
     open_items = (_item(1, Size.SMALL), _item(2, Size.SMALL), _item(3, None))
 
