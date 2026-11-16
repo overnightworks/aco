@@ -135,7 +135,6 @@ def test_an_abandoned_release_or_one_without_a_declared_size_has_no_size_line(
         pytest.param(
             forge.ItemState.CLOSED, body.Size.SMALL, ["lane_size: S"], id="closed-by-the-merge"
         ),
-        pytest.param(forge.ItemState.OPEN, None, [], id="unsized"),
     ],
 )
 def test_a_github_release_of_an_item_records_its_size_from_the_one_read_it_makes(
@@ -144,7 +143,7 @@ def test_a_github_release_of_an_item_records_its_size_from_the_one_read_it_makes
     github_clone: Path,
     bare_remote: Path,
     item_state: forge.ItemState,
-    size: body.Size | None,
+    size: body.Size,
     expected: list[str],
 ) -> None:
     """Spec: LANREC-21, LANREC-28."""
@@ -171,20 +170,11 @@ def test_a_github_release_of_an_item_records_its_size_from_the_one_read_it_makes
     assert merged.forge.issue_reference_lookups == [WORK_ITEM_ISSUE]
 
 
-@pytest.mark.parametrize(
-    ("size", "expected"),
-    [
-        pytest.param(body.Size.LARGE, ["lane_size: L"], id="sized"),
-        pytest.param(None, [], id="unsized"),
-    ],
-)
 def test_a_state_ref_release_of_an_item_records_the_size_its_record_declares(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     github_clone: Path,
     bare_remote: Path,
-    size: body.Size | None,
-    expected: list[str],
 ) -> None:
     """Spec: LANREC-28."""
     merged = arrange_merged_pull_request(
@@ -196,7 +186,7 @@ def test_a_state_ref_release_of_an_item_records_the_size_its_record_declares(
         pull_request_body="",
         branch=LANE_BRANCH,
     )
-    seed_sized_item(github_clone, bare_remote, size)
+    seed_sized_item(github_clone, bare_remote, body.Size.LARGE)
     real_git(github_clone, "pull", "-q", "--ff-only", "origin", "main")
     write_repository_config(github_clone, 'storage = "state-ref"\n')
     real_git(github_clone, "checkout", "-q", LANE_BRANCH)
@@ -207,4 +197,4 @@ def test_a_state_ref_release_of_an_item_records_the_size_its_record_declares(
     )
 
     assert (result.status, result.stderr) == (0, "")
-    assert recorded_size_lines(bare_remote) == expected
+    assert recorded_size_lines(bare_remote) == ["lane_size: L"]
