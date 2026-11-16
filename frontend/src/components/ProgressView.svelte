@@ -1,6 +1,9 @@
 <script lang="ts">
 	import {
+		barShares,
+		LANDED_COUNT_LABEL,
 		NO_CONTAINERS_TEXT,
+		NOTHING_PLANNED_TEXT,
 		OPEN_COUNT_LABEL,
 		PROGRESS_REGION_LABEL,
 		PROGRESS_UNKNOWN_LABEL,
@@ -16,18 +19,24 @@
 </script>
 
 {#snippet bar(counts: ProgressCounts, label: string)}
-	<div
-		class="bar"
-		class:done={counts.percent === 100}
-		role="progressbar"
-		aria-label={label}
-		aria-valuemin={0}
-		aria-valuemax={counts.planned}
-		aria-valuenow={counts.closed}
-		aria-valuetext={progressFigure(counts)}
-	>
-		<span style:width="{counts.percent ?? 0}%"></span>
-	</div>
+	{#if counts.planned === 0}
+		<p class="quiet">{NOTHING_PLANNED_TEXT}</p>
+	{:else}
+		{@const shares = barShares(counts)}
+		<div
+			class="bar"
+			class:done={counts.percent === 100}
+			role="progressbar"
+			aria-label={label}
+			aria-valuemin={0}
+			aria-valuemax={counts.planned}
+			aria-valuenow={counts.closed}
+			aria-valuetext={progressFigure(counts)}
+		>
+			<span class="landed" style:width="{shares.landed}%"></span>
+			<span class="other" style:width="{shares.otherClosed}%"></span>
+		</div>
+	{/if}
 {/snippet}
 
 <section aria-label={PROGRESS_REGION_LABEL}>
@@ -55,6 +64,7 @@
 				</h2>
 				{@render bar(progress, repo.name)}
 				<ul class="counts">
+					<li>{LANDED_COUNT_LABEL} <b>{progress.landed}</b></li>
 					<li>{OPEN_COUNT_LABEL} <b>{progress.open}</b></li>
 					<li>{UNCUT_COUNT_LABEL} <b>{progress.uncut}</b></li>
 					<li class:waiting={progress.waiting > 0}>
@@ -72,7 +82,12 @@
 										<span class="number">#{container.number}</span>
 										{container.title}
 									</span>
-									<span class="figure">{progressFigure(container)}</span>
+									<span class="figure">
+										{#if container.waiting > 0}
+											<span class="chip">{WAITING_COUNT_LABEL} {container.waiting}</span>
+										{/if}
+										{progressFigure(container)}
+									</span>
 								</div>
 								{@render bar(container, container.title)}
 							</li>
@@ -118,13 +133,28 @@
 		box-shadow: inset 0 0 0 1px var(--line);
 		overflow: hidden;
 	}
+	.bar {
+		display: flex;
+	}
 	.bar span {
 		display: block;
 		height: 100%;
+	}
+	.bar .landed {
+		background: var(--good);
+	}
+	.bar .other {
 		background: var(--accent);
 	}
-	.bar.done span {
+	.bar.done .other {
 		background: var(--good);
+	}
+	.chip {
+		margin-right: 6px;
+		padding: 2px 8px;
+		border-radius: 999px;
+		background: var(--warn-soft);
+		color: var(--warn);
 	}
 	.counts {
 		display: flex;

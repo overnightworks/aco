@@ -10,9 +10,10 @@ test('[ABRD-135] a repo shows its figure, bar, counts and each top-level contain
 
 	const article = screen.getByRole('article');
 	expect(within(article).getAllByText('7/48 · 14 %')).toHaveLength(2);
+	expect(within(article).getByText(/^Landed/)).toHaveTextContent('Landed 4');
 	expect(within(article).getByText(/^Open/)).toHaveTextContent('Open 31');
 	expect(within(article).getByText(/^Uncut/)).toHaveTextContent('Uncut 10');
-	expect(within(article).getByText(/^Waiting/)).toHaveTextContent('Waiting 2');
+	expect(within(article).getByText('Waiting')).toHaveTextContent('Waiting 2');
 	expect(within(article).getByText('#10')).toBeInTheDocument();
 	expect(screen.getAllByRole('progressbar')).toHaveLength(2);
 	expect(screen.getAllByRole('progressbar')[1]).toHaveAttribute('aria-valuetext', '7/48 · 14 %');
@@ -24,6 +25,7 @@ test('[ABRD-135] a repo with no container says so and shows no percent', () => {
 			repo({
 				progress: progressRead({
 					closed: 0,
+					landed: 0,
 					planned: 0,
 					open: 0,
 					uncut: 0,
@@ -37,6 +39,56 @@ test('[ABRD-135] a repo with no container says so and shows no percent', () => {
 
 	expect(screen.getByText('0/0')).toBeInTheDocument();
 	expect(screen.getByText('No container is open.')).toBeInTheDocument();
+	expect(screen.getByText('Nothing planned')).toBeInTheDocument();
+});
+
+test('[ABRD-135] a container with nothing planned shows the text and no progressbar', () => {
+	const empty = progressContainer({
+		closed: 0,
+		landed: 0,
+		planned: 0,
+		open: 0,
+		uncut: 0,
+		percent: null,
+		waiting: 0
+	});
+	render(ProgressView, {
+		repos: [
+			repo({
+				progress: progressRead({
+					closed: 0,
+					landed: 0,
+					planned: 0,
+					open: 0,
+					uncut: 0,
+					percent: null,
+					containers: [empty]
+				})
+			})
+		]
+	});
+
+	expect(screen.getAllByText('Nothing planned')).toHaveLength(2);
+	expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+});
+
+test('[ABRD-135] a bar shows landed and other closes as two parts', () => {
+	render(ProgressView, { repos: [repo({ progress: progressRead() })] });
+
+	const bar = screen.getByRole('progressbar', { name: 'Epic' });
+	expect(bar.querySelector('.landed')).toBeInTheDocument();
+	expect(bar.querySelector('.other')).toBeInTheDocument();
+});
+
+test('[ABRD-137] a container shows its waiting count only when it is not zero', () => {
+	const quiet = progressContainer({ number: 11, title: 'Quiet', waiting: 0 });
+	render(ProgressView, {
+		repos: [repo({ progress: progressRead({ containers: [progressContainer(), quiet] }) })]
+	});
+
+	const [waiting, ...others] = within(screen.getByRole('article')).getAllByText(/^Waiting \d/);
+	expect(waiting).toHaveTextContent('Waiting 1');
+	expect(others).toHaveLength(0);
 });
 
 test('[ABRD-135] a container at one hundred percent is marked done', () => {

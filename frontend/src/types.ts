@@ -109,6 +109,8 @@ export interface BoardItem {
  * `null` while nothing is planned (ABRD-131). */
 export interface ProgressCounts {
 	closed: number;
+	/** Of `closed`, the children a trunk commit's trailer names as landed (ABRD-136). */
+	landed: number;
 	planned: number;
 	open: number;
 	uncut: number;
@@ -118,6 +120,8 @@ export interface ProgressCounts {
 export interface ProgressContainer extends ProgressCounts {
 	number: number;
 	title: string;
+	/** The container's open children that wait on the operator (ABRD-137). */
+	waiting: number;
 }
 
 /** A repo's progress read (ABRD-132): the sum of its top-level containers. */
