@@ -116,3 +116,27 @@ test('[ABRD-146] a container whose range is unknown shows the sentence beside it
 		within(screen.getByRole('article')).getByText('40 lanes left · no lane records')
 	).toBeInTheDocument();
 });
+
+test('[ABRD-151] a container lists its closed children with their actuals', () => {
+	const container = progressContainer({
+		closed_children: [
+			{ number: 12, title: 'Done thing', wall_seconds: 5400, fix_rounds: 2, recorded: true },
+			{ number: 13, title: 'Hand closed', wall_seconds: null, fix_rounds: null, recorded: false }
+		]
+	});
+	render(ProgressView, { repos: [repo({ progress: progressRead({ containers: [container] }) })] });
+
+	const article = screen.getByRole('article');
+	expect(within(article).getByText('#12 Done thing · 1.5 h · 2 fix rounds')).toBeInTheDocument();
+	expect(within(article).getByText('#13 Hand closed · no record')).toBeInTheDocument();
+});
+
+test('[ABRD-151] a container without closed children lists none', () => {
+	render(ProgressView, {
+		repos: [repo({ progress: progressRead({ containers: [progressContainer()] }) })]
+	});
+
+	expect(
+		within(screen.getByRole('article')).queryByRole('list', { name: 'Closed children' })
+	).toBeNull();
+});

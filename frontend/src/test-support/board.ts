@@ -207,6 +207,7 @@ export function progressContainer(overrides: Partial<ProgressContainer> = {}): P
 		percent: 14,
 		lanes_left: 40,
 		estimate: { error: 'no lane records' },
+		closed_children: [],
 		...overrides
 	};
 }

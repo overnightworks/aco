@@ -170,5 +170,37 @@ for (const viewport of [
 
 			await expect(page.getByText('1 lane left · no lane records')).toBeVisible();
 		});
+
+		test('[ABRD-151] a container lists its closed children with their lane time and fix rounds', async ({
+			page
+		}, testInfo) => {
+			await arrange([container(10, 'Song jump', { closed: [101, 102, 103, 104], open: [20] })], {
+				laneRecords: [
+					{ issue: 101, wall_seconds: 5400, fix_rounds: 2 },
+					{ issue: 101, wall_seconds: 1800, fix_rounds: 1 },
+					{ issue: 102, wall_seconds: 600 }
+				]
+			});
+			const { appUrl, token } = readBoardRuntime();
+			await page.goto(`${appUrl}#t=${token}`);
+			await page
+				.getByRole('navigation', { name: 'Views' })
+				.getByRole('button', { name: 'Progress' })
+				.click();
+
+			const closed = page.getByRole('list', { name: 'Closed children' });
+			await expect(closed.getByRole('listitem')).toHaveText([
+				'#101 Child 101 · 2 h · 3 fix rounds',
+				'#102 Child 102 · 10 min · fix rounds unknown',
+				'#103 Child 103 · no record',
+				'#104 Child 104 · no record'
+			]);
+			expect(
+				await page.evaluate(
+					() => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+				)
+			).toBe(true);
+			await page.screenshot({ path: testInfo.outputPath('progress-closed-children.png') });
+		});
 	});
 }

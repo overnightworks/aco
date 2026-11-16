@@ -1,6 +1,8 @@
 <script lang="ts">
 	import {
 		barShares,
+		CLOSED_CHILDREN_LABEL,
+		closedChildFigure,
 		LANDED_COUNT_LABEL,
 		NO_CONTAINERS_TEXT,
 		NOTHING_PLANNED_TEXT,
@@ -98,6 +100,13 @@
 									<p class="remaining">
 										{remainingFigure(container.lanes_left, container.estimate)}
 									</p>
+								{/if}
+								{#if container.closed_children.length > 0}
+									<ul class="closed-children" aria-label={CLOSED_CHILDREN_LABEL}>
+										{#each container.closed_children as child (child.number)}
+											<li>{closedChildFigure(child)}</li>
+										{/each}
+									</ul>
 								{/if}
 							</li>
 						{/each}
@@ -212,6 +221,16 @@
 		margin: 6px 0 0;
 		font-size: 13px;
 		color: var(--fg-2);
+	}
+	.closed-children {
+		margin: 6px 0 0;
+		padding: 0;
+		list-style: none;
+		font-size: 13px;
+		color: var(--fg-2);
+	}
+	.closed-children li {
+		overflow-wrap: anywhere;
 	}
 	.quiet {
 		margin: 12px 0 0;
