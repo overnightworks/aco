@@ -388,7 +388,7 @@ def _container_estimate(repository: BoardForge) -> object:
 def test_the_progress_read_prices_the_lanes_left_from_the_state_ref_lane_records(
     tmp_path: Path, isolated_global_git_config: Path
 ) -> None:
-    """Spec: ABRD-139."""
+    """Spec: ABRD-141."""
     del isolated_global_git_config
     repository = board_checkout(tmp_path / "repository")
     repository.put_item(
@@ -412,7 +412,7 @@ def test_the_progress_read_prices_the_lanes_left_from_the_state_ref_lane_records
 def test_a_state_ref_without_lane_records_leaves_the_range_unknown_by_name(
     tmp_path: Path, isolated_global_git_config: Path
 ) -> None:
-    """Spec: ABRD-141."""
+    """Spec: ABRD-142."""
     del isolated_global_git_config
     repository = board_checkout(tmp_path / "repository")
     repository.put_item(
@@ -428,7 +428,7 @@ def test_a_state_ref_without_lane_records_leaves_the_range_unknown_by_name(
 def test_an_unreadable_state_ref_leaves_only_the_range_unknown_and_the_counts_shown(
     tmp_path: Path, isolated_global_git_config: Path
 ) -> None:
-    """Spec: ABRD-142."""
+    """Spec: ABRD-143."""
     del isolated_global_git_config
     repository = board_checkout(tmp_path / "repository")
     repository.put_item(

@@ -265,7 +265,10 @@ but not grow.
   Its Progress view is derived from the same listing, each top-level
   container's sub-issue list and the trunk's `Work-Item:` trailers:
   `progress.py` counts each container's closed, landed, waiting and planned
-  work (ABRD-131); it keeps no state and adds no store.
+  work (ABRD-131); it keeps no state and adds no store. The same read prices
+  the lanes left from the lane records on the state ref's tip, one `ls-remote`
+  and object fetch per repository inside its parallel read (`inbox.py`); a
+  failed state read leaves only the ranges unknown.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
   the item commands still carries both storage paths. It is known and

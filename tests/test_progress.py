@@ -301,7 +301,7 @@ def _container_of(read: progress.Progress | progress.ProgressUnavailable) -> pro
 
 
 def test_a_container_prices_each_open_child_at_its_declared_size_and_the_rest_pooled() -> None:
-    """Spec: ABRD-139, ABRD-140."""
+    """Spec: ABRD-141."""
     arranged = [_container(10, closed=0, open_count=3, uncut=1)]
     open_items = (_item(1, Size.SMALL), _item(2, Size.SMALL), _item(3, None))
 
@@ -320,7 +320,7 @@ def test_a_container_prices_each_open_child_at_its_declared_size_and_the_rest_po
 
 
 def test_an_open_child_that_waits_on_the_operator_is_no_lane_left() -> None:
-    """Spec: ABRD-138."""
+    """Spec: ABRD-140."""
     arranged = [_container(10, closed=0, open_count=2)]
     open_items = (_item(1, Size.SMALL), _item(2, Size.SMALL))
 
@@ -337,7 +337,7 @@ def test_an_open_child_that_waits_on_the_operator_is_no_lane_left() -> None:
 
 
 def test_a_nested_container_and_a_foreign_child_each_count_as_one_pooled_lane() -> None:
-    """Spec: ABRD-139."""
+    """Spec: ABRD-141."""
     foreign = workboard.IssueReference("owner/other", 5)
     arranged = [_container(10, closed=0, open_count=1, foreign_open=(foreign,))]
     open_items = (_item(1, Size.SMALL, kind=ItemKind.CONTAINER),)
@@ -350,7 +350,7 @@ def test_a_nested_container_and_a_foreign_child_each_count_as_one_pooled_lane() 
 
 
 def test_a_container_with_no_lane_left_has_no_estimate() -> None:
-    """Spec: ABRD-138."""
+    """Spec: ABRD-140."""
     container = _container_of(_read([_container(10, closed=3)], prices=_history(FIVE_SMALL)))
 
     assert (container.lanes_left, container.estimate) == (0, None)
@@ -367,7 +367,7 @@ def test_a_container_with_no_lane_left_has_no_estimate() -> None:
 def test_a_container_without_a_range_says_why_and_keeps_its_counts(
     prices: lane_measure.LanePrices | None, sentence: str
 ) -> None:
-    """Spec: ABRD-141, ABRD-142."""
+    """Spec: ABRD-142, ABRD-143."""
     arranged = [_container(10, closed=2, open_count=1, uncut=1)]
 
     container = _container_of(_read(arranged, prices=prices))

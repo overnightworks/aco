@@ -40,6 +40,7 @@ reason (an abandoned one).
 - [ ] [LANREC-11] `lane_build`, `lane_fix`, `lane_review`, `lane_test`, `lane_gate` and `lane_land` hold the `<model>/<effort>` or `none` that stage names in the routing line, one trailer for each stage that parses.
 - [ ] [LANREC-12] `lane_fix_rounds` holds the routing line's fix rounds, `lane_blocking` its count of blocking findings, `lane_experiment` its experiment tag; each has a line only when it parses.
 - [ ] [LANREC-28] `lane_size` is `S`, `M` or `L`: the item's top-level `size` from the read the release already makes; an unsized item, an abandoned lane or a release without an issue has no line.
+- [ ] [LANREC-29] A reader tells a lane's issue from its release commit's subject `release issue <n>`; a lane release and any other transition name none.
 
 ## The routing line
 

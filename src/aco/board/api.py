@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .. import expectation_grammar, expectations, progress, rulings
+from .. import expectation_grammar, expectations, lane_measure, progress, rulings
 from .board import BoardReading, RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
@@ -85,8 +85,36 @@ def _progress_json(
                 "title": container.title,
                 **_counts_json(container),
                 "waiting": container.waiting,
+                "lanes_left": container.lanes_left,
+                "estimate": _estimate_json(container.estimate),
             }
             for container in read.containers
+        ],
+    }
+
+
+def _estimate_json(
+    estimate: lane_measure.RemainingWork | lane_measure.NoRange | None,
+) -> dict[str, object] | None:
+    """The agent work left in a container as seconds; `error` is the sentence of why there is
+    no range, and only then are the figures absent. `None` while no lane is left."""
+    if estimate is None:
+        return None
+    if isinstance(estimate, lane_measure.NoRange):
+        return {"error": estimate.value}
+    return {
+        "error": None,
+        "low_seconds": estimate.low_seconds,
+        "high_seconds": estimate.high_seconds,
+        "samples": estimate.items,
+        "classes": [
+            {
+                "size": priced.size.value if priced.size is not None else None,
+                "lanes": priced.lanes,
+                "basis": priced.basis.value,
+                "samples": priced.items,
+            }
+            for priced in estimate.classes
         ],
     }
 

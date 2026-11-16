@@ -5,10 +5,18 @@ from typing import Any, cast
 
 from aco_board_fixtures import BoardClient
 from board_fixtures import complete_contract, slice_entries
-from board_forge import BoardForge, ForgeOperation, ForgeRequest, child_list
+from board_forge import (
+    BoardForge,
+    ForgeOperation,
+    ForgeRequest,
+    ReleasedItem,
+    child_list,
+    seed_lane_records,
+)
 
 from aco import workboard
 from aco.body import ItemKind
+from aco.lane_record import LaneOutcome, LaneRecord
 
 
 def _repo(board: BoardClient) -> dict[str, Any]:
@@ -58,6 +66,8 @@ def test_a_repo_lists_closed_and_planned_per_top_level_container_and_for_itself(
                 "uncut": 2,
                 "percent": 20,
                 "waiting": 0,
+                "lanes_left": 4,
+                "estimate": {"error": "lane records unreadable"},
             }
         ],
     }
@@ -153,3 +163,49 @@ def test_a_repo_without_containers_shows_no_planned_work(
     progress = _repo(board)["progress"]
 
     assert (progress["planned"], progress["percent"], progress["containers"]) == (0, None, [])
+
+
+def _finished(number: int, wall_seconds: int) -> ReleasedItem:
+    record = LaneRecord(LaneOutcome.LANDED, wall_seconds=wall_seconds, item_size=None)
+    return ReleasedItem(number, record, 1_700_000_000 + number)
+
+
+def test_a_container_shows_its_lanes_left_and_the_range_in_seconds_with_its_samples(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-140, ABRD-141, ABRD-144."""
+    repository.put_item(
+        10,
+        complete_contract("Build.", slice=slice_entries("S1")),
+        kind=ItemKind.CONTAINER,
+        children=child_list(closed=[1], open=[2, 3]),
+    )
+    repository.put_item(3, complete_contract("Decide."), labels=[workboard.NEEDS_OPERATOR_LABEL])
+    seed_lane_records(repository, [_finished(n, 100 * n) for n in range(1, 7)])
+
+    [container] = _repo(board)["progress"]["containers"]
+
+    assert (container["lanes_left"], container["waiting"], container["estimate"]) == (
+        2,
+        1,
+        {
+            "error": None,
+            "low_seconds": 700,
+            "high_seconds": 1000,
+            "samples": 6,
+            "classes": [{"size": None, "lanes": 2, "basis": "pooled", "samples": 6}],
+        },
+    )
+
+
+def test_a_container_with_no_lane_left_carries_no_estimate(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-140."""
+    repository.put_item(
+        10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
+    )
+
+    [container] = _repo(board)["progress"]["containers"]
+
+    assert (container["lanes_left"], container["estimate"]) == (0, None)

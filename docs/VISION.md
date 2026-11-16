@@ -29,15 +29,17 @@ steps only he can take.
   operator to decide, and with them the steps only he can take; an answer he
   gives in chat counts the same.
 - It shows the operator, per repository and per top-level container, how
-  much planned work is closed and what is open, uncut or waiting on him: a
-  view derived from the items, not a record of its own.
+  much planned work is closed and what is open, uncut or waiting on him, and
+  how much agent work is likely left, as a range measured from finished lanes,
+  never a date: a view derived from the items, not a record of its own.
 
 ## What it deliberately is not
 
 - Not a reading room. Status, transcripts and evidence stay with the agents;
   what reaches the operator is a decision or a step only he can take, each
   something to act on, not to read; the one view beside them is the derived
-  progress of the work (what is closed of what is planned).
+  progress of the work (what is closed of what is planned, and what is likely
+  left).
 - Not a code host or issue tracker. It uses the ones a repository already
   has and adds only what they cannot hold.
 - Not a standing service: nothing has to run between sessions. Agents
@@ -45,6 +47,7 @@ steps only he can take.
   operator's inbox starts its own reader for its own length.
 - Not a project-management tool. A piece of work has a rough size, and every
   lane leaves one record of its duration, rounds, size and models for agents
-  to read when they compare how work was done: no time sheets, and no
-  reports for the operator beyond that derived progress view.
+  to read when they compare how work was done and for the progress view's
+  range: no time sheets, no dates and no reports for the operator beyond that
+  derived view.
 - Not a decider. It records the operator's word and never rules in his place.

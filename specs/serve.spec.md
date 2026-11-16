@@ -203,7 +203,7 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 
 ## Progress
 
-- [ ] [ABRD-131] Each repo's `progress` lists its top-level containers: `closed`, `landed` (ABRD-136), `planned` (children and uncut `[[slice]]` rows), `open`, `uncut`, `waiting` (ABRD-137), `percent` (E-ABRD-20).
+- [ ] [ABRD-131] Each repo's `progress` lists its top-level containers: `closed`, `landed` (ABRD-136), `planned` (children and uncut `[[slice]]` rows), `open`, `uncut`, `waiting` (ABRD-137), `percent` and the work left, `lanes_left` and `estimate` (ABRD-140 to ABRD-145; E-ABRD-20).
 - [ ] [ABRD-132] `percent` (rounded down) is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line sums its top-level containers, a container with a parent anywhere has none.
 - [ ] [ABRD-133] `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
 - [ ] [ABRD-134] A failed read of a container's parent, sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).
@@ -212,6 +212,13 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - [ ] [ABRD-137] A container's `waiting` counts its open children in this repository that wait on the operator, `aco inbox`'s steps; `progress.waiting` stays the repo's total.
 - [ ] [ABRD-138] `closed` and `open` count the container's sub-issue list; a container that is unreadable, not a member's or without counts is neither listed nor summed.
 - [ ] [ABRD-139] The tab shows a repo's landed, closed otherwise, open, uncut and waiting counts and a container's waiting count when not 0; with nothing planned it shows only `Nothing planned`, no bar.
+- [ ] [ABRD-140] A container's `lanes_left` is its open children not waiting on the operator plus its uncut rows; with none left its `estimate` is `null`. The work of waiting children is never in the range.
+- [ ] [ABRD-141] A container's `estimate` prices each lane left at the median to 80th percentile of finished lane seconds of its size class: the middle two averaged, nearest rank; the range sums both ends.
+- [ ] [ABRD-142] A finished item is one sample: its lanes' seconds summed, sized by its latest landed lane; one lane of unknown time, or none landed, makes it none. A class under `5` samples is priced pooled.
+- [ ] [ABRD-143] A lane with no declared size, a nested container, a child in another repository or an uncut row is priced pooled. Per class the estimate lists `lanes`, `basis` (`measured` or `pooled`) and `samples`.
+- [ ] [ABRD-144] Under `5` pooled samples `estimate` is `{"error": "not enough lane records yet"}`, with no lane records `"no lane records"`, with them unreadable `"lane records unreadable"`; the counts stay.
+- [ ] [ABRD-145] A range is `{"error": null, "low_seconds", "high_seconds", "samples", "classes"}` in whole seconds, `samples` being the pooled items; the tab rounds to hours and never shows a date.
+- [ ] [ABRD-146] The tab shows per container `5 lanes left · about 3 to 7 h agent work · from 31 finished items` (`under 1 h` below an hour), or the lanes left and the sentence; waiting stays its own chip.
 
 A closed child counts however it closed, not-planned included. A container whose own state is closed is not listed, so its children are not counted. Landed plus closed otherwise plus open plus uncut is planned.
 
@@ -503,7 +510,8 @@ request: GET /api/board, header X-Board-Token: <board token>
 forge requests: the open-item listing, the parent of #10, the parent of #11, the sub-issues of #10
 answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [], "progress": {
   "error": null, "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
-  "containers": [{"number": 10, "title": "Song jump", "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1}]}}]}
+  "containers": [{"number": 10, "title": "Song jump", "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
+    "lanes_left": 2, "estimate": {"error": "no lane records"}}]}}]}
 ```
 
 ### E-ABRD-21 -- a container's parent cannot be read
