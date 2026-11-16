@@ -135,7 +135,7 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
 def test_the_blocking_count_is_one_per_arrow_or_unknown_when_ambiguous(
     blocking: str, expected_count: int | None
 ) -> None:
-    """Spec: LANREC-19, LANREC-23, LANREC-24."""
+    """Spec: LANREC-19, LANREC-23, LANREC-24, LANREC-27."""
     assert read(f"Routing: build a/b. Fix rounds: 0. Blocking: {blocking}")[2] == expected_count
 
 
@@ -241,8 +241,11 @@ def test_a_stage_that_does_not_fit_is_left_out_and_the_others_stay(
 
 
 def test_stages_out_of_order_leave_every_stage_unknown_and_the_other_fields_read() -> None:
-    """Spec: LANREC-16, LANREC-23."""
-    line = "Routing: build a/b; review c/d; fix none. Fix rounds: 2. Experiment: tag-1. Blocking: x → ci"
+    """Spec: LANREC-16, LANREC-26."""
+    line = (
+        "Routing: build a/b; review c/d; fix none. "
+        "Fix rounds: 2. Experiment: tag-1. Blocking: x → ci"
+    )
 
     assert read(line) == ((), 2, 1, "tag-1")
 

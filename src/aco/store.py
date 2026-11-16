@@ -804,8 +804,9 @@ def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
 
 
 def peek_state(*, worktree: Path, remote: str) -> ClaimState:
-    """Read `STATE_REF` on `remote` for a caller that must not write: one of the two peeks in this module, with `peek_state_for_reset`, that read
-    through `_peek_tip` and so skip `fetch_state`'s own lineage guard, anchor, and stamp.
+    """Read `STATE_REF` on `remote` for a caller that must not write: one of the two peeks in
+    this module, with `peek_state_for_reset`, that read through `_peek_tip` and so skip
+    `fetch_state`'s own lineage guard, anchor, and stamp.
 
     The tip is `ls_remote_state`'s own answer: the fetch that follows (`_fetch_ref_objects`)
     only brings the objects into this worktree's local store so `_parse_state_tree` can read

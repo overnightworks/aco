@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from cli_fixtures import (
     forbid_forge_resolution,
-    outside_a_checkout,  # noqa: F401 - a fixture
     real_git,
     run_cli,
     track_board_config,
@@ -358,7 +357,7 @@ def test_reading_the_lanes_changes_nothing_on_the_state_ref_or_the_checkout(
 def test_a_group_with_a_newline_is_refused_on_one_line(
     recorded: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: STATS-05."""
+    """Spec: STATS-22."""
     status, _stdout, stderr = stats(capsys, "2026-11-01\n..2026-11-07", UNUSED_TAG)
 
     assert (status, stderr.count("\n")) == (2, 1)
