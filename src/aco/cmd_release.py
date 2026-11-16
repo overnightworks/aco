@@ -217,19 +217,19 @@ def _verify_merged_release(
 
 def _pending_landing_close(
     client: github.GitHubForge, identity: protocol.ClaimIdentity, pull_request: int
-) -> _MergedLandingClose | None:
-    """The still-open item a verified landing leaves for `run` to
-    close, or `None`: an issue-less lane has none."""
+) -> tuple[_MergedLandingClose | None, forge.ItemReference | None]:
+    """The still-open item a verified landing leaves for `run` to close, or `None`, and the
+    read that told it; an issue-less lane has neither."""
     if isinstance(identity, protocol.LaneIdentity):
-        return None
+        return None, None
     reference = board_read.fetch_issue_reference(client, identity.issue)
     if reference.state is forge.ItemState.OPEN:
-        return _MergedLandingClose(identity.issue, pull_request)
+        return _MergedLandingClose(identity.issue, pull_request), reference
     if reference.state is not forge.ItemState.CLOSED:
         raise protocol.ClaimUnavailableError(
             f"work item #{identity.issue} is {reference.state.value}, not closed"
         )
-    return None
+    return None, reference
 
 
 @dataclass(frozen=True)
@@ -436,9 +436,9 @@ def release_transition(
         operation_id=uuid.uuid4().hex,
         coordinator_override=parsed.coordinator_override,
     )
-    merge_commit = None if lane is None else lane.merge_commit
+    merge_commit, item = (None, None) if lane is None else (lane.merge_commit, lane.item)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, merge_commit),
+        lane_record.release_subject(context, resolved.selected, outcome, merge_commit, item),
         intent,
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
@@ -475,14 +475,11 @@ def _verify_and_close_merged_release(
     merged: protocol.MergedRelease,
     selected: protocol.ActiveClaim,
 ) -> _LandedLane:
-    """A github `--merged` release's forge half, run once `selected` is resolved and its
-    releaser authorized: an unauthorized or mismatched-claim release never reaches the forge at
-    all, so it can neither verify, comment on, nor close a pull request's issue. `storage` is
-    proven `github` here (`release_transition` returned for `state-ref`), so the cast is
-    honest: `session._build_forge` builds exactly a `github.GitHubForge` for every other
-    storage pin. The close runs before the release transition: a close failure -- a transient
-    forge error, most often -- raises before that transition ever runs, so the claim it would
-    have released stays exactly as live as it was."""
+    """A github `--merged` release's forge half, run once `selected` is resolved and its releaser
+    authorized: an unauthorized or mismatched-claim release never reaches the forge. `storage` is
+    proven `github` here (`release_transition` returned for `state-ref`), so the cast is honest:
+    `session._build_forge` builds exactly a `github.GitHubForge` for every other storage pin. The
+    close runs before the release transition, so a close failure leaves the claim live."""
     client = cast(github.GitHubForge, context.forge)
     storage = context.config.storage
     verified = _verify_merged_release(context, client, identity, merged)
@@ -493,14 +490,14 @@ def _verify_and_close_merged_release(
         verified.trunk_since_landing,
         storage,
     )
-    pending_close = _pending_landing_close(client, identity, merged.pull_request)
+    pending_close, item = _pending_landing_close(client, identity, merged.pull_request)
     if pending_close is not None:
         client.close_landed_item(pending_close.issue, pull_request=pending_close.pull_request)
     tips = (verified.landed_head,)
     if _is_adopted_lane(selected.identity, selected.branch):
         tips += (selected.base,)
     lane = _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
-    return lane.landed_as(verified.merge_commit)
+    return lane.landed_as(verified.merge_commit, item)
 
 
 def _report_merged_pull_request_left_nothing(
@@ -593,16 +590,18 @@ def _cleanup_unless_claimed_again(
 class _LandedLane:
     """The lane a `--merged` release cleans up after: `proven_tips` (the head the forge recorded as
     landed, none under `state-ref`, plus an adopted lane's `base`), `rerun` (the `release` line
-    repeating this cleanup where its worktree is, REL-52), `merge_commit` (the forge's)."""
+    repeating this cleanup where its worktree is, REL-52), `merge_commit` (the forge's), `item`
+    (the work item as the release read it)."""
 
     identity: protocol.ClaimIdentity
     branch: str
     proven_tips: frozenset[str]
     rerun: str
     merge_commit: str | None = None
+    item: forge.ItemReference | None = None
 
-    def landed_as(self, merge_commit: str) -> _LandedLane:
-        return _LandedLane(self.identity, self.branch, self.proven_tips, self.rerun, merge_commit)
+    def landed_as(self, commit: str, item: forge.ItemReference | None) -> _LandedLane:
+        return _LandedLane(self.identity, self.branch, self.proven_tips, self.rerun, commit, item)
 
 
 def _landed_lane(
@@ -612,10 +611,9 @@ def _landed_lane(
     branch: str,
     proven_tips: Iterable[str],
 ) -> _LandedLane:
-    """`branch`'s lane, landed as `landing` -- a pull request number, or the
-    verified trunk sha under `storage = "state-ref"` -- with its `rerun`
-    rendered by the one advice renderer, so it runs as printed under either
-    storage pin and from any checkout (REL-52)."""
+    """`branch`'s lane, landed as `landing` -- a pull request number, or the verified trunk sha
+    under `storage = "state-ref"` -- with its `rerun` rendered by the one advice renderer, so it
+    runs as printed under either storage pin and from any checkout (REL-52)."""
     item = (
         ()
         if isinstance(identity, protocol.LaneIdentity)
@@ -734,7 +732,8 @@ def _cmd_release_landed(
     # `storage` is already proven `state-ref` by `release_transition`, so
     # this cast is honest: `session._build_forge` builds exactly a `StateRefBoard`.
     client = cast(state_board.StateRefBoard, context.forge)
-    if client.item_reference(identity.issue).state is forge.ItemState.MISSING:
+    item = client.item_reference(identity.issue)
+    if item.state is forge.ItemState.MISSING:
         raise protocol.ClaimUnavailableError(
             board_read.missing_item_refusal(identity.issue, client, context.config.storage)
         )
@@ -760,8 +759,7 @@ def _cmd_release_landed(
         storage,
     )
     write = client.prepare_landing(identity.issue)
-    worktree = context.toplevel
-    new_oid = store.hash_blob(worktree, write.content)
+    new_oid = store.hash_blob(context.toplevel, write.content)
     outcome = protocol.LandedRelease(commit=protocol.ObjectId(commit))
     intent = protocol.LandingIntent(
         item_id=write.item_id,
@@ -775,7 +773,7 @@ def _cmd_release_landed(
         coordinator_override=parsed.coordinator_override,
     )
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome),
+        lane_record.release_subject(context, resolved.selected, outcome, item=item),
         intent,
     )
     client.mark_landed(write, new_oid)

@@ -11,7 +11,7 @@ from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 
-from . import checkout, protocol, store, workboard
+from . import body, checkout, forge, protocol, store, workboard
 from .routing_line import RoutingLine, RoutingStage, parse_routing_line, stage_choice_fits
 from .session import RunContext
 
@@ -28,6 +28,7 @@ class LaneTrailerKey(StrEnum):
     FILES = "lane_files"
     ADDED = "lane_added"
     DELETED = "lane_deleted"
+    SIZE = "lane_size"
     BUILD = "lane_build"
     FIX = "lane_fix"
     REVIEW = "lane_review"
@@ -58,6 +59,7 @@ class LaneRecord:
     merge_commit: str | None = None
     wall_seconds: int | None = None
     size: ProductionSize | None = None
+    item_size: body.Size | None = None
     routing: RoutingLine | None = None
 
     def trailers(self) -> tuple[str, ...]:
@@ -73,6 +75,7 @@ class LaneRecord:
                 (LaneTrailerKey.ADDED, self.size.added),
                 (LaneTrailerKey.DELETED, self.size.deleted),
             ]
+        figures.append((LaneTrailerKey.SIZE, self.item_size))
         if self.routing is not None:
             figures += [
                 (_stage_key(stage), self.routing.stages[stage])
@@ -91,13 +94,14 @@ class LaneRecord:
 class ReleasedLane:
     """The release being recorded: `released_at` is Unix seconds, `merge_commit` the sha the
     forge or the trunk walk named for a landed lane, `state_tip` the state-ref tip the claim
-    was read from."""
+    was read from, `item_size` the size class its work item declares."""
 
     claim: protocol.ActiveClaim
     outcome: protocol.ReleaseOutcome
     merge_commit: str | None
     released_at: int
     state_tip: str | None
+    item_size: body.Size | None = None
 
 
 def release_subject(
@@ -105,16 +109,19 @@ def release_subject(
     claim: protocol.ActiveClaim,
     outcome: protocol.ReleaseOutcome,
     verified_merge: str | None = None,
+    item: forge.ItemReference | None = None,
 ) -> store.TransitionSubject:
     """The release transition's subject for `claim`, carrying its lane record. `verified_merge`
     is the merge commit the forge's landing was verified to have: a github `--merged` release
-    reads it nowhere else."""
+    reads it nowhere else. `item` is the work item the landing release already read, whose body
+    declares the size."""
     released = ReleasedLane(
         claim,
         outcome,
         _merge_commit(outcome, verified_merge),
         int(context.now().timestamp()),
         context.observation.tip,
+        _declared_size(item, context.config.storage),
     )
     record = compute_record(context.toplevel, context.config, released)
     subject = store.transition_subject("release", claim.identity, claim.branch)
@@ -125,6 +132,12 @@ def release_subject(
 
 def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:
     return outcome.commit if isinstance(outcome, protocol.LandedRelease) else verified_merge
+
+
+def _declared_size(item: forge.ItemReference | None, storage: body.Storage) -> body.Size | None:
+    if item is None or item.body is None:
+        return None
+    return body.parse_body(item.body, storage=storage).size
 
 
 def compute_record(
@@ -140,7 +153,7 @@ def compute_record(
             routing=parse_routing_line(outcome.explanation),
         )
     if merge_commit is None or protocol.COMMIT_PATTERN.fullmatch(merge_commit) is None:
-        return LaneRecord(LaneOutcome.LANDED)
+        return LaneRecord(LaneOutcome.LANDED, item_size=released.item_size)
     merge = merge_commit
     landed = _unknown_if_unreadable(lambda: _read_commit(toplevel, merge))
     return LaneRecord(
@@ -148,6 +161,7 @@ def compute_record(
         merge_commit=merge,
         wall_seconds=None if landed is None else _seconds_between(opened, landed.timestamp),
         size=_unknown_if_unreadable(lambda: _production_size(toplevel, config, merge)),
+        item_size=released.item_size,
         routing=None if landed is None else parse_routing_line(landed.message),
     )
 
@@ -285,11 +299,13 @@ def parse_record(message: str) -> LaneRecord | None:
     outcome = values.get(LaneTrailerKey.OUTCOME, "")
     if outcome not in LaneOutcome:
         return None
+    item_size = values.get(LaneTrailerKey.SIZE, "")
     return LaneRecord(
         outcome=LaneOutcome(outcome),
         merge_commit=values.get(LaneTrailerKey.MERGE),
         wall_seconds=_whole_number(values.get(LaneTrailerKey.WALL_SECONDS)),
         size=_recorded_size(values),
+        item_size=body.Size(item_size) if item_size in body.Size else None,
         routing=_recorded_routing(values),
     )
 
