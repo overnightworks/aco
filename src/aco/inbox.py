@@ -20,7 +20,9 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import (
+    board_read,
     body,
+    checkout,
     expectations,
     forge,
     progress,
@@ -139,7 +141,7 @@ def read_issues(
 def read_context(context: session.RunContext, *, with_progress: bool = False) -> Reading:
     """The rows, the steps and the plans of the checkout `context` is bound to,
     from one listing of its open items; with `with_progress`, also the progress
-    view, which reads each container's parent."""
+    view, which reads each container's parent and sub-issues and the trunk's trailers."""
     listed = tuple(context.forge.list_open_board_issues())
     storage = context.config.storage
     reading = read_issues(
@@ -153,12 +155,32 @@ def read_context(context: session.RunContext, *, with_progress: bool = False) ->
         reading.rows,
         reading.steps,
         reading.plans,
-        progress.of(
-            listed,
-            storage=storage,
-            waiting=len(reading.steps),
-            parent_of=context.forge.parent_issue,
+        _progress(context, listed, reading.steps),
+    )
+
+
+def _progress(
+    context: session.RunContext,
+    listed: tuple[workboard.Issue, ...],
+    operator_steps: tuple[Step, ...],
+) -> Progress | ProgressUnavailable:
+    """The progress view of `listed`, whose landed items the trunk's trailers
+    name; a failed trunk read leaves it unknown."""
+    try:
+        landings = checkout.trunk_landings(
+            context.trunk_ref, board_read.TRUNK_LANDING_DEPTH, directory=context.toplevel
+        )
+    except protocol.ClaimError as error:
+        return ProgressUnavailable(str(error))
+    return progress.of(
+        listed,
+        storage=context.config.storage,
+        marks=progress.Marks(
+            frozenset(step.number for step in operator_steps),
+            frozenset(item.item for item in board_read.trunk_landing_items(landings)),
         ),
+        parent_of=context.forge.parent_issue,
+        children_of=context.forge.list_children,
     )
 
 

@@ -56,7 +56,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — |
 | no repository found, at start or on a later read | ABRD-109 | — |
 | a directory under the root that cannot be read | ABRD-110 | — |
-| a repo with open containers, none, or a failed read of a container's parent | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135 | — |
+| a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139 | — |
 
 ## Writing a decision
 
@@ -203,13 +203,17 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 
 ## Progress
 
-- [ ] [ABRD-131] Each repo's `progress` lists its top-level containers: `closed` children, `planned` (all children plus uncut `[[slice]]` rows), `open`, `uncut` and `percent`, rounded down (E-ABRD-20).
-- [ ] [ABRD-132] `percent` is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line is the sum of its top-level containers, a container with a parent in any repo has none.
+- [ ] [ABRD-131] Each repo's `progress` lists its top-level containers: `closed`, `landed` (ABRD-136), `planned` (children and uncut `[[slice]]` rows), `open`, `uncut`, `waiting` (ABRD-137), `percent` (E-ABRD-20).
+- [ ] [ABRD-132] `percent` (rounded down) is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line sums its top-level containers, a container with a parent anywhere has none.
 - [ ] [ABRD-133] `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
-- [ ] [ABRD-134] A failed read of a container's parent leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; the repo's items stay listed (E-ABRD-21).
-- [ ] [ABRD-135] The tab `Progress` lists per repo and per top-level container a bar and `closed/planned · percent %` (`7/48 · 14 %`), open, uncut and waiting counts; an unknown progress shows its sentence.
+- [ ] [ABRD-134] A failed read of a container's parent, sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).
+- [ ] [ABRD-135] The tab `Progress` shows per container a bar of `Landed` and `Closed otherwise` children and `closed/planned · percent %` (`7/48 · 14 %`); an unknown progress shows its sentence.
+- [ ] [ABRD-136] A closed child is `landed` when a trunk commit (the last `5000` first-parent) names it in a `Work-Item:` trailer; a child in another repository never is; `landed` is at most `closed`.
+- [ ] [ABRD-137] A container's `waiting` counts its open children in this repository that wait on the operator, `aco inbox`'s steps; `progress.waiting` stays the repo's total.
+- [ ] [ABRD-138] `closed` and `open` count the container's sub-issue list; a container that is unreadable, not a member's or without counts is neither listed nor summed.
+- [ ] [ABRD-139] The tab shows a repo's landed, closed otherwise, open, uncut and waiting counts and a container's waiting count when not 0; with nothing planned it shows only `Nothing planned`, no bar.
 
-A closed child counts however it closed, not-planned included. A container whose own state is closed is not listed, so its children are not counted.
+A closed child counts however it closed, not-planned included. A container whose own state is closed is not listed, so its children are not counted. Landed plus closed otherwise plus open plus uncut is planned.
 
 ## The SPA shell
 
@@ -492,19 +496,19 @@ answer 200: {"root": "<root>", "repos": [
 
 ### E-ABRD-20 -- progress per top-level container
 
-Setup: test-forge, open container `#10` titled `Song jump` with 3 children closed of 4 and 2 uncut `[[slice]]` rows, container `#11` with a parent `#10`, and item `#20` labelled `needs-operator`
+Setup: test-forge, open container `#10` titled `Song jump` whose sub-issue list holds 3 closed children, two of them named by a trunk commit's `Work-Item:` trailer, and the open child `#20` labelled `needs-operator`, with 2 uncut `[[slice]]` rows, and container `#11` with a parent `#10`
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
-forge requests: the open-item listing, the parent of #10, the parent of #11
+forge requests: the open-item listing, the parent of #10, the parent of #11, the sub-issues of #10
 answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [], "progress": {
-  "error": null, "closed": 3, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
-  "containers": [{"number": 10, "title": "Song jump", "closed": 3, "planned": 6, "open": 1, "uncut": 2, "percent": 50}]}}]}
+  "error": null, "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
+  "containers": [{"number": 10, "title": "Song jump", "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1}]}}]}
 ```
 
 ### E-ABRD-21 -- a container's parent cannot be read
 
-Setup: test-forge, open container `#10` with 3 children closed of 4, whose parent read fails with `GitHub is down`
+Setup: test-forge, open container `#10` with 3 children closed of 4, whose parent read (or sub-issue read) fails with `GitHub is down`
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>

@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Any, cast, get_type_hints
 
 import pytest
-from aco_board_fixtures import board_checkout
+from aco_board_fixtures import board_checkout, land_item
 from board_fixtures import board_issue, complete_contract
-from board_forge import ForgeOperation, item_body, run_context
+from board_forge import BoardForge, ForgeOperation, child_list, item_body, run_context
+from cli_fixtures import real_git
 from github_pages import (
     board_issue_page_client,
     raw_board_issue,
@@ -19,8 +20,9 @@ from github_pages import (
 )
 from option_cards import card, card_body, open_option_entry
 
-from aco import body, forge, inbox, repositories, rulings, workboard
+from aco import body, forge, inbox, progress, repositories, rulings, workboard
 from aco.board import board
+from aco.body import ItemKind
 
 _CARD = card_body(card())
 
@@ -313,6 +315,65 @@ def test_one_read_of_a_checkout_lists_its_open_items_once_for_its_rows_and_its_s
         if request.operation is ForgeOperation.LIST_OPEN_ISSUES
     ]
     assert len(listings) == 1
+
+
+def _repository_with_a_container(tmp_path: Path) -> BoardForge:
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(
+        10,
+        complete_contract("Build."),
+        kind=ItemKind.CONTAINER,
+        children=child_list(closed=[11, 12]),
+    )
+    return repository
+
+
+def _progress_read(repository: BoardForge) -> inbox.Reading:
+    context = run_context(None).for_directory(repository.directory)
+    return inbox.read_context(context, with_progress=True)
+
+
+def test_a_closed_child_a_trunk_commit_names_is_landed_in_the_progress_read(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    del isolated_global_git_config
+    repository = _repository_with_a_container(tmp_path)
+    land_item(repository, 11)
+
+    shown = _progress_read(repository).progress
+
+    assert isinstance(shown, progress.Progress)
+    assert (shown.closed, shown.landed) == (2, 1)
+
+
+def test_an_unreadable_trunk_leaves_the_progress_unknown_and_the_items_listed(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    del isolated_global_git_config
+    repository = _repository_with_a_container(tmp_path)
+    repository.put_item(5, item_body(open_option_entry()))
+    real_git(repository.directory, "branch", "--move", "renamed")
+
+    reading = _progress_read(repository)
+
+    assert isinstance(reading.progress, progress.ProgressUnavailable)
+    assert [row.number for row in reading.rows] == [5]
+
+
+def test_a_read_without_progress_reads_neither_the_sub_issues_nor_the_trunk(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    del isolated_global_git_config
+    repository = _repository_with_a_container(tmp_path)
+    real_git(repository.directory, "branch", "--move", "renamed")
+    context = run_context(None).for_directory(repository.directory)
+
+    reading = inbox.read_context(context)
+
+    assert reading.progress is None
+    assert ForgeOperation.LIST_CHILDREN not in {
+        request.operation for request in repository.request_log()
+    }
 
 
 @pytest.mark.parametrize("record", [inbox.Reading, board.RepoSnapshot])

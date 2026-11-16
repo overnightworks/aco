@@ -199,8 +199,10 @@ export function progressContainer(overrides: Partial<ProgressContainer> = {}): P
 		number: 10,
 		title: 'Epic',
 		closed: 7,
+		landed: 4,
 		planned: 48,
 		open: 31,
+		waiting: 1,
 		uncut: 10,
 		percent: 14,
 		...overrides
@@ -211,6 +213,7 @@ export function progressRead(overrides: Partial<ProgressRead> = {}): ProgressRea
 	return {
 		error: null,
 		closed: 7,
+		landed: 4,
 		planned: 48,
 		open: 31,
 		uncut: 10,

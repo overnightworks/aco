@@ -192,7 +192,7 @@ class LandingReads:
     trunk_ref: str
 
 
-def _trunk_landing_items(
+def trunk_landing_items(
     trunk_landings: tuple[checkout.TrunkLanding, ...],
 ) -> tuple[workboard.TrunkLandingItem, ...]:
     """Sha and date of every item a trunk commit's trailer lands: the Landungen
@@ -287,7 +287,7 @@ def build_board(
             now=now,
             today=context.today(),
             trunk_landings=tuple(landing.committed_at for landing in trunk_landings),
-            trunk_landing_items=_trunk_landing_items(trunk_landings),
+            trunk_landing_items=trunk_landing_items(trunk_landings),
             children=children,
             nesting_parents=nesting_parents,
             dependencies=dependencies,

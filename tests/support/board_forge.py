@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn, cast
 
 from board_fixtures import MINIMAL_BLOCK_TOML, NoBoardProbe, block_body, board_issue
 
@@ -32,6 +32,7 @@ _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _ITEM_READ_FAILURE = "item_read_failure"
 _PARENT_READ_FAILURE = "parent_read_failure"
+_CHILD_READ_FAILURE = "child_read_failure"
 _WRITE_FAILURE = "write_failure"
 _WRITE_ANSWER = "write_answer"
 _REPLACINGS = "replacings"
@@ -43,6 +44,7 @@ RULING_DAY = date(2026, 10, 3)
 class ForgeOperation(StrEnum):
     LIST_OPEN_ISSUES = "list_open_board_issues"
     READ_PARENT = "parent_issue"
+    LIST_CHILDREN = "list_children"
     READ_ITEM = "item_reference"
     WRITE_BODY = "update_item_body"
     CREATE_ISSUE = "create_issue"
@@ -56,14 +58,25 @@ class ForgeRequest:
 
 
 @dataclass
+class StoredChild:
+    number: int
+    closed: bool = False
+
+
+def child_list(*, closed: Iterable[int] = (), open: Iterable[int] = ()) -> list[StoredChild]:
+    """A container's sub-issues: the `open` numbers, then the `closed` ones."""
+    return [*(StoredChild(number) for number in open), *(StoredChild(n, True) for n in closed)]
+
+
+@dataclass
 class StoredItem:
     title: str
     body: str
     author_is_member: bool = True
     labels: list[str] = field(default_factory=list[str])
     kind: str | None = None
-    children_closed: int | None = None
-    children_total: int | None = None
+    children: list[StoredChild] | None = None
+    """The sub-issue list a container reports counts for; `None` reports none."""
     parent: int | None = None
 
 
@@ -78,6 +91,7 @@ class _ForgeState:
     listing_failure: str | None = None
     item_read_failure: str | None = None
     parent_read_failure: str | None = None
+    child_read_failure: str | None = None
     write_failure: str | None = None
     write_answer: _CheckAnswer | None = None
     replacings: list[str] = field(default_factory=list[str])
@@ -87,10 +101,11 @@ class _ForgeState:
     def from_json(cls, text: str) -> _ForgeState:
         stored = json.loads(text)
         return cls(
-            {int(number): StoredItem(**item) for number, item in stored[_ITEMS].items()},
+            {int(number): _stored_item(item) for number, item in stored[_ITEMS].items()},
             stored[_LISTING_FAILURE],
             stored[_ITEM_READ_FAILURE],
             stored[_PARENT_READ_FAILURE],
+            stored[_CHILD_READ_FAILURE],
             stored[_WRITE_FAILURE],
             _answer_from_json(stored[_WRITE_ANSWER]),
             stored[_REPLACINGS],
@@ -104,12 +119,25 @@ class _ForgeState:
                 _LISTING_FAILURE: self.listing_failure,
                 _ITEM_READ_FAILURE: self.item_read_failure,
                 _PARENT_READ_FAILURE: self.parent_read_failure,
+                _CHILD_READ_FAILURE: self.child_read_failure,
                 _WRITE_FAILURE: self.write_failure,
                 _WRITE_ANSWER: _answer_to_json(self.write_answer),
                 _REPLACINGS: self.replacings,
                 _CLOSED: sorted(self.closed),
             }
         )
+
+
+def _stored_item(stored: dict[str, object]) -> StoredItem:
+    children = stored["children"]
+    return StoredItem(
+        **{
+            **stored,
+            "children": None
+            if children is None
+            else [StoredChild(**child) for child in cast(list[dict[str, Any]], children)],
+        }
+    )
 
 
 def _answer_to_json(answer: _CheckAnswer | None) -> dict[str, object] | None:
@@ -153,21 +181,19 @@ class BoardForge:
         author_is_member: bool = True,
         labels: Iterable[str] = (),
         kind: ItemKind | None = None,
-        children: tuple[int, int] | None = None,
+        children: list[StoredChild] | None = None,
         parent: int | None = None,
     ) -> None:
-        """Item `number`; a container's `children` are its (closed, total)
-        counts, and `parent` the item it is a child of."""
+        """Item `number`; a container's `children` are its sub-issues, whose
+        list its counts derive from, and `parent` the item it is a child of."""
         state = self._state()
-        closed, total = children if children is not None else (None, None)
         state.items[number] = StoredItem(
             title,
             raw_body,
             author_is_member,
             list(labels),
             None if kind is None else kind.value,
-            closed,
-            total,
+            children,
             parent,
         )
         self._replace_state(state)
@@ -199,6 +225,12 @@ class BoardForge:
         """Every later read of an item's parent raises a forge failure carrying `message`."""
         state = self._state()
         state.parent_read_failure = message
+        self._replace_state(state)
+
+    def fail_child_reads(self, message: str) -> None:
+        """Every later read of a container's sub-issues raises a failure carrying `message`."""
+        state = self._state()
+        state.child_read_failure = message
         self._replace_state(state)
 
     def close_item(self, number: int) -> None:
@@ -291,8 +323,8 @@ class BoardForge:
                 labels=tuple(item.labels),
                 kind=None if item.kind is None else ItemKind(item.kind),
                 author_is_member=item.author_is_member,
-                children_closed=item.children_closed,
-                children_total=item.children_total,
+                children_closed=_closed_count(item),
+                children_total=None if item.children is None else len(item.children),
             )
             for number, item in state.items.items()
             if number not in state.closed
@@ -339,7 +371,17 @@ class BoardForge:
         _unsupported("list_recent_merged_board_pull_requests")
 
     def list_children(self, number: int) -> workboard.ChildList:
-        _unsupported("list_children")
+        self._log(ForgeRequest(ForgeOperation.LIST_CHILDREN, number))
+        state = self._state()
+        if state.child_read_failure is not None:
+            raise forge.ForgeTransientError(state.child_read_failure)
+        return tuple(
+            workboard.ChildItem(
+                child.number,
+                workboard.ChildState.CLOSED if child.closed else workboard.ChildState.OPEN,
+            )
+            for child in state.items[number].children or ()
+        )
 
     def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
         _unsupported("reopened_at")
@@ -410,6 +452,10 @@ class BoardForge:
         written = stored.with_name(f"{stored.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         written.write_text(state.to_json(), encoding="utf-8")
         written.replace(stored)
+
+
+def _closed_count(item: StoredItem) -> int | None:
+    return None if item.children is None else sum(child.closed for child in item.children)
 
 
 def item_lock_is_held(state_home: Path) -> bool:

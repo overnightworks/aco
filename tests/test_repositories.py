@@ -92,11 +92,6 @@ def test_a_checkout_not_tracking_the_board_configuration_is_not_found(
 
 def test_a_linked_worktree_is_not_found_beside_its_checkout(tmp_path: Path) -> None:
     main = board_checkout(tmp_path / "main")
-    real_git(
-        main.directory,
-        *("-c", "user.name=test", "-c", "user.email=test@example.com"),
-        *("commit", "--quiet", "-m", "board"),
-    )
     real_git(main.directory, "worktree", "add", "--quiet", str(tmp_path / "linked"))
 
     discovery = repositories.discover(tmp_path)
