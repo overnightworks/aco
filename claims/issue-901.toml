@@ -1,8 +1,0 @@
-claim_id = "d733b8e620e6454fb63750fe758f3ad9"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "a744e1efd039d6aedce14c79b35244a61e8ed2c6"
-branch = "claude/issue-901-serve-estimates-remaining-work"
-scope = ["docs/ARCHITECTURE.md", "docs/VISION.md", "frontend/e2e/itemFixture.ts", "frontend/e2e/progress.spec.ts", "frontend/src/app/model/progress.test.ts", "frontend/src/app/model/progress.ts", "frontend/src/components/ProgressView.svelte", "frontend/src/components/ProgressView.test.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/lane-record.spec.md", "specs/serve.spec.md", "src/aco/board/api.py", "src/aco/board/static", "src/aco/inbox.py", "src/aco/lane_measure.py", "src/aco/lane_record.py", "src/aco/progress.py", "tests/board/conftest.py", "tests/board/test_aco_source.py", "tests/board/test_aco_source_state_ref.py", "tests/board/test_board_api_progress.py", "tests/support/board_fixtures.py", "tests/support/board_forge.py", "tests/support/e2e_server.py", "tests/support/lane_record_fixtures.py", "tests/support/store_fixtures.py", "tests/test_inbox.py", "tests/test_lane_measure.py", "tests/test_lane_record.py", "tests/test_progress.py"]
-opened_commit = "9668e5c9f11b40e90cd78712b479447cbd2c1af5"
-whole_reason = "the range crosses the lane measure, progress read, board wire, frontend view, VISION and their tests and fixtures"
