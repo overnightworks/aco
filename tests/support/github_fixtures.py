@@ -232,9 +232,8 @@ class FakeForge:
         return number
 
     def link_child(self, parent: int, child: int) -> None:
-        """This fake's mirror of `GitHubForge.link_child`: records `child` as
-        `parent`'s open sub-issue; `fail_create_child_relation` simulates the
-        POST failing, leaving `child` the orphan a repeat `cut` must adopt."""
+        """This fake's mirror of `GitHubForge.link_child`: records `child` as `parent`'s open
+        sub-issue; `fail_create_child_relation` fails the POST, leaving the orphan `cut` adopts."""
         self.linked_children.append((parent, child))
         if self.fail_create_child_relation:
             raise protocol.ClaimError("relation POST failed (simulated)")

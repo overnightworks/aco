@@ -998,10 +998,9 @@ class GitHubForge:
     def list_children(self, number: int) -> workboard.ChildList:
         """Every sub-issue GitHub records under `number`, open or closed.
 
-        Every child's state is read here rather than filtered by `--jq`: a
-        state this adapter does not understand would otherwise vanish and make
-        a parent look childless, which is exactly the landing this check must
-        refuse. A child recorded in another repository is a `ForeignChild`.
+        Every child's state is read here rather than filtered by `--jq`: a state this adapter does
+        not understand would otherwise vanish and make a parent look childless, which is exactly the
+        landing this check must refuse. A child recorded in another repository is a `ForeignChild`.
         """
         raw = self._run(
             [

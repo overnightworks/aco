@@ -511,12 +511,10 @@ class StateRefBoard:
         return () if item_id is None else self._children(item_id)
 
     def _children(self, item_id: str) -> tuple[workboard.ChildItem, ...]:
-        """`item_id`'s children, every unreadable item that may be one
-        counted open: its state may not read, so its
-        container never reads as childless past it, and the board offers no
-        close that `item close` would refuse by it (ITEM-54). An unreadable
-        child is titled by its record's title when that still reads, else by
-        its id."""
+        """`item_id`'s children, every unreadable item that may be one counted open: its state
+        may not read, so its container never reads as childless past it, and the board offers
+        no close that `item close` would refuse by it (ITEM-54). An unreadable child is titled
+        by its record's title when that still reads, else by its id."""
         decoded = self._items.get(item_id)
         kind = None if decoded is None else _item_kind(decoded.record.kind)
         readable = (
