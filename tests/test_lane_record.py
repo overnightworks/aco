@@ -13,7 +13,7 @@ from board_fixtures import REPOSITORY, standing_active_claim
 from claim_worktrees import lane_held_by_ada, make_stand_in
 from cli_fixtures import (
     FROZEN_CLI_NOW,
-    FixedDateTime,
+    freeze_cli_now,
     push_repository_trunk,
     real_git,
     real_repository_with_bare_remote,
@@ -25,7 +25,7 @@ from github_fixtures import FakeForge
 from merged_release import arrange_merged_pull_request
 from store_fixtures import claim_intent
 
-from aco import lane_record, protocol, store, workboard
+from aco import protocol, store, workboard
 from aco.lane_record import (
     LaneOutcome,
     LaneRecord,
@@ -405,7 +405,9 @@ def release_trailers(
     """The trailers `release_subject` puts on the release of a lane claimed in `history`; its
     context holds no forge, so a read of one fails the test."""
     observation = SimpleNamespace(tip=history.tip)
-    context = SimpleNamespace(toplevel=history.path, config=CONFIG, observation=observation)
+    context = SimpleNamespace(
+        toplevel=history.path, config=CONFIG, observation=observation, now=lambda: FROZEN_CLI_NOW
+    )
     claim = standing_active_claim(lane=True, opened_commit=history.opened_commit)
 
     return release_subject(cast(RunContext, context), claim, outcome, verified_merge).trailers
@@ -615,7 +617,7 @@ def test_a_release_is_dated_by_the_clock_the_record_reads(
     """Spec: LANREC-01, STATS-02."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
-    monkeypatch.setattr(lane_record, "datetime", FixedDateTime)
+    freeze_cli_now(monkeypatch)
     release = ["--repo", REPOSITORY, "release", "--agent", "Ada", "--abandoned", ROUTING]
     day = FROZEN_CLI_NOW.date().isoformat()
 

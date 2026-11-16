@@ -7,7 +7,6 @@ import dataclasses
 import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
@@ -114,7 +113,7 @@ def release_subject(
         claim,
         outcome,
         _merge_commit(outcome, verified_merge),
-        int(datetime.now(UTC).timestamp()),
+        int(context.now().timestamp()),
         context.observation.tip,
     )
     record = compute_record(context.toplevel, context.config, released)

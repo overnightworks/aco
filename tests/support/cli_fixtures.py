@@ -59,6 +59,7 @@ def freeze_cli_now(monkeypatch: pytest.MonkeyPatch) -> None:
     def frozen_run_context(repo: forge.RepositoryId | None) -> RunContext:
         context = real_run_context(repo)
         context.today = FROZEN_CLI_NOW.date
+        context.now = lambda: FROZEN_CLI_NOW
         return context
 
     monkeypatch.setattr(session, "run_context", frozen_run_context)
