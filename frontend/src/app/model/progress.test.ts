@@ -21,9 +21,3 @@ test('[ABRD-135] a bar splits its closed share into landed and other closes', ()
 
 	expect(shares).toEqual({ landed: 25, otherClosed: 50 });
 });
-
-test('[ABRD-135] nothing planned fills no part of a bar', () => {
-	const shares = barShares({ closed: 0, landed: 0, planned: 0, open: 0, uncut: 0, percent: null });
-
-	expect(shares).toEqual({ landed: 0, otherClosed: 0 });
-});

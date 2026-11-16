@@ -17,13 +17,11 @@ export function progressFigure({ closed, planned, percent }: ProgressCounts): st
 }
 
 /** The two filled parts of a bar as a share of its width: the landed children,
- * and the children closed another way (ABRD-135). */
+ * and the children closed another way (ABRD-135); the caller draws no bar
+ * while nothing is planned. */
 export function barShares({ closed, landed, planned }: ProgressCounts): {
 	landed: number;
 	otherClosed: number;
 } {
-	if (planned === 0) {
-		return { landed: 0, otherClosed: 0 };
-	}
 	return { landed: (100 * landed) / planned, otherClosed: (100 * (closed - landed)) / planned };
 }

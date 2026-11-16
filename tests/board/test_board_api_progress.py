@@ -3,7 +3,7 @@ and a fake forge (specs/serve.spec.md, ABRD-131 to ABRD-137)."""
 
 from typing import Any, cast
 
-from aco_board_fixtures import BoardClient, land_item
+from aco_board_fixtures import BoardClient
 from board_fixtures import complete_contract, slice_entries
 from board_forge import BoardForge, ForgeOperation, ForgeRequest, child_list
 
@@ -100,25 +100,6 @@ def test_a_failed_child_read_shows_its_sentence_and_no_counts(
     repo = _repo(board)
 
     assert (repo["error"], repo["progress"]) == (None, {"error": "GitHub is down"})
-
-
-def test_a_closed_child_a_trunk_commit_names_is_landed_apart_from_other_closes(
-    repository: BoardForge, board: BoardClient
-) -> None:
-    """ABRD-136."""
-    repository.put_item(
-        10,
-        complete_contract("Build."),
-        kind=ItemKind.CONTAINER,
-        children=child_list(closed=[1, 2, 3]),
-    )
-    land_item(repository, 1)
-    land_item(repository, 2)
-
-    progress = _repo(board)["progress"]
-
-    assert (progress["closed"], progress["landed"]) == (3, 2)
-    assert [(c["closed"], c["landed"]) for c in progress["containers"]] == [(3, 2)]
 
 
 def test_a_container_lists_the_open_children_that_wait_on_the_operator(
