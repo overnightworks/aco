@@ -45,6 +45,17 @@ def head_moved_refusal(number: int) -> protocol.ClaimUnavailableError:
     )
 
 
+def refuse_other_pinned_head(number: int, queued_head: str, pinned_head: str | None) -> None:
+    """A rerun finding the pull request queued lands what the queue holds, so a `--head` pin
+    that does not name the queued head refuses before the wait."""
+    if forge.pin_names_head(queued_head, pinned_head):
+        return
+    raise protocol.ClaimUnavailableError(
+        f"pull request #{number} is queued at head {queued_head}, "
+        f"not the pinned {pinned_head}; the queue lands the queued head"
+    )
+
+
 def _not_queued(
     number: int, step: str, error: protocol.ClaimError
 ) -> protocol.ClaimUnavailableError:
