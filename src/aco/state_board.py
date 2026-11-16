@@ -519,12 +519,18 @@ class StateRefBoard:
         kind = None if decoded is None else _item_kind(decoded.record.kind)
         return (
             *(
-                workboard.ChildItem(record.number, workboard.ChildState(record.state.value))
+                workboard.ChildItem(
+                    record.number, workboard.ChildState(record.state.value), record.title
+                )
                 for record in (child.record for child in self._items.values())
                 if record.parent == item_id
             ),
             *(
-                workboard.ChildItem(items.item_number(child_id), workboard.ChildState.OPEN)
+                workboard.ChildItem(
+                    items.item_number(child_id),
+                    workboard.ChildState.OPEN,
+                    child.title or child_id,
+                )
                 for child_id, child in self._malformed.items()
                 if child.may_be_child_of(item_id, kind)
             ),

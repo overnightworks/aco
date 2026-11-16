@@ -181,6 +181,7 @@ class ChildItem:
 
     number: int
     state: ChildState
+    title: str
     blocked_by: tuple[IssueReference, ...] = ()
 
 

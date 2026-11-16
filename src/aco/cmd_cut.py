@@ -298,7 +298,7 @@ def _adopt_existing_child(
         [number] = open_matches
         if number in orphans:
             client.link_child(container, number)
-        return workboard.ChildItem(number, workboard.ChildState.OPEN)
+        return workboard.ChildItem(number, workboard.ChildState.OPEN, title)
     closed = next((child for child in linked if child.state is workboard.ChildState.CLOSED), None)
     if closed is None:
         return None

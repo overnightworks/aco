@@ -1180,7 +1180,7 @@ def test_completion_boost_requires_at_least_one_closed_sibling() -> None:
         (),
         BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={110: (workboard.ChildItem(111, workboard.ChildState.OPEN),)},
+        children={110: (workboard.ChildItem(111, workboard.ChildState.OPEN, "Child"),)},
     )
 
     child_item = next(item for item in projected.items if item.number == 111)
@@ -1208,7 +1208,7 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
     assert container_item.actionable_reason == "container; claim a child"
     assert container_item not in projected.ready_now
     assert container_item.container == workboard.ContainerProgress(
-        1, 2, (workboard.ChildItem(121, workboard.ChildState.OPEN, blocked_by=()),)
+        1, 2, (workboard.ChildItem(121, workboard.ChildState.OPEN, "Child 121", blocked_by=()),)
     )
 
     payload = cmd_board.board_payload(projected)
@@ -1219,7 +1219,13 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
         "closed": 1,
         "total": 2,
         "open_children": [
-            {"number": 121, "state": "open", "blocked_by": [], "foreign_blockers": []}
+            {
+                "number": 121,
+                "state": "open",
+                "title": "Child 121",
+                "blocked_by": [],
+                "foreign_blockers": [],
+            }
         ],
         "foreign_children": [],
     }
@@ -1256,13 +1262,19 @@ def test_board_shows_a_container_child_blocked_by_another_open_issue() -> None:
         BoardConfig(),
         dependencies=child_dependencies,
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
+        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN, "Child"),)},
     )
 
     payload = cmd_board.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     assert _as_dict(container_json["container"])["open_children"] == [
-        {"number": 121, "state": "open", "blocked_by": [130], "foreign_blockers": []}
+        {
+            "number": 121,
+            "state": "open",
+            "title": "Child",
+            "blocked_by": [130],
+            "foreign_blockers": [],
+        }
     ]
 
 
@@ -1331,7 +1343,7 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
         (),
         BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN),)},
+        children={120: (workboard.ChildItem(121, workboard.ChildState.OPEN, "Child"),)},
         dependencies=dependencies,
     )
 
@@ -1343,6 +1355,7 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
         {
             "number": 121,
             "state": "open",
+            "title": "Child",
             "blocked_by": [3],
             "foreign_blockers": ["overnightworks/other-repo#9"],
         }
@@ -1587,7 +1600,7 @@ def test_next_action_skips_a_container_that_still_holds_an_open_child() -> None:
         (),
         BoardConfig(),
         now=datetime(2026, 8, 21, tzinfo=UTC),
-        children={150: (workboard.ChildItem(151, workboard.ChildState.OPEN),)},
+        children={150: (workboard.ChildItem(151, workboard.ChildState.OPEN, "Child"),)},
     )
 
     assert workboard.next_action(projected) is None
@@ -2535,35 +2548,35 @@ STATE_REF_RECORD: dict[str, object] = {
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (workboard.ChildItem(80, workboard.ChildState.OPEN),),
+            (workboard.ChildItem(80, workboard.ChildState.OPEN, "Child"),),
             complete_contract("keiner"),
             None,
             id="an_open_child_keeps_the_parent_un_closable",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED, "Child"),),
             complete_contract("Cut it.", slice=slice_entries("Scheibe 1")),
             None,
             id="an_uncut_slice_row_keeps_the_parent_un_closable",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED, "Child"),),
             complete_contract("Cut slice 2."),
             None,
             id="a_next_line_naming_work_keeps_the_parent_un_closable",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED, "Child"),),
             block_body('version = 2\nnow = "N"\nnext = "keiner"\ndone_when = "D"\n'),
             None,
             id="a_malformed_parent_body_is_never_named",
         ),
         pytest.param(
             ItemKind.CONTAINER,
-            (workboard.ChildItem(80, workboard.ChildState.CLOSED),),
+            (workboard.ChildItem(80, workboard.ChildState.CLOSED, "Child"),),
             complete_contract("keiner"),
             79,
             id="no_open_children_and_no_uncut_row_names_the_parent",
@@ -2612,7 +2625,7 @@ def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_
 ) -> None:
     """With `Next` naming no work, only the uncut row decides."""
     parent = workboard.ParentIssue(PARENT_ISSUE_REFERENCE, body, ItemKind.CONTAINER)
-    children = (workboard.ChildItem(80, workboard.ChildState.CLOSED),)
+    children = (workboard.ChildItem(80, workboard.ChildState.CLOSED, "Child"),)
 
     assert workboard.closable_container_number(parent, children, storage) == expected
 

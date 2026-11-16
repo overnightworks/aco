@@ -55,6 +55,7 @@ from aco.board.board import Boards
 from aco.board.cli import discovered_boards
 from aco.board.server import start_board
 from aco.lane_record import LaneOutcome, LaneRecord
+from aco.routing_line import RoutingLine
 
 _DATE_KEYS = (
     expectation_grammar.ASKED_ON,
@@ -111,14 +112,25 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     )
 
 
+def _routing_of(entry: Mapping[str, object]) -> RoutingLine | None:
+    rounds = entry.get("fix_rounds")
+    if rounds is None:
+        return None
+    return RoutingLine(stages={}, fix_rounds=int(str(rounds)), blocking=None, experiment=None)
+
+
 def _released_items(arranged: object) -> list[ReleasedItem]:
-    """The finished items an arrangement names, each `{"issue", "wall_seconds"}`, as release
-    commits dated one second apart."""
+    """The finished items an arrangement names, each `{"issue", "wall_seconds"}` and optionally
+    `"fix_rounds"`, as release commits dated one second apart."""
     assert isinstance(arranged, list)
     return [
         ReleasedItem(
             int(entry["issue"]),
-            LaneRecord(LaneOutcome.LANDED, wall_seconds=int(entry["wall_seconds"])),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                wall_seconds=int(entry["wall_seconds"]),
+                routing=_routing_of(entry),
+            ),
             _FIRST_RELEASE + position,
         )
         for position, entry in enumerate(arranged)

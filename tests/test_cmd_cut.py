@@ -289,7 +289,7 @@ def with_linked_child(
     return replace(
         case,
         issues=(*case.issues, *open_child),
-        children={79: (workboard.ChildItem(number, state),)},
+        children={79: (workboard.ChildItem(number, state, title),)},
         references={
             number: forge.ItemReference(
                 forge.ItemState(state.value), title, CHILD_BODY.format("D", ""), False

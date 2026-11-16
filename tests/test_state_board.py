@@ -213,8 +213,8 @@ CHILD_B_ISSUE = workboard.Issue(
 GITHUB_ISSUES = (CONTAINER_ISSUE, CHILD_A_ISSUE, CHILD_B_ISSUE)
 GITHUB_CHILDREN: dict[int, workboard.ChildList] = {
     CONTAINER_NUMBER: (
-        workboard.ChildItem(CHILD_A_NUMBER, workboard.ChildState.OPEN),
-        workboard.ChildItem(CHILD_B_NUMBER, workboard.ChildState.OPEN),
+        workboard.ChildItem(CHILD_A_NUMBER, workboard.ChildState.OPEN, "Slice A"),
+        workboard.ChildItem(CHILD_B_NUMBER, workboard.ChildState.OPEN, "Slice B"),
     )
 }
 GITHUB_DEPENDENCIES = {
@@ -839,7 +839,7 @@ class TestMalformedItem:
         assert container is not None
         assert container.has_open_child
         assert adapter.list_children(CONTAINER_NUMBER) == (
-            workboard.ChildItem(MALFORMED_NUMBER, workboard.ChildState.OPEN),
+            workboard.ChildItem(MALFORMED_NUMBER, workboard.ChildState.OPEN, MALFORMED_ID),
         )
 
     @pytest.mark.parametrize(

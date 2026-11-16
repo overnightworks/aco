@@ -194,7 +194,10 @@ def children_of_parent(parent: ParentWorld | None) -> dict[int, workboard.ChildL
     closed_numbers = range(90, 90 + parent.closed_children)
     return {
         PARENT_ISSUE: (
-            *(workboard.ChildItem(number, workboard.ChildState.OPEN) for number in open_numbers),
+            *(
+                workboard.ChildItem(number, workboard.ChildState.OPEN, "Child")
+                for number in open_numbers
+            ),
             *(
                 workboard.ForeignChild(
                     workboard.IssueReference("other/repo", number), workboard.ChildState.OPEN
@@ -202,7 +205,7 @@ def children_of_parent(parent: ParentWorld | None) -> dict[int, workboard.ChildL
                 for number in range(954, 954 + parent.foreign_open_children)
             ),
             *(
-                workboard.ChildItem(number, workboard.ChildState.CLOSED)
+                workboard.ChildItem(number, workboard.ChildState.CLOSED, "Child")
                 for number in closed_numbers
             ),
         )

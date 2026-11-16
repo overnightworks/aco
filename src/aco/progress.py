@@ -27,6 +27,15 @@ def percent(closed: int, planned: int) -> int | None:
 
 
 @dataclass(frozen=True)
+class ClosedChild:
+    """A closed child of this repository; `actuals` is `None` when no lane record names it."""
+
+    number: int
+    title: str
+    actuals: lane_measure.ItemActuals | None
+
+
+@dataclass(frozen=True)
 class Container:
     number: int
     title: str
@@ -37,6 +46,7 @@ class Container:
     uncut: int
     estimate: lane_measure.RemainingWork | lane_measure.NoRange | None
     """The agent work left; `None` when no lane is left."""
+    closed_children: tuple[ClosedChild, ...]
 
     @property
     def lanes_left(self) -> int:
@@ -56,11 +66,13 @@ class Container:
 class Marks:
     """What other sources of the repository say: the items waiting on the operator,
     those a trunk commit's trailer names as landed, and what a lane costs by the lane
-    records on the state ref (`None` when they could not be read)."""
+    records on the state ref, and what each item's lanes took (both `None` when the records
+    could not be read)."""
 
     operator_steps: frozenset[int]
     landed: frozenset[int]
     prices: lane_measure.LanePrices | None
+    actuals: Mapping[int, lane_measure.ItemActuals] | None
 
 
 @dataclass(frozen=True)
@@ -159,6 +171,24 @@ def _container(
         len(waiting),
         uncut,
         lane_measure.remaining_work(marks.prices, sizes) if lanes_left else None,
+        _closed_children(local, marks.actuals),
+    )
+
+
+def _closed_children(
+    local: tuple[workboard.ChildItem, ...],
+    actuals: Mapping[int, lane_measure.ItemActuals] | None,
+) -> tuple[ClosedChild, ...]:
+    """The closed `local` children by number; with unreadable lane records every figure is
+    unknown, with none naming a child it has no actuals."""
+    return tuple(
+        ClosedChild(
+            child.number,
+            child.title,
+            lane_measure.ItemActuals(None, None) if actuals is None else actuals.get(child.number),
+        )
+        for child in sorted(local, key=lambda child: child.number)
+        if child.state is workboard.ChildState.CLOSED
     )
 
 

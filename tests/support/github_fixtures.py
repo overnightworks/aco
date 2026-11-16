@@ -239,7 +239,7 @@ class FakeForge:
             raise protocol.ClaimError("relation POST failed (simulated)")
         self.children[parent] = (
             *self.children.get(parent, ()),
-            workboard.ChildItem(child, workboard.ChildState.OPEN),
+            workboard.ChildItem(child, workboard.ChildState.OPEN, f"Child {child}"),
         )
         self.parents[child] = workboard.ParentIssue(
             workboard.IssueReference(self.repository.path, parent), ""

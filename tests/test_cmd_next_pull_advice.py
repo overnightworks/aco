@@ -119,7 +119,7 @@ def serve_nested_container(monkeypatch: pytest.MonkeyPatch, nested: Issue) -> Fa
         monkeypatch,
         FakeForge(
             board_issues=(nested,),
-            children={NESTED: (ChildItem(300, ChildState.CLOSED),)},
+            children={NESTED: (ChildItem(300, ChildState.CLOSED, "Child"),)},
             parents={NESTED: parent},
         ),
     )

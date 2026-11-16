@@ -650,7 +650,7 @@ def test_board_skips_the_children_list_for_a_container_with_zero_children(
     )
     client = FakeForge()
     client.board_issues = issues
-    client.children[30] = (ChildItem(31, ChildState.OPEN),)
+    client.children[30] = (ChildItem(31, ChildState.OPEN, "Child"),)
     observed_children_calls: list[int] = []
     original_list_children = client.list_children
 
@@ -4624,8 +4624,8 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     board_parent = (parent,) if parent_open and parent_repository == REPOSITORY else ()
     client = _configured_board_client(monkeypatch, tmp_path, open_issues=(*board_parent, nested))
     client.children = {
-        298: (ChildItem(299, ChildState.OPEN),),
-        299: (ChildItem(300, ChildState.CLOSED),),
+        298: (ChildItem(299, ChildState.OPEN, "Child"),),
+        299: (ChildItem(300, ChildState.CLOSED, "Child"),),
     }
     client.parents[299] = workboard.ParentIssue(
         workboard.IssueReference(parent_repository, 298), parent.body, parent_kind
@@ -5920,7 +5920,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     plain = board_issue(91, "Plain", complete_contract("Ship it."))
     client = _MinimalForgeReader(
         open_issues=(container, plain),
-        children_by_number={90: (ChildItem(92, ChildState.OPEN),)},
+        children_by_number={90: (ChildItem(92, ChildState.OPEN, "Child"),)},
     )
     _fake_every_git_read_as_tmp_path(monkeypatch, tmp_path)
     monkeypatch.setattr(checkout, "trunk_landings", lambda *_args, **_kwargs: ())
@@ -5930,7 +5930,7 @@ def test_board_fetches_children_only_for_container_kinded_issues(
     assert client.observed_children_lookups == [90]
     container_item = next(item for item in projected.items if item.number == 90)
     assert container_item.container is not None
-    assert container_item.container.open_children == (ChildItem(92, ChildState.OPEN),)
+    assert container_item.container.open_children == (ChildItem(92, ChildState.OPEN, "Child"),)
 
 
 def test_body_contract_checks_names_a_blockless_container_by_its_no_block_defect() -> None:
@@ -8853,9 +8853,9 @@ def _released_last_child_client(
         complete_contract(parent_next, slice=slice_entries(*parent_slices)),
         body.ItemKind.CONTAINER,
     )
-    children = [ChildItem(WORK_ITEM_ISSUE, ChildState.CLOSED)]
+    children = [ChildItem(WORK_ITEM_ISSUE, ChildState.CLOSED, "Child")]
     if sibling_open:
-        children.append(ChildItem(999, ChildState.OPEN))
+        children.append(ChildItem(999, ChildState.OPEN, "Child"))
     client.children[PARENT_OF_WORK_ITEM] = tuple(children)
     if parent_closed:
         client.closed_issues.add(PARENT_OF_WORK_ITEM)

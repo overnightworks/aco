@@ -1009,7 +1009,7 @@ class GitHubForge:
                 "--paginate",
                 f"repos/{self.repository}/issues/{number}/sub_issues?per_page=100",
                 "--jq",
-                ".[] | {number,repository:.repository_url,state,type:(.type.name // null)}",
+                ".[] | {number,repository:.repository_url,state,title,type:(.type.name // null)}",
             ]
         )
         children: list[workboard.ChildItem | workboard.ForeignChild] = []
@@ -1017,7 +1017,10 @@ class GitHubForge:
             child = self._issue_reference(value, "sub-issue")
             state = workboard.ChildState(self._issue_state(value, "sub-issue").value)
             if child.repository == self.repository.path:
-                children.append(workboard.ChildItem(child.number, state))
+                title = value.get("title") if isinstance(value, dict) else None
+                if not isinstance(title, str):
+                    raise forge.ForgeMalformedResponseError("GitHub returned a malformed sub-issue")
+                children.append(workboard.ChildItem(child.number, state, title))
             else:
                 children.append(workboard.ForeignChild(child, state))
         return tuple(children)

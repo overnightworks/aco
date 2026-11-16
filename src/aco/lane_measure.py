@@ -250,15 +250,20 @@ class _FinishedItem:
     size: Size | None
 
 
-def _finished_items(lanes: Iterable[RecordedLane]) -> tuple[_FinishedItem, ...]:
-    """One sample per work item that has a landed lane: the sum of its records' wall time, sized
-    by its latest landed record. An item with a record of unknown wall time is no sample."""
+def _by_issue(lanes: Iterable[RecordedLane]) -> dict[int, list[RecordedLane]]:
+    """The lanes grouped by the work item their release names; a lane without one is dropped."""
     by_issue: dict[int, list[RecordedLane]] = {}
     for lane in lanes:
         if lane.issue is not None:
             by_issue.setdefault(lane.issue, []).append(lane)
+    return by_issue
+
+
+def _finished_items(lanes: Iterable[RecordedLane]) -> tuple[_FinishedItem, ...]:
+    """One sample per work item that has a landed lane: the sum of its records' wall time, sized
+    by its latest landed record. An item with a record of unknown wall time is no sample."""
     finished: list[_FinishedItem] = []
-    for records in by_issue.values():
+    for records in _by_issue(lanes).values():
         landed = [lane for lane in records if lane.record.outcome is LaneOutcome.LANDED]
         wall = [lane.record.wall_seconds for lane in records]
         if landed and None not in wall:
@@ -269,6 +274,31 @@ def _finished_items(lanes: Iterable[RecordedLane]) -> tuple[_FinishedItem, ...]:
                 )
             )
     return tuple(finished)
+
+
+@dataclass(frozen=True)
+class ItemActuals:
+    """What one work item's lanes took: the sum of their wall seconds and fix rounds, each
+    `None` when any of its records lacks it."""
+
+    wall_seconds: int | None
+    fix_rounds: int | None
+
+
+def _sum_if_known(values: Iterable[int | None]) -> int | None:
+    known = list(values)
+    return None if None in known else sum(value for value in known if value is not None)
+
+
+def item_actuals(lanes: Iterable[RecordedLane]) -> dict[int, ItemActuals]:
+    """The actuals of every work item that has a record among `lanes`, by issue number."""
+    return {
+        issue: ItemActuals(
+            _sum_if_known(lane.record.wall_seconds for lane in records),
+            _sum_if_known(_fix_rounds(lane.record) for lane in records),
+        )
+        for issue, records in _by_issue(lanes).items()
+    }
 
 
 def _lane_time(seconds: Sequence[int]) -> LaneTime | None:

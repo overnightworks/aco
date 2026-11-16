@@ -10,6 +10,7 @@ from board_forge import (
     ForgeOperation,
     ForgeRequest,
     ReleasedItem,
+    StoredChild,
     child_list,
     seed_lane_records,
 )
@@ -17,6 +18,7 @@ from board_forge import (
 from aco import workboard
 from aco.body import ItemKind
 from aco.lane_record import LaneOutcome, LaneRecord
+from aco.routing_line import RoutingLine
 
 
 def _repo(board: BoardClient) -> dict[str, Any]:
@@ -68,6 +70,15 @@ def test_a_repo_lists_closed_and_planned_per_top_level_container_and_for_itself(
                 "waiting": 0,
                 "lanes_left": 4,
                 "estimate": {"error": "lane records unreadable"},
+                "closed_children": [
+                    {
+                        "number": 1,
+                        "title": "Child 1",
+                        "wall_seconds": None,
+                        "fix_rounds": None,
+                        "recorded": True,
+                    }
+                ],
             }
         ],
     }
@@ -209,3 +220,31 @@ def test_a_container_with_no_lane_left_carries_no_estimate(
     [container] = _repo(board)["progress"]["containers"]
 
     assert (container["lanes_left"], container["estimate"]) == (0, None)
+
+
+def test_a_container_lists_its_closed_children_with_title_and_actuals_in_seconds(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-147, ABRD-148, ABRD-149."""
+    repository.put_item(
+        10,
+        complete_contract("Build."),
+        kind=ItemKind.CONTAINER,
+        children=[StoredChild(2, True, "Second"), StoredChild(1, True, "First")],
+    )
+    routing = RoutingLine(stages={}, fix_rounds=3, blocking=None, experiment=None)
+    record = LaneRecord(LaneOutcome.LANDED, wall_seconds=5400, routing=routing)
+    seed_lane_records(repository, [ReleasedItem(1, record, 1_700_000_001)])
+
+    [container] = _repo(board)["progress"]["containers"]
+
+    assert container["closed_children"] == [
+        {"number": 1, "title": "First", "wall_seconds": 5400, "fix_rounds": 3, "recorded": True},
+        {
+            "number": 2,
+            "title": "Second",
+            "wall_seconds": None,
+            "fix_rounds": None,
+            "recorded": False,
+        },
+    ]

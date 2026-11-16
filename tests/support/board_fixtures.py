@@ -318,13 +318,16 @@ def container_with_children(
     open from another repository, then `closed` closed children numbered
     from 1000."""
     listed = (
-        *(workboard.ChildItem(child, workboard.ChildState.OPEN) for child in open_children),
+        *(
+            workboard.ChildItem(child, workboard.ChildState.OPEN, f"Child {child}")
+            for child in open_children
+        ),
         *(
             workboard.ForeignChild(reference, workboard.ChildState.OPEN)
             for reference in foreign_open
         ),
         *(
-            workboard.ChildItem(1000 + index, workboard.ChildState.CLOSED)
+            workboard.ChildItem(1000 + index, workboard.ChildState.CLOSED, f"Child {1000 + index}")
             for index in range(closed)
         ),
     )

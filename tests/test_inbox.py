@@ -15,6 +15,7 @@ from board_forge import (
     BoardForge,
     ForgeOperation,
     ReleasedItem,
+    StoredChild,
     child_list,
     item_body,
     run_context,
@@ -32,6 +33,7 @@ from aco import body, forge, inbox, lane_measure, progress, repositories, ruling
 from aco.board import board
 from aco.body import ItemKind
 from aco.lane_record import LaneOutcome, LaneRecord
+from aco.routing_line import RoutingLine
 
 _CARD = card_body(card())
 
@@ -407,6 +409,51 @@ def test_the_progress_read_prices_the_lanes_left_from_the_state_ref_lane_records
         items=5,
         classes=(lane_measure.PricedClass(None, 2, lane_measure.Basis.POOLED, 5),),
     )
+
+
+def test_the_progress_read_gives_each_closed_child_its_title_and_lane_actuals(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    """Spec: ABRD-147, ABRD-148, ABRD-149."""
+    del isolated_global_git_config
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(
+        10,
+        complete_contract("Build."),
+        kind=ItemKind.CONTAINER,
+        children=[StoredChild(1, True, "Recorded"), StoredChild(2, True, "Unrecorded")],
+    )
+    routing = RoutingLine(stages={}, fix_rounds=2, blocking=None, experiment=None)
+    record = LaneRecord(LaneOutcome.LANDED, wall_seconds=90, routing=routing)
+    seed_lane_records(repository, [ReleasedItem(1, record, 1_700_000_001)])
+
+    shown = _progress_read(repository).progress
+
+    assert isinstance(shown, progress.Progress)
+    [container] = shown.containers
+    assert container.closed_children == (
+        progress.ClosedChild(1, "Recorded", lane_measure.ItemActuals(90, 2)),
+        progress.ClosedChild(2, "Unrecorded", None),
+    )
+
+
+def test_an_unreadable_state_ref_leaves_the_closed_children_actuals_unknown(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    """Spec: ABRD-150."""
+    del isolated_global_git_config
+    repository = board_checkout(tmp_path / "repository")
+    repository.put_item(
+        10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
+    )
+
+    shown = _progress_read(repository).progress
+
+    assert isinstance(shown, progress.Progress)
+    [container] = shown.containers
+    assert [child.actuals for child in container.closed_children] == [
+        lane_measure.ItemActuals(None, None)
+    ]
 
 
 def test_a_state_ref_without_lane_records_leaves_the_range_unknown_by_name(
