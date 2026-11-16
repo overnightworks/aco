@@ -197,7 +197,7 @@ def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: st
     """`land --head`: the head this preflight read -- the one
     the merge pins -- must be the commit the reviewers saw, so a push after
     their review never lands unseen."""
-    if reviewed_head is None or readiness.head_sha.startswith(reviewed_head):
+    if forge.pin_names_head(readiness.head_sha, reviewed_head):
         return
     raise protocol.ClaimUnavailableError(
         f"pull request #{readiness.number} head is {readiness.head_sha}, "
@@ -720,6 +720,8 @@ def _land_merge_unmerged(
         if defect is not None:
             raise _land_head_refusal(number, defect)
         checkout.refuse_unlandable_checkout(context.default_branch, directory=context.toplevel)
+        if isinstance(standing, forge.QueuedPullRequest):
+            cmd_land_queue.refuse_other_pinned_head(number, detail.head_sha, parsed.head)
         return detail, None, cmd_land_queue.await_merge(client, number, standing, pause)
     check_context = policy.LandingCheckContext(
         context, client.repository.path, context.config.storage
