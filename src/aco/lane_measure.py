@@ -2,6 +2,7 @@
 
 Pure: it takes lanes already read from the state ref and touches no git, forge or clock."""
 
+import math
 import re
 import statistics
 from collections import Counter
@@ -11,6 +12,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 
 from . import protocol
+from .body import Size
 from .lane_record import LaneOutcome, LaneRecord, RecordedLane
 from .routing_line import EXPERIMENT_TAG, RoutingStage
 
@@ -180,3 +182,139 @@ def _stage_choices(stage: RoutingStage, records: Sequence[LaneRecord]) -> StageC
         if record.routing is not None and stage in record.routing.stages
     ]
     return StageChoices(counts=dict(Counter(chosen)), unknown=len(records) - len(chosen))
+
+
+MINIMUM_ITEMS = 5
+"""The finished items a distribution needs before it prices a lane."""
+_UPPER_PERCENT = 80
+
+
+class NoRange(StrEnum):
+    """Why remaining work has no range, as its sentence."""
+
+    NO_RECORDS = "no lane records"
+    TOO_FEW = "not enough lane records yet"
+
+
+class Basis(StrEnum):
+    """Whether a size class was priced from its own items or from all finished items."""
+
+    MEASURED = "measured"
+    POOLED = "pooled"
+
+
+@dataclass(frozen=True)
+class LaneTime:
+    """The agent time of one lane over `items` finished items: the median as `aco stats` reads
+    it and the nearest-rank 80th percentile, both in seconds."""
+
+    median_seconds: float
+    upper_seconds: int
+    items: int
+
+
+@dataclass(frozen=True)
+class LanePrices:
+    """What a lane costs, from the finished items of `recorded` lanes: per size class once the
+    class has `MINIMUM_ITEMS`, else pooled over all sizes, which has none under that count."""
+
+    recorded: int
+    by_size: Mapping[Size, LaneTime]
+    pooled: LaneTime | None
+
+
+@dataclass(frozen=True)
+class PricedClass:
+    """`lanes` lanes of `size` (`None`: no declared size) priced on `basis` from `items` items."""
+
+    size: Size | None
+    lanes: int
+    basis: Basis
+    items: int
+
+
+@dataclass(frozen=True)
+class RemainingWork:
+    """The agent time left as a range in seconds; `items` is the finished items pooled."""
+
+    low_seconds: int
+    high_seconds: int
+    items: int
+    classes: tuple[PricedClass, ...]
+
+
+@dataclass(frozen=True)
+class _FinishedItem:
+    wall_seconds: int
+    size: Size | None
+
+
+def _finished_items(lanes: Iterable[RecordedLane]) -> tuple[_FinishedItem, ...]:
+    """One sample per work item that has a landed lane: the sum of its records' wall time, sized
+    by its latest landed record. An item with a record of unknown wall time is no sample."""
+    by_issue: dict[int, list[RecordedLane]] = {}
+    for lane in lanes:
+        if lane.issue is not None:
+            by_issue.setdefault(lane.issue, []).append(lane)
+    finished: list[_FinishedItem] = []
+    for records in by_issue.values():
+        landed = [lane for lane in records if lane.record.outcome is LaneOutcome.LANDED]
+        wall = [lane.record.wall_seconds for lane in records]
+        if landed and None not in wall:
+            latest = max(landed, key=lambda lane: lane.released_at)
+            finished.append(
+                _FinishedItem(
+                    sum(seconds for seconds in wall if seconds is not None), latest.record.item_size
+                )
+            )
+    return tuple(finished)
+
+
+def _lane_time(seconds: Sequence[int]) -> LaneTime | None:
+    if len(seconds) < MINIMUM_ITEMS:
+        return None
+    ordered = sorted(seconds)
+    rank = math.ceil(_UPPER_PERCENT * len(ordered) / 100)
+    return LaneTime(float(statistics.median(ordered)), ordered[rank - 1], len(ordered))
+
+
+def lane_prices(lanes: Iterable[RecordedLane]) -> LanePrices:
+    """The prices of a lane from `lanes`, newest first or in any order."""
+    recorded = tuple(lanes)
+    items = _finished_items(recorded)
+    by_size = {
+        size: price
+        for size in Size
+        if (price := _lane_time([item.wall_seconds for item in items if item.size is size]))
+        is not None
+    }
+    return LanePrices(len(recorded), by_size, _lane_time([item.wall_seconds for item in items]))
+
+
+def remaining_work(prices: LanePrices, sizes: Iterable[Size | None]) -> RemainingWork | NoRange:
+    """The range for one lane per entry of `sizes`: each lane at its class's median to 80th
+    percentile, or the pooled one when its class has too few items. No range without records, or
+    while the pooled distribution is under `MINIMUM_ITEMS` items."""
+    if prices.recorded == 0:
+        return NoRange.NO_RECORDS
+    if prices.pooled is None:
+        return NoRange.TOO_FEW
+    counts = Counter(sizes)
+    classes: list[PricedClass] = []
+    low = high = 0.0
+    for size in (*Size, None):
+        if not counts[size]:
+            continue
+        measured = None if size is None else prices.by_size.get(size)
+        price = prices.pooled if measured is None else measured
+        classes.append(
+            PricedClass(
+                size,
+                counts[size],
+                Basis.POOLED if measured is None else Basis.MEASURED,
+                price.items,
+            )
+        )
+        low += counts[size] * price.median_seconds
+        high += counts[size] * price.upper_seconds
+    return RemainingWork(round(low), round(high), prices.pooled.items, tuple(classes))

@@ -5,7 +5,18 @@ from datetime import UTC, date, datetime
 import pytest
 
 from aco import protocol
-from aco.lane_measure import DateRange, FigureName, measure, parse_group
+from aco.body import Size
+from aco.lane_measure import (
+    Basis,
+    DateRange,
+    FigureName,
+    NoRange,
+    RemainingWork,
+    lane_prices,
+    measure,
+    parse_group,
+    remaining_work,
+)
 from aco.lane_record import LaneOutcome, LaneRecord, RecordedLane
 
 NOVEMBER = DateRange(date(2026, 11, 1), date(2026, 11, 30))
@@ -62,3 +73,126 @@ def test_a_text_that_is_no_range_and_no_tag_is_refused(group: str) -> None:
     """Spec: STATS-05, STATS-16, STATS-17."""
     with pytest.raises(protocol.ClaimError):
         parse_group(group)
+
+
+RELEASED_AT = int(datetime(2026, 11, 2, 12, tzinfo=UTC).timestamp())
+
+
+def finished(
+    issue: int,
+    wall_seconds: int | None,
+    size: Size | None = None,
+    *,
+    released_at: int = RELEASED_AT,
+    outcome: LaneOutcome = LaneOutcome.LANDED,
+) -> RecordedLane:
+    record = LaneRecord(outcome, wall_seconds=wall_seconds, item_size=size)
+    return RecordedLane(released_at, record, issue)
+
+
+def items_of(size: Size | None, seconds: list[int], first_issue: int = 1) -> list[RecordedLane]:
+    return [
+        finished(first_issue + index, wall_seconds, size)
+        for index, wall_seconds in enumerate(seconds)
+    ]
+
+
+def priced(lanes: list[RecordedLane], sizes: list[Size | None]) -> RemainingWork | NoRange:
+    return remaining_work(lane_prices(lanes), sizes)
+
+
+def shown(work: RemainingWork) -> tuple[int, int, int, list[tuple[Size | None, int, Basis, int]]]:
+    return (
+        work.low_seconds,
+        work.high_seconds,
+        work.items,
+        [(entry.size, entry.lanes, entry.basis, entry.items) for entry in work.classes],
+    )
+
+
+def test_no_recorded_lane_leaves_no_range() -> None:
+    """Spec: ABRD-141."""
+    assert priced([], [Size.SMALL]) is NoRange.NO_RECORDS
+
+
+def test_under_five_pooled_items_leave_no_range() -> None:
+    """Spec: ABRD-140."""
+    lanes = items_of(Size.SMALL, [60, 120, 180, 240])
+
+    assert priced(lanes, [Size.SMALL]) is NoRange.TOO_FEW
+
+
+def test_a_range_is_the_sum_of_class_medians_to_the_sum_of_class_80th_percentiles() -> None:
+    """Spec: ABRD-139."""
+    lanes = items_of(Size.SMALL, [100, 200, 300, 400, 500]) + items_of(
+        Size.MEDIUM, [1000, 2000, 3000, 4000, 5000, 6000], first_issue=10
+    )
+
+    work = priced(lanes, [Size.SMALL, Size.MEDIUM, Size.MEDIUM])
+
+    assert isinstance(work, RemainingWork)
+    assert shown(work) == (
+        300 + 2 * 3500,
+        400 + 2 * 5000,
+        11,
+        [
+            (Size.SMALL, 1, Basis.MEASURED, 5),
+            (Size.MEDIUM, 2, Basis.MEASURED, 6),
+        ],
+    )
+
+
+def test_a_class_under_five_items_and_an_unsized_lane_use_the_pooled_distribution() -> None:
+    """Spec: ABRD-140."""
+    lanes = items_of(Size.SMALL, [10, 20, 30, 40, 50]) + items_of(
+        Size.LARGE, [1000, 2000], first_issue=10
+    )
+
+    work = priced(lanes, [Size.LARGE, None])
+
+    assert isinstance(work, RemainingWork)
+    assert shown(work) == (
+        2 * 40,
+        2 * 1000,
+        7,
+        [(Size.LARGE, 1, Basis.POOLED, 7), (None, 1, Basis.POOLED, 7)],
+    )
+
+
+def test_an_item_is_one_sample_over_all_its_records_sized_by_its_latest_landed_one() -> None:
+    """Spec: ABRD-140."""
+    lanes = [
+        finished(1, 100, outcome=LaneOutcome.ABANDONED),
+        finished(1, 200, Size.SMALL, released_at=RELEASED_AT + 1),
+        finished(1, 400, Size.LARGE, released_at=RELEASED_AT + 2),
+        *items_of(Size.LARGE, [100, 200, 800, 900], first_issue=10),
+    ]
+
+    work = priced(lanes, [Size.LARGE])
+
+    assert isinstance(work, RemainingWork)
+    assert shown(work) == (700, 800, 5, [(Size.LARGE, 1, Basis.MEASURED, 5)])
+
+
+@pytest.mark.parametrize(
+    "unsampled",
+    [
+        pytest.param([finished(9, None)], id="a-record-without-wall-time"),
+        pytest.param(
+            [finished(9, 50), finished(9, None, released_at=RELEASED_AT + 1)],
+            id="any-record-of-the-item-without-wall-time",
+        ),
+        pytest.param([finished(9, 50, outcome=LaneOutcome.ABANDONED)], id="an-item-never-landed"),
+        pytest.param(
+            [RecordedLane(RELEASED_AT, LaneRecord(LaneOutcome.LANDED, wall_seconds=50))],
+            id="a-lane-without-an-issue",
+        ),
+    ],
+)
+def test_an_item_whose_time_is_not_fully_known_or_that_never_landed_is_no_sample(
+    unsampled: list[RecordedLane],
+) -> None:
+    """Spec: ABRD-139."""
+    lanes = items_of(None, [10, 20, 30, 40], first_issue=100) + unsampled
+
+    assert priced(lanes, [None]) is NoRange.TOO_FEW
