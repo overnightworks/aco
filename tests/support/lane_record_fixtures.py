@@ -2,7 +2,7 @@
 
 import pytest
 
-from aco import lane_record, protocol, store
+from aco import forge, lane_record, protocol, store
 
 
 def stub_lane_record(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -14,6 +14,7 @@ def stub_lane_record(monkeypatch: pytest.MonkeyPatch) -> None:
         claim: protocol.ActiveClaim,
         _outcome: protocol.ReleaseOutcome,
         _verified_merge: str | None = None,
+        item: forge.ItemReference | None = None,
     ) -> store.TransitionSubject:
         return store.transition_subject("release", claim.identity, claim.branch)
 

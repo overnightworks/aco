@@ -25,7 +25,7 @@ from github_fixtures import FakeForge
 from merged_release import arrange_merged_pull_request
 from store_fixtures import claim_intent
 
-from aco import protocol, store, workboard
+from aco import body, protocol, store, workboard
 from aco.lane_record import (
     LaneOutcome,
     LaneRecord,
@@ -71,13 +71,15 @@ def release_commit_message(remote: Path) -> str:
 
 
 def test_a_record_renders_its_known_figures_in_order_and_leaves_unknown_ones_out() -> None:
-    """Spec: LANREC-04, LANREC-06, LANREC-07, LANREC-08, LANREC-09, LANREC-11, LANREC-12."""
+    """Spec: LANREC-04, LANREC-06, LANREC-07, LANREC-08, LANREC-09, LANREC-11, LANREC-12,
+    LANREC-28."""
     routing = parse_routing_line(ROUTING)
     record = LaneRecord(
         outcome=LaneOutcome.LANDED,
         merge_commit=MERGE_SHA,
         wall_seconds=0,
         size=ProductionSize(files=2, added=0, deleted=7),
+        item_size=body.Size.MEDIUM,
         routing=routing,
     )
 
@@ -88,6 +90,7 @@ def test_a_record_renders_its_known_figures_in_order_and_leaves_unknown_ones_out
         "lane_files: 2",
         "lane_added: 0",
         "lane_deleted: 7",
+        "lane_size: M",
         *ROUTING_TRAILERS,
     )
 
@@ -98,12 +101,13 @@ def test_a_record_with_nothing_measured_is_only_its_outcome() -> None:
 
 
 def test_a_record_read_back_from_its_message_renders_the_same_trailers() -> None:
-    """Spec: STATS-01, STATS-08."""
+    """Spec: STATS-01, STATS-08, LANREC-28."""
     record = LaneRecord(
         outcome=LaneOutcome.LANDED,
         merge_commit=MERGE_SHA,
         wall_seconds=0,
         size=ProductionSize(files=2, added=0, deleted=7),
+        item_size=body.Size.LARGE,
         routing=parse_routing_line(ROUTING),
     )
     message = "\n".join(["release lane", "", *record.trailers()])
@@ -143,6 +147,21 @@ def test_a_record_read_back_from_its_message_renders_the_same_trailers() -> None
             id="a-size-missing-a-line",
         ),
         pytest.param(
+            ("lane_size: S", "lane_size: S"),
+            ("lane_outcome: landed",),
+            id="a-repeated-size-class",
+        ),
+        pytest.param(
+            ("lane_size: XL",),
+            ("lane_outcome: landed",),
+            id="a-size-class-that-is-none-of-the-three",
+        ),
+        pytest.param(
+            ("lane_size: M",),
+            ("lane_outcome: landed", "lane_size: M"),
+            id="a-size-class-that-stands",
+        ),
+        pytest.param(
             ("lane_build: Sonnet/High", "lane_fix: none", "lane_build: x/y"),
             ("lane_outcome: landed", "lane_fix: none"),
             id="a-stage-that-does-not-fit-or-repeats",
@@ -157,7 +176,7 @@ def test_a_record_read_back_from_its_message_renders_the_same_trailers() -> None
 def test_a_figure_whose_line_is_repeated_or_malformed_is_unknown(
     lines: tuple[str, ...], expected_trailers: tuple[str, ...]
 ) -> None:
-    """Spec: STATS-08."""
+    """Spec: STATS-08, LANREC-28."""
     message = "\n".join(["release lane", "", "lane_outcome: landed", *lines])
 
     record = parse_record(message)

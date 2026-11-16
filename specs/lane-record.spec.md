@@ -19,6 +19,7 @@ reason (an abandoned one).
 | the merge commit | LANREC-07 | — |
 | wall time | LANREC-08 | LANREC-08 |
 | production size | LANREC-09, LANREC-10, LANREC-25 | — |
+| item size class | LANREC-28 | — |
 | the routing line | LANREC-13..LANREC-15 | LANREC-13, LANREC-14 |
 | the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 |
 | a figure that cannot be computed | LANREC-21 | LANREC-21 |
@@ -30,7 +31,7 @@ reason (an abandoned one).
 - [ ] [LANREC-02] A release with nothing left to release (REL-47) writes no commit and so no record.
 - [ ] [LANREC-03] The record is computed once, before the release commit is pushed: a push repeated after a lost race carries the same record.
 - [ ] [LANREC-04] A trailer line is `<key>: <value>`. A figure that cannot be computed has no line: a missing line means unknown, and `0` is written only for a measured zero.
-- [ ] [LANREC-05] A value is a validated token: an outcome, a sha, a model or effort name, a whole number or a tag (LANREC-17..LANREC-20). A finding, a reason or any other free text never reaches a trailer.
+- [ ] [LANREC-05] A value is a validated token: an outcome, a sha, a model or effort name, a size class, a whole number or a tag (LANREC-17..LANREC-20, LANREC-28). A finding, a reason or any other free text never reaches a trailer.
 - [ ] [LANREC-06] `lane_outcome` is `landed` for `--merged` and `abandoned` for `--abandoned`; every record carries it.
 - [ ] [LANREC-07] `lane_merge` is the 40-character sha of the merge commit the lane landed as: the forge's recorded one under `github` storage, the resolved trunk commit under `state-ref`. An abandoned lane has none.
 - [ ] [LANREC-08] `lane_wall_seconds` is the whole seconds from the state-ref commit that added the claim (adopted: its adoption) to the merge commit's committer date, or the release commit's if abandoned.
@@ -38,6 +39,7 @@ reason (an abandoned one).
 - [ ] [LANREC-10] A renamed file counts once, with only its changed lines; a binary file counts as one file, no lines. Without `production_paths`, with an unreadable diff or an abandoned lane, the three have no line.
 - [ ] [LANREC-11] `lane_build`, `lane_fix`, `lane_review`, `lane_test`, `lane_gate` and `lane_land` hold the `<model>/<effort>` or `none` that stage names in the routing line, one trailer for each stage that parses.
 - [ ] [LANREC-12] `lane_fix_rounds` holds the routing line's fix rounds, `lane_blocking` its count of blocking findings, `lane_experiment` its experiment tag; each has a line only when it parses.
+- [ ] [LANREC-28] `lane_size` is `S`, `M` or `L`: the item's top-level `size` from the read the release already makes; an unsized item, an abandoned lane or a release without an issue has no line.
 
 ## The routing line
 

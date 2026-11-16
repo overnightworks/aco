@@ -18,7 +18,7 @@
 "src/aco/checkout.py" = 2019
 "src/aco/cli.py" = 823
 "src/aco/cmd_claim.py" = 1132
-"src/aco/cmd_release.py" = 887
+"src/aco/cmd_release.py" = 886
 "src/aco/github.py" = 1441
 "src/aco/protocol.py" = 1837
 "src/aco/state_board.py" = 923
