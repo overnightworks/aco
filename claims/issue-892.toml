@@ -1,8 +1,0 @@
-claim_id = "b6a65d85ee304c8a9dca6e78fa010602"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "b2ee7324a7073d59defe2c3692eb74ee158ab339"
-branch = "claude/issue-892-progress-landed-and-waiting"
-scope = ["docs/ARCHITECTURE.md", "frontend/e2e", "frontend/src", "quality/baseline.toml", "specs/serve.spec.md", "src/aco/board/api.py", "src/aco/board/static", "src/aco/board_read.py", "src/aco/inbox.py", "src/aco/progress.py", "tests/board", "tests/support", "tests/test_board_read.py", "tests/test_inbox.py", "tests/test_progress.py", "tests/test_repositories.py"]
-opened_commit = "02cd9cf420a98f6d23da9843735c4ed2da19e505"
-whole_reason = "one vertical slice: progress read, wire, page, spec and its test rig"
