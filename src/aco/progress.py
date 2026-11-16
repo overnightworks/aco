@@ -93,9 +93,7 @@ class ProgressUnavailable:
     reason: str
 
 
-def _counted_containers(
-    issues: Iterable[workboard.Issue], *, storage: body.Storage
-) -> tuple[workboard.Issue, ...]:
+def _counted_containers(issues: Iterable[workboard.Issue]) -> tuple[workboard.Issue, ...]:
     """The members' readable open containers among `issues` that the forge
     reports counts for, by ascending number; the counts only say that it does."""
     found = [
@@ -147,7 +145,7 @@ def of(
     whose `parent_of` is a parent, in whichever repository it sits, counted
     from their `children_of` lists, with the `marks` of its items. A failed read of a parent or of
     children leaves the repository unknown rather than counted wrong."""
-    counted = _counted_containers(issues, storage=storage)
+    counted = _counted_containers(issues)
 
     def read(issue: workboard.Issue) -> workboard.ChildList | None:
         if parent_of(issue.number) is not None:
