@@ -1219,13 +1219,7 @@ def test_board_shows_container_progress_and_refuses_it_as_actionable() -> None:
         "closed": 1,
         "total": 2,
         "open_children": [
-            {
-                "number": 121,
-                "state": "open",
-                "title": "Child 121",
-                "blocked_by": [],
-                "foreign_blockers": [],
-            }
+            {"number": 121, "state": "open", "blocked_by": [], "foreign_blockers": []}
         ],
         "foreign_children": [],
     }
@@ -1268,13 +1262,7 @@ def test_board_shows_a_container_child_blocked_by_another_open_issue() -> None:
     payload = cmd_board.board_payload(projected)
     container_json = next(item for item in _payload_items(payload) if item["number"] == 120)
     assert _as_dict(container_json["container"])["open_children"] == [
-        {
-            "number": 121,
-            "state": "open",
-            "title": "Child",
-            "blocked_by": [130],
-            "foreign_blockers": [],
-        }
+        {"number": 121, "state": "open", "blocked_by": [130], "foreign_blockers": []}
     ]
 
 
@@ -1355,7 +1343,6 @@ def test_board_json_splits_a_container_childs_foreign_blocker() -> None:
         {
             "number": 121,
             "state": "open",
-            "title": "Child",
             "blocked_by": [3],
             "foreign_blockers": ["overnightworks/other-repo#9"],
         }

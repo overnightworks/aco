@@ -142,6 +142,7 @@ def board_payload(board: workboard.Board) -> dict[str, object]:
             if container is not None:
                 _project_foreign_children(container)
                 for child in container["open_children"]:
+                    child.pop("title")  # the row's public shape carries no title
                     _project_blocker_references(child, "blocked_by", repository)
     for row in cast(_JsonRows, payload["landings"]):
         _project_landing_row(row)

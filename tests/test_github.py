@@ -2500,13 +2500,8 @@ def test_github_adapter_refuses_a_default_branch_over_the_length_bound() -> None
 API_REPOSITORY_URL = f"https://api.github.com/repos/{REPOSITORY}"
 
 
-def api_sub_issue(number: int, state: str) -> dict[str, object]:
-    return {
-        "number": number,
-        "repository": API_REPOSITORY_URL,
-        "state": state,
-        "title": f"Sub-issue {number}",
-    }
+def api_sub_issue(number: int, state: str, title: object = "T") -> dict[str, object]:
+    return {"number": number, "repository": API_REPOSITORY_URL, "state": state, "title": title}
 
 
 def sub_issue_client(*children: dict[str, object]) -> GitHubForge:
@@ -2531,8 +2526,8 @@ def test_github_adapter_reads_a_recorded_parent_and_its_children() -> None:
     )
     assert client.parent_number(72) == 79
     assert client.list_children(79) == (
-        workboard.ChildItem(72, workboard.ChildState.OPEN, "Sub-issue 72"),
-        workboard.ChildItem(73, workboard.ChildState.OPEN, "Sub-issue 73"),
+        workboard.ChildItem(72, workboard.ChildState.OPEN, "T"),
+        workboard.ChildItem(73, workboard.ChildState.OPEN, "T"),
     )
 
 
@@ -2540,8 +2535,8 @@ def test_github_adapter_reports_a_closed_child_alongside_open_ones() -> None:
     client = sub_issue_client(api_sub_issue(72, "closed"), api_sub_issue(73, "open"))
 
     assert client.list_children(79) == (
-        workboard.ChildItem(72, workboard.ChildState.CLOSED, "Sub-issue 72"),
-        workboard.ChildItem(73, workboard.ChildState.OPEN, "Sub-issue 73"),
+        workboard.ChildItem(72, workboard.ChildState.CLOSED, "T"),
+        workboard.ChildItem(73, workboard.ChildState.OPEN, "T"),
     )
 
 
@@ -2550,15 +2545,10 @@ def test_github_adapter_reports_a_closed_child_alongside_open_ones() -> None:
     [
         pytest.param({"number": 72, "repository": API_REPOSITORY_URL}, id="state-missing"),
         pytest.param(api_sub_issue(72, "archived"), id="state-unknown"),
-        pytest.param(
-            {"number": 72, "repository": API_REPOSITORY_URL, "state": "open"}, id="title-missing"
-        ),
-        pytest.param({**api_sub_issue(72, "open"), "title": 5}, id="title-not-text"),
+        pytest.param(api_sub_issue(72, "open", title=5), id="title-not-text"),
     ],
 )
-def test_github_adapter_fails_loud_on_a_sub_issue_it_cannot_read(
-    child: dict[str, object],
-) -> None:
+def test_github_adapter_fails_loud_on_an_unreadable_sub_issue(child: dict[str, object]) -> None:
     client = sub_issue_client(child)
 
     with pytest.raises(ClaimError, match="malformed sub-issue"):

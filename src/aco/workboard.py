@@ -174,9 +174,8 @@ class ChildState(StrEnum):
 class ChildItem:
     """One sub-issue, as the port returns it and as the board shows it.
 
-    `blocked_by` is empty at the port boundary -- the adapter cannot know it
-    -- and `build_board` fills it for open children from the dependencies it
-    already read for the board, with no extra request.
+    `blocked_by` is empty at the port boundary -- the adapter cannot know it --
+    and `build_board` fills it for open children from the dependencies it already read.
     """
 
     number: int
