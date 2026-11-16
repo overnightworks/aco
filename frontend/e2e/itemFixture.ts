@@ -63,10 +63,10 @@ interface WithdrawnEntry {
 
 type Entry = OptionEntry | YesNoEntry | WithdrawnEntry;
 
-/** A container's counts as the forge's summary reports them. */
-export interface ContainerCounts {
-	closed: number;
-	total: number;
+/** A container's sub-issues by number, the list its counts derive from. */
+export interface ContainerChildren {
+	closed: number[];
+	open: number[];
 }
 
 export interface Item {
@@ -74,7 +74,7 @@ export interface Item {
 	title: string;
 	entries: Entry[];
 	/** Set once the item is a container. */
-	container?: ContainerCounts;
+	container?: ContainerChildren;
 	/** The item this one is a child of. */
 	parent?: number;
 	/** Whether the item waits on the operator. */
@@ -143,14 +143,19 @@ function dated(items: Item[]): Item[] {
 }
 
 /** The board holds exactly `items` from now on; `listingFailure` makes every
- * listing fail with that message until the next arrangement. */
+ * listing fail with that message until the next arrangement, and `landed` are
+ * the items a trunk commit's trailer names as landed. */
 export async function arrange(
 	items: Item[],
-	{ listingFailure }: { listingFailure?: string } = {}
+	{ listingFailure, landed }: { listingFailure?: string; landed?: number[] } = {}
 ): Promise<void> {
 	const response = await fetch(`${readBoardRuntime().controlUrl}/board`, {
 		method: 'PUT',
-		body: JSON.stringify({ items: dated(items), listing_failure: listingFailure ?? null })
+		body: JSON.stringify({
+			items: dated(items),
+			landed: landed ?? [],
+			listing_failure: listingFailure ?? null
+		})
 	});
 	if (!response.ok) {
 		throw new Error(`aco refuses the arrangement: ${await response.text()}`);
@@ -164,12 +169,18 @@ export async function storedLine(number: number, index: number): Promise<Record<
 	return lines[index - 1];
 }
 
-/** A container with `closed` of `total` children closed, no card of its own. */
+/** A container with these sub-issues, no card of its own. */
 export function container(
 	number: number,
 	title: string,
-	counts: ContainerCounts,
+	children: Partial<ContainerChildren>,
 	overrides: Partial<Item> = {}
 ): Item {
-	return { number, title, entries: [], container: counts, ...overrides };
+	return {
+		number,
+		title,
+		entries: [],
+		container: { closed: [], open: [], ...children },
+		...overrides
+	};
 }

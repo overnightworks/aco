@@ -41,14 +41,30 @@ DEFAULT_LABEL = "repo"
 def board_checkout(directory: Path) -> BoardForge:
     """A git checkout at `directory` tracking an empty board configuration
     (the `github` pin), cloned from the forge repository its forge names, and
-    the forge holding its items."""
+    the forge holding its items. The checkout's trunk holds one commit, so
+    its landings can be read."""
     directory.mkdir(parents=True)
     repository = BoardForge(directory)
     real_git(directory, "init", "--quiet")
     real_git(directory, "remote", "add", "origin", f"https://github.com/{repository.repository}")
     write_repository_config(directory)
+    real_git(directory, "config", "user.name", "Board")
+    real_git(directory, "config", "user.email", "board@example.com")
     real_git(directory, "add", workboard.CONFIG_PATH.as_posix())
+    real_git(directory, "commit", "-q", "-m", "track board configuration")
     return repository
+
+
+def land_item(repository: BoardForge, number: int) -> None:
+    """A trunk commit in `repository`'s checkout whose trailer names item `number` as landed."""
+    real_git(
+        repository.directory,
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        f"Land item {number}\n\nWork-Item: #{number}",
+    )
 
 
 def fixed_boards(boards: Mapping[str, Board]) -> Callable[[], Found]:

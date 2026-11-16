@@ -80,7 +80,12 @@ def _progress_json(
         **_counts_json(read),
         "waiting": read.waiting,
         "containers": [
-            {"number": container.number, "title": container.title, **_counts_json(container)}
+            {
+                "number": container.number,
+                "title": container.title,
+                **_counts_json(container),
+                "waiting": container.waiting,
+            }
             for container in read.containers
         ],
     }
@@ -89,6 +94,7 @@ def _progress_json(
 def _counts_json(counts: progress.Progress | progress.Container) -> dict[str, object]:
     return {
         "closed": counts.closed,
+        "landed": counts.landed,
         "planned": counts.planned,
         "open": counts.open,
         "uncut": counts.uncut,

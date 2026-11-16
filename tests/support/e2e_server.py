@@ -44,9 +44,10 @@ import board_forge
 from aco_board_fixtures import (
     DEFAULT_LABEL,
     board_checkout,
+    land_item,
     rulings_lines,
 )
-from board_forge import BoardForge, StoredItem
+from board_forge import BoardForge, StoredItem, child_list
 
 from aco import body, expectation_grammar, session, workboard
 from aco.board.board import Boards
@@ -91,17 +92,18 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
             ]
         )
     container = arranged.get("container")
-    counts: tuple[int | None, int | None] = (None, None)
-    if isinstance(container, dict):
-        counts = (int(container["closed"]), int(container["total"]))
+    children = (
+        child_list(closed=container["closed"], open=container["open"])
+        if isinstance(container, dict)
+        else None
+    )
     parent = arranged.get("parent")
     return StoredItem(
         str(arranged["title"]),
         raw_body,
         labels=[workboard.NEEDS_OPERATOR_LABEL] if arranged.get("waiting") else [],
         kind=body.ItemKind.CONTAINER.value if container is not None else None,
-        children_closed=counts[0],
-        children_total=counts[1],
+        children=children,
         parent=parent if isinstance(parent, int) else None,
     )
 
@@ -113,6 +115,10 @@ def arrange_board(repository: BoardForge, arrangement: Mapping[str, object]) -> 
     assert isinstance(arranged_items, list)
     items = {int(arranged["number"]): _stored_item(arranged) for arranged in arranged_items}
     repository.replace_items(items)
+    landed = arrangement.get("landed", [])
+    assert isinstance(landed, list)
+    for number in landed:
+        land_item(repository, int(number))
     listing_failure = arrangement.get("listing_failure")
     if listing_failure is not None:
         repository.fail_listing(str(listing_failure))
