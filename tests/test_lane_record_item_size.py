@@ -1,19 +1,16 @@
 """The size class a released lane records from its work item (LANREC-28)."""
 
 from pathlib import Path
-from types import SimpleNamespace
-from typing import cast
 
 import pytest
 from board_fixtures import REPOSITORY, block_body, standing_active_claim, write_repository_config
 from cli_fixtures import FROZEN_CLI_NOW, fresh_observation, real_git, run_cli
 from github_fixtures import WORK_ITEM_ISSUE
+from lane_record_fixtures import release_trailers_of
 from merged_release import arrange_merged_pull_request
 from store_fixtures import item_record
 
 from aco import body, forge, items, protocol, store, workboard
-from aco.lane_record import release_subject
-from aco.session import RunContext
 
 LANE_BRANCH = "docs/tidy-readme"
 
@@ -33,8 +30,8 @@ def item_text(size: body.Size | None, *, record: dict[str, object] | None = None
     return block_body(body.render_block(data).removesuffix("\n"), before="Prose.\n\n", after="")
 
 
-def seed_sized_item(clone: Path, remote: Path, size: body.Size | None) -> None:
-    """The work item as an open record on the real state ref, declaring `size` or none."""
+def seed_sized_item(clone: Path, remote: Path, size: body.Size) -> None:
+    """The work item as an open record on the real state ref, declaring `size`."""
     content = item_text(size, record=item_record(title="Item", state="open", kind="task"))
     item_id = items.format_item_id(WORK_ITEM_ISSUE)
     store.commit_transition(
@@ -61,17 +58,17 @@ def served_item(size: body.Size | None) -> forge.ItemReference:
 def release_trailers(
     tmp_path: Path, outcome: protocol.ReleaseOutcome, item: forge.ItemReference | None
 ) -> tuple[str, ...]:
-    """The trailers `release_subject` puts on a lane's release that read `item`; the merge is
-    unknown, so no repository history is read."""
-    context = SimpleNamespace(
+    """The trailers a lane's release that read `item` carries; the merge is unknown, so no
+    repository history is read."""
+    return release_trailers_of(
         toplevel=tmp_path,
         config=workboard.BoardConfig(),
-        observation=SimpleNamespace(tip=None),
-        now=lambda: FROZEN_CLI_NOW,
+        tip=None,
+        now=FROZEN_CLI_NOW,
+        claim=standing_active_claim(lane=True),
+        outcome=outcome,
+        item=item,
     )
-    claim = standing_active_claim(lane=True)
-
-    return release_subject(cast(RunContext, context), claim, outcome, None, item).trailers
 
 
 @pytest.mark.parametrize(
