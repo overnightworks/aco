@@ -475,14 +475,11 @@ def _verify_and_close_merged_release(
     merged: protocol.MergedRelease,
     selected: protocol.ActiveClaim,
 ) -> _LandedLane:
-    """A github `--merged` release's forge half, run once `selected` is resolved and its
-    releaser authorized: an unauthorized or mismatched-claim release never reaches the forge at
-    all, so it can neither verify, comment on, nor close a pull request's issue. `storage` is
-    proven `github` here (`release_transition` returned for `state-ref`), so the cast is
-    honest: `session._build_forge` builds exactly a `github.GitHubForge` for every other
-    storage pin. The close runs before the release transition: a close failure -- a transient
-    forge error, most often -- raises before that transition ever runs, so the claim it would
-    have released stays exactly as live as it was."""
+    """A github `--merged` release's forge half, run once `selected` is resolved and its releaser
+    authorized: an unauthorized or mismatched-claim release never reaches the forge. `storage` is
+    proven `github` here (`release_transition` returned for `state-ref`), so the cast is honest:
+    `session._build_forge` builds exactly a `github.GitHubForge` for every other storage pin. The
+    close runs before the release transition, so a close failure leaves the claim live."""
     client = cast(github.GitHubForge, context.forge)
     storage = context.config.storage
     verified = _verify_merged_release(context, client, identity, merged)
@@ -500,14 +497,7 @@ def _verify_and_close_merged_release(
     if _is_adopted_lane(selected.identity, selected.branch):
         tips += (selected.base,)
     lane = _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
-    return _LandedLane(
-        lane.identity,
-        lane.branch,
-        lane.proven_tips,
-        lane.rerun,
-        merge_commit=verified.merge_commit,
-        item=item,
-    )
+    return lane.landed_as(verified.merge_commit, item)
 
 
 def _report_merged_pull_request_left_nothing(
@@ -610,6 +600,9 @@ class _LandedLane:
     merge_commit: str | None = None
     item: forge.ItemReference | None = None
 
+    def landed_as(self, commit: str, item: forge.ItemReference | None) -> _LandedLane:
+        return _LandedLane(self.identity, self.branch, self.proven_tips, self.rerun, commit, item)
+
 
 def _landed_lane(
     identity: protocol.ClaimIdentity,
@@ -618,10 +611,9 @@ def _landed_lane(
     branch: str,
     proven_tips: Iterable[str],
 ) -> _LandedLane:
-    """`branch`'s lane, landed as `landing` -- a pull request number, or the
-    verified trunk sha under `storage = "state-ref"` -- with its `rerun`
-    rendered by the one advice renderer, so it runs as printed under either
-    storage pin and from any checkout (REL-52)."""
+    """`branch`'s lane, landed as `landing` -- a pull request number, or the verified trunk sha
+    under `storage = "state-ref"` -- with its `rerun` rendered by the one advice renderer, so it
+    runs as printed under either storage pin and from any checkout (REL-52)."""
     item = (
         ()
         if isinstance(identity, protocol.LaneIdentity)
