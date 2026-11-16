@@ -6,22 +6,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from cli_fixtures import forbid_forge_resolution, real_git, run_cli
+from cli_fixtures import (
+    forbid_forge_resolution,
+    real_git,
+    run_cli,
+    track_board_config,
+)
 from store_fixtures import (
     lineage_observation,
     publish_claims_from_a_second_clone,
     state_ref_tip,
 )
 
-from aco import store
+from aco import lane_measure, store, workboard
 from aco.lane_record import LaneOutcome, LaneRecord, ProductionSize
 from aco.routing_line import RoutingLine, RoutingStage
 
-SONNET = "sonnet-5.5/high"
-REVIEWER = "opus-5.5/medium"
-OPUS = "opus-5.5/high"
-LANDING = "haiku-5.5/low"
-NO_BLOCKING_FINDING = None
 UNUSED_TAG = "tag:unused"
 
 
@@ -54,58 +54,63 @@ def routing(
     return RoutingLine(stages, fix_rounds, blocking, experiment)
 
 
-RELEASES = (
-    (
-        at("2026-11-02T12:00:00"),
-        LaneRecord(
-            LaneOutcome.LANDED,
-            merge_commit="a" * 40,
-            wall_seconds=1800,
-            size=ProductionSize(files=2, added=40, deleted=5),
-            routing=routing(
-                {
-                    RoutingStage.BUILD: SONNET,
-                    RoutingStage.FIX: "none",
-                    RoutingStage.REVIEW: REVIEWER,
-                    RoutingStage.LAND: LANDING,
-                },
-                fix_rounds=1,
-                blocking=2,
-                experiment="builder-sonnet",
-            ),
-        ).trailers(),
-    ),
-    (
-        at("2026-11-03T23:59:59"),
-        LaneRecord(
-            LaneOutcome.LANDED,
-            wall_seconds=3000,
-            size=ProductionSize(files=4, added=100, deleted=20),
-            routing=routing(
-                {RoutingStage.BUILD: SONNET, RoutingStage.REVIEW: REVIEWER},
-                fix_rounds=2,
-                blocking=NO_BLOCKING_FINDING,
-                experiment="builder-sonnet",
-            ),
-        ).trailers(),
-    ),
-    (
-        at("2026-11-09T00:00:00"),
-        LaneRecord(
-            LaneOutcome.LANDED,
-            wall_seconds=1200,
-            routing=routing(
-                {RoutingStage.BUILD: OPUS}, fix_rounds=0, blocking=0, experiment="builder-opus"
-            ),
-        ).trailers(),
-    ),
-    (
-        at("2026-11-10T12:00:00"),
-        LaneRecord(LaneOutcome.ABANDONED, wall_seconds=60).trailers(),
-    ),
-    (at("2026-11-04T12:00:00"), ()),
-    (at("2026-11-05T12:00:00"), ("lane_outcome: paused", "lane_wall_seconds: 5")),
-)
+def released_commits() -> tuple[tuple[int, tuple[str, ...]], ...]:
+    """The commits pushed to the state ref: four recorded lanes and two commits that are none."""
+    return (
+        (
+            at("2026-11-02T12:00:00"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                merge_commit="a" * 40,
+                wall_seconds=1800,
+                size=ProductionSize(files=2, added=40, deleted=5),
+                routing=routing(
+                    {
+                        RoutingStage.BUILD: "sonnet-5.5/high",
+                        RoutingStage.FIX: "none",
+                        RoutingStage.REVIEW: "opus-5.5/medium",
+                        RoutingStage.LAND: "haiku-5.5/low",
+                    },
+                    fix_rounds=1,
+                    blocking=2,
+                    experiment="builder-sonnet",
+                ),
+            ).trailers(),
+        ),
+        (
+            at("2026-11-03T23:59:59"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                wall_seconds=3000,
+                size=ProductionSize(files=4, added=100, deleted=20),
+                routing=routing(
+                    {RoutingStage.BUILD: "sonnet-5.5/high", RoutingStage.REVIEW: "opus-5.5/medium"},
+                    fix_rounds=2,
+                    blocking=None,
+                    experiment="builder-sonnet",
+                ),
+            ).trailers(),
+        ),
+        (
+            at("2026-11-09T00:00:00"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                wall_seconds=1200,
+                routing=routing(
+                    {RoutingStage.BUILD: "opus-5.5/high"},
+                    fix_rounds=0,
+                    blocking=0,
+                    experiment="builder-opus",
+                ),
+            ).trailers(),
+        ),
+        (
+            at("2026-11-10T12:00:00"),
+            LaneRecord(LaneOutcome.ABANDONED, wall_seconds=60).trailers(),
+        ),
+        (at("2026-11-04T12:00:00"), ()),
+        (at("2026-11-05T12:00:00"), ("lane_outcome: paused", "lane_wall_seconds: 5")),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -117,7 +122,7 @@ def _no_forge(monkeypatch: pytest.MonkeyPatch) -> None:
 def recorded(clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A bootstrapped state ref that holds four recorded lanes and two commits that are none."""
     publish_claims_from_a_second_clone(clone, bare_remote, ())
-    for released_at, trailers in RELEASES:
+    for released_at, trailers in released_commits():
         push_release_commit(monkeypatch, clone, bare_remote, release_message(trailers), released_at)
     return clone
 
@@ -143,12 +148,12 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  added: median 70, n 2, unknown 0",
         "  deleted: median 12.5, n 2, unknown 0",
         "  cost: median unknown, n 0, unknown 2",
-        f"  build: {SONNET} 2, unknown 0",
+        "  build: sonnet-5.5/high 2, unknown 0",
         "  fix: none 1, unknown 1",
-        f"  review: {REVIEWER} 2, unknown 0",
+        "  review: opus-5.5/medium 2, unknown 0",
         "  test: unknown 2",
         "  gate: unknown 2",
-        f"  land: {LANDING} 1, unknown 1",
+        "  land: haiku-5.5/low 1, unknown 1",
         "B tag:builder-opus: lanes 1 (landed 1, abandoned 0)",
         "  wall_seconds: median 1200, n 1, unknown 0",
         "  fix_rounds: median 0, n 1, unknown 0",
@@ -157,7 +162,7 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  added: median unknown, n 0, unknown 1",
         "  deleted: median unknown, n 0, unknown 1",
         "  cost: median unknown, n 0, unknown 1",
-        f"  build: {OPUS} 1, unknown 0",
+        "  build: opus-5.5/high 1, unknown 0",
         "  fix: unknown 1",
         "  review: unknown 1",
         "  test: unknown 1",
@@ -177,7 +182,7 @@ def test_json_carries_the_same_figures_under_the_shared_envelope(
     assert list(payload) == ["ok", "reason", "a", "b"]
     assert (payload["ok"], payload["reason"]) == (True, "compared")
     assert payload["a"]["figures"]["fix_rounds"] == {"median": 1.5, "n": 2, "unknown": 0}
-    assert payload["a"]["stages"]["land"] == {"choices": {LANDING: 1}, "unknown": 1}
+    assert payload["a"]["stages"]["land"] == {"choices": {"haiku-5.5/low": 1}, "unknown": 1}
     assert payload["b"] == {
         "group": "tag:builder-opus",
         "lanes": 1,
@@ -192,7 +197,7 @@ def test_json_carries_the_same_figures_under_the_shared_envelope(
             "cost": {"median": None, "n": 0, "unknown": 1},
         },
         "stages": {
-            "build": {"choices": {OPUS: 1}, "unknown": 0},
+            "build": {"choices": {"opus-5.5/high": 1}, "unknown": 0},
             "fix": {"choices": {}, "unknown": 1},
             "review": {"choices": {}, "unknown": 1},
             "test": {"choices": {}, "unknown": 1},
@@ -347,3 +352,76 @@ def test_reading_the_lanes_changes_nothing_on_the_state_ref_or_the_checkout(
         tip_before,
         bookkeeping_before,
     )
+
+
+def test_a_group_with_a_newline_is_refused_on_one_line(
+    recorded: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-22."""
+    status, _stdout, stderr = stats(capsys, "2026-11-01\n..2026-11-07", UNUSED_TAG)
+
+    assert (status, stderr.count("\n")) == (2, 1)
+    assert stderr.startswith("ERROR: group ")
+
+
+def test_a_checkout_without_a_tracked_configuration_is_refused(
+    recorded: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-18, PIN-32."""
+    real_git(recorded, "rm", "-q", str(workboard.CONFIG_PATH))
+    real_git(recorded, "commit", "-q", "-m", "drop the board configuration")
+
+    status, stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG, "--json")
+
+    payload = json.loads(stdout)
+    assert (status, payload["reason"]) == (2, "unavailable")
+    assert stderr == f"ERROR: {payload['message']}\n"
+    assert payload["message"].startswith(f"{workboard.CONFIG_PATH} was removed on this branch")
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        pytest.param("production_paths = 'src/'", id="no-list"),
+        pytest.param("production_paths = ['/src/']", id="an-absolute-entry"),
+    ],
+)
+def test_a_malformed_production_paths_is_refused_although_stats_reads_no_size(
+    recorded: Path, capsys: pytest.CaptureFixture[str], entry: str
+) -> None:
+    """Spec: STATS-18, PIN-55, PIN-56."""
+    track_board_config(recorded, f"{entry}\n")
+
+    status, stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG, "--json")
+
+    payload = json.loads(stdout)
+    assert (status, payload["reason"]) == (2, "unavailable")
+    assert stderr == f"ERROR: {payload['message']}\n"
+    assert payload["message"].startswith("board configuration ")
+    assert " production_paths " in payload["message"]
+
+
+def test_stats_outside_a_checkout_says_it_reads_the_configuration(
+    outside_a_checkout: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-19."""
+    status, _stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG)
+
+    assert status == 2
+    assert stderr.startswith(
+        f"ERROR: this command reads the repository's configuration from {workboard.CONFIG_PATH} "
+        "and needs a checkout (a shallow one is enough): "
+    )
+    assert "body contract" not in stderr
+
+
+def test_the_help_says_a_day_is_a_utc_day_and_gives_the_tag_grammar(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: STATS-20."""
+    status, stdout, _stderr = stats(capsys, "--help")
+
+    flat = " ".join(stdout.split())
+    assert status == 0
+    assert "UTC calendar day" in flat
+    assert f"tag:NAME where NAME is {lane_measure.TAG_GRAMMAR}" in flat

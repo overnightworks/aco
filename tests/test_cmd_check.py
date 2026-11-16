@@ -28,7 +28,7 @@ IN_BOTH_FORMS = pytest.mark.parametrize("flags", [[], ["--json"]], ids=["text", 
 STATE_REF_CONFIG = 'storage = "state-ref"\n'
 GIT_DETAIL = "fatal: not a git repository (or any of the parent directories): .git"
 NEEDS_A_CHECKOUT = (
-    "this command reads the repository's body contract from .aco/board.toml "
+    "this command reads the repository's configuration from .aco/board.toml "
     f"and needs a checkout (a shallow one is enough): {GIT_DETAIL}"
 )
 REPO_UNDER_STATE_REF = "--repo is meaningless under storage = state-ref"

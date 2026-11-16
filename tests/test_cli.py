@@ -2225,7 +2225,7 @@ def test_start_resume_refuses_when_the_worktree_toplevel_read_exits_nonzero(
     captured = capsys.readouterr()
     assert (status, captured.out) == (2, "")
     assert captured.err == (
-        "ERROR: this command reads the repository's body contract from .aco/board.toml "
+        "ERROR: this command reads the repository's configuration from .aco/board.toml "
         "and needs a checkout (a shallow one is enough): fatal: not a work tree\n"
     )
 

@@ -16,6 +16,10 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 | a commit that records no lane | STATS-12 | STATS-12 |
 | the global `--repo` | STATS-13 | STATS-13 |
 | a state ref that cannot be read | STATS-14 | STATS-14 |
+| a checkout without a usable configuration, or none | STATS-18, STATS-19 | STATS-18, STATS-19 |
+| `--help` | STATS-20 | — |
+| a stage's choices | STATS-10 | STATS-21 |
+| a group with a control character | STATS-22 | STATS-22 |
 | no state ref, or none with a record | STATS-15 | STATS-15 |
 
 ## Reading the lanes
@@ -41,11 +45,16 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 
 ## Refusals
 
-- [ ] [STATS-05] A group that is neither form refuses `group '<text>' must be FROM..TO as YYYY-MM-DD days or tag:NAME`, exit `2`, `invalid_usage` (see E-STATS-03).
-- [ ] [STATS-16] A range with an impossible day refuses `group '<text>' holds an impossible day`, one that ends before it starts `group '<text>' ends before it starts`; exit `2`, `invalid_usage`.
-- [ ] [STATS-17] A tag that does not fit STATS-03 refuses `group '<text>' names no tag: a tag is 1 to 40 lowercase letters, digits or '-'`, exit `2`, `invalid_usage`.
+- [ ] [STATS-05] A group that is neither form refuses `group <text> must be FROM..TO as YYYY-MM-DD days or tag:NAME`, exit `2`, `invalid_usage` (see E-STATS-03).
+- [ ] [STATS-16] A range with an impossible day refuses `group <text> holds an impossible day`, one that ends before it starts `group <text> ends before it starts`; exit `2`, `invalid_usage`.
+- [ ] [STATS-17] A tag that does not fit STATS-03 refuses `group <text> names no tag: a tag is 1 to 40 lowercase letters, digits or '-'`, exit `2`, `invalid_usage`.
 - [ ] [STATS-13] The global `--repo` refuses `aco stats reads this checkout's own state ref; --repo does not apply to it`, exit `2`; `--json` has `reason` `invalid_usage` (see E-STATS-04).
 - [ ] [STATS-14] A checkout that cannot read the state ref (no canonical remote, a failed fetch or `git log`) prints `ERROR: <sentence>` on stderr, exit `2`; `--json` has `reason` `unavailable` (see E-STATS-05).
+- [ ] [STATS-18] The shared configuration read refuses before any lane is read: no tracked `.aco/board.toml` with PIN-32's sentence, a malformed `production_paths` with PIN-55's or PIN-56's; exit `2`, `unavailable`.
+- [ ] [STATS-19] Run outside a git checkout, stats refuses with `<no-checkout sentence>` of `specs/check.spec.md`, which names the configuration it reads, never a body contract; exit `2`, `unavailable`.
+- [ ] [STATS-20] `aco stats --help` says that a day is a UTC calendar day and gives STATS-03's tag grammar.
+- [ ] [STATS-21] The order of a stage's `choices` in `--json` carries no meaning; only the text form is ordered (STATS-10).
+- [ ] [STATS-22] A refusal prints a group argument as Python's `repr` writes it (`'yesterday'`), so a newline in it prints escaped and the `ERROR:` line stays one line.
 
 `reason`, by which refusal fired:
 
@@ -53,7 +62,7 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 |---|---|
 | STATS-05, STATS-16, STATS-17 (a group) | `invalid_usage` |
 | STATS-13 (`--repo`) | `invalid_usage` |
-| STATS-14 (the state ref cannot be read) | `unavailable` |
+| STATS-14, STATS-18, STATS-19 (the state ref or the configuration cannot be read) | `unavailable` |
 
 ## Never
 

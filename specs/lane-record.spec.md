@@ -20,7 +20,7 @@ reason (an abandoned one).
 | wall time | LANREC-08 | LANREC-08 |
 | production size | LANREC-09, LANREC-10, LANREC-25 | — |
 | the routing line | LANREC-13..LANREC-15 | LANREC-13, LANREC-14 |
-| the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24 |
+| the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 |
 | a figure that cannot be computed | LANREC-21 | LANREC-21 |
 | a malformed `production_paths` | LANREC-22 | LANREC-22 |
 
@@ -60,6 +60,8 @@ Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effo
 - [ ] [LANREC-23] A doubled `Fix rounds:`, `Experiment:` or `Blocking:` sentence, `Blocking: none` plus more, or stages out of LANREC-16's order record that field as unknown; the others still read.
 - [ ] [LANREC-24] The word after a finding's `→` is never checked against the six stages: `ci`, `head` and any other word count the finding, because the line's writer owns the destinations.
 - [ ] [LANREC-25] `production_paths = []` is the key left unset: the three size figures have no line (LANREC-10), never a measured zero.
+- [ ] [LANREC-26] Stages out of LANREC-16's order leave all six stage fields unknown, those standing in order included; `Fix rounds:`, `Blocking:` and `Experiment:` still record.
+- [ ] [LANREC-27] A `×` counts only when a space follows it: `3×3 matrix → ci` is one finding.
 
 ## Failure
 

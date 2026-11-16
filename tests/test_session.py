@@ -650,25 +650,25 @@ def test_a_repo_that_is_not_owner_slash_repo_refuses_before_any_git_or_gh_call(
     [
         pytest.param(
             process.ProcessTimedOutError("slow"),
-            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "this command reads the repository's configuration from .aco/board.toml and needs a "
             "checkout (a shallow one is enough): git rev-parse timed out",
             id="times-out",
         ),
         pytest.param(
             process.ExecutableMissingError("git"),
-            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "this command reads the repository's configuration from .aco/board.toml and needs a "
             "checkout (a shallow one is enough): git is required for issue claims",
             id="not-installed",
         ),
         pytest.param(
             OSError("denied"),
-            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "this command reads the repository's configuration from .aco/board.toml and needs a "
             "checkout (a shallow one is enough): git failed to launch: denied",
             id="fails-to-launch",
         ),
         pytest.param(
             process.CapturedResult(128, b"", b"fatal: not a work tree"),
-            "this command reads the repository's body contract from .aco/board.toml and needs a "
+            "this command reads the repository's configuration from .aco/board.toml and needs a "
             "checkout (a shallow one is enough): fatal: not a work tree",
             id="exit-status-is-the-toplevel-refusal",
         ),

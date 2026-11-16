@@ -127,13 +127,14 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
         pytest.param("\u00d7 → review", 1, id="a-multiplication-sign-without-a-number"),
         pytest.param("0\u00d7 → review", None, id="a-zero-count"),
         pytest.param("1000\u00d7 → review", 1, id="four-digits-are-no-counted-form"),
+        pytest.param("3\u00d73 matrix → ci", 1, id="a-multiplication-sign-inside-a-word"),
         pytest.param("", None, id="empty"),
     ],
 )
 def test_the_blocking_count_is_one_per_arrow_or_unknown_when_ambiguous(
     blocking: str, expected_count: int | None
 ) -> None:
-    """Spec: LANREC-19, LANREC-23, LANREC-24."""
+    """Spec: LANREC-19, LANREC-23, LANREC-24, LANREC-27."""
     assert read(f"Routing: build a/b. Fix rounds: 0. Blocking: {blocking}")[2] == expected_count
 
 
@@ -236,6 +237,16 @@ def test_a_stage_that_does_not_fit_is_left_out_and_the_others_stay(
 ) -> None:
     """Spec: LANREC-16, LANREC-17, LANREC-23."""
     assert read(f"Routing: {stages}. Fix rounds: 0. Blocking: none")[0] == expected
+
+
+def test_stages_out_of_order_leave_every_stage_unknown_and_the_other_fields_read() -> None:
+    """Spec: LANREC-16, LANREC-26."""
+    line = (
+        "Routing: build a/b; review c/d; fix none. "
+        "Fix rounds: 2. Experiment: tag-1. Blocking: x → ci"
+    )
+
+    assert read(line) == ((), 2, 1, "tag-1")
 
 
 def test_a_line_that_ends_after_its_stages_still_reads_them() -> None:

@@ -152,6 +152,10 @@ def utc_today() -> date:
     return datetime.now(UTC).date()
 
 
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 def run_context(repo: forge.RepositoryId | None) -> RunContext:
     """This run's root context, built once the command is known to need a
     repository at all."""
@@ -388,7 +392,8 @@ class RunContext:
     `directory` is the checkout this context answers for, or `None` for
     the calling process's own cwd. `build_forge` turns this context's facts
     into the storage pin's forge adapter; the context holds what it builds.
-    `today` is the run's clock; `rule` reads its one date from it.
+    `today` is the run's clock; `rule` reads its one date from it. `now` is the run's
+    timestamp clock; a release reads its wall time from it.
     `ruling_search` is the forge's search for rulings, which `ask` reads.
     `board_probe` is the forge's cheap change check, which `aco wait` reads.
     """
@@ -402,10 +407,12 @@ class RunContext:
         board_probe: forge.BoardProbe,
         directory: Path | None = None,
         today: Callable[[], date] = utc_today,
+        now: Callable[[], datetime] = utc_now,
     ) -> None:
         self.repo = repo
         self.directory = directory
         self.today = today
+        self.now = now
         self.ruling_search = ruling_search
         self.board_probe = board_probe
         self._build_forge = build_forge
@@ -422,6 +429,7 @@ class RunContext:
             build_forge=self._build_forge,
             directory=directory,
             today=self.today,
+            now=self.now,
             ruling_search=self.ruling_search,
             board_probe=self.board_probe,
         )
@@ -441,6 +449,7 @@ class RunContext:
             build_forge=self._build_forge,
             directory=self.directory,
             today=self.today,
+            now=self.now,
             ruling_search=self.ruling_search,
             board_probe=self.board_probe,
         )
@@ -475,7 +484,7 @@ class RunContext:
             )
         except protocol.ClaimError as error:
             raise protocol.ClaimUnavailableError(
-                "this command reads the repository's body contract from "
+                "this command reads the repository's configuration from "
                 f"{workboard.CONFIG_PATH} and needs a checkout (a shallow one is "
                 f"enough): {error}"
             ) from error

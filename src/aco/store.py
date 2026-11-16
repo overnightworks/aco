@@ -804,9 +804,9 @@ def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
 
 
 def peek_state(*, worktree: Path, remote: str) -> ClaimState:
-    """Read `STATE_REF` on `remote` for a caller that must not write (`land`'s read-only
-    preflight): one of the two peeks in this module, with `peek_state_for_reset`, that read
-    through `_peek_tip` and so skip `fetch_state`'s own lineage guard, anchor, and stamp.
+    """Read `STATE_REF` on `remote` for a caller that must not write: one of the two peeks in
+    this module, with `peek_state_for_reset`, that read through `_peek_tip` and so skip
+    `fetch_state`'s own lineage guard, anchor, and stamp.
 
     The tip is `ls_remote_state`'s own answer: the fetch that follows (`_fetch_ref_objects`)
     only brings the objects into this worktree's local store so `_parse_state_tree` can read
@@ -817,15 +817,12 @@ def peek_state(*, worktree: Path, remote: str) -> ClaimState:
     reachable tag on `STATE_REF`'s own history from auto-following into the shared local
     `refs/tags/*` namespace during this read.
 
-    `reset` reads this way, through `peek_state_for_reset`, to recover from exactly what
-    `fetch_state`'s lineage check refuses -- a rewritten or deleted ref this worktree's own stamp
-    disagrees with -- so it reads and acts on whatever tip is on `remote` right now, never
-    against this worktree's history. `land`'s preflight uses it to observe a live claim before
-    its first write: a pull request this preflight goes on to refuse must never have anchored a
-    ref or stamped a lineage when the merge never happens. Both callers share the same
-    requirement -- a dry run, a live-claim refusal, a failed export, or a refused merge must
-    change nothing durable -- so this performs no per-worktree write at all: no anchor write, no
-    `lineage_stamp` write, no local tag, no `FETCH_HEAD`. `fetch_state` stays the write-capable
+    The callers share one requirement: a read that may be refused, dry-run or only reported
+    must change nothing durable, even when the merge, the export or the report never happens, so
+    this performs no per-worktree write at all: no anchor write, no `lineage_stamp` write, no
+    local tag, no `FETCH_HEAD`. `peek_state_for_reset` also reads whatever tip is on `remote`
+    right now, never against this worktree's history, to recover from what `fetch_state`'s
+    lineage check refuses. `fetch_state` stays the write-capable
     read every live transition (`claim`, `release`, ...) still needs, since those callers go on
     to write and must keep this worktree's own lineage current.
     """

@@ -430,7 +430,7 @@ def test_an_untracked_scope_entry_outside_a_working_tree_keeps_the_checkout_refu
 
     assert status == 2
     assert capsys.readouterr().err == (
-        "ERROR: this command reads the repository's body contract from "
+        "ERROR: this command reads the repository's configuration from "
         ".aco/board.toml and needs a checkout (a shallow one is "
         "enough): fatal: this operation must be run in a work tree\n"
     )
