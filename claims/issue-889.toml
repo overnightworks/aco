@@ -3,5 +3,6 @@ agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
 role = "builder"
 base = "a744e1efd039d6aedce14c79b35244a61e8ed2c6"
 branch = "claude/issue-889-queued-rerun-refuses-other-head"
-scope = ["specs/land.spec.md", "src/aco/cmd_land_queue.py", "tests/test_cmd_land_queue.py"]
+scope = ["quality/config.toml", "specs/land.spec.md", "src/aco/cmd_land.py", "src/aco/cmd_land_queue.py", "src/aco/forge.py", "tests/test_cmd_land_queue.py", "tests/test_forge.py"]
 opened_commit = "09c58011f44d1934c5fe5978dda88df31d8f1899"
+whole_reason = "the refusal hooks into the land flow, its head-prefix rule sits beside the forge records, and the gate demanded the orphaned advisory allowance gone"
