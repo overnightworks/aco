@@ -17,11 +17,6 @@ from aco import store
 from aco.lane_record import LaneOutcome, LaneRecord, ProductionSize
 from aco.routing_line import RoutingLine, RoutingStage
 
-SONNET = "sonnet-5.5/high"
-REVIEWER = "opus-5.5/medium"
-OPUS = "opus-5.5/high"
-LANDING = "haiku-5.5/low"
-NO_BLOCKING_FINDING = None
 UNUSED_TAG = "tag:unused"
 
 
@@ -54,58 +49,63 @@ def routing(
     return RoutingLine(stages, fix_rounds, blocking, experiment)
 
 
-RELEASES = (
-    (
-        at("2026-11-02T12:00:00"),
-        LaneRecord(
-            LaneOutcome.LANDED,
-            merge_commit="a" * 40,
-            wall_seconds=1800,
-            size=ProductionSize(files=2, added=40, deleted=5),
-            routing=routing(
-                {
-                    RoutingStage.BUILD: SONNET,
-                    RoutingStage.FIX: "none",
-                    RoutingStage.REVIEW: REVIEWER,
-                    RoutingStage.LAND: LANDING,
-                },
-                fix_rounds=1,
-                blocking=2,
-                experiment="builder-sonnet",
-            ),
-        ).trailers(),
-    ),
-    (
-        at("2026-11-03T23:59:59"),
-        LaneRecord(
-            LaneOutcome.LANDED,
-            wall_seconds=3000,
-            size=ProductionSize(files=4, added=100, deleted=20),
-            routing=routing(
-                {RoutingStage.BUILD: SONNET, RoutingStage.REVIEW: REVIEWER},
-                fix_rounds=2,
-                blocking=NO_BLOCKING_FINDING,
-                experiment="builder-sonnet",
-            ),
-        ).trailers(),
-    ),
-    (
-        at("2026-11-09T00:00:00"),
-        LaneRecord(
-            LaneOutcome.LANDED,
-            wall_seconds=1200,
-            routing=routing(
-                {RoutingStage.BUILD: OPUS}, fix_rounds=0, blocking=0, experiment="builder-opus"
-            ),
-        ).trailers(),
-    ),
-    (
-        at("2026-11-10T12:00:00"),
-        LaneRecord(LaneOutcome.ABANDONED, wall_seconds=60).trailers(),
-    ),
-    (at("2026-11-04T12:00:00"), ()),
-    (at("2026-11-05T12:00:00"), ("lane_outcome: paused", "lane_wall_seconds: 5")),
-)
+def released_commits() -> tuple[tuple[int, tuple[str, ...]], ...]:
+    """The commits pushed to the state ref: four recorded lanes and two commits that are none."""
+    return (
+        (
+            at("2026-11-02T12:00:00"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                merge_commit="a" * 40,
+                wall_seconds=1800,
+                size=ProductionSize(files=2, added=40, deleted=5),
+                routing=routing(
+                    {
+                        RoutingStage.BUILD: "sonnet-5.5/high",
+                        RoutingStage.FIX: "none",
+                        RoutingStage.REVIEW: "opus-5.5/medium",
+                        RoutingStage.LAND: "haiku-5.5/low",
+                    },
+                    fix_rounds=1,
+                    blocking=2,
+                    experiment="builder-sonnet",
+                ),
+            ).trailers(),
+        ),
+        (
+            at("2026-11-03T23:59:59"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                wall_seconds=3000,
+                size=ProductionSize(files=4, added=100, deleted=20),
+                routing=routing(
+                    {RoutingStage.BUILD: "sonnet-5.5/high", RoutingStage.REVIEW: "opus-5.5/medium"},
+                    fix_rounds=2,
+                    blocking=None,
+                    experiment="builder-sonnet",
+                ),
+            ).trailers(),
+        ),
+        (
+            at("2026-11-09T00:00:00"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                wall_seconds=1200,
+                routing=routing(
+                    {RoutingStage.BUILD: "opus-5.5/high"},
+                    fix_rounds=0,
+                    blocking=0,
+                    experiment="builder-opus",
+                ),
+            ).trailers(),
+        ),
+        (
+            at("2026-11-10T12:00:00"),
+            LaneRecord(LaneOutcome.ABANDONED, wall_seconds=60).trailers(),
+        ),
+        (at("2026-11-04T12:00:00"), ()),
+        (at("2026-11-05T12:00:00"), ("lane_outcome: paused", "lane_wall_seconds: 5")),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -117,7 +117,7 @@ def _no_forge(monkeypatch: pytest.MonkeyPatch) -> None:
 def recorded(clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A bootstrapped state ref that holds four recorded lanes and two commits that are none."""
     publish_claims_from_a_second_clone(clone, bare_remote, ())
-    for released_at, trailers in RELEASES:
+    for released_at, trailers in released_commits():
         push_release_commit(monkeypatch, clone, bare_remote, release_message(trailers), released_at)
     return clone
 
@@ -143,12 +143,12 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  added: median 70, n 2, unknown 0",
         "  deleted: median 12.5, n 2, unknown 0",
         "  cost: median unknown, n 0, unknown 2",
-        f"  build: {SONNET} 2, unknown 0",
+        "  build: sonnet-5.5/high 2, unknown 0",
         "  fix: none 1, unknown 1",
-        f"  review: {REVIEWER} 2, unknown 0",
+        "  review: opus-5.5/medium 2, unknown 0",
         "  test: unknown 2",
         "  gate: unknown 2",
-        f"  land: {LANDING} 1, unknown 1",
+        "  land: haiku-5.5/low 1, unknown 1",
         "B tag:builder-opus: lanes 1 (landed 1, abandoned 0)",
         "  wall_seconds: median 1200, n 1, unknown 0",
         "  fix_rounds: median 0, n 1, unknown 0",
@@ -157,7 +157,7 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  added: median unknown, n 0, unknown 1",
         "  deleted: median unknown, n 0, unknown 1",
         "  cost: median unknown, n 0, unknown 1",
-        f"  build: {OPUS} 1, unknown 0",
+        "  build: opus-5.5/high 1, unknown 0",
         "  fix: unknown 1",
         "  review: unknown 1",
         "  test: unknown 1",
@@ -177,7 +177,7 @@ def test_json_carries_the_same_figures_under_the_shared_envelope(
     assert list(payload) == ["ok", "reason", "a", "b"]
     assert (payload["ok"], payload["reason"]) == (True, "compared")
     assert payload["a"]["figures"]["fix_rounds"] == {"median": 1.5, "n": 2, "unknown": 0}
-    assert payload["a"]["stages"]["land"] == {"choices": {LANDING: 1}, "unknown": 1}
+    assert payload["a"]["stages"]["land"] == {"choices": {"haiku-5.5/low": 1}, "unknown": 1}
     assert payload["b"] == {
         "group": "tag:builder-opus",
         "lanes": 1,
@@ -192,7 +192,7 @@ def test_json_carries_the_same_figures_under_the_shared_envelope(
             "cost": {"median": None, "n": 0, "unknown": 1},
         },
         "stages": {
-            "build": {"choices": {OPUS: 1}, "unknown": 0},
+            "build": {"choices": {"opus-5.5/high": 1}, "unknown": 0},
             "fix": {"choices": {}, "unknown": 1},
             "review": {"choices": {}, "unknown": 1},
             "test": {"choices": {}, "unknown": 1},
