@@ -3,6 +3,7 @@
 The figures come from real git history in a temporary repository; releases run through the
 real CLI against the real state ref, with the forge as the only fake."""
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -11,6 +12,8 @@ import pytest
 from board_fixtures import REPOSITORY, standing_active_claim
 from claim_worktrees import lane_held_by_ada, make_stand_in
 from cli_fixtures import (
+    FROZEN_CLI_NOW,
+    FixedDateTime,
     push_repository_trunk,
     real_git,
     real_repository_with_bare_remote,
@@ -22,7 +25,7 @@ from github_fixtures import FakeForge
 from merged_release import arrange_merged_pull_request
 from store_fixtures import claim_intent
 
-from aco import protocol, store, workboard
+from aco import lane_record, protocol, store, workboard
 from aco.lane_record import (
     LaneOutcome,
     LaneRecord,
@@ -600,6 +603,28 @@ def test_an_abandoned_release_leaves_a_record_from_its_reason(
         f"lane_wall_seconds: {release_date - claim_date}",
     )
     assert lines[2:] == ROUTING_TRAILERS
+
+
+def test_a_release_is_dated_by_the_clock_the_record_reads(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: LANREC-01, STATS-02."""
+    stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
+    stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
+    monkeypatch.setattr(lane_record, "datetime", FixedDateTime)
+    release = ["--repo", REPOSITORY, "release", "--agent", "Ada", "--abandoned", ROUTING]
+    day = FROZEN_CLI_NOW.date().isoformat()
+
+    released = run_cli(release, capsys)
+    selected = run_cli(["stats", f"{day}..{day}", "tag:builder-sonnet", "--json"], capsys)
+
+    release_date = real_git(bare_remote, "log", "-1", "--format=%ct", store.STATE_REF).stdout
+    assert (released.status, int(release_date)) == (0, int(FROZEN_CLI_NOW.timestamp()))
+    assert json.loads(selected.stdout)["a"]["lanes"] == 1
 
 
 def test_a_record_survives_a_push_that_loses_its_race(bare_remote: Path, worktree: Path) -> None:
