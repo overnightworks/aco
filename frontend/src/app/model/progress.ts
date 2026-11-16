@@ -59,7 +59,7 @@ const SECONDS_PER_MINUTE = 60;
 
 function laneTime(seconds: number | null): string {
 	if (seconds === null) return 'time unknown';
-	if (seconds < SECONDS_PER_HOUR) return `${Math.round(seconds / SECONDS_PER_MINUTE)} min`;
+	if (seconds < SECONDS_PER_HOUR) return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min`;
 	return `${Number((seconds / SECONDS_PER_HOUR).toFixed(1))} h`;
 }
 
