@@ -61,7 +61,7 @@ Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effo
 - [ ] [LANREC-24] The word after a finding's `→` is never checked against the six stages: `ci`, `head` and any other word count the finding, because the line's writer owns the destinations.
 - [ ] [LANREC-25] `production_paths = []` is the key left unset: the three size figures have no line (LANREC-10), never a measured zero.
 - [ ] [LANREC-26] Stages out of LANREC-16's order leave all six stage fields unknown, those standing in order included; `Fix rounds:`, `Blocking:` and `Experiment:` still record.
-- [ ] [LANREC-27] A `×` counts only when a space or the end of the finding follows it: `3×3 matrix → ci` is one finding.
+- [ ] [LANREC-27] A `×` counts only when a space follows it: `3×3 matrix → ci` is one finding.
 
 ## Failure
 

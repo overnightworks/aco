@@ -39,7 +39,7 @@ _NO_BLOCKING_LEAD = re.compile(r"none(?=\.|\s|$)")
 _NO_BLOCKING = re.compile(r"none\.?")
 _ARROW = "→"
 _STAGE_AFTER_ARROW = re.compile(_ARROW + r"\s*[A-Za-z][A-Za-z0-9-]*")
-_COUNTED_FINDING = re.compile(r"\s*(\d{1,3})\u00d7(?:\s|$)")
+_COUNTED_FINDING = re.compile(r"\s*(\d{1,3})\u00d7\s")
 
 
 @dataclass(frozen=True)

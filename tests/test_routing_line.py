@@ -128,7 +128,6 @@ def test_fix_rounds_are_a_short_whole_number_or_unknown(
         pytest.param("0\u00d7 → review", None, id="a-zero-count"),
         pytest.param("1000\u00d7 → review", 1, id="four-digits-are-no-counted-form"),
         pytest.param("3\u00d73 matrix → ci", 1, id="a-multiplication-sign-inside-a-word"),
-        pytest.param("3\u00d7", None, id="a-count-with-no-arrow"),
         pytest.param("", None, id="empty"),
     ],
 )
