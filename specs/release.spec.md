@@ -38,7 +38,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 | `--branch` omitted, issue without `--claim-id`, empty checkout branch | REL-07 | REL-07 | REL-07 |
 | `--coordinator-override` without `--role coordinator` | REL-08 | REL-08 | REL-08 |
 | identity/branch resolve to no live claim | REL-09 | REL-09, REL-54 | REL-09 |
-| no live claim on the identity, no `--claim-id`, the landing verified | — | REL-47, REL-49..REL-51, REL-65 | — |
+| no live claim on the identity, no `--claim-id`, the landing verified | — | REL-47, REL-49..REL-51, REL-65, REL-66 | — |
 | a live claim off the landing's own branch | — | REL-48, REL-56 | — |
 | a live claim on that branch opened from a trunk already holding the landing | — | REL-53 | — |
 | `--claim-id` mismatches the resolved claim | REL-10 | REL-10 | REL-10 |
@@ -102,8 +102,9 @@ GitHub closes the item at merge time through `Closes #<n>`.
 - [ ] [REL-54] An issue-less lane's pull request merged from a branch other than the release's own is no such rerun: REL-09 refuses.
 - [ ] [REL-49] Its text is `LANDED <landing> already; nothing left to release`, `<landing>` `pull request #<n>` or, under `storage = "state-ref"`, `commit <sha>`, then its `worktree:` line (REL-65).
 - [ ] [REL-50] Its cleanup (REL-25..REL-34) acts on the pull request's own source branch, or under `storage = "state-ref"` on the release's own branch (REL-04, REL-06).
-- [ ] [REL-51] Its `--json` prints `specs/output.spec.md`'s envelope, `reason` `merged`, then `outcome` `"nothing left to release"`, `issue`, `lane`, `branch`, `worktree` (REL-65).
+- [ ] [REL-51] Its `--json` prints `specs/output.spec.md`'s envelope, `reason` `merged`, then `outcome` `"nothing left to release"`, `issue`, `lane`, `branch` (REL-66), `worktree` (REL-65).
 - [ ] [REL-65] A rerun with no claim and no local lane branch (the default branch is never one) prints no `worktree:` line, `worktree` `null` even with `--keep-worktree`; with the branch, REL-30.
+- [ ] [REL-66] That rerun on the default branch, given or current, has no lane branch: its `--json` `branch` is `null`, the trunk never standing in for one.
 - [ ] [REL-55] It reads the claim state afresh right before that cleanup; a claim on the identity found then keeps both: `worktree: kept -- claimed again while this release ran`.
 - [ ] [REL-59] That rerun reads the claim state afresh right before its cleanup (REL-55): any live claim then on the branch, issue or lane, keeps both: `worktree: kept -- claimed again while this release ran`.
 

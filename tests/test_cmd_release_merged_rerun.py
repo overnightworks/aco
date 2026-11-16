@@ -41,20 +41,28 @@ def seed_open_item(clone: Path, remote: Path) -> None:
 @pytest.mark.parametrize(
     "branch_flags", [(), ("--branch", "main")], ids=["no-branch", "trunk-branch"]
 )
-@pytest.mark.parametrize("output_flags", [(), ("--json",)], ids=["text", "json"])
-def test_a_merged_rerun_from_the_trunk_leaves_the_lane_worktree_alone(
+@pytest.mark.parametrize(
+    ("output_flags", "expected_output"),
+    [
+        ((), "LANDED commit {merge_commit} already; nothing left to release\n"),
+        (("--json",), {"branch": None, "worktree": None}),
+    ],
+    ids=["text", "json"],
+)
+def test_a_merged_rerun_from_the_trunk_reports_no_lane_branch_and_removes_nothing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     github_clone: Path,
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
     output_flags: tuple[str, ...],
+    expected_output: str | dict[str, None],
     branch_flags: tuple[str, ...],
 ) -> None:
-    """Spec: REL-47, REL-50, REL-65. A rerun with no claim, run from the
+    """Spec: REL-47, REL-50, REL-65, REL-66. A rerun with no claim, run from the
     default branch with or without `--branch` naming it, has no lane branch: it
-    prints no `worktree:` line and removes nothing, the lane's worktree and
-    branch included."""
+    prints no `worktree:` line and `--json` `branch` `null`, and removes nothing, the
+    lane's worktree and branch included."""
     landing = arrange_merged_pull_request(
         monkeypatch,
         github_clone,
@@ -86,10 +94,17 @@ def test_a_merged_rerun_from_the_trunk_leaves_the_lane_worktree_alone(
     )
 
     assert (result.status, result.stderr) == (0, "")
-    assert (json.loads(result.stdout)["worktree"] if output_flags else result.stdout) in (
-        None,
-        f"LANDED commit {landing.merge_commit} already; nothing left to release\n",
+    printed = (
+        {field: json.loads(result.stdout)[field] for field in ("branch", "worktree")}
+        if output_flags
+        else result.stdout
     )
+    expected = (
+        expected_output.format(merge_commit=landing.merge_commit)
+        if isinstance(expected_output, str)
+        else expected_output
+    )
+    assert printed == expected
     assert state_ref_tip(bare_remote) == tip_before
     assert lane_worktree.is_dir()
     assert real_git(github_clone, "branch", "--list", LANDING_BRANCH).stdout.strip()
