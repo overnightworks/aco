@@ -31,7 +31,7 @@ reason (an abandoned one).
 - [ ] [LANREC-02] A release with nothing left to release (REL-47) writes no commit and so no record.
 - [ ] [LANREC-03] The record is computed once, before the release commit is pushed: a push repeated after a lost race carries the same record.
 - [ ] [LANREC-04] A trailer line is `<key>: <value>`. A figure that cannot be computed has no line: a missing line means unknown, and `0` is written only for a measured zero.
-- [ ] [LANREC-05] A value is a validated token: an outcome, a sha, a model or effort name, a size class, a whole number or a tag (LANREC-17..LANREC-20, LANREC-28). A finding, a reason or any other free text never reaches a trailer.
+- [ ] [LANREC-05] A value is a validated token: an outcome, a sha, a model or effort name, a size class, a whole number or a tag. A finding, a reason or any other free text never reaches a trailer.
 - [ ] [LANREC-06] `lane_outcome` is `landed` for `--merged` and `abandoned` for `--abandoned`; every record carries it.
 - [ ] [LANREC-07] `lane_merge` is the 40-character sha of the merge commit the lane landed as: the forge's recorded one under `github` storage, the resolved trunk commit under `state-ref`. An abandoned lane has none.
 - [ ] [LANREC-08] `lane_wall_seconds` is the whole seconds from the state-ref commit that added the claim (adopted: its adoption) to the merge commit's committer date, or the release commit's if abandoned.
