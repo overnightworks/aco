@@ -1,0 +1,8 @@
+claim_id = "f0b48e7372614295a4ec24c16260f9a8"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "606e5aaf464465c76f38d9489e9c3de0f1b3e2b2"
+branch = "claude/issue-890-the-gate-and-release-pins-move-to-qualit"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", ".github/workflows/release.yml", "quality/baseline.toml"]
+opened_commit = "b1a1ba1cd05f4fb6d46a4652588b70266bd24c8d"
+whole_reason = "four workflow pins and the baseline the new rules may write move together"
