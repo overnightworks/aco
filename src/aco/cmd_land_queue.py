@@ -2,6 +2,7 @@
 written into the pull request, one enqueue pinned to the preflight head, and the wait for
 the queue's verdict. `cmd_land` decides when this path runs and what follows a merge."""
 
+import sys
 import time
 from collections.abc import Callable
 
@@ -27,6 +28,7 @@ _QUEUE_READ_FAILED = (
     "reading the merge queue state of pull request #{number} failed ({foreign}); "
     "re-run aco land {number}"
 )
+_WAITING = "waiting for pull request #{number} in the merge queue"
 _REMOVED = (
     "pull request #{number} was removed from the merge queue ({foreign}); re-run aco land {number}"
 )
@@ -56,7 +58,7 @@ def enqueue(client: github.GitHubForge, detail: forge.Landing, head_sha: str, me
     which the queue's squash takes as its own, unless it already does. A failure leaves
     the pull request as it was and the claim standing; a re-run reads the queue first."""
     number = detail.number
-    if detail.body != message:
+    if detail.body.rstrip("\n") != message.rstrip("\n"):
         try:
             client.update_item_body(number, message, replacing=detail.body)
         except protocol.ClaimError as error:
@@ -109,7 +111,11 @@ def await_merge(
 ) -> str:
     """The merge commit once the queue merged the pull request. `state` is the latest
     read, judged at once; every read after it follows `pause`. A pull request that left
-    the queue refuses and the claim stays."""
+    the queue refuses and the claim stays. A pull request still queued at the start says
+    once on stderr that it waits."""
+    if isinstance(state, forge.QueuedPullRequest):
+        sys.stderr.write(_WAITING.format(number=number) + "\n")
+        sys.stderr.flush()
     unqueued_reads = 0
     while not isinstance(state, forge.MergedPullRequest):
         unqueued_reads = unqueued_reads + 1 if isinstance(state, forge.UnqueuedPullRequest) else 0
