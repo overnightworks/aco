@@ -111,12 +111,12 @@ def shown(work: RemainingWork) -> tuple[int, int, int, list[tuple[Size | None, i
 
 
 def test_no_recorded_lane_leaves_no_range() -> None:
-    """Spec: ABRD-142."""
+    """Spec: ABRD-144."""
     assert priced([], [Size.SMALL]) is NoRange.NO_RECORDS
 
 
 def test_under_five_pooled_items_leave_no_range() -> None:
-    """Spec: ABRD-141."""
+    """Spec: ABRD-144."""
     lanes = items_of(Size.SMALL, [60, 120, 180, 240])
 
     assert priced(lanes, [Size.SMALL]) is NoRange.TOO_FEW
@@ -160,7 +160,7 @@ def test_a_class_under_five_items_and_an_unsized_lane_use_the_pooled_distributio
 
 
 def test_an_item_is_one_sample_over_all_its_records_sized_by_its_latest_landed_one() -> None:
-    """Spec: ABRD-141."""
+    """Spec: ABRD-142."""
     lanes = [
         finished(1, 100, outcome=LaneOutcome.ABANDONED),
         finished(1, 200, Size.SMALL, released_at=RELEASED_AT + 1),
@@ -192,7 +192,7 @@ def test_an_item_is_one_sample_over_all_its_records_sized_by_its_latest_landed_o
 def test_an_item_whose_time_is_not_fully_known_or_that_never_landed_is_no_sample(
     unsampled: list[RecordedLane],
 ) -> None:
-    """Spec: ABRD-141."""
+    """Spec: ABRD-144."""
     lanes = items_of(None, [10, 20, 30, 40], first_issue=100) + unsampled
 
     assert priced(lanes, [None]) is NoRange.TOO_FEW

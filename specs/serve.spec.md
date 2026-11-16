@@ -203,7 +203,7 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 
 ## Progress
 
-- [ ] [ABRD-131] Each repo's `progress` lists its top-level containers: `closed`, `landed` (ABRD-136), `planned` (children and uncut `[[slice]]` rows), `open`, `uncut`, `waiting` (ABRD-137), `percent` and the work left, `lanes_left` and `estimate` (ABRD-140 to ABRD-145; E-ABRD-20).
+- [ ] [ABRD-131] A repo's `progress` lists top-level containers: `closed`, `landed` (ABRD-136), `planned`, `open`, `uncut`, `waiting` (ABRD-137), `percent`, `lanes_left`, `estimate` (ABRD-140 to ABRD-145; E-ABRD-20).
 - [ ] [ABRD-132] `percent` (rounded down) is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line sums its top-level containers, a container with a parent anywhere has none.
 - [ ] [ABRD-133] `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
 - [ ] [ABRD-134] A failed read of a container's parent, sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).

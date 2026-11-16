@@ -367,7 +367,7 @@ def test_a_container_with_no_lane_left_has_no_estimate() -> None:
 def test_a_container_without_a_range_says_why_and_keeps_its_counts(
     prices: lane_measure.LanePrices | None, sentence: str
 ) -> None:
-    """Spec: ABRD-142, ABRD-143."""
+    """Spec: ABRD-144."""
     arranged = [_container(10, closed=2, open_count=1, uncut=1)]
 
     container = _container_of(_read(arranged, prices=prices))
