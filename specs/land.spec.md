@@ -82,7 +82,7 @@ order `merge`, `squash`, `rebase`.
 | a `merge_queue` rule applies to the target branch | LANDCMD-59, LANDCMD-60 |
 | the queue path writes the landing message | LANDCMD-61, LANDCMD-62 |
 | the queue path enqueues | LANDCMD-63, LANDCMD-64 |
-| the queue path waits | LANDCMD-65, LANDCMD-66, LANDCMD-67, LANDCMD-68 |
+| the queue path waits | LANDCMD-65, LANDCMD-66, LANDCMD-67, LANDCMD-68, LANDCMD-75 |
 | a rerun finds the pull request queued, merged or removed | LANDCMD-69 |
 | the rules or the queue state cannot be read | LANDCMD-70 |
 
@@ -152,11 +152,12 @@ preflight, refused or not, exactly as `reset`'s own read does.
 
 - [ ] [LANDCMD-59] Where a `merge_queue` rule applies to the pull request's target branch, `aco land` queues it (LANDCMD-61..68) instead of LANDCMD-12; no flag or setting chooses, and it merges nothing directly.
 - [ ] [LANDCMD-60] The preflight and the checkout check run unchanged before any write, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
-- [ ] [LANDCMD-61] After every check passed, the pull request's body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue's squash takes; a body that already is that message is not written.
+- [ ] [LANDCMD-61] After the checks passed, the body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue squash takes; a body already that message, apart from a trailing newline, is not written.
 - [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n>`, exit `2`; nothing is queued.
 - [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 (`pull request #<n> changed while it was checked; re-run land`), exit `2`.
 - [ ] [LANDCMD-64] Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n>`, exit `2`; `aco land` never repeats an enqueue.
 - [ ] [LANDCMD-65] Then `aco land` reads the pull request's queue state every 60 seconds or slower; merged, it runs the steps after the merge (LANDCMD-15..17, LANDCMD-54..58) unchanged, and the claim stays until then.
+- [ ] [LANDCMD-75] A wait that begins with the pull request queued writes `waiting for pull request #<n> in the merge queue` once to stderr; one already merged writes nothing; stdout and exit codes stay.
 - [ ] [LANDCMD-66] An open pull request the queue removed after its latest addition, or absent twice in a row, refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n>`, exit `2`.
 - [ ] [LANDCMD-67] A pull request closed after such a removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's or `no reason recorded`.
 - [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n>`, exit `2`, claim kept.

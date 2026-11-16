@@ -22,6 +22,7 @@ TRAILERS_COMPOSED = "Closes #72\n\nCo-Authored-By: A <a@x>\nWork-Item: #72\n"
 NOT_QUEUED = forge.UnqueuedPullRequest(None)
 QUEUED = forge.QueuedPullRequest()
 RELEASED = "RELEASED issue #72: landing\n"
+WAITING = f"waiting for pull request #{NUMBER} in the merge queue\n"
 CLEAN_CHECKOUT_REFUSAL = "ERROR: land must run from a clean checkout of the default branch 'main'\n"
 
 
@@ -61,6 +62,7 @@ class QueueCase:
     body_error: protocol.ClaimError | None = None
     status: int = 0
     stderr: str = ""
+    waits: bool = True
     written: tuple[str, ...] = (COMPOSED,)
     enqueues: int = 1
     pauses: int = 2
@@ -131,7 +133,7 @@ def observations(world: QueueWorld, result: CliRun) -> tuple[dict[str, object], 
     }
     expected: dict[str, object] = {
         "exit": case.status,
-        "stderr": case.stderr,
+        "stderr": (WAITING if case.waits else "") + case.stderr,
         "released": case.status == 0,
         "merged line": case.status == 0,
         "claim kept": case.status != 0,
@@ -167,6 +169,10 @@ class TestLandThroughTheMergeQueue:
                 id="an-entry-missing-in-one-read-only-is-waited-out",
             ),
             pytest.param(
+                QueueCase(body=COMPOSED.rstrip("\n"), written=()),
+                id="a-body-missing-only-its-trailing-newline-is-not-written-again",
+            ),
+            pytest.param(
                 QueueCase(
                     reads=(QUEUED, LANDS),
                     body=COMPOSED,
@@ -186,7 +192,9 @@ class TestLandThroughTheMergeQueue:
                 id="a-re-run-finds-it-removed-and-queues-it-again",
             ),
             pytest.param(
-                QueueCase(reads=(LANDS,), body=COMPOSED, written=(), enqueues=0, pauses=0),
+                QueueCase(
+                    reads=(LANDS,), body=COMPOSED, written=(), enqueues=0, pauses=0, waits=False
+                ),
                 id="a-queue-merge-seen-before-the-preflight-releases",
             ),
             pytest.param(
@@ -202,11 +210,14 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                     enqueues=0,
                     pauses=0,
+                    waits=False,
                 ),
                 id="a-queued-pull-request-of-another-repository-refuses-and-deletes-nothing",
             ),
             pytest.param(
-                QueueCase(queue_rule=False, written=(), enqueues=0, pauses=0, direct_merges=1),
+                QueueCase(
+                    queue_rule=False, written=(), enqueues=0, pauses=0, waits=False, direct_merges=1
+                ),
                 id="without-a-queue-rule-the-merge-is-direct",
             ),
             pytest.param(
@@ -266,6 +277,7 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                     enqueues=0,
                     pauses=0,
+                    waits=False,
                 ),
                 id="a-failed-preflight-check-writes-and-queues-nothing",
             ),
@@ -281,6 +293,7 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                     enqueues=0,
                     pauses=0,
+                    waits=False,
                 ),
                 id="a-draft-writes-and-queues-nothing",
             ),
@@ -293,6 +306,7 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                     enqueues=0,
                     pauses=0,
+                    waits=False,
                 ),
                 id="an-unclean-checkout-writes-and-queues-nothing",
             ),
@@ -305,6 +319,7 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                     enqueues=0,
                     pauses=0,
+                    waits=False,
                 ),
                 id="a-body-the-forge-refuses-is-no-enqueue",
             ),
@@ -317,6 +332,7 @@ class TestLandThroughTheMergeQueue:
                         f"ERROR: pull request #{NUMBER} changed while it was checked; re-run land\n"
                     ),
                     pauses=0,
+                    waits=False,
                 ),
                 id="a-head-that-moved-is-refused-after-one-enqueue",
             ),
@@ -327,6 +343,7 @@ class TestLandThroughTheMergeQueue:
                     status=2,
                     stderr=not_queued("enqueueing it", "HTTP 502"),
                     pauses=0,
+                    waits=False,
                 ),
                 id="an-enqueue-that-fails-is-not-repeated",
             ),
@@ -341,6 +358,7 @@ class TestLandThroughTheMergeQueue:
                     written=(),
                     enqueues=0,
                     pauses=0,
+                    waits=False,
                 ),
                 id="rules-that-cannot-be-read-refuse-before-anything-is-written",
             ),
