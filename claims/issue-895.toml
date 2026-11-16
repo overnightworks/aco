@@ -1,8 +1,0 @@
-claim_id = "0d97f3316d2f40be8c0e6b46e2bee2fb"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "28d5c0c6300962799126fdf1b6991c78efa3da4f"
-branch = "claude/issue-895-release-records-size"
-scope = ["quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/lane-record.spec.md", "src/aco/cmd_release.py", "src/aco/lane_record.py", "tests/support/lane_record_fixtures.py", "tests/test_cmd_release.py", "tests/test_lane_record.py", "tests/test_lane_record_item_size.py"]
-opened_commit = "f09eb25461c1c3a7b3e53330b8c27f14fdc6684a"
-whole_reason = "the size reaches the record through the release path, its fixtures, spec and the shared baseline and whitelist"
