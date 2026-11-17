@@ -87,10 +87,12 @@ async function expectRuled(letters: string[]): Promise<void> {
 	}
 }
 
-async function send(page: Page, kind: 'other' | 'unclear'): Promise<void> {
+/** Sends an answer for the card: Unclear, Other… at the point numbered `point`, or Other… on a one-point card. */
+async function send(page: Page, kind: 'other' | 'unclear', point?: number): Promise<void> {
 	if (kind === 'other') {
-		await page.getByRole('button', { name: 'Other…' }).click();
-		await page.getByRole('textbox', { name: 'Your answer' }).fill(ANSWER);
+		const scope = point === undefined ? '' : `Point ${point}: `;
+		await page.getByRole('button', { name: `${scope}Other…`, exact: true }).click();
+		await page.getByRole('textbox', { name: `${scope}Your answer`, exact: true }).fill(ANSWER);
 	} else {
 		await page.getByRole('button', { name: 'Unclear' }).click();
 		await page.getByRole('textbox', { name: 'What is unclear? (optional)' }).fill(NOTE);
@@ -160,12 +162,10 @@ const acceptAll = (page: Page): Locator =>
 const strip = (page: Page): Locator => page.locator('.strip');
 const undo = (page: Page): Locator =>
 	strip(page).getByRole('button', { name: 'Undo', exact: true });
+const otherAt = (page: Page, number: number): Locator =>
+	page.getByRole('button', { name: `Point ${number}: Other…`, exact: true });
+const picks = (page: Page): Locator => page.getByRole('group', { name: 'Decide' });
 const decideBar = (page: Page): Locator => page.locator('.decide-row .bar');
-
-async function pickAll(page: Page, letters: string[]): Promise<void> {
-	for (const [position, letter] of letters.entries())
-		await pick(page, position + 1, letter).click();
-}
 
 async function shoot(page: Page, testInfo: { outputPath(name: string): string }, name: string) {
 	const filter = (value: string) =>
@@ -213,7 +213,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'list');
 		});
 
-		test('[ABRD-83] [ABRD-106] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all, the count, Other… and Unclear', async ({
+		test('[ABRD-83] [ABRD-106] [ABRD-154] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all and Unclear, with an Other… at every point', async ({
 			page
 		}, testInfo) => {
 			const { repository } = readBoardRuntime();
@@ -238,14 +238,12 @@ for (const viewport of [
 				await expect(pointPicks(page, number).getByRole('button')).toHaveText(['A', 'B']);
 				await expect(pick(page, number, 'A')).toHaveClass(/recommended/);
 				await expect(pick(page, number, 'A')).toHaveAttribute('aria-pressed', 'false');
+				await expect(otherAt(page, number)).toBeVisible();
+				await expect(otherAt(page, number)).toBeInViewport();
 			}
-			await expect(decideBar(page).getByRole('button')).toHaveText([
-				'Accept all',
-				'Other…',
-				'Unclear'
-			]);
+			await expect(decideBar(page).getByRole('button')).toHaveText(['Accept all', 'Unclear']);
 			await expect(acceptAll(page)).toHaveClass(/recommended/);
-			await expect(decideBar(page).getByText('0 of 3 chosen')).toBeVisible({ visible: !phone });
+			await expect(page.getByText(/of 3 chosen/)).toHaveCount(0);
 			await shoot(page, testInfo, 'card');
 			await fits(page, viewport.width);
 		});
@@ -307,13 +305,13 @@ for (const viewport of [
 				await expect(page.locator('.decide-row')).toHaveCSS('position', 'sticky');
 				await expect(page.locator('.decide-row')).toBeInViewport();
 				await expect(acceptAll(page)).toBeInViewport();
-				await expect(page.getByRole('button', { name: 'Other…' })).toBeInViewport();
+				await expect(otherAt(page, 1)).toBeInViewport();
 				await expect(page.getByRole('button', { name: 'Unclear' })).toBeInViewport();
 				await fits(page, viewport.width);
 			}
 		});
 
-		test('[ABRD-84] the points, their picks and Accept all are reachable by keyboard with the right state', async ({
+		test('[ABRD-84] the points, their picks, Other… and Accept all are reachable by keyboard with the right state', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -328,90 +326,136 @@ for (const viewport of [
 			await expect(pick(page, 1, 'A')).toBeFocused();
 			await page.keyboard.press('Tab');
 			await expect(pick(page, 1, 'B')).toBeFocused();
+			await page.keyboard.press('Tab');
+			await expect(otherAt(page, 1)).toBeFocused();
+			await pick(page, 1, 'B').focus();
 			await page.keyboard.press('Space');
 			await expect(pick(page, 1, 'B')).toHaveAttribute('aria-pressed', 'true');
 			await expect(pick(page, 1, 'A')).toHaveAttribute('aria-pressed', 'false');
+			await expect(undo(page)).toBeFocused();
 
 			await acceptAll(page).focus();
 			await page.keyboard.press('Enter');
-			await expect(undo(page)).toBeFocused();
+			await expect(strip(page)).toHaveCount(2);
+			await expect(undo(page).last()).toBeFocused();
 		});
 
-		test('[ABRD-86] a pick marks its point, posts nothing and opens the first unchosen point when it was the open one', async ({
-			page
-		}) => {
-			await arrangeCards();
-			const posts = logPosts(page);
-			await open(page, phone);
-
-			await toggle(page, 1).click();
-			await pick(page, 1, 'B').click();
-
-			await expect(pick(page, 1, 'B')).toHaveAttribute('aria-pressed', 'true');
-			await expect(decideBar(page).getByText('1 of 3 chosen')).toBeAttached();
-			await expect(toggle(page, 1)).toHaveAttribute('aria-expanded', 'false');
-			await expect(toggle(page, 2)).toHaveAttribute('aria-expanded', 'true');
-			await pick(page, 1, 'A').click();
-			await expect(pick(page, 1, 'A')).toHaveAttribute('aria-pressed', 'true');
-			await expect(pick(page, 1, 'B')).toHaveAttribute('aria-pressed', 'false');
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			expect(posts).toEqual([]);
-		});
-
-		test('[ABRD-87] the last pick starts one window with one strip, then one post stores every point, and Decided lists each point', async ({
+		test('[ABRD-86] a pick answers its point alone: it waits, the other points stay open, and the card stays with the points left, renumbered', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
-			await pickAll(page, ['B', 'A', 'A']);
+			await pick(page, 1, 'B').click();
 
 			await expect(strip(page)).toHaveCount(1);
-			await expect(strip(page)).toContainText(`Saves shortly: 1B 2A 3A · ${CARD_NAME}`);
-			await expect(undo(page)).toBeFocused();
-			await shoot(page, testInfo, 'strip');
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await expect(strip(page)).toContainText(`Saves shortly: 1B · ${CARD_NAME}`);
+			await expect(pick(page, 1, 'B')).toHaveAttribute('aria-pressed', 'true');
+			await expect(pick(page, 1, 'B')).toBeDisabled();
+			await expect(pick(page, 1, 'A')).toBeDisabled();
+			await expect(pick(page, 2, 'A')).toBeEnabled();
+			await expect(otherAt(page, 2)).toBeEnabled();
+			await expect(acceptAll(page)).toBeEnabled();
+			await shoot(page, testInfo, 'one-waiting');
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS - 1000);
+			expect(posts).toEqual([]);
+			await page.clock.runFor(1000);
 
 			await expect
 				.poll(() => posts)
-				.toEqual([
-					cardPost(7, [
-						{ line: 2, fingerprint: expect.any(String), option: 'B' },
-						{ line: 3, fingerprint: expect.any(String), option: 'A' },
-						{ line: 4, fingerprint: expect.any(String), option: 'A' }
-					])
-				]);
-			await expectRuled(['B', 'A', 'A']);
-			if (!phone) await expect(page.getByRole('heading', { name: 'Frage 1?' })).toBeVisible();
-			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
-			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
-			const rows = decidedList(page).getByRole('button');
-			await expect(rows).toHaveCount(3);
-			await expect(rows).toContainText(['Thema 4', 'Thema 3', 'Thema 2']);
-			await decidedList(page).getByTitle('Frage 2?', { exact: true }).click();
-			await expectDecidedAnswer(page, 'B — Weg B', BOARD_PICK_HOW);
+				.toEqual([cardPost(7, [{ line: 2, fingerprint: expect.any(String), option: 'B' }])]);
+			await expectRuled(['B']);
+			expect((await storedLine(7, 3)).ruling).toBeNull();
+			await expect(
+				card(page).getByRole('heading', { name: 'Song-Seite · 2 points' })
+			).toBeVisible();
+			await expect(card(page).locator('button.toggle')).toHaveText([
+				/^\s*1\s+Frage 3\?/,
+				/^\s*2\s+Frage 4\?/
+			]);
+			await expect(strip(page)).toHaveCount(0);
+			await shoot(page, testInfo, 'two-left');
 		});
 
-		test('[ABRD-87] Undo inside the window posts nothing and clears the picks', async ({
+		test('[ABRD-87] picks on two points are two strips and two posts, Undo frees one point alone, and Decided lists each stored point', async ({
 			page
-		}) => {
+		}, testInfo) => {
 			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
-			await pickAll(page, ['B', 'A', 'A']);
-			await undo(page).click();
+			await pick(page, 1, 'B').click();
+			await pick(page, 2, 'A').click();
+			await pick(page, 3, 'A').click();
+
+			await expect(strip(page)).toHaveCount(3);
+			await expect(strip(page).nth(1)).toContainText(`Saves shortly: 2A · ${CARD_NAME}`);
+			await shoot(page, testInfo, 'strips');
+			await undo(page).nth(2).click();
+			await expect(strip(page)).toHaveCount(2);
+			await expect(pick(page, 3, 'A')).toBeEnabled();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			expect(posts).toEqual([]);
-			await expect(strip(page)).toHaveCount(0);
-			await expect(pointPicks(page, 1).getByRole('button', { pressed: true })).toHaveCount(0);
-			await expect(decideBar(page).getByText('0 of 3 chosen')).toBeAttached();
-			expect((await storedLine(7, 2)).ruling).toBeNull();
+			await expect.poll(() => posts.length).toBe(2);
+			await expectRuled(['B', 'A']);
+			expect((await storedLine(7, 4)).ruling).toBeNull();
+			await expect(
+				card(page).getByRole('heading', { name: 'Frage 4?', exact: true })
+			).toBeVisible();
+			if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
+			await page.getByRole('button', { name: /^Decided \d+$/ }).click();
+			const rows = decidedList(page).getByRole('button');
+			await expect(rows).toHaveCount(2);
+			await expect(rows).toContainText(['Thema 3', 'Thema 2']);
+			await decidedList(page).getByTitle('Frage 2?', { exact: true }).click();
+			await expectDecidedAnswer(page, 'B — Weg B', BOARD_PICK_HOW);
 		});
 
-		test('[ABRD-88] a final pick asks first with its point, and Cancel leaves the point unchosen', async ({
+		test('[ABRD-155] the stage stays on the card until its last point is stored, then leaves it, the third point alone showing the one-point layout', async ({
+			page
+		}) => {
+			await arrangeCards();
+			await open(page, phone);
+
+			await pick(page, 1, 'B').click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await pick(page, 1, 'A').click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await expectRuled(['B', 'A']);
+			await expect(
+				card(page).getByRole('heading', { name: 'Frage 4?', exact: true })
+			).toBeVisible();
+			await expect(card(page).locator('button.toggle')).toHaveCount(0);
+			await expect(acceptAll(page)).toHaveCount(0);
+			await expect(picks(page)).toBeVisible();
+			await picks(page)
+				.getByRole('button', { name: /^Decide B:/ })
+				.click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await expectRuled(['B', 'A', 'B']);
+			await expect(
+				card(page).getByRole('heading', { name: 'Frage 1?', exact: true })
+			).toBeVisible();
+		});
+
+		test('[ABRD-87] leaving the page inside the windows stores every waiting point', async ({
+			page
+		}) => {
+			await arrangeCards();
+			await open(page, phone);
+
+			await pick(page, 1, 'B').click();
+			await pick(page, 3, 'A').click();
+			await page.goto('about:blank');
+
+			await expectRuled(['B']);
+			await expect.poll(() => storedLine(7, 4)).toMatchObject({ ruling: 'A', via: 'board' });
+			expect((await storedLine(7, 3)).ruling).toBeNull();
+		});
+
+		test('[ABRD-88] a final pick asks first with its point, Cancel leaves the point open, and confirming starts its window', async ({
 			page
 		}) => {
 			await arrangeCards([point(2), point(3, { option: FINAL_OPTIONS }), point(4)]);
@@ -427,7 +471,7 @@ for (const viewport of [
 			await expect(dialog).toHaveCount(0);
 			await expect(pick(page, 2, 'B')).toHaveAttribute('aria-pressed', 'false');
 			await expect(pick(page, 2, 'B')).toBeFocused();
-			await expect(decideBar(page).getByText('0 of 3 chosen')).toBeAttached();
+			await expect(strip(page)).toHaveCount(0);
 
 			await pick(page, 2, 'B').click();
 			await page
@@ -435,11 +479,13 @@ for (const viewport of [
 				.getByRole('button', { name: 'Decide B', exact: true })
 				.click();
 			await expect(pick(page, 2, 'B')).toHaveAttribute('aria-pressed', 'true');
-			await expect(decideBar(page).getByText('1 of 3 chosen')).toBeAttached();
+			await expect(strip(page)).toContainText(`Saves shortly: 2B · ${CARD_NAME}`);
 			expect(posts).toEqual([]);
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await expect.poll(() => storedLine(7, 3)).toMatchObject({ ruling: 'B', via: 'board' });
 		});
 
-		test('[ABRD-89] Accept all with nothing final picks each recommended letter, shows the strip and posts once', async ({
+		test('[ABRD-89] Accept all picks the recommendation for the points still open only, after one pick waits', async ({
 			page
 		}) => {
 			await arrangeCards([point(2), point(3, { recommended: 'B' }), point(4)]);
@@ -450,13 +496,16 @@ for (const viewport of [
 			await acceptAll(page).click();
 
 			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await expect(strip(page)).toContainText(`Saves shortly: 1A 2B 3A · ${CARD_NAME}`);
+			await expect(strip(page)).toHaveCount(2);
+			await expect(strip(page).last()).toContainText(`Saves shortly: 2B 3A · ${CARD_NAME}`);
+			await expect(acceptAll(page)).toBeDisabled();
+			await expect(page.getByRole('button', { name: 'Unclear' })).toBeDisabled();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			await expect.poll(() => posts.length).toBe(1);
-			await expectRuled(['A', 'B', 'A']);
+			await expect.poll(() => posts.length).toBe(2);
+			await expectRuled(['B', 'B', 'A']);
 		});
 
-		test('[ABRD-90] Accept all with a final recommendation asks first, Cancel or Esc post nothing, and confirming stores the recommendations', async ({
+		test('[ABRD-90] Accept all with a final recommendation asks first, Cancel or Esc post nothing, and confirming stores the recommendations of the open points', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards([
@@ -489,31 +538,42 @@ for (const viewport of [
 			await expectRuled(['A', 'B', 'A']);
 		});
 
-		test('[ABRD-92] Other… answers the whole card with one text, after one strip', async ({
+		test('[ABRD-154] Other… at a point answers that point alone with its own text, after its own strip', async ({
 			page
-		}) => {
+		}, testInfo) => {
 			await arrangeCards();
 			const posts = logPosts(page);
 			await open(page, phone);
 
-			await send(page, 'other');
+			await send(page, 'other', 2);
 
-			await expect(strip(page)).toContainText(`Saves shortly: Other · ${CARD_NAME}`);
+			await expect(strip(page)).toContainText('Saves shortly: Other · Thema 3');
+			await expect(otherAt(page, 2)).toBeDisabled();
+			await expect(otherAt(page, 1)).toBeEnabled();
+			await shoot(page, testInfo, 'other-waiting');
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect
 				.poll(() => posts)
-				.toEqual([
-					cardPost(
-						7,
-						[2, 3, 4].map((index) => ({ line: index, fingerprint: expect.any(String) })),
-						{ other: ANSWER }
-					)
-				]);
-			for (const index of [2, 3, 4]) {
-				await expect
-					.poll(() => storedLine(7, index))
-					.toMatchObject({ ruling: 'other', other: ANSWER });
-			}
+				.toEqual([cardPost(7, [{ line: 3, fingerprint: expect.any(String) }], { other: ANSWER })]);
+			await expect.poll(() => storedLine(7, 3)).toMatchObject({ ruling: 'other', other: ANSWER });
+			expect((await storedLine(7, 2)).ruling).toBeNull();
+			expect((await storedLine(7, 4)).ruling).toBeNull();
+			await expect(
+				card(page).getByRole('heading', { name: 'Song-Seite · 2 points' })
+			).toBeVisible();
+		});
+
+		test('[ABRD-154] the Other panels of two points hold their own text', async ({ page }) => {
+			await arrangeCards();
+			await open(page, phone);
+
+			await otherAt(page, 1).click();
+			await page.getByRole('textbox', { name: 'Point 1: Your answer', exact: true }).fill('Eins');
+			await otherAt(page, 3).click();
+			await page.getByRole('textbox', { name: 'Point 3: Your answer', exact: true }).fill('Drei');
+
+			await expect(page.getByRole('textbox', { name: 'Point 1: Your answer' })).toHaveValue('Eins');
+			await expect(page.getByRole('textbox', { name: 'Point 3: Your answer' })).toHaveValue('Drei');
 		});
 
 		test('[ABRD-92] Unclear sends the whole card back with its note, and the card is then with its head without Unclear', async ({
@@ -578,14 +638,14 @@ for (const viewport of [
 			);
 			await expect(card(page).getByRole('heading', { name, exact: true })).toBeVisible();
 			await expect(page.getByRole('button', { name: 'Unclear' })).toHaveCount(0);
-			await expect(page.getByRole('button', { name: 'Other…' })).toBeVisible();
+			await expect(otherAt(page, 1)).toBeVisible();
 			await expect(acceptAll(page)).toBeVisible();
 			await expect(pointPicks(page, 1).getByRole('button')).toHaveText(['A', 'B']);
 			await shoot(page, testInfo, 'with-head-card');
 			await fits(page, viewport.width);
 		});
 
-		test('[ABRD-92] Other… on a card with a point with its head stores every point and drops the sent-back marks', async ({
+		test('[ABRD-154] Other… at a point with its head stores that point alone and drops its sent-back marks', async ({
 			page
 		}) => {
 			await arrange([
@@ -593,14 +653,13 @@ for (const viewport of [
 			]);
 			await open(page, phone, 'Song-Seite · 2 points');
 
-			await send(page, 'other');
+			await send(page, 'other', 2);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			for (const index of [2, 3]) {
-				await expect
-					.poll(() => storedLine(7, index))
-					.toMatchObject({ ruling: 'other', other: ANSWER, returned_on: null });
-			}
+			await expect
+				.poll(() => storedLine(7, 3))
+				.toMatchObject({ ruling: 'other', other: ANSWER, returned_on: null });
+			await expect.poll(async () => (await storedLine(7, 2)).ruling).toBeNull();
 		});
 
 		test('[ABRD-36] [ABRD-106] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
@@ -661,8 +720,8 @@ for (const viewport of [
 			});
 		}
 
-		for (const how of ['the last pick', 'Accept all'] as const) {
-			test(`[ABRD-91] ${how} on a card that gained a point after the page read is refused, nothing is stored, and Neu laden keeps the picks of the unchanged points`, async ({
+		for (const how of ['the pick', 'Accept all'] as const) {
+			test(`[ABRD-91] ${how} on a card that gained a point after the page read stores the points posted and leaves the new point open`, async ({
 				page
 			}) => {
 				await arrangeCards();
@@ -670,21 +729,14 @@ for (const viewport of [
 				await arrangeCards([...threePoints(), withdrawn(), point(6)]);
 
 				if (how === 'Accept all') await acceptAll(page).click();
-				else await pickAll(page, ['B', 'A', 'A']);
+				else await pick(page, 1, 'B').click();
 				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-				await expect(page.getByRole('alert')).toContainText(LINE_CHANGED_MESSAGE);
-				await expect(pointPicks(page, 1)).toHaveCount(0);
-				await expect(acceptAll(page)).toHaveCount(0);
-				for (const index of [2, 3, 4, 6]) {
+				await expect(page.getByRole('alert')).toHaveCount(0);
+				await expectRuled(how === 'Accept all' ? ['A', 'A', 'A'] : ['B']);
+				for (const index of how === 'Accept all' ? [6] : [3, 4, 6]) {
 					expect((await storedLine(7, index)).ruling).toBeNull();
 				}
-				await page.getByRole('button', { name: 'Neu laden' }).click();
-				await expect(
-					card(page).getByRole('heading', { name: 'Song-Seite · 4 points' })
-				).toBeVisible();
-				await expect(card(page).locator('button.toggle')).toHaveCount(4);
-				await expect(page.getByRole('button', { pressed: true })).not.toHaveCount(0);
 			});
 		}
 
@@ -699,7 +751,7 @@ for (const viewport of [
 				point(4)
 			]);
 
-			await pickAll(page, ['B', 'A', 'A']);
+			await pick(page, 2, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('alert')).toContainText(ALREADY_RULED_MESSAGE);
@@ -707,7 +759,7 @@ for (const viewport of [
 			expect((await storedLine(7, 4)).ruling).toBeNull();
 		});
 
-		test('[ABRD-45] any other failure keeps the picks, and picking again posts again', async ({
+		test('[ABRD-45] any other failure shows its banner with the point open again, and picking again posts again', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -727,11 +779,12 @@ for (const viewport of [
 			});
 			await open(page, phone);
 
-			await pickAll(page, ['B', 'A', 'A']);
+			await pick(page, 1, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect(page.getByRole('alert')).toContainText('aco unavailable');
-			await expect(page.getByRole('button', { pressed: true })).not.toHaveCount(0);
+			await expect(page.getByRole('button', { pressed: true })).toHaveCount(0);
+			await expect(pick(page, 1, 'A')).toBeEnabled();
 			await pick(page, 1, 'A').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
@@ -739,7 +792,7 @@ for (const viewport of [
 			await expect.poll(() => storedLine(7, 2)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 
-		test('[ABRD-91] Neu laden after a changed card drops the changed point’s pick, keeps the others, and the next post names the fresh point', async ({
+		test('[ABRD-91] a point changed after the page read is refused, Neu laden shows it fresh, and the next post names it', async ({
 			page
 		}) => {
 			await arrange([sprung(...threePoints())]);
@@ -747,25 +800,32 @@ for (const viewport of [
 			const boards = logBoards(page);
 			await open(page, phone);
 
-			await pickAll(page, ['B', 'B']);
-			await arrange([sprung(point(2), point(3, { problem: 'Problem 3 geändert.' }), point(4))]);
-			await pick(page, 3, 'A').click();
+			await pick(page, 1, 'B').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+			await expectRuled(['B']);
+			await arrange([
+				sprung(
+					point(2, { ruling: 'B', ruled_on: '2026-10-26', via: 'board' }),
+					point(3, { problem: 'Problem 3 geändert.' }),
+					point(4)
+				)
+			]);
+			await pick(page, 1, 'A').click();
+			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+
+			await expect(page.getByRole('alert')).toContainText(LINE_CHANGED_MESSAGE);
+			expect((await storedLine(7, 3)).ruling).toBeNull();
+			const readsBefore = boards.length;
 			await page.getByRole('button', { name: 'Neu laden' }).click();
-
-			await expect(pick(page, 1, 'B')).toHaveAttribute('aria-pressed', 'true');
-			await expect(pick(page, 2, 'B')).toHaveAttribute('aria-pressed', 'false');
-			await expect(pick(page, 3, 'A')).toHaveAttribute('aria-pressed', 'true');
-			await expect(decideBar(page).getByText('2 of 3 chosen')).toBeAttached();
+			await expect.poll(() => boards.length).toBeGreaterThan(readsBefore);
 			const changed = await fingerprintOf(boards.at(-1), 3);
-			await pick(page, 2, 'B').click();
+			await pick(page, 1, 'A').click();
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			await expect.poll(() => posts.length).toBe(2);
-			const cardPosted = posts.at(-1) as { lines: { line: number; fingerprint: string }[] };
-			expect(cardPosted.lines.find((entry) => entry.line === 3)?.fingerprint).toBe(changed);
-			expect(await fingerprintOf(boards[0], 3)).not.toBe(changed);
-			await expectRuled(['B', 'B', 'A']);
+			await expect.poll(() => posts.length).toBe(3);
+			const posted = posts.at(-1) as { lines: { line: number; fingerprint: string }[] };
+			expect(posted.lines.find((entry) => entry.line === 3)?.fingerprint).toBe(changed);
+			await expect.poll(() => storedLine(7, 3)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 	});
 }
