@@ -25,6 +25,7 @@ class LandingCase:
     readiness: forge.LandingReadiness
     sentence: str
     arguments: tuple[str, ...] = ()
+    head_omitted: bool = False
     state_ref: bool = False
     merged: bool = False
     body: str = "Work-Item: #72\n\nCloses #72"
@@ -83,7 +84,9 @@ def world(
 
 
 def land(world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> CliRun:
-    return run_cli(["land", "12", *world.case.arguments], capsys)
+    pinned = world.case.head_omitted or "--head" in world.case.arguments
+    head = () if pinned else ("--head", MERGE_COMMIT_SHA)
+    return run_cli(["land", "12", *head, *world.case.arguments], capsys)
 
 
 class TestLandReadiness:
@@ -540,6 +543,27 @@ class TestLandEntry:
     @pytest.mark.parametrize(
         "world",
         [
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "aco land needs --head <sha>, the head the reviewers saw: "
+                    "it merges only that state",
+                    head_omitted=True,
+                    requests=0,
+                ),
+                id="head-omitted",
+            ),
+            pytest.param(
+                LandingCase(
+                    landing_readiness(),
+                    "aco land needs --head <sha>, the head the reviewers saw: "
+                    "it merges only that state",
+                    head_omitted=True,
+                    merged=True,
+                    requests=0,
+                ),
+                id="rerun-head-omitted",
+            ),
             pytest.param(
                 LandingCase(
                     landing_readiness(),

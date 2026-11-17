@@ -44,12 +44,12 @@ order `merge`, `squash`, `rebase`.
 |---|---|
 | `<n>` below 1 | LANDCMD-44 |
 | `--head` not 7 to 40 hex digits | LANDCMD-33 |
+| no `--head` given | LANDCMD-32 |
 | `<path>` absent from this checkout | PIN-32 (cited) |
 | `<path>` present but untracked or ignored | PIN-01 (cited) |
 | `storage = "state-ref"` | LANDCMD-01 |
 | `--coordinator-override` without `--role coordinator` | LANDCMD-19 |
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
-| no `--head` given | LANDCMD-32 |
 | pull request not open | LANDCMD-02 |
 | pull request is a draft | LANDCMD-74 |
 | the default branch adopts the quality gate and the completed checks hold no `quality / verdict` | LANDCMD-43 |
@@ -103,13 +103,13 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
-- [ ] [LANDCMD-32] Without `--head`, `aco land` pins the head preflight reads (LANDCMD-12); a rerun (LANDCMD-18) of a merged pull request never compares `--head`; a queued one does (LANDCMD-76).
+- [ ] [LANDCMD-32] Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
 - [ ] [LANDCMD-74] A draft pull request refuses `pull request #<n> is a draft; mark it ready with gh pr ready <n>`, exit `2`, after LANDCMD-02 and before LANDCMD-43, on the queue path (LANDCMD-60) too (E-LANDCMD-74).
 - [ ] [LANDCMD-43] If `<branch>`'s config has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
-- [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n>`, exit `2`.
+- [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`.
 - [ ] [LANDCMD-49] `was not merged` means this run merged nothing: it also holds when an earlier run merged the pull request and a read of this rerun fails (LANDCMD-18).
 - [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions`, `its merge rules` or `its merge queue state`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
 - [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable or invalid `quality/config.toml` takes LANDCMD-46).
@@ -145,7 +145,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-35] Removing the classification line leaves no run of blank lines where it stood: a paragraph it alone made goes with it, and a whitespace-only line counts as blank.
 - [ ] [LANDCMD-14] A pull request whose head sha changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run land`, exit `2`; nothing merges.
 - [ ] [LANDCMD-37] A merge GitHub refuses (HTTP 405 other than LANDCMD-71's "Merge already in progress") refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
-- [ ] [LANDCMD-71] A merge call failing with HTTP 5xx, or a 405 `Merge already in progress`, refuses `pull request #<n> may still be merging (<error>); re-run aco land <n>`, exit `2`, claim kept (E-LANDCMD-71).
+- [ ] [LANDCMD-71] A merge call with HTTP 5xx or a 405 `Merge already in progress` refuses `pull request #<n> may still be merging (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept (E-LANDCMD-71).
 - [ ] [LANDCMD-72] After a 5xx, one read of the pull request comes first: merged at the pinned head, `aco land` goes on as after a merge (LANDCMD-15); open or unreadable, it refuses as LANDCMD-71; a 405 reads nothing.
 - [ ] [LANDCMD-73] LANDCMD-71's `<error>` is escaped and cut alone like LANDCMD-47's; a rerun of a pull request merged in between resumes without a second merge (LANDCMD-18).
 
@@ -154,21 +154,21 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-59] Where a `merge_queue` rule applies to the pull request's target branch, `aco land` queues it (LANDCMD-61..68) instead of LANDCMD-12; no flag or setting chooses, and it merges nothing directly.
 - [ ] [LANDCMD-60] The preflight and the checkout check run unchanged before any write, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
 - [ ] [LANDCMD-61] After the checks passed, the body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue squash takes; a body already that message, apart from a trailing newline, is not written.
-- [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n>`, exit `2`; nothing is queued.
+- [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; nothing is queued.
 - [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 (`pull request #<n> changed while it was checked; re-run land`), exit `2`.
-- [ ] [LANDCMD-64] Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n>`, exit `2`; `aco land` never repeats an enqueue.
+- [ ] [LANDCMD-64] Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; `aco land` never repeats an enqueue.
 - [ ] [LANDCMD-65] Then `aco land` reads the pull request's queue state every 60 seconds or slower; merged, it runs the steps after the merge (LANDCMD-15..17, LANDCMD-54..58) unchanged, and the claim stays until then.
 - [ ] [LANDCMD-75] A wait that begins with the pull request queued writes `waiting for pull request #<n> in the merge queue` once to stderr; one already merged writes nothing; stdout and exit codes stay.
-- [ ] [LANDCMD-66] An open pull request the queue removed after its latest addition, or absent twice in a row, refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n>`, exit `2`.
+- [ ] [LANDCMD-66] An open pull request the queue removed after its last addition or absent twice refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n> --head <sha>`, exit `2`.
 - [ ] [LANDCMD-67] A pull request closed after such a removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's or `no reason recorded`.
-- [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n>`, exit `2`, claim kept.
+- [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept.
 - [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits (LANDCMD-65) unless LANDCMD-76 refuses, writing nothing; merged, it releases (LANDCMD-18); else it preflights.
 - [ ] [LANDCMD-76] A queued rerun (LANDCMD-69) whose `--head` is no prefix of its head refuses `pull request #<n> is queued at head <queued>, not the pinned <pinned>; the queue lands the queued head`, exit `2`.
 - [ ] [LANDCMD-70] LANDCMD-60's preflight follows LANDCMD-69's reads; the branch rules are read once, serving LANDCMD-42 without a queue; a failed read refuses as LANDCMD-46 (`its merge rules`, `its merge queue state`).
 
 ## After the merge
 
-- [ ] [LANDCMD-15] A failed branch delete, fast-forward, or delegated `release --merged` prints `MERGED pull request #<n> as <sha>; follow-up incomplete: <step> (<error>); re-run aco land <n>`, exit `2`.
+- [ ] [LANDCMD-15] A failed branch delete, fast-forward, or delegated `release --merged` prints `MERGED pull request #<n> as <sha>; follow-up incomplete: <step> (<error>); re-run aco land <n> --head <sha>`, exit `2`.
 - [ ] [LANDCMD-26] LANDCMD-15's `<error>` is the failed step's own sentence (for `release`, the one `release --merged` would print, without `ERROR: `), display controls escaped as NEXT-37 shows them.
 - [ ] [LANDCMD-21] The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
 - [ ] [LANDCMD-16] Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
@@ -245,7 +245,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` closed without merging
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 is not open; it cannot be landed
 exit 2
 ```
@@ -255,7 +255,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open and a draft, `mergeable_state` `clean`, one completed check `build`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 is a draft; mark it ready with gh pr ready 57
 exit 2
 ```
@@ -267,7 +267,7 @@ Nothing is written, merged or enqueued, and `aco land` never marks the pull requ
 Setup: bare-remote, fake `gh`, default branch `main` holding `quality/config.toml` with a `[gate]` table, pull request `#57` open, `mergeable_state` `blocked`, one completed check `build`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 has no quality / verdict check; main adopts the quality gate (quality/config.toml)
 exit 2
 ```
@@ -279,7 +279,7 @@ The adoption read of LANDCMD-43 is one contents read of `quality/config.toml` on
 Setup: bare-remote, fake `gh`, pull request `#57` open, `mergeable_state` `clean`, one check `build` still running
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 has checks still running: build; wait for every check to succeed
 exit 2
 ```
@@ -289,7 +289,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, `mergeable_state` `clean`, five checks still running: `check-0` through `check-4`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 has checks still running: check-0, check-1, check-2, and 2 more; wait for every check to succeed
 exit 2
 ```
@@ -299,7 +299,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, its head deleting `.aco/board.toml`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 removes .aco/board.toml; aco land cannot release its claim across that change
 exit 2
 ```
@@ -309,7 +309,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, its head setting `storage = "state-ref"` in `.aco/board.toml`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 changes storage in .aco/board.toml; aco land cannot release its claim across that change
 exit 2
 ```
@@ -319,7 +319,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, its head setting `storage = "gitlab"` in `.aco/board.toml`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 carries an invalid .aco/board.toml: board configuration .aco/board.toml storage must be 'github' or 'state-ref'
 exit 2
 ```
@@ -329,7 +329,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, its own head branch's live claim held by `Grok`, not `Ada`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: only the original claimant may release; take the claim over with `aco handover 42 --from Grok --reason <text>`, or use an explicit coordinator override (holder='Grok (builder)', this session='Ada (builder)')
 exit 2
 ```
@@ -339,7 +339,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, this checkout on `main` with an uncommitted change
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: land must run from a clean checkout of the default branch 'main'
 exit 2
 ```
@@ -349,7 +349,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, `aco land` running from a second clean clone on `main` with no user.name or user.email
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state
 exit 2
 ```
@@ -359,7 +359,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, no `merge_method` in `<path>`, the repository allowing only rebase merges
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 cannot land: this repository allows neither a merge commit nor a squash merge
 exit 2
 ```
@@ -369,7 +369,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, no `merge_method` in `<path>`, the repository's settings allowing all three methods, a ruleset on `main` allowing only squash and rebase
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -384,7 +384,7 @@ exit 0
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, no `merge_method` in `<path>`, the repository's settings allowing a merge commit and a squash, no ruleset
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -399,7 +399,7 @@ exit 0
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, `merge_method = "merge"` in `<path>`, a ruleset on `main` allowing only squash and rebase
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: board.toml merge_method merge is not allowed on main: GitHub allows squash, rebase
 exit 2
 ```
@@ -409,7 +409,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, no `merge_method` in `<path>`, the repository's settings allowing only merge commits, a ruleset on `main` allowing only squash and rebase
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: GitHub allows no merge method aco can use on main
 exit 2
 ```
@@ -419,7 +419,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open, every read of its `mergeable_state` answering `unknown`, one completed check `build`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 is not mergeable (unknown)
 exit 2
 ```
@@ -431,8 +431,8 @@ The command re-read the readiness 10 times, 3 seconds apart, before it refused; 
 Setup: bare-remote, fake `gh`, pull request `#57` open, the fake `gh` answering the readiness read with the error `unexpected end of JSON input`
 
 ```console
-$ aco land 57
-2> ERROR: pull request #57 was not merged: reading its landing preconditions failed (unexpected end of JSON input); re-run aco land 57
+$ aco land 57 --head <sha>
+2> ERROR: pull request #57 was not merged: reading its landing preconditions failed (unexpected end of JSON input); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -443,7 +443,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` already merged, its head `release/1.x` of the repository `stranger/fork`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 proposes a branch of stranger/fork; cross-repository pull requests are not classified
 exit 2
 ```
@@ -455,7 +455,7 @@ No branch of this repository is deleted, the checkout stays where it was and no 
 Setup: bare-remote, fake `gh`, pull request `#57` open and green during preflight, its head moved before the pinned merge request lands
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: pull request #57 changed while it was checked; re-run land
 exit 2
 ```
@@ -465,7 +465,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open and green during preflight, the pinned merge request answered `Repository rule violations found (HTTP 405)`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: GitHub refused the merge of pull request #57: gh: Repository rule violations found (HTTP 405)
 exit 2
 ```
@@ -475,8 +475,8 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` open and green during preflight, the pinned merge request answered `gh: Server Error (HTTP 502)`, the following read finding the pull request still open
 
 ```console
-$ aco land 57
-2> ERROR: pull request #57 may still be merging (gh: Server Error (HTTP 502)); re-run aco land 57
+$ aco land 57 --head <sha>
+2> ERROR: pull request #57 may still be merging (gh: Server Error (HTTP 502)); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -487,8 +487,8 @@ The claim stands and nothing else was written. Had the read found the pull reque
 Setup: bare-remote, fake `gh`, pull request `#57` merges cleanly, the delegated `release --merged` path then fails
 
 ```console
-$ aco land 57
-2> ERROR: MERGED pull request #57 as <sha>; follow-up incomplete: release (forge unreachable); re-run aco land 57
+$ aco land 57 --head <sha>
+2> ERROR: MERGED pull request #57 as <sha>; follow-up incomplete: release (forge unreachable); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -497,7 +497,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` already merged (LANDCMD-15's own scenario, resumed)
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -511,7 +511,7 @@ Setup: bare-remote, fake `gh`, the default branch's tip `9b09880` before the mer
 `quality / verdict` concluded `failure`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -528,7 +528,7 @@ Setup: bare-remote, fake `gh`, the default branch's tip `fc934d8` before the mer
 from a `push` run
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -544,7 +544,7 @@ Setup: bare-remote, fake `gh`, the default branch's tip `127f26c` before the mer
 from a `workflow_dispatch` run
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none
@@ -560,7 +560,7 @@ earlier `aco land 57` from this landing clone, which holds no worktree and no lo
 the lane worktree lives in the original checkout
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 LANDED pull request #57 already; nothing left to release
 exit 0
 ```
@@ -574,7 +574,7 @@ no linked worktree ...` line naming the `aco release` line to run in the checkou
 Setup: bare-remote, fake `gh`, pull request `#57` open, mergeable, every check green, a `merge_queue` rule on `main`, the queue merging it on its second read
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> waiting for pull request #57 in the merge queue
 RELEASED issue #42: <claim-id>
 freed: none
@@ -590,8 +590,8 @@ The pull request's body was written once (LANDCMD-61), it was enqueued once pinn
 Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the forge refusing the body write with `update item body failed`
 
 ```console
-$ aco land 57
-2> ERROR: pull request #57 was not queued: writing its landing message failed (update item body failed); re-run aco land 57
+$ aco land 57 --head <sha>
+2> ERROR: pull request #57 was not queued: writing its landing message failed (update item body failed); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -600,8 +600,8 @@ exit 2
 Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the enqueue answered `HTTP 502`
 
 ```console
-$ aco land 57
-2> ERROR: pull request #57 was not queued: enqueueing it failed (HTTP 502); re-run aco land 57
+$ aco land 57 --head <sha>
+2> ERROR: pull request #57 was not queued: enqueueing it failed (HTTP 502); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -610,9 +610,9 @@ exit 2
 Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the queue removing the entry for `failed_checks` while the pull request stays open
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> waiting for pull request #57 in the merge queue
-2> ERROR: pull request #57 was removed from the merge queue (failed_checks); re-run aco land 57
+2> ERROR: pull request #57 was removed from the merge queue (failed_checks); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -623,7 +623,7 @@ The claim stands; the re-run starts at the preflight (LANDCMD-69). Where GitHub 
 Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the queue removing the entry for `failed_checks` and the pull request closed
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> waiting for pull request #57 in the merge queue
 2> ERROR: pull request #57 was removed from the merge queue and closed (failed_checks)
 exit 2
@@ -634,9 +634,9 @@ exit 2
 Setup: bare-remote, fake `gh`, as E-LANDCMD-65, the second queue state read answered `HTTP 502`
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> waiting for pull request #57 in the merge queue
-2> ERROR: reading the merge queue state of pull request #57 failed (HTTP 502); re-run aco land 57
+2> ERROR: reading the merge queue state of pull request #57 failed (HTTP 502); re-run aco land 57 --head <sha>
 exit 2
 ```
 
@@ -645,7 +645,7 @@ exit 2
 Setup: bare-remote, fake `gh`, pull request `#57` already queued with its body holding the composed message, a `merge_queue` rule on `main`, the pull request not mergeable (`dirty`), the queue merging it on its next read
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> waiting for pull request #57 in the merge queue
 RELEASED issue #42: <claim-id>
 freed: none

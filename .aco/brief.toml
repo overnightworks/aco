@@ -75,7 +75,7 @@ checks = [
 rules = [
   "Never land another lane's claim; the head holds the landing decision.",
   "Merge or fast-forward main only after every required review and CI check is green.",
-  "Land with aco land <pr> from a clean checkout of the default branch; it composes the merge commit itself, never gh pr merge.",
+  "Land with aco land <pr> --head <sha> from a clean checkout of the default branch; it composes the merge commit itself, never gh pr merge.",
   "Release the claim once the merge lands.",
   "Reinstall the tool from the freshly merged main afterward.",
 ]
