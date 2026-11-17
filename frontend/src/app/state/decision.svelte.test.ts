@@ -360,3 +360,137 @@ test.each([
 		expect(store.isPending(songKey)).toBe(false);
 	}
 );
+
+const otherCard = optionLine({
+	index: 5,
+	fingerprint: 'fp2',
+	topic: 'Hosts',
+	options: [optionA, optionB]
+});
+const otherKey = cardKey('repo', 43);
+
+test('[ABRD-152] flush posts every decision in its window at once, each card as its own write, and no timer posts again', async () => {
+	const send = sender(storedAnswer(storedSong));
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
+	store.choose('repo', 43, [otherCard], { shown: otherCard, option: optionA });
+
+	store.flush();
+
+	expect(send).toHaveBeenCalledTimes(2);
+	expect(send).toHaveBeenCalledWith('token', {
+		repo: 'repo',
+		item: 42,
+		lines: [{ line: 4, fingerprint: 'fp-shown', option: 'B' }]
+	});
+	expect(send).toHaveBeenCalledWith('token', {
+		repo: 'repo',
+		item: 43,
+		lines: [{ line: 5, fingerprint: 'fp2', option: 'A' }]
+	});
+	expect(store.pendingEntries).toEqual([]);
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(send).toHaveBeenCalledTimes(2);
+});
+
+test('[ABRD-152] a second flush posts nothing more', () => {
+	const send = sender(storedAnswer(storedSong));
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
+
+	store.flush();
+	store.flush();
+
+	expect(send).toHaveBeenCalledTimes(1);
+});
+
+test('[ABRD-152] flush posts nothing for an undone decision or a card not fully chosen', () => {
+	const send = sender(storedAnswer(storedSong));
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	const second = optionLine({ index: 6, fingerprint: 'fp3', options: [optionA, optionB] });
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
+	store.undo(songKey);
+	store.choose('repo', 43, [otherCard, second], { shown: otherCard, option: optionA });
+
+	store.flush();
+
+	expect(send).not.toHaveBeenCalled();
+	expect(store.picks(otherKey, [otherCard, second])).toHaveLength(1);
+});
+
+test('[ABRD-153] a refused post on a card not shown is an unseen failure naming it until the card is shown', async () => {
+	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.showCard(otherKey);
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.unseenFailures).toEqual([
+		{
+			key: songKey,
+			name: 'Jump',
+			message: 'Schon entschieden: diese Zeile wurde inzwischen woanders entschieden.'
+		}
+	]);
+
+	store.showCard(songKey);
+
+	expect(store.unseenFailures).toEqual([]);
+	expect(store.banner(songKey)).not.toBeNull();
+});
+
+test('[ABRD-153] a failed post on a card not shown is an unseen failure too', async () => {
+	const send = vi.fn(async () => {
+		throw new Error('network down');
+	});
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.showCard(otherKey);
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.unseenFailures.map((failure) => failure.key)).toEqual([songKey]);
+});
+
+test.each([
+	[
+		'a new undo window starts on it',
+		(store: DecisionStore) =>
+			store.choose('repo', 42, songPoints, { shown: songCard, option: optionB })
+	],
+	[
+		'its banner is dropped for a re-read',
+		(store: DecisionStore) => store.reloadAfterBanner(songKey)
+	]
+])('[ABRD-153] an unseen failure goes when %s', async (_name, clearBanner) => {
+	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.showCard(otherKey);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(store.unseenFailures).toHaveLength(1);
+
+	await clearBanner(store);
+
+	expect(store.unseenFailures).toEqual([]);
+});
+
+test('[ABRD-153] a refused post on the card shown raises no failure strip', async () => {
+	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.showCard(songKey);
+
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(store.unseenFailures).toEqual([]);
+	expect(store.banner(songKey)).not.toBeNull();
+});

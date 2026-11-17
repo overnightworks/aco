@@ -368,7 +368,7 @@ for (const viewport of [
 			await pickAll(page, ['B', 'A', 'A']);
 
 			await expect(strip(page)).toHaveCount(1);
-			await expect(strip(page)).toContainText(`Decided: 1B 2A 3A · ${CARD_NAME}`);
+			await expect(strip(page)).toContainText(`Saves shortly: 1B 2A 3A · ${CARD_NAME}`);
 			await expect(undo(page)).toBeFocused();
 			await shoot(page, testInfo, 'strip');
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
@@ -450,7 +450,7 @@ for (const viewport of [
 			await acceptAll(page).click();
 
 			await expect(page.getByRole('dialog')).toHaveCount(0);
-			await expect(strip(page)).toContainText(`Decided: 1A 2B 3A · ${CARD_NAME}`);
+			await expect(strip(page)).toContainText(`Saves shortly: 1A 2B 3A · ${CARD_NAME}`);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect.poll(() => posts.length).toBe(1);
 			await expectRuled(['A', 'B', 'A']);
@@ -483,7 +483,7 @@ for (const viewport of [
 
 			await acceptAll(page).click();
 			await dialog.getByRole('button', { name: 'Accept all', exact: true }).click();
-			await expect(strip(page)).toContainText(`Decided: 1A 2B 3A · ${CARD_NAME}`);
+			await expect(strip(page)).toContainText(`Saves shortly: 1A 2B 3A · ${CARD_NAME}`);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect.poll(() => posts.length).toBe(1);
 			await expectRuled(['A', 'B', 'A']);
@@ -498,7 +498,7 @@ for (const viewport of [
 
 			await send(page, 'other');
 
-			await expect(strip(page)).toContainText(`Decided: Other · ${CARD_NAME}`);
+			await expect(strip(page)).toContainText(`Saves shortly: Other · ${CARD_NAME}`);
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 			await expect
 				.poll(() => posts)
@@ -629,7 +629,7 @@ for (const viewport of [
 				.getByRole('group', { name: 'Decide' })
 				.getByRole('button', { name: /^Decide B:/ })
 				.click();
-			await expect(strip(page)).toContainText('Decided: B — Weg B · Einzel');
+			await expect(strip(page)).toContainText('Saves shortly: B — Weg B · Einzel');
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
 			await expect
