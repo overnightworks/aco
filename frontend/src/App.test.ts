@@ -16,6 +16,7 @@ function fakeFetch(status: number, body: unknown) {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
+	Reflect.deleteProperty(document, 'visibilityState');
 });
 
 test('the shell names the board in its heading, whatever the state', () => {
@@ -223,7 +224,6 @@ test('[ABRD-152] hiding the page posts the decision at once, showing it does not
 	setVisibility('hidden');
 
 	expect(rulePosts()).toHaveLength(1);
-	Reflect.deleteProperty(document, 'visibilityState');
 });
 
 test('[ABRD-153] a refused post on a card left behind keeps a strip naming it until the card is shown', async () => {
