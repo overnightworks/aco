@@ -61,7 +61,7 @@ object. A refusal reaching the shared collection point prints
 - [ ] [BRIEF-08] `<item>` naming no item at all prints one empty line for the missing body, then every section exactly as BRIEF-01..06 describe with no live claim -- never a refusal (see E-BRIEF-06).
 - [ ] [BRIEF-29] Text prints a ruled option line of a valid body as its `text`, `ruling`, `ruled_on`, `via`, `question` and the chosen option's `name` and `contract` only; bytes outside the block stay (E-BRIEF-19).
 - [ ] [BRIEF-30] Text prints an option line ruled `other` as its `text`, `ruling`, `ruled_on`, `via`, the operator's `other` answer and `question`, and no option.
-- [ ] [BRIEF-31] Text prints open, returned, withdrawn and yes/no lines in full with their content unchanged (beside a ruled line the block is written again canonically, so quoting and layout may differ); a body that is not valid, or holds no ruled option line, prints byte for byte. `--json`'s `"body"` is always as stored.
+- [ ] [BRIEF-31] Text prints open, returned, withdrawn and yes/no lines in full, content unchanged; a body not valid or with no ruled option line prints byte for byte. `--json`'s `"body"` is as stored.
 - [ ] [BRIEF-23] Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `"body"` keeps it as stored.
 
 ## `--json`
