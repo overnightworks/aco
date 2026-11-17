@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { StripState } from '../app/model/boardSummary';
-	import { UNDO_SECONDS, UNDO_STRIP_LABEL } from '../app/model/decision';
+	import { UNDO_STRIP_LABEL, type StripState } from '../app/model/boardSummary';
+	import { UNDO_SECONDS } from '../app/model/decision';
 	import StateShape from './StateShape.svelte';
 
 	let { message, kind, onUndo }: { message: string; kind: StripState; onUndo: () => void } =
