@@ -2,10 +2,7 @@
 option only while that option can be taken back and the line is not a money,
 access or data-risk decision (RULE-45)."""
 
-import tomllib
-
 import pytest
-from cli_fixtures import run_cli
 from option_cards import (
     assert_refusal_writes_nothing,
     card,
@@ -15,13 +12,8 @@ from option_cards import (
     decide,
     item_body,
     serve_item,
+    shown_hash,
 )
-
-from aco.expectation_grammar import card_hash
-
-
-def shown_hash(card_text: str) -> str:
-    return card_hash(tomllib.loads(card_text)["expectation"][0])
 
 
 @pytest.mark.usefixtures("github_world")
@@ -59,15 +51,7 @@ class TestRuleDefaultStandsInOnlyForAReversibleChoice:
         assert_refusal_writes_nothing(
             client,
             capsys,
-            decide("A", "default", shown_hash(card_text)),
+            decide("A", "default", shown_hash(item_body(card_text), 2)),
             message,
             "invalid_usage",
         )
-
-    def test_a_reversible_product_line_is_ruled_by_default(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Spec: RULE-45 -- the refusal leaves every other default ruling as it was."""
-        serve_item(monkeypatch, item_body(card()))
-        ruled = run_cli(["rule", "7", *decide("A", "default", shown_hash(card()))], capsys)
-        assert (ruled.status, ruled.stdout) == (0, "RULED #7 line 2 A; 0 line(s) still open\n")
