@@ -107,7 +107,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` keeps the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
 - [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Saves shortly: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
 - [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
-- [ ] [ABRD-152] When the page is hidden or closed, every decision in its undo window is posted at once, each card its own write with the token header; the window ends there, and nothing not yet chosen is posted.
+- [ ] [ABRD-152] When the page is hidden or closed, every decision in its undo window is posted at once, each answer its own write with the token header; the window ends there, and nothing not yet chosen is posted.
 - [ ] [ABRD-153] A refused or failed post keeps a warning strip `Not saved: <name>` with its sentence above the stage until that card is shown; the card's own banner stays (ABRD-45).
 - [ ] [ABRD-154] Each point has its own `Other…` and text, kept per point also on a one-point card; `Send` posts that point alone with the strip `Saves shortly: Other · <topic>` (ABRD-67).
 - [ ] [ABRD-155] After a stored answer the stage stays on its card while the item has an open point and moves on (a noted answer to Decided, ABRD-129) once the last point is stored.
@@ -135,9 +135,9 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-97] A point is saving (ABRD-100) from its window's end until its answer is applied: its picks and `Other…` take no click; `Accept all` and `Unclear` take none while every open point saves.
 - [ ] [ABRD-98] A read's rows for an item apply only if the read was sent after that item's last stored answer arrived; until then the page keeps the item that answer carried.
 - [ ] [ABRD-99] From the start of its undo window until its answer is applied, a point marks its chosen letter at full strength and dims the rest, without the accent; `Other…` and `Unclear` mark none.
-- [ ] [ABRD-100] A card with a saving point shows the Saving shape on its row (a dashed ring, turning unless motion is reduced), also with its head; its meta reads `saving`; `Saving` replaces `Other…` and `Unclear`.
+- [ ] [ABRD-100] A card with a saving point shows the Saving shape on its row (a dashed ring, turning unless motion is reduced), also with its head; its meta reads `saving`; `Other…` and `Unclear` stay beside it, disabled.
 - [ ] [ABRD-66] The typed answer is kept per point, also on a one-point card: closing the panel, switching cards, `Undo` and a failed post keep it; `Undo` reopens the panel with it, and a stored decision drops it.
-- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Saves shortly: Other · <name>` (ABRD-82) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
+- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Saves shortly: Other · <name>` (ABRD-82; ABRD-154 on a card of points, where the name is the point topic) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
 - [ ] [ABRD-68] `Send` posts the point as shown when the panel opened, so a point changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] A card post's `unclear` (ABRD-78) stores no `via`; its note is trimmed, a blank one is none, and every posted line returns to its head (E-ABRD-14).

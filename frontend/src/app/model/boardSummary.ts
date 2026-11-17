@@ -358,13 +358,14 @@ export function decidedKeyOf(repos: Readings, key: string): string | null {
 	return null;
 }
 
+/** Where the stage goes after a post of a card. */
+export type StageMove =
+	{ kind: 'keep' } | { kind: 'decided'; key: string } | { kind: 'select'; key: string | null };
+
 /** Where the stage goes once a post of the card `key` is stored: nowhere while
  * the card still has an open point; else, as the last point leaves, to its
  * decided card when the answer came with a note and no other card is open, or
  * to the next open card (or its decided card) otherwise. */
-export type StageMove =
-	{ kind: 'keep' } | { kind: 'decided'; key: string } | { kind: 'select'; key: string | null };
-
 export function stageAfterRuled(repos: Readings, key: string, noted: boolean): StageMove {
 	if (findSelection(repos, key)?.kind === 'card') {
 		return { kind: 'keep' };
