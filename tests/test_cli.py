@@ -4388,15 +4388,15 @@ class _CutRoundTripCase:
 def _uncut_row_case(
     case_id: str, container_number: int, next_line: str, row_title: str
 ) -> _CutRoundTripCase:
-    """A container whose block still carries one undispatched `[[slice]]` --
-    `cut` always links it and titles the created child with that entry's own
-    title, regardless of what the container's `Next` line itself says."""
+    """A container whose block carries one undispatched `[[slice]]` row: `cut`
+    links it and titles the child from the row, never from the `Next` line."""
+    cut_body = complete_contract(next_line, planned_at_first_cut=1, slice=[])
     return _CutRoundTripCase(
         case_id,
         container_number,
         complete_contract(next_line, slice=_cuttable_slice_entries(row_title)),
         row_title,
-        lambda _child: {container_number: complete_contract(next_line, slice=[])},
+        lambda _child: {container_number: cut_body},
         lambda child: f"CUT #{container_number} row 1 -> #{child}\n",
     )
 

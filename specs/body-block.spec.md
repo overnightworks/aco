@@ -54,6 +54,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 | `scope` defective | BODY-53..BODY-56, BODY-111 | BODY-50 | BODY-52 |
 | `size` valid or defective | BODY-57..BODY-59 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `whole` valid or defective | BODY-60..BODY-62 | BODY-50 (defective only) | BODY-52 (defective only) |
+| `planned_at_first_cut` valid or defective | BODY-118..BODY-121 | BODY-50 (defective only) | BODY-52 (defective only) |
 | a block table header outside every fence | BODY-109 | BODY-50 | BODY-52 |
 | complete valid block | BODY-14 | — | — |
 
@@ -76,7 +77,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-10] A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
 - [ ] [BODY-11] A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
 - [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
-- [ ] [BODY-13] Any top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `scope`, `size`, `whole`, `expectation`, `slice` prints `body malformed: <key>: unknown top-level key <key>`, exit `2`.
+- [ ] [BODY-13] Any top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `scope`, `size`, `whole`, `planned_at_first_cut`, `expectation`, `slice` is refused `unknown top-level key`, exit `2`.
 - [ ] [BODY-14] A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
 
 ## `[record]`, the state-ref item identity
@@ -300,6 +301,13 @@ keeps its index. Inside one entry the refusals print in this order: `text`,
   whole = 1
   # any reason over 512 characters
   ```
+
+## `planned_at_first_cut`, a container's planned count at its first cut
+
+- [ ] [BODY-118] A block with no `planned_at_first_cut` key is valid: an older container carries none, and `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-119] `planned_at_first_cut = <n>` is valid for an integer `n` of at least 1 (`aco cut` writes it, CUT-45): `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-120] Any other value (`0`, a negative integer, a boolean, a string, a float, an array) prints `body malformed: planned_at_first_cut: planned_at_first_cut must be a positive integer`, exit `2`.
+- [ ] [BODY-121] A rewrite of the block (BODY-07) keeps the key, ahead of `slice = []` and every table.
 
 ## Never
 
