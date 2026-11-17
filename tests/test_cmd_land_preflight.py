@@ -19,6 +19,10 @@ from landing_refusals import ParserExit, RefusalLength, refusal_observations
 
 from aco import cli, cmd_land, forge
 
+HEAD_REQUIRED = "aco land needs --head <sha>, the head the reviewers saw: it merges only that state"
+OVERRIDE = ("--coordinator-override",)
+OVERRIDE_ROLE = "a coordinator override requires --role coordinator"
+
 
 @dataclass(frozen=True)
 class LandingCase:
@@ -543,26 +547,24 @@ class TestLandEntry:
     @pytest.mark.parametrize(
         "world",
         [
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "aco land needs --head <sha>, the head the reviewers saw: "
-                    "it merges only that state",
-                    head_omitted=True,
-                    requests=0,
-                ),
-                id="head-omitted",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "aco land needs --head <sha>, the head the reviewers saw: "
-                    "it merges only that state",
-                    head_omitted=True,
-                    merged=True,
-                    requests=0,
-                ),
-                id="rerun-head-omitted",
+            *(
+                pytest.param(
+                    LandingCase(
+                        landing_readiness(),
+                        sentence,
+                        arguments=arguments,
+                        head_omitted=head_omitted,
+                        merged=merged,
+                        requests=0,
+                    ),
+                    id=("rerun-" if merged else "") + name,
+                )
+                for merged in (False, True)
+                for name, sentence, arguments, head_omitted in (
+                    ("head-omitted", HEAD_REQUIRED, (), True),
+                    ("override-omitted-role", OVERRIDE_ROLE, OVERRIDE, False),
+                    ("override-wrong-role", OVERRIDE_ROLE, (*OVERRIDE, "--role", "builder"), False),
+                )
             ),
             pytest.param(
                 LandingCase(
@@ -573,44 +575,6 @@ class TestLandEntry:
                     requests=0,
                 ),
                 id="state-ref",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override",),
-                    requests=0,
-                ),
-                id="override-omitted-role",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override", "--role", "builder"),
-                    requests=0,
-                ),
-                id="override-wrong-role",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override",),
-                    merged=True,
-                    requests=0,
-                ),
-                id="rerun-override-omitted-role",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override", "--role", "builder"),
-                    merged=True,
-                    requests=0,
-                ),
-                id="rerun-override-wrong-role",
             ),
             pytest.param(
                 LandingCase(

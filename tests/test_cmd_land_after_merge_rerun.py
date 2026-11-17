@@ -677,8 +677,7 @@ class TestLandAfterMergeRerun:
                     land_stdout="",
                     land_stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
                     "release (branch 'dependabot/x' is not an issueless lane; "
-                    "pass an issue number, "
-                    "or check out a branch prefixed 'docs/' or 'fix/'); "
+                    "pass an issue number, or check out a branch prefixed 'docs/' or 'fix/'); "
                     "re-run aco land 12 --head <sha>\n",
                     claims=((protocol.IssueIdentity(72), "dependabot/x", "bob-claim"),),
                     lane_exists=True,
@@ -742,8 +741,7 @@ class TestLandAfterMergeRerun:
                     merge_message="feat: land the lane (#12)\n\nNo-Item: fix\n",
                     delete_error="delete branch failed (simulated)",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
-                    "follow-up incomplete: "
-                    "delete-branch (delete branch failed (simulated)); "
+                    "follow-up incomplete: delete-branch (delete branch failed (simulated)); "
                     "re-run aco land 12 --head <sha>\n",
                     quality_error="GitHub returned HTTP 500",
                     stdout="RELEASED lane dependabot/x: landing\nfreed: none\nnext: none\n"
@@ -765,8 +763,7 @@ class TestLandAfterMergeRerun:
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
-                RerunCase(arguments=("--head", "0000000")),
-                id="squash-rerun-on-recorded-head",
+                RerunCase(arguments=("--head", "0000000")), id="squash-rerun-on-recorded-head"
             ),
         ],
         indirect=True,
@@ -854,9 +851,8 @@ class TestLandAfterMergeRerun:
         """
         case = world.case
         capsys.readouterr()
-        result = run_cli(
-            ["land", "12", "--head", world.world.landing.head, *case.arguments], capsys
-        )
+        head = world.world.landing.head
+        result = run_cli(["land", "12", "--head", head, *case.arguments], capsys)
         observed = {"exit": result.status, "stdout": result.stdout, "stderr": result.stderr}
         expected = {
             "exit": case.status,

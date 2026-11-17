@@ -143,7 +143,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-34] When that body ends in a trailer paragraph as git's trailer parsing reads it, the classification joins it as its last line, no blank line between, where git then reads both.
 - [ ] [LANDCMD-36] Any other body takes a blank line, then the classification alone as its last paragraph.
 - [ ] [LANDCMD-35] Removing the classification line leaves no run of blank lines where it stood: a paragraph it alone made goes with it, and a whitespace-only line counts as blank.
-- [ ] [LANDCMD-14] A pull request whose head sha changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run aco land <n> --head <sha>`, exit `2`; nothing merges.
+- [ ] [LANDCMD-14] A pull request whose head changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run aco land <n> --head <sha>`, exit `2`.
 - [ ] [LANDCMD-37] A merge GitHub refuses (HTTP 405 other than LANDCMD-71's "Merge already in progress") refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
 - [ ] [LANDCMD-71] A merge call with HTTP 5xx or a 405 `Merge already in progress` refuses `pull request #<n> may still be merging (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept (E-LANDCMD-71).
 - [ ] [LANDCMD-72] After a 5xx, one read of the pull request comes first: merged at the pinned head, `aco land` goes on as after a merge (LANDCMD-15); open or unreadable, it refuses as LANDCMD-71; a 405 reads nothing.
@@ -155,7 +155,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-60] The preflight and the checkout check run unchanged before any write, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
 - [ ] [LANDCMD-61] After the checks passed, the body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue squash takes; a body already that message, apart from a trailing newline, is not written.
 - [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; nothing is queued.
-- [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 (`pull request #<n> changed while it was checked; re-run aco land <n> --head <sha>`), exit `2`.
+- [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 with the re-run hint, exit `2`.
 - [ ] [LANDCMD-64] Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; `aco land` never repeats an enqueue.
 - [ ] [LANDCMD-65] Then `aco land` reads the pull request's queue state every 60 seconds or slower; merged, it runs the steps after the merge (LANDCMD-15..17, LANDCMD-54..58) unchanged, and the claim stays until then.
 - [ ] [LANDCMD-75] A wait that begins with the pull request queued writes `waiting for pull request #<n> in the merge queue` once to stderr; one already merged writes nothing; stdout and exit codes stay.
