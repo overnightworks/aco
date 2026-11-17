@@ -6,6 +6,7 @@ import {
 	cardOtherRequest,
 	cardPicksRequest,
 	cardUnclearRequest,
+	entryKey,
 	LINE_CHANGED_MESSAGE,
 	lineKey,
 	noteOrNull,
@@ -127,5 +128,12 @@ describe('readDecisionResult', () => {
 			kind: 'failed',
 			message: 'unbekannter Fehler'
 		});
+	});
+});
+
+describe('entryKey', () => {
+	test('[ABRD-87] a post is keyed by its card and the sorted lines it names', () => {
+		expect(entryKey('repo:7:card', [5, 2])).toBe('repo:7:card:2,5');
+		expect(entryKey('repo:7:card', [3])).not.toBe(entryKey('repo:7:card', [2]));
 	});
 });

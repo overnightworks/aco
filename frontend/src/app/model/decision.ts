@@ -42,8 +42,19 @@ export const RELOAD_LABEL = 'Neu laden';
 
 export const BOARD_UNREACHABLE_MESSAGE = 'Das Board ist nicht erreichbar.';
 
+/** A point of a card and a ruled line are named alike: by item and line index. */
+export function pointKey(repo: string, item: number, index: number): string {
+	return `${repo}:${item}:${index}`;
+}
+
 export function lineKey(repo: string, item: number, line: ExpectationLine): string {
-	return `${repo}:${item}:${line.index}`;
+	return pointKey(repo, item, line.index);
+}
+
+/** One post's key: its card and the line indexes it posts, so two posts of one
+ * card that name different lines are two entries. */
+export function entryKey(card: string, indexes: readonly number[]): string {
+	return `${card}:${[...indexes].sort((first, second) => first - second).join(',')}`;
 }
 
 /** Every option card, one-point included, posts as one card: one key per item. */

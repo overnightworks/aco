@@ -11,6 +11,8 @@ const unclearPanel = { kind: 'unclear', shown } as const;
 function renderRow(
 	overrides: Partial<{
 		points: (typeof card)[];
+		kinds: ('other' | 'unclear')[];
+		number: number | null;
 		panel: typeof otherPanel | typeof unclearPanel | null;
 		draft: string;
 		pending: boolean;
@@ -24,6 +26,7 @@ function renderRow(
 	};
 	render(EscapeRow, {
 		points: shown,
+		kinds: ['other', 'unclear'],
 		panel: null,
 		draft: '',
 		pending: false,
@@ -97,15 +100,6 @@ test('[ABRD-72] an open card offers Other… then Unclear, and Unclear opens its
 	expect(onOpen).toHaveBeenCalledWith('unclear', shown);
 });
 
-test('[ABRD-72] a card with its head offers no Unclear and no Unclear panel, and keeps Other…', () => {
-	const withHead = [optionLine({ returned_on: '2026-10-26', returned_note: null })];
-	renderRow({ points: withHead, panel: { kind: 'unclear', shown: withHead } });
-
-	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
-	expect(screen.queryByRole('textbox')).toBeNull();
-	expect(screen.getByRole('button', { name: 'Other…' })).toBeTruthy();
-});
-
 test('[ABRD-73] the Unclear panel has an optional note field and a Send that is enabled while blank', async () => {
 	const { onSend, onClose } = renderRow({ panel: unclearPanel });
 
@@ -133,10 +127,17 @@ test('[ABRD-75] a pending decision disables Unclear and its Send', () => {
 	expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test('[ABRD-72] a card of points offers no Unclear once any point is with its head', () => {
-	const points = [optionLine({ index: 2 }), optionLine({ index: 3, returned_on: '2026-10-26' })];
-	renderRow({ points });
+test('[ABRD-72] a row offers only the kinds it is given, and shows no panel of another kind', () => {
+	renderRow({ kinds: ['other'], panel: unclearPanel });
 
 	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
+	expect(screen.queryByRole('textbox')).toBeNull();
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeTruthy();
+});
+
+test('[ABRD-154] a row at a point names the point in its button and its field', () => {
+	renderRow({ kinds: ['other'], number: 2, panel: otherPanel });
+
+	expect(screen.getByRole('button', { name: 'Point 2: Other…' })).toBeTruthy();
+	expect(screen.getByRole('textbox', { name: 'Point 2: Your answer' })).toBeTruthy();
 });

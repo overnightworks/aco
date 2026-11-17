@@ -11,7 +11,7 @@ import {
 } from '../../test-support/board';
 import type { DecisionResult, OptionLine } from '../../types';
 import type { Pick } from '../model/card';
-import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS } from '../model/decision';
+import { cardKey, LINE_CHANGED_MESSAGE, pointKey, UNDO_SECONDS } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
 
 const optionA = cardOption({ name: 'Keep it open' });
@@ -36,19 +36,23 @@ function pickOf(shown: OptionLine | undefined, option = optionB): Pick {
 	return { shown, option };
 }
 
+function lineOf(index: number, option: string) {
+	return { line: index, fingerprint: `fp-${index}`, option };
+}
+
 const storedCard = item({
 	number: 7,
 	lines: points.map(({ index }) => ruledOptionLine({ index }))
+});
+const oneStored = item({
+	number: 7,
+	lines: [ruledOptionLine({ index: 2 }), points[1] as OptionLine, points[2] as OptionLine]
 });
 
 function setup(result: DecisionResult = storedAnswer(storedCard)) {
 	const send = vi.fn(async () => result) as unknown as typeof postDecision;
 	const { store: board, wiring, reads } = readyBoard([repo({ items: [item({ number: 7 })] })]);
 	return { send, board, reads, store: new DecisionStore('token', wiring, send) };
-}
-
-function chooseAll(store: DecisionStore, letters: Pick[] = points.map((shown) => pickOf(shown))) {
-	for (const pick of letters) store.choose('repo', 7, points, pick);
 }
 
 beforeEach(() => {
@@ -60,24 +64,124 @@ afterEach(() => {
 });
 
 describe('picking on a card of points', () => {
-	test('[ABRD-86] a pick marks its point and posts nothing, however long it waits', async () => {
-		const { send, store } = setup();
+	test('[ABRD-86] a pick answers its point alone: one strip, then one post naming only that line', async () => {
+		const { send, store } = setup(storedAnswer(oneStored));
 
 		store.choose('repo', 7, points, pickOf(points[0]));
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 2000);
 
-		expect(store.picks(key, points).map((pick) => pick.shown.index)).toEqual([2]);
-		expect(store.isPending(key)).toBe(false);
+		expect(store.pendingEntries).toEqual([
+			{ key: `${key}:2`, message: `1B · ${name}`, state: 'done' }
+		]);
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000 - 1);
 		expect(send).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(1);
+		expect(send).toHaveBeenCalledTimes(1);
+		expect(send).toHaveBeenCalledWith('token', {
+			repo: 'repo',
+			item: 7,
+			lines: [lineOf(2, 'B')]
+		});
 	});
 
-	test('[ABRD-86] picking a point again changes its letter', () => {
-		const { store } = setup();
+	test('[ABRD-86] two picks are two windows and two writes, each naming its own line', async () => {
+		const { send, store } = setup(storedAnswer(oneStored));
+
+		store.choose('repo', 7, points, pickOf(points[0], optionB));
+		store.choose('repo', 7, points, pickOf(points[2], optionA));
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+		expect(send).toHaveBeenCalledTimes(2);
+		expect(send).toHaveBeenCalledWith(
+			'token',
+			expect.objectContaining({ lines: [lineOf(2, 'B')] })
+		);
+		expect(send).toHaveBeenCalledWith(
+			'token',
+			expect.objectContaining({ lines: [lineOf(5, 'A')] })
+		);
+	});
+
+	test('[ABRD-97] a waiting point is told from the others, and clears once its post is answered', async () => {
+		const { store } = setup(storedAnswer(oneStored));
+
+		store.choose('repo', 7, points, pickOf(points[1]));
+
+		expect([...store.waitingIndexes(key)]).toEqual([3]);
+		expect(store.waitingIndexes(cardKey('repo', 8)).size).toBe(0);
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		expect(store.waitingIndexes(key).size).toBe(0);
+	});
+
+	test('[ABRD-99] the card holds the picks of every waiting point, none while nothing waits', async () => {
+		const { store } = setup(storedAnswer(oneStored));
+		expect(store.held(key)).toBeNull();
 
 		store.choose('repo', 7, points, pickOf(points[0], optionA));
-		store.choose('repo', 7, points, pickOf(points[0], optionB));
+		store.choose('repo', 7, points, pickOf(points[1], optionB));
 
-		expect(store.picks(key, points).map((pick) => pick.option.letter)).toEqual(['B']);
+		expect(store.held(key)?.map((held) => held.option.letter)).toEqual(['A', 'B']);
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		expect(store.held(key)).toBeNull();
+	});
+
+	test('[ABRD-100] the card saves from the end of the window until its post is answered', async () => {
+		let answer: (result: DecisionResult) => void = () => undefined;
+		const send = vi.fn(
+			() =>
+				new Promise<DecisionResult>((resolve) => {
+					answer = resolve;
+				})
+		) as unknown as typeof postDecision;
+		const { wiring } = readyBoard([repo({ items: [item({ number: 7 })] })]);
+		const store = new DecisionStore('token', wiring, send);
+		store.choose('repo', 7, points, pickOf(points[0]));
+		expect(store.isSaving(key)).toBe(false);
+
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+		expect(store.isSaving(key)).toBe(true);
+		expect([...store.waitingIndexes(key)]).toEqual([2]);
+		answer(storedAnswer(oneStored));
+		await vi.advanceTimersByTimeAsync(0);
+		expect(store.isSaving(key)).toBe(false);
+	});
+
+	test('[ABRD-87] Undo of a pick posts nothing for it and frees its point, the others stay waiting', async () => {
+		const { send, store } = setup(storedAnswer(oneStored));
+		store.choose('repo', 7, points, pickOf(points[0]));
+		store.choose('repo', 7, points, pickOf(points[1]));
+
+		store.undo(`${key}:2`);
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+		expect(send).toHaveBeenCalledTimes(1);
+		expect(send).toHaveBeenCalledWith(
+			'token',
+			expect.objectContaining({ lines: [lineOf(3, 'B')] })
+		);
+	});
+
+	test('[ABRD-44] a stored point shows its item in place and names the card as just ruled', async () => {
+		const { board, reads, store } = setup(storedAnswer(oneStored));
+		store.choose('repo', 7, points, pickOf(points[0]));
+
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+		expect(board.repos[0]?.items).toEqual([oneStored]);
+		expect(reads()).toBe(0);
+		expect(store.justRuled).toBe(key);
+		store.acknowledgeRuled();
+		expect(store.justRuled).toBeNull();
+	});
+
+	test('[ABRD-98] a waiting point of one card leaves the other card’s points free', () => {
+		const { store } = setup();
+		store.choose('repo', 8, points, pickOf(points[0]));
+
+		store.choose('repo', 7, points, pickOf(points[1]));
+
+		expect([...store.waitingIndexes(cardKey('repo', 8))]).toEqual([2]);
+		expect([...store.waitingIndexes(key)]).toEqual([3]);
 	});
 
 	test('[ABRD-85] a point opens when toggled, another toggle closes any other, the same one closes it', () => {
@@ -91,324 +195,136 @@ describe('picking on a card of points', () => {
 		expect(store.openPoint(key)).toBeNull();
 	});
 
-	test('[ABRD-86] a pick on the open point opens the first unchosen point', () => {
-		const { store } = setup();
-		store.togglePoint(key, 2);
-
-		store.choose('repo', 7, points, pickOf(points[0]));
-
-		expect(store.openPoint(key)).toBe(3);
-	});
-
-	test('[ABRD-86] a pick on another point leaves the open point', () => {
-		const { store } = setup();
-		store.togglePoint(key, 3);
-
-		store.choose('repo', 7, points, pickOf(points[0]));
-
-		expect(store.openPoint(key)).toBe(3);
-	});
-
-	test('[ABRD-86] the picks of one card do not touch another card’s', () => {
-		const { store } = setup();
-		const otherKey = cardKey('repo', 8);
-
-		store.choose('repo', 7, points, pickOf(points[0]));
-
-		expect(store.picks(otherKey, points)).toEqual([]);
-		expect(store.picks(key, points)).toHaveLength(1);
-	});
-});
-
-describe('the last pick', () => {
-	test('[ABRD-87] starts one window with one strip, then posts the card once with every pick', async () => {
-		const { send, store } = setup();
-
-		chooseAll(store, [
-			pickOf(points[0], optionB),
-			pickOf(points[1], optionA),
-			pickOf(points[2], optionA)
-		]);
-
-		expect(store.pendingEntries).toEqual([{ key, message: `1B 2A 3A · ${name}`, state: 'done' }]);
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000 - 1);
-		expect(send).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(1);
-		expect(send).toHaveBeenCalledTimes(1);
-		expect(send).toHaveBeenCalledWith('token', {
-			repo: 'repo',
-			item: 7,
-			lines: [
-				{ line: 2, fingerprint: 'fp-2', option: 'B' },
-				{ line: 3, fingerprint: 'fp-3', option: 'A' },
-				{ line: 5, fingerprint: 'fp-5', option: 'A' }
-			]
-		});
-	});
-
-	test('[ABRD-87] Undo posts nothing and clears the picks', async () => {
-		const { send, store } = setup();
-		chooseAll(store);
-
-		store.undo(key);
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-		expect(send).not.toHaveBeenCalled();
-		expect(store.picks(key, points)).toEqual([]);
-		expect(store.isPending(key)).toBe(false);
-	});
-
-	test('[ABRD-44] a stored card shows its item in place, drops its picks and names the card as just ruled', async () => {
-		const { board, reads, store } = setup();
-		chooseAll(store);
-
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-		expect(board.repos[0]?.items).toEqual([storedCard]);
-		expect(reads()).toBe(0);
-		expect(store.justRuled).toBe(key);
-		expect(store.picks(key, points)).toEqual([]);
-	});
-
-	test('[ABRD-98] a stored answer keeps the partial picks of another card', async () => {
-		const send = vi.fn(async () => storedAnswer(storedCard)) as unknown as typeof postDecision;
-		const neighbour = item({ number: 8, lines: points });
-		const { store: board, wiring } = readyBoard([
-			repo({ items: [item({ number: 7 }), neighbour] })
-		]);
-		const store = new DecisionStore('token', wiring, send);
-		const neighbourKey = cardKey('repo', 8);
-		store.choose('repo', 8, points, pickOf(points[0]));
-		chooseAll(store);
-
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-		store.reconcilePicks(board.repos);
-
-		expect(board.repos[0]?.items).toEqual([storedCard, neighbour]);
-		expect(store.picks(neighbourKey, points).map((pick) => pick.shown.index)).toEqual([2]);
-	});
-
 	test('[ABRD-44] a one-point card starts its window with the pick itself, named by letter, option and topic', async () => {
 		const { send, store } = setup();
 		const only = point(4, { topic: 'Jump' });
 
 		store.choose('repo', 7, [only], pickOf(only));
 
-		expect(store.pendingEntries).toEqual([{ key, message: 'B — As today · Jump', state: 'done' }]);
+		expect(store.pendingEntries).toEqual([
+			{ key: `${key}:4`, message: 'B — As today · Jump', state: 'done' }
+		]);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 		expect(send).toHaveBeenCalledWith('token', {
 			repo: 'repo',
 			item: 7,
-			lines: [{ line: 4, fingerprint: 'fp-4', option: 'B' }]
+			lines: [lineOf(4, 'B')]
 		});
 	});
 });
 
 describe('Accept all', () => {
-	test('[ABRD-89] picks each recommended letter, replacing earlier picks, and starts the window', async () => {
+	const recommending = [
+		point(2, { recommended: 'A' }),
+		point(3, { recommended: 'B' }),
+		point(5, { recommended: 'A' })
+	];
+
+	test('[ABRD-89] picks each recommended letter in one window and one write', async () => {
 		const { send, store } = setup();
-		const recommending = [
-			point(2, { recommended: 'A' }),
-			point(3, { recommended: 'B' }),
-			point(5, { recommended: 'A' })
-		];
+
+		store.acceptAll('repo', 7, recommending);
+
+		expect(store.pendingEntries).toEqual([
+			{ key: `${key}:2,3,5`, message: `1A 2B 3A · ${name}`, state: 'done' }
+		]);
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+		expect(send).toHaveBeenCalledTimes(1);
+		expect(send).toHaveBeenCalledWith('token', {
+			repo: 'repo',
+			item: 7,
+			lines: [lineOf(2, 'A'), lineOf(3, 'B'), lineOf(5, 'A')]
+		});
+	});
+
+	test('[ABRD-89] after a pick is stored it posts the points still open, once', async () => {
+		const { send, store } = setup(storedAnswer(oneStored));
+		store.choose('repo', 7, recommending, pickOf(recommending[0], optionB));
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+		store.acceptAll('repo', 7, recommending.slice(1));
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+		expect(send).toHaveBeenCalledTimes(2);
+		expect(send).toHaveBeenLastCalledWith('token', {
+			repo: 'repo',
+			item: 7,
+			lines: [lineOf(3, 'B'), lineOf(5, 'A')]
+		});
+	});
+
+	test('[ABRD-89] it skips the points that wait and numbers the strip among all the points', async () => {
+		const { send, store } = setup(storedAnswer(oneStored));
 		store.choose('repo', 7, recommending, pickOf(recommending[0], optionB));
 
 		store.acceptAll('repo', 7, recommending);
 
-		expect(store.pendingEntries).toEqual([{ key, message: `1A 2B 3A · ${name}`, state: 'done' }]);
-		expect(store.openPoint(key)).toBeNull();
+		expect(store.pendingEntries.map((entry) => entry.message)).toEqual([
+			`1B · ${name}`,
+			`2B 3A · ${name}`
+		]);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-		expect(send).toHaveBeenCalledTimes(1);
+		expect(send).toHaveBeenCalledWith(
+			'token',
+			expect.objectContaining({ lines: [lineOf(3, 'B'), lineOf(5, 'A')] })
+		);
 	});
 
-	test('[ABRD-89] Undo after Accept all posts nothing and clears the picks', async () => {
+	test('[ABRD-89] Undo after Accept all posts nothing', async () => {
 		const { send, store } = setup();
-		store.acceptAll('repo', 7, points);
+		store.acceptAll('repo', 7, recommending);
 
-		store.undo(key);
+		store.undo(`${key}:2,3,5`);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 		expect(send).not.toHaveBeenCalled();
-		expect(store.picks(key, points)).toEqual([]);
+		expect(store.waitingIndexes(key).size).toBe(0);
 	});
 
-	test('[ABRD-89] a point whose recommendation names no option leaves the card incomplete, so nothing waits', () => {
-		const { store } = setup();
+	test('[ABRD-89] a point whose recommendation names no option stays open, the others post', async () => {
+		const { send, store } = setup();
 		const broken = [point(2), point(3, { recommended: 'D' })];
 
 		store.acceptAll('repo', 7, broken);
-
-		expect(store.isPending(key)).toBe(false);
-		expect(store.picks(key, broken)).toHaveLength(1);
-	});
-});
-
-describe('the card as shown', () => {
-	test('[ABRD-91] a re-read drops the pick of a changed point and keeps the others', () => {
-		const { store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
-		store.choose('repo', 7, points, pickOf(points[1]));
-		const reread = [
-			points[0] as OptionLine,
-			point(3, { fingerprint: 'fp-new' }),
-			points[2] as OptionLine
-		];
-
-		const indexes = store.picks(key, reread).map((pick) => pick.shown.index);
-
-		expect(indexes).toEqual([2]);
-	});
-
-	test('[ABRD-91] the next post names the fresh fingerprint of a point picked again', async () => {
-		const { send, store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
-		store.choose('repo', 7, points, pickOf(points[1]));
-		const fresh = point(3, { fingerprint: 'fp-new' });
-		const reread = [points[0] as OptionLine, fresh, points[2] as OptionLine];
-
-		store.choose('repo', 7, reread, pickOf(fresh));
-		store.choose('repo', 7, reread, pickOf(points[2]));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 		expect(send).toHaveBeenCalledWith(
 			'token',
-			expect.objectContaining({
-				lines: [
-					expect.objectContaining({ line: 2, fingerprint: 'fp-2' }),
-					expect.objectContaining({ line: 3, fingerprint: 'fp-new' }),
-					expect.objectContaining({ line: 5, fingerprint: 'fp-5' })
-				]
-			})
+			expect.objectContaining({ lines: [lineOf(2, 'A')] })
 		);
 	});
 
-	test('[ABRD-91] a point added since shows unchosen, so the last old pick starts no window', () => {
+	test('[ABRD-89] with no valid recommendation, or every point waiting, nothing new waits', () => {
 		const { store } = setup();
-		const grown = [...points, point(7)];
+		store.acceptAll('repo', 7, [point(2, { recommended: 'D' })]);
+		expect(store.pendingEntries).toEqual([]);
 
-		for (const shown of points) store.choose('repo', 7, grown, pickOf(shown));
+		store.acceptAll('repo', 7, recommending);
+		store.acceptAll('repo', 7, recommending);
 
-		expect(store.isPending(key)).toBe(false);
-		expect(store.picks(key, grown)).toHaveLength(3);
-	});
-
-	test('[ABRD-91] a re-read during the window leaves it running with the card as picked', async () => {
-		const { send, store } = setup();
-		chooseAll(store);
-		const reread = [point(2, { fingerprint: 'fp-new' })];
-
-		expect(store.picks(key, reread)).toEqual([]);
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-
-		expect(send).toHaveBeenCalledWith(
-			'token',
-			expect.objectContaining({
-				lines: [
-					expect.objectContaining({ fingerprint: 'fp-2' }),
-					expect.objectContaining({ fingerprint: 'fp-3' }),
-					expect.objectContaining({ fingerprint: 'fp-5' })
-				]
-			})
-		);
+		expect(store.pendingEntries).toHaveLength(1);
 	});
 });
 
-function readingOf(shown: OptionLine[]) {
-	return [repo({ name: 'repo', items: [item({ number: 7, lines: shown })] })];
-}
-
-describe('picks across re-reads', () => {
-	test('[ABRD-91] a point that changed and returned to its old fingerprint does not revive its pick', () => {
-		const { store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
-		store.choose('repo', 7, points, pickOf(points[1]));
-		const changed = [
-			points[0] as OptionLine,
-			point(3, { fingerprint: 'fp-new' }),
-			points[2] as OptionLine
-		];
-
-		store.reconcilePicks(readingOf(changed));
-		store.reconcilePicks(readingOf([...points]));
-
-		expect(store.picks(key, points).map((pick) => pick.shown.index)).toEqual([2]);
-	});
-
-	test('[ABRD-91] a card that disappears from a successful re-read does not revive its picks', () => {
-		const { store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
-
-		store.reconcilePicks(readingOf([]));
-		store.reconcilePicks(readingOf([...points]));
-
-		expect(store.picks(key, points)).toHaveLength(0);
-	});
-
-	test('[ABRD-91] a repo that failed to read keeps the picks of its cards', () => {
-		const { store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
-
-		store.reconcilePicks([repo({ name: 'repo', error: 'offline', items: [] })]);
-		store.reconcilePicks(readingOf([...points]));
-
-		expect(store.picks(key, points)).toHaveLength(1);
-	});
-
-	test('[ABRD-91] a repo whose name extends a readable repo name keeps its picks while it fails to read', () => {
-		const { store } = setup();
-		store.choose('repo:child', 7, points, pickOf(points[0]));
-
-		store.reconcilePicks([
-			repo({ name: 'repo', items: [] }),
-			repo({ name: 'repo:child', error: 'offline', items: [] })
-		]);
-
-		expect(store.picks('repo:child:7:card', points)).toHaveLength(1);
-	});
-
-	test('[ABRD-91] a repo whose name extends a readable repo name by a number keeps its picks while it fails to read', () => {
-		const { store } = setup();
-		store.choose('repo:123', 7, points, pickOf(points[0]));
-
-		store.reconcilePicks([
-			repo({ name: 'repo', items: [] }),
-			repo({ name: 'repo:123', error: 'offline', items: [] })
-		]);
-
-		expect(store.picks('repo:123:7:card', points)).toHaveLength(1);
-	});
-
-	test('[ABRD-91] a re-read keeps the picks of unchanged points', () => {
-		const { store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
-
-		store.reconcilePicks(readingOf([...points]));
-
-		expect(store.picks(key, points)).toHaveLength(1);
-	});
-});
-
-describe('a refused card', () => {
-	test('[ABRD-45] "Neu laden" after a changed refusal drops the banner and keeps the picks of unchanged points', async () => {
+describe('a refused post', () => {
+	test('[ABRD-45] "Neu laden" after a changed refusal drops the banner and re-reads', async () => {
 		const { reads, store } = setup({ status: 'failed', message: LINE_CHANGED_MESSAGE });
-		chooseAll(store);
+		store.choose('repo', 7, points, pickOf(points[0]));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 		expect(store.banner(key)?.kind).toBe('changed');
-		expect(store.picks(key, points)).toHaveLength(3);
 
 		await store.reloadAfterBanner(key);
 
 		expect(store.banner(key)).toBeNull();
-		expect(store.picks(key, points)).toHaveLength(3);
 		expect(reads()).toBe(1);
 	});
 
-	test('[ABRD-45] any other failure keeps the picks, and picking again posts again', async () => {
+	test('[ABRD-45] a failed point shows open again with the banner, and picking again posts again', async () => {
 		const { send, store } = setup({ status: 'failed', message: 'aco unavailable' });
-		chooseAll(store);
+		store.choose('repo', 7, points, pickOf(points[0]));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 		expect(store.banner(key)).toEqual({ kind: 'failed', message: 'aco unavailable' });
+		expect(store.waitingIndexes(key).size).toBe(0);
 
 		store.choose('repo', 7, points, pickOf(points[0], optionA));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -416,49 +332,45 @@ describe('a refused card', () => {
 		expect(send).toHaveBeenCalledTimes(2);
 		expect(send).toHaveBeenLastCalledWith(
 			'token',
-			expect.objectContaining({
-				lines: [
-					expect.objectContaining({ line: 2, option: 'A' }),
-					expect.objectContaining({ line: 3, option: 'B' }),
-					expect.objectContaining({ line: 5, option: 'B' })
-				]
-			})
+			expect.objectContaining({ lines: [lineOf(2, 'A')] })
 		);
 	});
 });
 
-describe('Other and Unclear for the whole card', () => {
-	test('[ABRD-92] Other waits out the window with one strip and posts every point with the same text', async () => {
-		const { send, store } = setup();
+describe('Other and Unclear on a card of points', () => {
+	test('[ABRD-154] Other answers its point alone, with its own strip and the text it was given', async () => {
+		const { send, store } = setup(storedAnswer(oneStored));
+		const second = point(3, { topic: 'Library' });
 
-		store.decideOther('repo', 7, points, '  Only on desktop ');
+		store.decideOther('repo', 7, second, '  Only on desktop ');
 
-		expect(store.pendingEntries).toEqual([{ key, message: `Other · ${name}`, state: 'done' }]);
+		expect(store.pendingEntries).toEqual([
+			{ key: `${key}:3`, message: 'Other · Library', state: 'done' }
+		]);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 		expect(send).toHaveBeenCalledWith('token', {
 			repo: 'repo',
 			item: 7,
-			lines: [
-				{ line: 2, fingerprint: 'fp-2' },
-				{ line: 3, fingerprint: 'fp-3' },
-				{ line: 5, fingerprint: 'fp-5' }
-			],
+			lines: [{ line: 3, fingerprint: 'fp-3' }],
 			other: 'Only on desktop'
 		});
 	});
 
-	test('[ABRD-92] Unclear waits as a With head strip and posts every point with the note', async () => {
+	test('[ABRD-92] Unclear covers the points not waiting and waits as a With head strip', async () => {
 		const { send, store } = setup(storedAnswer(storedCard, 'returned'));
+		store.choose('repo', 7, points, pickOf(points[0]));
 
 		store.decideUnclear('repo', 7, points, ' Why? ');
 
-		expect(store.pendingEntries).toEqual([{ key, message: name, state: 'back' }]);
+		expect(store.pendingEntries.map(({ key: entry, state }) => [entry, state])).toEqual([
+			[`${key}:2`, 'done'],
+			[`${key}:3,5`, 'back']
+		]);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 		expect(send).toHaveBeenCalledWith('token', {
 			repo: 'repo',
 			item: 7,
 			lines: [
-				{ line: 2, fingerprint: 'fp-2' },
 				{ line: 3, fingerprint: 'fp-3' },
 				{ line: 5, fingerprint: 'fp-5' }
 			],
@@ -468,25 +380,41 @@ describe('Other and Unclear for the whole card', () => {
 		expect(store.justReturned).toBe(key);
 	});
 
-	test('[ABRD-92] Undo of an Other answer keeps the picks already made and reopens the panel', async () => {
-		const { send, store } = setup();
-		store.choose('repo', 7, points, pickOf(points[0]));
+	test('[ABRD-92] Unclear starts nothing while every point waits', () => {
+		const { store } = setup();
+		store.acceptAll('repo', 7, points);
 
-		store.decideOther('repo', 7, points, 'x');
-		store.undo(key);
+		store.decideUnclear('repo', 7, points, '');
+
+		expect(store.pendingEntries).toHaveLength(1);
+	});
+
+	test('[ABRD-154] Undo of an Other answer reopens its point’s panel and keeps its draft', async () => {
+		const { send, store } = setup();
+		const second = points[1] as OptionLine;
+		const panelKey = pointKey('repo', 7, 3);
+		store.setDraft(panelKey, 'other', 'x');
+
+		store.decideOther('repo', 7, second, 'x');
+		store.undo(`${key}:3`);
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 		expect(send).not.toHaveBeenCalled();
-		expect(store.picks(key, points)).toHaveLength(1);
-		expect(store.panel(key)).toEqual({ kind: 'other', shown: points });
+		expect(store.panel(panelKey)).toEqual({ kind: 'other', shown: [second] });
+		expect(store.draft(panelKey, 'other')).toBe('x');
 	});
 
-	test('[ABRD-66] the draft of a card of points is kept per card', () => {
-		const { store } = setup();
+	test('[ABRD-66] the Other draft is kept per point, and a stored point drops only its own', async () => {
+		const { store } = setup(storedAnswer(oneStored));
+		const first = pointKey('repo', 7, 2);
+		const second = pointKey('repo', 7, 3);
+		store.setDraft(first, 'other', 'one');
+		store.setDraft(second, 'other', 'two');
 
-		store.setDraft(key, 'other', 'Only on desktop');
+		store.choose('repo', 7, points, pickOf(points[0]));
+		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-		expect(store.draft(key, 'other')).toBe('Only on desktop');
-		expect(store.draft(cardKey('repo', 8), 'other')).toBe('');
+		expect(store.draft(first, 'other')).toBe('');
+		expect(store.draft(second, 'other')).toBe('two');
 	});
 });

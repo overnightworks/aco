@@ -6,17 +6,14 @@ import {
 	cardName,
 	cardTitle,
 	confirmationFor,
-	livePicks,
-	nextOpenAfterPick,
 	openPoints,
 	pickedLetter,
 	pickedText,
 	pointNumber,
 	recommendedPicks,
-	withPick,
 	type Pick
 } from './card';
-import { chosenText, pointPickLabel } from './optionCard';
+import { pointPickLabel } from './optionCard';
 
 const optionA = cardOption({ name: 'Keep it open' });
 const optionB = cardOption({ letter: 'B', name: 'As today' });
@@ -88,81 +85,7 @@ describe('cardName and cardTitle', () => {
 	});
 });
 
-describe('picks as shown', () => {
-	test('[ABRD-91] a pick keeps the point as it was shown when picked', () => {
-		const picks = withPick([], pick(threePoints[0] as OptionLine));
-
-		expect(livePicks(picks, threePoints)).toEqual(picks);
-	});
-
-	test('[ABRD-86] picking a point again changes its letter and leaves the others', () => {
-		const first = threePoints[0] as OptionLine;
-		const second = threePoints[1] as OptionLine;
-		const picks = withPick(withPick([pick(first, optionA)], pick(second, optionA)), pick(first));
-
-		const letters = livePicks(picks, threePoints).map((live) => live.option.letter);
-
-		expect(letters).toEqual(['B', 'A']);
-	});
-
-	test('live picks follow the points’ order, not the order of picking', () => {
-		const first = threePoints[0] as OptionLine;
-		const last = threePoints[2] as OptionLine;
-		const picks = [pick(last), pick(first)];
-
-		const indexes = livePicks(picks, threePoints).map((live) => live.shown.index);
-
-		expect(indexes).toEqual([2, 5]);
-	});
-
-	test('[ABRD-91] a re-read drops the pick of a changed point and keeps the others', () => {
-		const picks = threePoints.map((shown) => pick(shown));
-		const reread = [
-			threePoints[0] as OptionLine,
-			point(3, { fingerprint: 'fp-new' }),
-			threePoints[2] as OptionLine
-		];
-
-		const indexes = livePicks(picks, reread).map((live) => live.shown.index);
-
-		expect(indexes).toEqual([2, 5]);
-	});
-
-	test('[ABRD-91] a re-read drops the pick of a point that is no longer open', () => {
-		const picks = threePoints.map((shown) => pick(shown));
-		const reread = [threePoints[0] as OptionLine, threePoints[2] as OptionLine];
-
-		const indexes = livePicks(picks, reread).map((live) => live.shown.index);
-
-		expect(indexes).toEqual([2, 5]);
-	});
-
-	test('[ABRD-91] a point added since shows unchosen', () => {
-		const picks = threePoints.map((shown) => pick(shown));
-		const reread = [...threePoints, point(7)];
-
-		expect(livePicks(picks, reread)).toHaveLength(3);
-	});
-});
-
-describe('the open point', () => {
-	test.each<[string, number | null, number, number[], number | null]>([
-		['the first unchosen point opens after a pick on the open point', 2, 2, [2], 3],
-		['the first unchosen point skips a chosen one', 2, 2, [2, 3], 5],
-		['no point opens once every point is chosen', 5, 5, [2, 3, 5], null],
-		['a pick on another point leaves the open point', 5, 2, [2], 5],
-		['a pick with no point open opens none', null, 2, [2], null]
-	])('[ABRD-86] %s', (_name, open, picked, chosen, expected) => {
-		const live = threePoints
-			.filter((candidate) => chosen.includes(candidate.index))
-			.map((shown) => pick(shown));
-		const shown = threePoints.find((candidate) => candidate.index === picked) as OptionLine;
-
-		expect(nextOpenAfterPick(open, threePoints, live, shown)).toBe(expected);
-	});
-});
-
-test('[ABRD-86] a point shows the letter picked for it, none while unchosen', () => {
+test('[ABRD-86] a point shows the letter of the pick waiting for it, none while none waits', () => {
 	const live = [pick(threePoints[0] as OptionLine, optionB)];
 
 	expect(pickedLetter(live, threePoints[0] as OptionLine)).toBe('B');
@@ -189,7 +112,7 @@ describe('Accept all', () => {
 	});
 
 	test('[ABRD-89] no confirm is asked when no recommended option is final', () => {
-		expect(acceptAllConfirmation(threePoints)).toBeNull();
+		expect(acceptAllConfirmation(threePoints, threePoints)).toBeNull();
 	});
 
 	test('[ABRD-90] the confirm names each point with a final recommended option and its consequence', () => {
@@ -200,11 +123,22 @@ describe('Accept all', () => {
 			point(7, { options: [optionA, finalB], recommended: 'A' })
 		];
 
-		expect(acceptAllConfirmation(points)).toEqual({
+		expect(acceptAllConfirmation(points, points)).toEqual({
 			title: 'Accept all recommendations?',
 			verb: 'Accept all',
 			lines: ['Point 2: Nicht rückholbar.', 'Point 3: Nicht rückholbar.']
 		});
+	});
+
+	test('[ABRD-90] the confirm lists only the points not waiting, numbered among all the points', () => {
+		const points = [
+			point(2, { options: [optionA, finalB], recommended: 'B' }),
+			point(3, { options: [optionA, finalB], recommended: 'B' })
+		];
+
+		expect(acceptAllConfirmation(points, points.slice(1))?.lines).toEqual([
+			'Point 2: Nicht rückholbar.'
+		]);
 	});
 });
 
@@ -236,10 +170,6 @@ describe('confirmationFor a pick', () => {
 });
 
 describe('words of a card', () => {
-	test('[ABRD-86] the Decide row counts the chosen points', () => {
-		expect(chosenText(1, 3)).toBe('1 of 3 chosen');
-	});
-
 	test('[ABRD-84] a point’s pick is named by the point, its letter and the option', () => {
 		expect(pointPickLabel(2, optionA)).toBe('Point 2: A – Keep it open');
 	});
@@ -253,6 +183,14 @@ describe('words of a card', () => {
 		const picks = [pick(points[0] as OptionLine, optionB), pick(points[1] as OptionLine, optionA)];
 
 		expect(pickedText(points, picks)).toBe('1B 2A · Song-Seite · 3 points');
+	});
+
+	test('[ABRD-87] the strip of one pick of a card of points names its place among the points', () => {
+		const points = threePoints.map((open) => ({ ...open, area: 'Song-Seite' }));
+
+		expect(pickedText(points, [pick(points[2] as OptionLine, optionA)])).toBe(
+			'3A · Song-Seite · 3 points'
+		);
 	});
 
 	test('[ABRD-58] the strip of a one-point card names the letter, the option and the topic', () => {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import type { ComponentProps, Snippet } from 'svelte';
 	import { cardTitle, pickedLetter, type Pick } from '../app/model/card';
 	import {
 		GROUP_LABEL,
@@ -11,6 +11,7 @@
 	import type { CardOption, OptionLine } from '../types';
 	import CardFrame from './CardFrame.svelte';
 	import CardRow from './CardRow.svelte';
+	import EscapeRow from './EscapeRow.svelte';
 	import OptionRows from './OptionRows.svelte';
 	import WarnMark from './WarnMark.svelte';
 
@@ -19,11 +20,11 @@
 		item,
 		points,
 		open,
-		picks,
+		held,
 		locked,
-		pending,
-		waiting,
+		blocked,
 		saving,
+		escapes,
 		onToggle,
 		onPick,
 		children
@@ -34,15 +35,18 @@
 		points: readonly OptionLine[];
 		/** The line index of the one open point, if any. */
 		open: number | null;
-		/** The picks that still count. */
-		picks: readonly Pick[];
+		/** The picks of the answers waiting in their undo window or being saved: their letters stay marked. */
+		held: readonly Pick[];
 		/** The card needs `Neu laden` before it can be decided. */
 		locked: boolean;
-		pending: boolean;
-		/** The card's answer waits in its undo window or is being saved: its picks stay marked. */
-		waiting: boolean;
-		/** The card's answer is being saved (ABRD-100). */
+		/** The points whose controls are disabled: waiting, or the card is reading again. */
+		blocked: ReadonlySet<number>;
+		/** A point of the card is being saved (ABRD-100). */
 		saving: boolean;
+		/** A point's own Other: its panel, draft and handlers. */
+		escapes: (
+			point: OptionLine
+		) => Omit<ComponentProps<typeof EscapeRow>, 'points' | 'kinds' | 'number' | 'pending'>;
 		onToggle: (index: number) => void;
 		onPick: (point: OptionLine, option: CardOption) => void;
 		children?: Snippet;
@@ -57,7 +61,7 @@
 		{#each points as point, position (point.index)}
 			{@const number = position + 1}
 			{@const isOpen = open === point.index}
-			{@const picked = pickedLetter(picks, point)}
+			{@const picked = pickedLetter(held, point)}
 			<CardRow label={position === 0 ? GROUP_LABEL.points : ''}>
 				<div class="point">
 					<button
@@ -90,10 +94,11 @@
 								<button
 									type="button"
 									class="pick"
-									class:recommended={!waiting && option.letter === point.recommended}
+									class:recommended={!blocked.has(point.index) &&
+										option.letter === point.recommended}
 									class:chosen={option.letter === picked}
 									aria-pressed={option.letter === picked}
-									disabled={pending}
+									disabled={blocked.has(point.index)}
 									aria-label={pointPickLabel(number, option)}
 									onclick={() => onPick(point, option)}
 								>
@@ -101,6 +106,13 @@
 								</button>
 							{/each}
 						</div>
+						<EscapeRow
+							points={[point]}
+							kinds={['other']}
+							{number}
+							pending={blocked.has(point.index)}
+							{...escapes(point)}
+						/>
 					{/if}
 				</div>
 			</CardRow>
@@ -116,9 +128,12 @@
 	.point {
 		padding: 4px 0;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-columns: minmax(0, 1fr) auto auto;
 		align-items: center;
 		gap: 12px;
+	}
+	.point > :global(.panel) {
+		grid-column: 1 / -1;
 	}
 	.point button.toggle {
 		display: grid;
@@ -206,7 +221,10 @@
 	}
 	@media (max-width: 760px) {
 		.point {
-			grid-template-columns: minmax(0, 1fr);
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.point button.toggle {
+			grid-column: 1 / -1;
 		}
 		.picks {
 			padding-left: 28px;

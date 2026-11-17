@@ -1,7 +1,7 @@
 /**
  * An item's open option lines as one card (`specs/serve.spec.md` ABRD-82 to
- * ABRD-92): the points, the card's name, the picks the operator made and the
- * rules that decide which point opens and which pick still counts. Pure, so
+ * ABRD-92): the points, the card's name, the picks a post holds and the
+ * confirms before them. Pure, so
  * `DecisionStore` and the components carry none of it.
  */
 
@@ -55,47 +55,16 @@ export function pointNumber(points: readonly OptionLine[], point: OptionLine): n
 	return points.findIndex((candidate) => candidate.index === point.index) + 1;
 }
 
-/** Adds a pick, replacing any earlier pick for the same point. */
-export function withPick(picks: readonly Pick[], pick: Pick): Pick[] {
-	return [...picks.filter((earlier) => earlier.shown.index !== pick.shown.index), pick];
-}
-
-/** The picks that still count, in the points' order: a pick counts only while
- * its point is still open with the fingerprint it was picked on. */
-export function livePicks(picks: readonly Pick[], points: readonly OptionLine[]): Pick[] {
-	return points.flatMap((point) =>
-		picks.filter(
-			(pick) => pick.shown.index === point.index && pick.shown.fingerprint === point.fingerprint
-		)
-	);
-}
-
-function firstUnchosen(points: readonly OptionLine[], live: readonly Pick[]): number | null {
-	return (
-		points.find((point) => !live.some((pick) => pick.shown.index === point.index))?.index ?? null
-	);
-}
-
-/** Which point is open once `picked` is chosen: the first unchosen point when
- * the picked one was the open one, else the open point stays. */
-export function nextOpenAfterPick(
-	open: number | null,
-	points: readonly OptionLine[],
-	live: readonly Pick[],
-	picked: OptionLine
-): number | null {
-	return open === picked.index ? firstUnchosen(points, live) : open;
-}
-
-/** The letter picked for `point`, or none while it is unchosen. */
+/** The letter of the pick waiting for `point`, or none while it waits for none. */
 export function pickedLetter(
-	live: readonly Pick[],
+	held: readonly Pick[],
 	point: OptionLine
 ): CardOption['letter'] | null {
-	return live.find((pick) => pick.shown.index === point.index)?.option.letter ?? null;
+	return held.find((pick) => pick.shown.index === point.index)?.option.letter ?? null;
 }
 
-/** Accept all's picks: every point's recommended option, as shown. */
+/** Accept all's picks: each point's recommended option, as shown; a point whose
+ * recommendation names no option has none and stays open. */
 export function recommendedPicks(points: readonly OptionLine[]): Pick[] {
 	return points.flatMap((shown) =>
 		shown.options
@@ -122,10 +91,14 @@ export function confirmationFor(points: readonly OptionLine[], pick: Pick): Conf
 		: null;
 }
 
-/** The confirm before Accept all, listing each point whose recommended option
- * cannot be taken back; none when there is none. */
-export function acceptAllConfirmation(points: readonly OptionLine[]): Confirmation | null {
-	const lines = recommendedPicks(points)
+/** The confirm before Accept all, listing each of the `available` points (the
+ * card's points not waiting) whose recommended option cannot be taken back,
+ * numbered among all the card's `points`; none when there is none. */
+export function acceptAllConfirmation(
+	points: readonly OptionLine[],
+	available: readonly OptionLine[]
+): Confirmation | null {
+	const lines = recommendedPicks(available)
 		.filter((pick) => asksToConfirm(pick.option))
 		.map((pick) => consequenceLine(points, pick));
 	return lines.length === 0

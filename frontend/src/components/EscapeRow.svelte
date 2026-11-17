@@ -3,7 +3,7 @@
 	import { NOTE_MAX_LENGTH } from '../app/model/decision';
 	import {
 		ESCAPE_LABEL,
-		hasHead,
+		pointPrefix,
 		sendsBlank,
 		type EscapeKind,
 		type EscapePanel
@@ -12,6 +12,8 @@
 
 	let {
 		points,
+		kinds,
+		number = null,
 		panel,
 		draft,
 		pending,
@@ -20,8 +22,12 @@
 		onDraft,
 		onSend
 	}: {
-		/** The card's points as shown now. */
+		/** The points the escapes answer, as shown now. */
 		points: readonly OptionLine[];
+		/** The escapes on offer, in order. */
+		kinds: readonly EscapeKind[];
+		/** The place of the one point the escapes answer, when the row stands at a point. */
+		number?: number | null;
 		/** The open panel with the card as shown when it opened; null while closed. */
 		panel: EscapePanel | null;
 		/** The text of the open panel's kind. */
@@ -35,8 +41,10 @@
 
 	let textarea: HTMLTextAreaElement | undefined = $state();
 
-	// A card with its head is not sent back again (ABRD-61).
-	const kinds: EscapeKind[] = $derived(hasHead(points) ? ['other'] : ['other', 'unclear']);
+	/** A row at a point names the point in its accessible names. */
+	function named(text: string): string {
+		return number === null ? text : `${pointPrefix(number)}${text}`;
+	}
 
 	async function toggle(kind: EscapeKind) {
 		if (panel?.kind === kind) {
@@ -64,6 +72,7 @@
 			type="button"
 			class="quiet"
 			aria-expanded={panel?.kind === kind}
+			aria-label={number === null ? undefined : named(ESCAPE_LABEL[kind].button)}
 			disabled={pending}
 			onclick={() => toggle(kind)}
 		>
@@ -76,7 +85,7 @@
 	<div class="panel">
 		<textarea
 			bind:this={textarea}
-			aria-label={ESCAPE_LABEL[open.kind].field}
+			aria-label={named(ESCAPE_LABEL[open.kind].field)}
 			placeholder={ESCAPE_LABEL[open.kind].placeholder}
 			maxlength={NOTE_MAX_LENGTH}
 			value={draft}

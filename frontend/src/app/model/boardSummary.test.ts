@@ -17,6 +17,7 @@ import {
 	refreshName,
 	STALE_AFTER_SECONDS,
 	stageAfterReturned,
+	stageAfterRuled,
 	openList,
 	outcomeLabel,
 	pictureDataUri,
@@ -688,6 +689,56 @@ describe('tabCounts', () => {
 
 	test('[ABRD-51] an empty board counts nothing', () => {
 		expect(tabCounts([])).toEqual({ open: 0, decided: 0 });
+	});
+});
+
+describe('stageAfterRuled', () => {
+	const twoOpen = [
+		repo({
+			items: [
+				item({ number: 7, lines: [optionLine({ index: 1 }), optionLine({ index: 2 })] }),
+				item({ number: 8, lines: [optionLine({ index: 1 })] })
+			]
+		})
+	];
+	const lastLeft = [
+		repo({
+			items: [
+				item({
+					number: 7,
+					lines: [
+						optionLine({ index: 1, ruling: 'A', ruled_on: '2026-10-01', via: 'board' }),
+						optionLine({ index: 2, ruling: 'B', ruled_on: '2026-10-01', via: 'board' })
+					]
+				}),
+				item({ number: 8, lines: [optionLine({ index: 1 })] })
+			]
+		})
+	];
+
+	test('[ABRD-155] the stage stays while the card still has an open point, noted or not', () => {
+		expect(stageAfterRuled(twoOpen, 'repo:7:card', false)).toEqual({ kind: 'keep' });
+		expect(stageAfterRuled(twoOpen, 'repo:7:card', true)).toEqual({ kind: 'keep' });
+	});
+
+	test('[ABRD-155] once its last point is stored the stage moves to the next open card', () => {
+		expect(stageAfterRuled(lastLeft, 'repo:7:card', false)).toEqual({
+			kind: 'select',
+			key: 'repo:8:card'
+		});
+	});
+
+	test('[ABRD-155] a noted last point shows its decided card, in the Decided view when nothing else is open', () => {
+		const alone = [repo({ items: [lastLeft[0]?.items[0] as ReturnType<typeof item>] })];
+
+		expect(stageAfterRuled(lastLeft, 'repo:7:card', true)).toEqual({
+			kind: 'select',
+			key: 'repo:7:1'
+		});
+		expect(stageAfterRuled(alone, 'repo:7:card', true)).toEqual({
+			kind: 'decided',
+			key: 'repo:7:1'
+		});
 	});
 });
 

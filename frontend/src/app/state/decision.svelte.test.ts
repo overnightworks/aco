@@ -10,7 +10,7 @@ import {
 	storedAnswer
 } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
-import { cardKey, UNDO_SECONDS } from '../model/decision';
+import { cardKey, entryKey, pointKey, UNDO_SECONDS } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
 
 const optionA = cardOption();
@@ -23,6 +23,8 @@ const songCard = optionLine({
 });
 const songKey = cardKey('repo', 42);
 const songPoints = [songCard];
+const songEntry = entryKey(songKey, [4]);
+const songPanel = pointKey('repo', 42, 4);
 
 function sender(result: DecisionResult): typeof postDecision {
 	return vi.fn(async () => result) as unknown as typeof postDecision;
@@ -42,7 +44,7 @@ test('undoing a key with nothing pending is a no-op', () => {
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring);
 
-	expect(() => store.undo(songKey)).not.toThrow();
+	expect(() => store.undo(songEntry)).not.toThrow();
 });
 
 test('once the window elapses, exactly one request is sent and the stored item shows in place', async () => {
@@ -61,7 +63,7 @@ test('once the window elapses, exactly one request is sent and the stored item s
 	});
 	expect(board.repos[0]?.items).toEqual([storedSong]);
 	expect(reads()).toBe(0);
-	expect(store.isPending(songKey)).toBe(false);
+	expect(store.held(songKey)).toBeNull();
 
 	// Nothing fires again later: the timer was consumed, not merely delayed.
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -121,7 +123,7 @@ test('a network failure during the write becomes its own failed banner and frees
 		kind: 'failed',
 		message: 'Das Board ist nicht erreichbar.'
 	});
-	expect(store.isPending(songKey)).toBe(false);
+	expect(store.held(songKey)).toBeNull();
 });
 
 test('deciding again clears a stale banner before the new window starts', async () => {
@@ -151,14 +153,14 @@ test('two cards pending at once each write exactly once, and undoing one leaves 
 
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	store.choose('repo', 43, [otherCard], { shown: otherCard, option: optionB });
-	expect(store.isPending(songKey)).toBe(true);
-	expect(store.isPending(otherKey)).toBe(true);
+	expect(store.held(songKey)).not.toBeNull();
+	expect(store.held(otherKey)).not.toBeNull();
 
-	store.undo(songKey);
+	store.undo(songEntry);
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.isPending(songKey)).toBe(false);
-	expect(store.isPending(otherKey)).toBe(false);
+	expect(store.held(songKey)).toBeNull();
+	expect(store.held(otherKey)).toBeNull();
 	expect(send).toHaveBeenCalledTimes(1);
 	expect(send).toHaveBeenCalledWith('token', {
 		repo: 'repo',
@@ -173,11 +175,13 @@ function otherStore(result: DecisionResult = storedAnswer(storedSong)) {
 	return { send, store: new DecisionStore('token', wiring, send) };
 }
 
-test('[ABRD-67] an Other answer waits out the window, names Other and the card’s name, then posts once', async () => {
+test('[ABRD-67] an Other answer waits out the window, names Other and the point’s topic, then posts once', async () => {
 	const { send, store } = otherStore();
 
-	store.decideOther('repo', 42, songPoints, '  Only on desktop ');
-	expect(store.pendingEntries).toEqual([{ key: songKey, message: 'Other · Jump', state: 'done' }]);
+	store.decideOther('repo', 42, songCard, '  Only on desktop ');
+	expect(store.pendingEntries).toEqual([
+		{ key: songEntry, message: 'Other · Jump', state: 'done' }
+	]);
 	expect(send).not.toHaveBeenCalled();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
@@ -192,11 +196,12 @@ test('[ABRD-67] an Other answer waits out the window, names Other and the card�
 
 test('[ABRD-68] Send posts the card the panel opened with, though the board shows a revised one', async () => {
 	const { send, store } = otherStore();
-	store.openPanel(songKey, { kind: 'other', shown: songPoints });
+	store.openPanel(songPanel, { kind: 'other', shown: songPoints });
 
-	const opened = store.panel(songKey);
-	if (opened === null) throw new Error('the panel should be open');
-	store.decideOther('repo', 42, opened.shown, 'x');
+	const opened = store.panel(songPanel);
+	const [shown] = opened?.shown ?? [];
+	if (shown === undefined) throw new Error('the panel should be open');
+	store.decideOther('repo', 42, shown, 'x');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(send).toHaveBeenCalledWith(
@@ -207,40 +212,40 @@ test('[ABRD-68] Send posts the card the panel opened with, though the board show
 
 test('[ABRD-67] sending closes the panel and undoing posts nothing and reopens it with the draft', async () => {
 	const { send, store } = otherStore();
-	store.openPanel(songKey, { kind: 'other', shown: songPoints });
-	store.setDraft(songKey, 'other', 'Only on desktop');
+	store.openPanel(songPanel, { kind: 'other', shown: songPoints });
+	store.setDraft(songPanel, 'other', 'Only on desktop');
 
-	store.decideOther('repo', 42, songPoints, store.draft(songKey, 'other'));
-	expect(store.panel(songKey)).toBeNull();
-	store.undo(songKey);
+	store.decideOther('repo', 42, songCard, store.draft(songPanel, 'other'));
+	expect(store.panel(songPanel)).toBeNull();
+	store.undo(songEntry);
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(send).not.toHaveBeenCalled();
-	expect(store.panel(songKey)).toEqual({ kind: 'other', shown: songPoints });
-	expect(store.draft(songKey, 'other')).toBe('Only on desktop');
+	expect(store.panel(songPanel)).toEqual({ kind: 'other', shown: songPoints });
+	expect(store.draft(songPanel, 'other')).toBe('Only on desktop');
 });
 
 test('[ABRD-66] the draft is kept per card and survives a failed post, and a stored decision drops it', async () => {
 	const failing = otherStore({ status: 'failed', message: 'aco unavailable' });
-	failing.store.setDraft(songKey, 'other', 'Only on desktop');
-	failing.store.decideOther('repo', 42, songPoints, 'Only on desktop');
+	failing.store.setDraft(songPanel, 'other', 'Only on desktop');
+	failing.store.decideOther('repo', 42, songCard, 'Only on desktop');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-	expect(failing.store.draft(songKey, 'other')).toBe('Only on desktop');
+	expect(failing.store.draft(songPanel, 'other')).toBe('Only on desktop');
 	expect(failing.store.draft(cardKey('repo', 43), 'other')).toBe('');
 
 	const ruling = otherStore();
-	ruling.store.setDraft(songKey, 'other', 'Only on desktop');
-	ruling.store.decideOther('repo', 42, songPoints, 'Only on desktop');
+	ruling.store.setDraft(songPanel, 'other', 'Only on desktop');
+	ruling.store.decideOther('repo', 42, songCard, 'Only on desktop');
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-	expect(ruling.store.draft(songKey, 'other')).toBe('');
+	expect(ruling.store.draft(songPanel, 'other')).toBe('');
 });
 
-test('[ABRD-65] a pending Other answer marks the card pending so no pick can join it', () => {
+test('[ABRD-65] a pending Other answer marks its point waiting so no pick can join it', () => {
 	const { store } = otherStore();
 
-	store.decideOther('repo', 42, songPoints, 'x');
+	store.decideOther('repo', 42, songCard, 'x');
 
-	expect(store.isPending(songKey)).toBe(true);
+	expect([...store.waitingIndexes(songKey)]).toEqual([4]);
 });
 
 test('[ABRD-97] a card saves from the end of its window until its answer is applied, and Undo then does nothing', async () => {
@@ -257,14 +262,14 @@ test('[ABRD-97] a card saves from the end of its window until its answer is appl
 
 	expect(store.pendingEntries).toEqual([]);
 	expect(store.isSaving(songKey)).toBe(true);
-	expect(store.isPending(songKey)).toBe(true);
-	store.undo(songKey);
-	expect(store.isPending(songKey)).toBe(true);
+	expect(store.held(songKey)).not.toBeNull();
+	store.undo(songEntry);
+	expect(store.held(songKey)).not.toBeNull();
 	expect(send).toHaveBeenCalledTimes(1);
 	answer(storedAnswer(storedSong));
 	await vi.advanceTimersByTimeAsync(0);
 	expect(store.isSaving(songKey)).toBe(false);
-	expect(store.isPending(songKey)).toBe(false);
+	expect(store.held(songKey)).toBeNull();
 	expect(board.repos[0]?.items).toEqual([storedSong]);
 });
 
@@ -278,7 +283,7 @@ test.each([
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.isPending(songKey)).toBe(false);
+	expect(store.held(songKey)).toBeNull();
 });
 
 const secondCard = optionLine({
@@ -297,45 +302,39 @@ test.each([
 	[
 		'a pick',
 		(store: DecisionStore) =>
-			store.choose('repo', 42, songPoints, { shown: songCard, option: optionB })
+			store.choose('repo', 42, twoPoints, { shown: songCard, option: optionB }),
+		1
 	],
-	['Accept all', (store: DecisionStore) => store.acceptAll('repo', 42, songPoints)]
-])('[ABRD-99] %s holds its picks in the window and while saving', async (_name, decide) => {
+	['Accept all', (store: DecisionStore) => store.acceptAll('repo', 42, twoPoints), 2]
+])('[ABRD-99] %s holds its picks in the window and while saving', async (_name, decide, count) => {
 	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 	const { send } = heldSend();
 	const store = new DecisionStore('token', wiring, send);
 	expect(store.held(songKey)).toBeNull();
 
 	decide(store);
-	const picks = store.picks(songKey, songPoints);
-	expect(store.held(songKey)).toEqual(picks);
-	expect(picks).toHaveLength(1);
+	expect(store.held(songKey)).toHaveLength(count);
 
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 	expect(store.isSaving(songKey)).toBe(true);
-	expect(store.held(songKey)).toEqual(picks);
+	expect(store.held(songKey)).toHaveLength(count);
 });
 
 test.each([
-	['Other', (store: DecisionStore) => store.decideOther('repo', 42, twoPoints, 'my own answer')],
+	['Other', (store: DecisionStore) => store.decideOther('repo', 42, songCard, 'my own answer')],
 	['Unclear', (store: DecisionStore) => store.decideUnclear('repo', 42, twoPoints, 'a note')]
-])(
-	'[ABRD-99] an %s answer holds no picks, even where a point was picked before it',
-	async (_name, decide) => {
-		const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
-		const { send } = heldSend();
-		const store = new DecisionStore('token', wiring, send);
-		store.choose('repo', 42, twoPoints, { shown: songCard, option: optionA });
-		expect(store.picks(songKey, twoPoints)).toHaveLength(1);
+])('[ABRD-99] an %s answer holds no picks', async (_name, decide) => {
+	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
+	const { send } = heldSend();
+	const store = new DecisionStore('token', wiring, send);
 
-		decide(store);
-		expect(store.held(songKey)).toEqual([]);
+	decide(store);
+	expect(store.held(songKey)).toEqual([]);
 
-		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
-		expect(store.isSaving(songKey)).toBe(true);
-		expect(store.held(songKey)).toEqual([]);
-	}
-);
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(store.isSaving(songKey)).toBe(true);
+	expect(store.held(songKey)).toEqual([]);
+});
 
 test.each([
 	['answers', false],
@@ -349,15 +348,15 @@ test.each([
 		});
 		const { wiring } = readyBoard();
 		const store = new DecisionStore('token', { ...wiring, reload: () => read });
-		expect(store.isPending(songKey)).toBe(false);
+		expect(store.isReading(songKey)).toBe(false);
 
 		const reloading = store.reloadAfterBanner(songKey).catch(() => {});
-		expect(store.isPending(songKey)).toBe(true);
-		expect(store.isPending(cardKey('repo', 43))).toBe(false);
+		expect(store.isReading(songKey)).toBe(true);
+		expect(store.isReading(cardKey('repo', 43))).toBe(false);
 
 		finish();
 		await reloading;
-		expect(store.isPending(songKey)).toBe(false);
+		expect(store.isReading(songKey)).toBe(false);
 	}
 );
 
@@ -406,19 +405,22 @@ test('[ABRD-152] a second flush posts nothing more', () => {
 	expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('[ABRD-152] flush posts nothing for an undone decision or a card not fully chosen', () => {
+test('[ABRD-152] flush posts nothing for an undone decision, and every other point of a card as its own write', () => {
 	const send = sender(storedAnswer(storedSong));
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
 	const second = optionLine({ index: 6, fingerprint: 'fp3', options: [optionA, optionB] });
+	const third = optionLine({ index: 7, fingerprint: 'fp4', options: [optionA, optionB] });
 	store.choose('repo', 42, songPoints, { shown: songCard, option: optionB });
-	store.undo(songKey);
-	store.choose('repo', 43, [otherCard, second], { shown: otherCard, option: optionA });
+	store.undo(songEntry);
+	store.choose('repo', 43, [otherCard, second, third], { shown: second, option: optionA });
+	store.choose('repo', 43, [otherCard, second, third], { shown: third, option: optionA });
 
 	store.flush();
 
-	expect(send).not.toHaveBeenCalled();
-	expect(store.picks(otherKey, [otherCard, second])).toHaveLength(1);
+	expect(send).toHaveBeenCalledTimes(2);
+	expect(send).not.toHaveBeenCalledWith('token', expect.objectContaining({ item: 42 }));
+	expect(store.pendingEntries).toEqual([]);
 });
 
 test('[ABRD-153] a refused post on a card not shown is an unseen failure naming it until the card is shown', async () => {

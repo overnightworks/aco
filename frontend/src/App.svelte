@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import {
-		decidedKeyOf,
-		nextOpenAfter,
+		stageAfterRuled,
 		stageAfterReturned,
 		firstDecidedKey,
 		firstOpenKey,
@@ -124,10 +123,6 @@
 	});
 
 	$effect(() => {
-		decisions?.reconcilePicks(board.repos);
-	});
-
-	$effect(() => {
 		if (token === null) {
 			board.setNoAccess();
 			decisions = null;
@@ -158,28 +153,36 @@
 		};
 	});
 
-	// Once a decision this tab made lands and its item is applied, the
-	// stage leaves the now-ruled card for the next open one -- but only while
-	// it is still the card shown, never yanking the operator off a different
-	// card they moved to in the meantime (picture: `nextOpenAfter`).
+	// Once a decision this tab made lands and its item is applied, the stage
+	// stays while the card still has an open point and leaves the now-ruled card
+	// for the next open one when its last point is stored -- but only while it
+	// is still the card shown, never yanking the operator off a different card
+	// they moved to in the meantime (`stageAfterRuled`).
 	$effect(() => {
-		if (decisions !== null && decisions.justRuled !== null && decisions.justRuled === selectedKey) {
-			const ruled = decisions.justRuled;
-			const next = nextOpenAfter(board.repos, ruled);
-			// A noted answer keeps its decided card on the stage, so the note is read;
-			// with no open card left the Open view shows only its calm state, so the
-			// card stands in the Decided view.
-			const noted = decisions.note(ruled) === null ? null : decidedKeyOf(board.repos, ruled);
-			if (noted !== null && next === null) {
-				selectedKey = null;
-				decidedKey = noted;
-				showDecidedCard = true;
-				view = 'decided';
-			} else {
-				selectedKey = noted ?? next;
-			}
-			void resetQuestion(question);
+		const ruled = decisions?.justRuled ?? null;
+		if (decisions === null || ruled === null) {
+			return;
 		}
+		decisions.acknowledgeRuled();
+		if (ruled !== selectedKey) {
+			return;
+		}
+		// A noted answer keeps its decided card on the stage, so the note is read;
+		// with no open card left the Open view shows only its calm state, so the
+		// card stands in the Decided view.
+		const move = stageAfterRuled(board.repos, ruled, decisions.note(ruled) !== null);
+		if (move.kind === 'keep') {
+			return;
+		}
+		if (move.kind === 'decided') {
+			selectedKey = null;
+			decidedKey = move.key;
+			showDecidedCard = true;
+			view = 'decided';
+		} else {
+			selectedKey = move.key;
+		}
+		void resetQuestion(question);
 	});
 
 	// The page posts every decision still in its undo window as it is hidden or

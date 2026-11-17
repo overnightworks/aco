@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
-import { META_LABEL } from '../app/model/optionCard';
+import { META_LABEL, type EscapePanel } from '../app/model/optionCard';
 import { cardOption, optionLine } from '../test-support/board';
 import type { OptionLine } from '../types';
 import GroupCard from './GroupCard.svelte';
@@ -25,24 +25,32 @@ function renderCard(
 	overrides: Partial<{
 		points: OptionLine[];
 		open: number | null;
-		picks: { shown: OptionLine; option: ReturnType<typeof cardOption> }[];
+		held: { shown: OptionLine; option: ReturnType<typeof cardOption> }[];
 		locked: boolean;
-		pending: boolean;
-		waiting: boolean;
+		blocked: ReadonlySet<number>;
+		panelOf: (point: OptionLine) => EscapePanel | null;
 		saving: boolean;
 	}> = {}
 ) {
 	const handlers = { onToggle: vi.fn(), onPick: vi.fn() };
+	const escapes = (point: OptionLine) => ({
+		panel: overrides.panelOf?.(point) ?? null,
+		draft: '',
+		onOpen: vi.fn(),
+		onClose: vi.fn(),
+		onDraft: vi.fn(),
+		onSend: vi.fn()
+	});
 	render(GroupCard, {
 		repo: 'songmaker',
 		item: 7,
 		points,
 		open: null,
-		picks: [],
+		held: [],
 		locked: false,
-		pending: false,
-		waiting: false,
+		blocked: new Set<number>(),
 		saving: false,
+		escapes,
 		...handlers,
 		...overrides
 	});
@@ -140,7 +148,7 @@ test('[ABRD-86] a pick reports its point as shown and its option', async () => {
 });
 
 test('[ABRD-86] a chosen point shows its pick pressed and the others not', () => {
-	renderCard({ picks: [{ shown: points[0] as OptionLine, option: optionB }] });
+	renderCard({ held: [{ shown: points[0] as OptionLine, option: optionB }] });
 
 	const pressed = screen
 		.getAllByRole('button', { pressed: true })
@@ -149,29 +157,31 @@ test('[ABRD-86] a chosen point shows its pick pressed and the others not', () =>
 	expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(5);
 });
 
-test('[ABRD-65] a pending decision disables every pick', () => {
-	renderCard({ pending: true });
+test('[ABRD-97] a waiting point disables its own picks and Other, the other points stay usable', () => {
+	renderCard({ blocked: new Set([3]) });
 
-	for (const pick of screen.getAllByRole('button', { name: /^Point \d: / })) {
-		expect(pick).toBeDisabled();
-	}
+	const second = within(screen.getByRole('group', { name: 'Point 2' })).getAllByRole('button');
+	const first = within(screen.getByRole('group', { name: 'Point 1' })).getAllByRole('button');
+	for (const pick of second) expect(pick).toBeDisabled();
+	for (const pick of first) expect(pick).toBeEnabled();
+	expect(screen.getByRole('button', { name: 'Point 2: Other…' })).toBeDisabled();
+	expect(screen.getByRole('button', { name: 'Point 1: Other…' })).toBeEnabled();
 });
 
-test('[ABRD-100] a saving card keeps its held picks pressed and locked, still opens a point and reads saving', async () => {
+test('[ABRD-100] a saving point keeps its held pick pressed and locked, the card still opens a point and reads saving', async () => {
 	const { onToggle } = renderCard({
-		pending: true,
-		waiting: true,
+		blocked: new Set([2]),
 		saving: true,
-		picks: points.map((shown) => ({ shown, option: optionB }))
+		held: [{ shown: points[0] as OptionLine, option: optionB }]
 	});
 
 	const pressed = screen.getAllByRole('button', { pressed: true });
-	expect(pressed).toHaveLength(3);
-	for (const pick of pressed) {
-		expect(pick).toBeDisabled();
-		expect(pick).toHaveClass('chosen');
-	}
-	for (const pick of screen.getAllByRole('button', { pressed: false })) {
+	expect(pressed.map((pick) => pick.getAttribute('aria-label'))).toEqual(['Point 1: B – As today']);
+	expect(pressed[0]).toBeDisabled();
+	expect(pressed[0]).toHaveClass('chosen');
+	for (const pick of within(screen.getByRole('group', { name: 'Point 1' })).getAllByRole('button', {
+		pressed: false
+	})) {
 		expect(pick).toBeDisabled();
 		expect(pick).not.toHaveClass('recommended');
 	}
@@ -181,9 +191,25 @@ test('[ABRD-100] a saving card keeps its held picks pressed and locked, still op
 });
 
 test('[ABRD-99] a waiting Other answer marks no pick', () => {
-	renderCard({ pending: true, waiting: true, picks: [] });
+	renderCard({ blocked: new Set([3]), held: [] });
 
 	expect(screen.queryByRole('button', { pressed: true })).toBeNull();
+});
+
+test('[ABRD-154] every point offers its own Other without opening the point', () => {
+	renderCard();
+
+	expect(screen.getAllByRole('button', { name: /^Point \d: Other…$/ })).toHaveLength(3);
+	expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+});
+
+test('[ABRD-154] a point’s open Other shows its panel under that point only', () => {
+	renderCard({
+		panelOf: (point) => (point.index === 3 ? { kind: 'other', shown: [point] } : null)
+	});
+
+	expect(screen.getAllByRole('textbox')).toHaveLength(1);
+	expect(screen.getByRole('textbox', { name: 'Point 2: Your answer' })).toBeInTheDocument();
 });
 
 test('[ABRD-45] a card that needs Neu laden hides its picks and keeps its rows', () => {
@@ -200,11 +226,18 @@ test('[ABRD-84] hostile texts render as text, never as markup', () => {
 		item: 7,
 		points: [point(2, { question: hostile, area: hostile }), point(3)],
 		open: null,
-		picks: [],
+		held: [],
 		locked: false,
-		pending: false,
-		waiting: false,
+		blocked: new Set<number>(),
 		saving: false,
+		escapes: () => ({
+			panel: null,
+			draft: '',
+			onOpen: vi.fn(),
+			onClose: vi.fn(),
+			onDraft: vi.fn(),
+			onSend: vi.fn()
+		}),
 		onToggle: vi.fn(),
 		onPick: vi.fn()
 	});
