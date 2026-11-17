@@ -19,12 +19,17 @@ from landing_refusals import ParserExit, RefusalLength, refusal_observations
 
 from aco import cli, cmd_land, forge
 
+HEAD_REQUIRED = "aco land needs --head <sha>, the head the reviewers saw: it merges only that state"
+OVERRIDE = ("--coordinator-override",)
+OVERRIDE_ROLE = "a coordinator override requires --role coordinator"
+
 
 @dataclass(frozen=True)
 class LandingCase:
     readiness: forge.LandingReadiness
     sentence: str
     arguments: tuple[str, ...] = ()
+    head_omitted: bool = False
     state_ref: bool = False
     merged: bool = False
     body: str = "Work-Item: #72\n\nCloses #72"
@@ -83,7 +88,9 @@ def world(
 
 
 def land(world: LandingScenario, capsys: pytest.CaptureFixture[str]) -> CliRun:
-    return run_cli(["land", "12", *world.case.arguments], capsys)
+    pinned = world.case.head_omitted or "--head" in world.case.arguments
+    head = () if pinned else ("--head", MERGE_COMMIT_SHA)
+    return run_cli(["land", "12", *head, *world.case.arguments], capsys)
 
 
 class TestLandReadiness:
@@ -421,7 +428,7 @@ class TestLandQualityGate:
                     landing_readiness(),
                     "pull request #12 was not merged: reading its landing preconditions failed "
                     "(quality/config.toml is not valid TOML: Invalid value (at end of document)); "
-                    "re-run aco land 12",
+                    "re-run aco land 12 --head <sha>",
                     quality_config="gate =",
                     quality_reads=("main",),
                 ),
@@ -513,7 +520,7 @@ class TestLandQualityGate:
                 LandingCase(
                     landing_readiness(),
                     "pull request #12 was not merged: reading its landing preconditions failed "
-                    "(GitHub returned HTTP 500); re-run aco land 12",
+                    "(GitHub returned HTTP 500); re-run aco land 12 --head <sha>",
                     quality_config_error=forge.ForgeError("GitHub returned HTTP 500"),
                     quality_reads=("main",),
                 ),
@@ -540,6 +547,25 @@ class TestLandEntry:
     @pytest.mark.parametrize(
         "world",
         [
+            *(
+                pytest.param(
+                    LandingCase(
+                        landing_readiness(),
+                        sentence,
+                        arguments=arguments,
+                        head_omitted=head_omitted,
+                        merged=merged,
+                        requests=0,
+                    ),
+                    id=("rerun-" if merged else "") + name,
+                )
+                for merged in (False, True)
+                for name, sentence, arguments, head_omitted in (
+                    ("head-omitted", HEAD_REQUIRED, (), True),
+                    ("override-omitted-role", OVERRIDE_ROLE, OVERRIDE, False),
+                    ("override-wrong-role", OVERRIDE_ROLE, (*OVERRIDE, "--role", "builder"), False),
+                )
+            ),
             pytest.param(
                 LandingCase(
                     landing_readiness(),
@@ -549,44 +575,6 @@ class TestLandEntry:
                     requests=0,
                 ),
                 id="state-ref",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override",),
-                    requests=0,
-                ),
-                id="override-omitted-role",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override", "--role", "builder"),
-                    requests=0,
-                ),
-                id="override-wrong-role",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override",),
-                    merged=True,
-                    requests=0,
-                ),
-                id="rerun-override-omitted-role",
-            ),
-            pytest.param(
-                LandingCase(
-                    landing_readiness(),
-                    "a coordinator override requires --role coordinator",
-                    arguments=("--coordinator-override", "--role", "builder"),
-                    merged=True,
-                    requests=0,
-                ),
-                id="rerun-override-wrong-role",
             ),
             pytest.param(
                 LandingCase(

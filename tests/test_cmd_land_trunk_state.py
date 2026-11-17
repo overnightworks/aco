@@ -67,7 +67,7 @@ class TestLandTrunkState:
 
         landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         merged = f"merged: {landed.landing.forge.landings[12].merge_commit}\n"
         observed = (result.status, result.stdout, result.stderr)
         expected = (0, RELEASED + merged + case.trunk_line.format(sha7=first_parent[:7]), "")
@@ -89,9 +89,9 @@ class TestLandTrunkState:
 
         landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
         capsys.readouterr()
-        first = run_cli(["land", "12"], capsys)
+        first = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         landed.landing.forge.close_error = None
-        rerun = run_cli(["land", "12"], capsys)
+        rerun = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         merged = f"merged: {landed.landing.forge.landings[12].merge_commit}\n"
         observed = (first.status, first.stdout, rerun.status, rerun.stdout, rerun.stderr)
         expected = (
@@ -116,10 +116,10 @@ class TestLandTrunkState:
         def arrange(client: FakeForge, _head: str) -> None:
             client.commit_checks_by_sha[first_parent] = (FAILED,)
 
-        landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
+        landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
         capsys.readouterr()
-        first = run_cli(["land", "12"], capsys)
-        rerun = run_cli(["land", "12"], capsys)
+        first = run_cli(["land", "12", "--head", landed.landing.head], capsys)
+        rerun = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         assert "trunk: red" in first.stdout
         observed = (rerun.status, rerun.stdout.splitlines()[0], rerun.stderr)
         expected = (

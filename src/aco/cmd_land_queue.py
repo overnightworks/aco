@@ -22,15 +22,17 @@ _NO_REMOVAL_REASON = "no reason recorded"
 _WRITING_MESSAGE = "writing its landing message"
 _ENQUEUEING = "enqueueing it"
 _NOT_QUEUED = (
-    "pull request #{number} was not queued: {step} failed ({foreign}); re-run aco land {number}"
+    "pull request #{number} was not queued: {step} failed ({foreign}); "
+    "re-run aco land {number} --head <sha>"
 )
 _QUEUE_READ_FAILED = (
     "reading the merge queue state of pull request #{number} failed ({foreign}); "
-    "re-run aco land {number}"
+    "re-run aco land {number} --head <sha>"
 )
 _WAITING = "waiting for pull request #{number} in the merge queue"
 _REMOVED = (
-    "pull request #{number} was removed from the merge queue ({foreign}); re-run aco land {number}"
+    "pull request #{number} was removed from the merge queue ({foreign}); "
+    "re-run aco land {number} --head <sha>"
 )
 _REMOVED_AND_CLOSED = (
     "pull request #{number} was removed from the merge queue and closed ({foreign})"
@@ -41,11 +43,12 @@ def head_moved_refusal(number: int) -> protocol.ClaimUnavailableError:
     """The refusal of a pinned merge or enqueue whose pull request changed since the
     preflight read its head."""
     return protocol.ClaimUnavailableError(
-        f"pull request #{number} changed while it was checked; re-run land"
+        f"pull request #{number} changed while it was checked; "
+        f"re-run aco land {number} --head <sha>"
     )
 
 
-def refuse_other_pinned_head(number: int, queued_head: str, pinned_head: str | None) -> None:
+def refuse_other_pinned_head(number: int, queued_head: str, pinned_head: str) -> None:
     """A rerun finding the pull request queued lands what the queue holds, so a `--head` pin
     that does not name the queued head refuses before the wait."""
     if forge.pin_names_head(queued_head, pinned_head):

@@ -28,6 +28,9 @@ from .session import RunContext
 _LAND_GITHUB_ONLY_REFUSAL = (
     "aco land is a github command; storage = state-ref has no pull requests to land"
 )
+_LAND_HEAD_REQUIRED_REFUSAL = (
+    "aco land needs --head <sha>, the head the reviewers saw: it merges only that state"
+)
 _LAND_SELF_PACKAGE_NAME = "overnightworks-aco"
 _LAND_REINSTALL_LINE = f"reinstall: uv tool install --force --from . {_LAND_SELF_PACKAGE_NAME}"
 
@@ -193,7 +196,7 @@ def _refuse_land_readiness(
         raise protocol.ClaimUnavailableError(checks_refusal)
 
 
-def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: str | None) -> None:
+def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: str) -> None:
     """`land --head`: the head this preflight read -- the one
     the merge pins -- must be the commit the reviewers saw, so a push after
     their review never lands unseen."""
@@ -455,7 +458,7 @@ _LAND_READ_FAILURE_ERRORS = frozenset(
 )
 _LAND_READ_FAILURE_REFUSAL = (
     "pull request #{number} was not merged: reading {what} failed ({foreign}); "
-    "re-run aco land {number}"
+    "re-run aco land {number} --head <sha>"
 )
 
 
@@ -519,7 +522,7 @@ def _land_step[LandStepResult](
     except protocol.ClaimError as error:
         raise protocol.ClaimUnavailableError(
             f"MERGED pull request #{number} as {sha}; follow-up incomplete: {step} "
-            f"({protocol.terminal_text(str(error))}); re-run aco land {number}"
+            f"({protocol.terminal_text(str(error))}); re-run aco land {number} --head <sha>"
         ) from error
 
 
@@ -538,7 +541,7 @@ def _land_release_routing(
     the `release` step's own `_land_step`, so a
     defect here -- an edited body's classification long gone from the merge
     commit's own history -- prints the ruled `MERGED ... follow-up
-    incomplete: release; re-run aco land <n>` line, never a bare refusal."""
+    incomplete: release; re-run aco land <n> --head <sha>` line, never a bare refusal."""
     if classification is not None:
         if isinstance(classification, workboard.WorkItemClassification):
             return classification.item.number
@@ -666,6 +669,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     check placed only there left a rerun free to delete the branch and
     fast-forward -- and `cmd_release.release_transition` free to close the item -- on a bare
     `--coordinator-override` with no coordinator role behind it."""
+    if parsed.head is None:
+        raise protocol.ClaimUnavailableError(_LAND_HEAD_REQUIRED_REFUSAL)
     if context.config.storage is not body.Storage.GITHUB:
         raise protocol.ClaimUnavailableError(_LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:

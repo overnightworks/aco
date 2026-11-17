@@ -529,7 +529,7 @@ class TestLandMessage:
         outcome = world.case.outcome
         assert isinstance(outcome, Landed)
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", world.head], capsys)
         message = real_git(world.clone, "log", "-1", "--format=%B", "main").stdout
         keys = trailer_keys(world.clone, message)
         observed, expected = landed_observations(
@@ -585,7 +585,7 @@ class TestLandMessage:
         """Spec: keine (Lücke). Git read failures refuse before merging."""
         assert isinstance(world.case.outcome, str)
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", world.head], capsys)
         observed, expected = refusal_observations(
             world, result, world.case.outcome, length=RefusalLength.WITHIN_LIMIT
         )
