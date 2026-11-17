@@ -199,9 +199,16 @@
 		};
 	});
 
-	// A failure strip stays until its card is shown.
+	// A failure strip stays until its card is on screen: a selected card the
+	// phone's list view or another tab hides is not shown.
 	$effect(() => {
-		decisions?.showCard(selectedKey);
+		void view;
+		void showQuestion;
+		const key = selectedKey;
+		void tick().then(() => {
+			const onScreen = view === 'open' && question && question.getClientRects().length > 0;
+			decisions?.showCard(onScreen ? key : null);
+		});
 	});
 
 	// A card this tab sent back to its head stays on the stage unless another
