@@ -53,6 +53,13 @@ export interface DecisionBoard {
 	applyItem: (repo: string, item: BoardItem) => void;
 }
 
+/** A post the board did not store on a card the operator is not looking at. */
+export interface UnseenFailure {
+	key: string;
+	name: string;
+	message: string;
+}
+
 export interface PendingDecision {
 	key: string;
 	message: string;
@@ -63,6 +70,8 @@ interface PendingEntry {
 	request: DecisionRequest;
 	message: string;
 	state: StripState;
+	/** The card's name, for a failure strip that outlives the card being shown. */
+	name: string;
 	timer: ReturnType<typeof setTimeout>;
 	/** The picks this answer posts: a pick's or Accept all's, none for an escape answer. */
 	held: readonly Pick[];
@@ -117,6 +126,11 @@ export class DecisionStore {
 	#picks: Record<string, Pick[]> = $state({});
 	/** The one open point per card, by line index; none until one is activated. */
 	#openPoints: Record<string, number | null> = $state({});
+	/** The card the stage shows, so a failure on any other card is told apart. */
+	#shownKey: string | null = null;
+	/** The cards whose refused or failed post came while another card was shown,
+	 * each with its name, until the card is shown. */
+	readonly #unseen = new SvelteMap<string, string>();
 
 	constructor(
 		private readonly token: string,
@@ -152,6 +166,22 @@ export class DecisionStore {
 
 	banner(key: string): DecisionBanner | null {
 		return this.#banners[key] ?? null;
+	}
+
+	/** The refused or failed posts of cards not shown, each naming its card. */
+	get unseenFailures(): UnseenFailure[] {
+		return [...this.#unseen].flatMap(([key, name]) => {
+			const banner = this.#banners[key];
+			return banner === undefined ? [] : [{ key, name, message: banner.message }];
+		});
+	}
+
+	/** The card the stage now shows; its failure strip goes, its own banner stays. */
+	showCard(key: string | null): void {
+		this.#shownKey = key;
+		if (key !== null) {
+			this.#unseen.delete(key);
+		}
 	}
 
 	get justRuled(): string | null {
@@ -259,6 +289,7 @@ export class DecisionStore {
 				cardPicksRequest(repo, item, picks),
 				pickedText(points, picks),
 				'done',
+				cardName(points),
 				picks
 			);
 		}
@@ -273,6 +304,7 @@ export class DecisionStore {
 			cardOtherRequest(repo, item, shown, answer),
 			pendingOtherText(cardName(shown)),
 			'done',
+			cardName(shown),
 			[],
 			{ kind: 'other', shown }
 		);
@@ -287,6 +319,7 @@ export class DecisionStore {
 			cardUnclearRequest(repo, item, shown, note),
 			cardName(shown),
 			'back',
+			cardName(shown),
 			[],
 			{ kind: 'unclear', shown }
 		);
@@ -297,12 +330,31 @@ export class DecisionStore {
 		request: DecisionRequest,
 		message: string,
 		state: StripState,
+		name: string,
 		held: readonly Pick[],
 		reopens: EscapePanel | null = null
 	): void {
 		this.#banners = withoutKey(this.#banners, key);
-		const timer = setTimeout(() => void this.#commit(key, request, held), this.undoSeconds * 1000);
-		this.#pending = { ...this.#pending, [key]: { request, message, state, timer, held, reopens } };
+		const entry: PendingEntry = {
+			request,
+			message,
+			state,
+			name,
+			held,
+			reopens,
+			timer: setTimeout(() => void this.#commit(key, entry), this.undoSeconds * 1000)
+		};
+		this.#pending = { ...this.#pending, [key]: entry };
+	}
+
+	/** Posts every decision in its undo window at once, each card as its own write,
+	 * and ends those windows. Runs synchronously so the requests start before the
+	 * page is gone; a second call finds nothing to post. */
+	flush(): void {
+		for (const [key, entry] of Object.entries(this.#pending)) {
+			clearTimeout(entry.timer);
+			void this.#commit(key, entry);
+		}
 	}
 
 	/** Cancels a still-pending decision; a no-op once it already wrote or was undone.
@@ -334,7 +386,7 @@ export class DecisionStore {
 		}
 	}
 
-	async #commit(key: string, request: DecisionRequest, held: readonly Pick[]): Promise<void> {
+	async #commit(key: string, { request, held, name }: PendingEntry): Promise<void> {
 		this.#pending = withoutKey(this.#pending, key);
 		this.#saving.set(key, held);
 		let outcome: DecisionOutcome;
@@ -359,6 +411,11 @@ export class DecisionStore {
 			this.#justReturned = key;
 		} else {
 			this.#banners = { ...this.#banners, [key]: outcome };
+			if (key === this.#shownKey) {
+				this.#unseen.delete(key);
+			} else {
+				this.#unseen.set(key, name);
+			}
 		}
 	}
 

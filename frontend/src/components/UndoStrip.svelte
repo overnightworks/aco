@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { STATE_LABEL, type StripState } from '../app/model/boardSummary';
-	import { UNDO_SECONDS } from '../app/model/decision';
+	import type { StripState } from '../app/model/boardSummary';
+	import { UNDO_SECONDS, UNDO_STRIP_LABEL } from '../app/model/decision';
 	import StateShape from './StateShape.svelte';
 
 	let { message, kind, onUndo }: { message: string; kind: StripState; onUndo: () => void } =
@@ -17,7 +17,7 @@
 
 <div class="strip" class:back={kind === 'back'} style:--undo-seconds="{UNDO_SECONDS}s">
 	<StateShape state={kind} />
-	<span class="tx">{STATE_LABEL[kind]}: {message}</span>
+	<span class="tx">{UNDO_STRIP_LABEL[kind]}: {message}</span>
 	<button type="button" class="undo" bind:this={undo} onclick={onUndo}>Undo</button>
 	<span class="drain" aria-hidden="true"></span>
 </div>

@@ -19,6 +19,7 @@
 	import { BoardStore } from './app/state/board.svelte';
 	import { cardKey } from './app/model/decision';
 	import { DecisionStore } from './app/state/decision.svelte';
+	import FailureStrip from './components/FailureStrip.svelte';
 	import ProgressView from './components/ProgressView.svelte';
 	import QuietSign from './components/QuietSign.svelte';
 	import RefreshButton from './components/RefreshButton.svelte';
@@ -181,6 +182,28 @@
 		}
 	});
 
+	// The page posts every decision still in its undo window as it is hidden or
+	// closed; both events may fire, the flush is idempotent.
+	$effect(() => {
+		const store = decisions;
+		if (store === null) return;
+		const flushIfHidden = () => {
+			if (document.visibilityState === 'hidden') store.flush();
+		};
+		const flush = () => store.flush();
+		window.addEventListener('pagehide', flush);
+		document.addEventListener('visibilitychange', flushIfHidden);
+		return () => {
+			window.removeEventListener('pagehide', flush);
+			document.removeEventListener('visibilitychange', flushIfHidden);
+		};
+	});
+
+	// A failure strip stays until its card is shown.
+	$effect(() => {
+		decisions?.showCard(selectedKey);
+	});
+
 	// A card this tab sent back to its head stays on the stage unless another
 	// card is open; the report is taken once, so selecting it again later never
 	// moves the stage.
@@ -256,12 +279,16 @@
 					saving={(key) => store.isSaving(key)}
 					onSelect={(key) => {
 						selectedKey = key;
+						store.showCard(key);
 						showQuestion = true;
 						void resetQuestion(question, true);
 					}}
 				/>
 			</div>
 			<div class="strips" aria-live="polite">
+				{#each decisions.unseenFailures as failure (failure.key)}
+					<FailureStrip name={failure.name} message={failure.message} />
+				{/each}
 				{#each decisions.pendingEntries as entry (entry.key)}
 					<UndoStrip message={entry.message} kind={entry.state} onUndo={() => undo(entry.key)} />
 				{/each}

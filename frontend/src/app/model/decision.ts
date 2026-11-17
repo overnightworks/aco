@@ -15,11 +15,19 @@ import type {
 	ExpectationLine,
 	OptionLine
 } from '../../types';
+import type { StripState } from './boardSummary';
 import type { Pick } from './card';
 
 export const UNDO_SECONDS = 8;
 /** The operator's window to change their mind before a decision writes; the
  * SPA is this value's one owner. */
+
+/** How a waiting decision's strip reads: a ruling is only posted once its window
+ * ends or the page is left, so it does not yet read as decided. */
+export const UNDO_STRIP_LABEL: Record<StripState, string> = {
+	done: 'Saves shortly',
+	back: 'With head'
+};
 
 export const NOTE_MAX_LENGTH = 280;
 /** Mirrors `NOTE_MAX_LENGTH` in `src/aco/board/ports.py` (ABRD-05); the
