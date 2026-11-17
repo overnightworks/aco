@@ -94,6 +94,7 @@ for (const viewport of [
 			await visit(page);
 			await show(page, phone, 'Verstecken?');
 			await pick(page, 'A').click();
+			await expect(page.locator('.strip')).toContainText('Saves shortly: A');
 
 			await page.evaluate(() => {
 				Object.defineProperty(document, 'visibilityState', {
