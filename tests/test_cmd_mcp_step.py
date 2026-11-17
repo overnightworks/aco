@@ -53,6 +53,9 @@ def _step_line(request_id: int = 1, /, **changes: object) -> str:
         "repository": "board-forge/here",
         "step": STEP,
         "item": 1,
+        "purpose": "The old key must not outlive the rotation.",
+        "actions": "Open the vault link.\nClick Rotate.",
+        "expected": "The vault shows a new key.",
         **changes,
     }
     given = {key: value for key, value in arguments.items() if value is not None}
@@ -148,7 +151,17 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
     assert here.stored_item(1).labels == [_LABEL]
     assert _writes(here) == [("update_item_body", 1), ("add_label", 1)]
     assert (lock_held_at_body, lock_held_at_label) == ([True], [True])
-    assert _steps_of(inbox) == [{"number": 1, "title": "Key", "step": STEP}]
+    assert _steps_of(inbox) == [
+        {
+            "number": 1,
+            "title": "Key",
+            "step": STEP,
+            "purpose": "The old key must not outlive the rotation.",
+            "actions": "Open the vault link.\nClick Rotate.",
+            "expected": "The vault shows a new key.",
+            "answer": None,
+        }
+    ]
 
 
 def test_the_same_call_again_writes_no_body_and_calls_the_label_again(
@@ -159,6 +172,41 @@ def test_the_same_call_again_writes_no_body_and_calls_the_label_again(
     assert again["structuredContent"] == first["structuredContent"]
     assert _writes(here) == [("update_item_body", 1), ("add_label", 1), ("add_label", 1)]
     assert here.stored_item(1).labels == [_LABEL]
+
+
+def test_a_call_with_other_fields_rewrites_the_step_table_and_keeps_the_rest_of_the_block(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other = _step_line(2, answer="Report the new key id.", purpose="Why.")
+
+    _serve(monkeypatch, _step_line(1), other)
+
+    stored = body.locate_block(here.stored_body(1)).data
+    assert stored["step"] == {
+        "purpose": "Why.",
+        "actions": "Open the vault link.\nClick Rotate.",
+        "expected": "The vault shows a new key.",
+        "answer": "Report the new key id.",
+    }
+    assert stored["next"] == STEP
+    assert _writes(here) == [
+        ("update_item_body", 1),
+        ("add_label", 1),
+        ("update_item_body", 1),
+        ("add_label", 1),
+    ]
+
+
+@pytest.mark.parametrize("field", ["purpose", "actions", "expected"])
+@pytest.mark.parametrize("given", [None, " \n"], ids=["missing", "blank"])
+def test_a_step_without_a_card_field_is_a_tool_error_naming_it_and_writes_nothing(
+    field: str, given: str | None, here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    [result] = _serve(monkeypatch, _step_line(1, **{field: given}))
+
+    assert result["isError"] is True
+    assert field in _text(result)
+    assert _writes(here) == []
 
 
 def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_lists_it(
@@ -183,7 +231,12 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
     assert data["next"] == STEP
     assert board_forge.RULING_DAY.isoformat() in str(data["now"])
     assert _writes(here) == [("create_issue", 2), ("add_label", 2)]
-    assert {"number": 2, "title": TITLE, "step": STEP} in _steps_of(inbox)
+    assert data["step"] == {
+        "purpose": "The old key must not outlive the rotation.",
+        "actions": "Open the vault link.\nClick Rotate.",
+        "expected": "The vault shows a new key.",
+    }
+    assert [step["number"] for step in _steps_of(inbox)] == [2]
 
 
 def test_the_same_title_call_again_opens_no_second_item_and_calls_the_label_again(

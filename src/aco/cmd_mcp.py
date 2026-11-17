@@ -15,6 +15,7 @@ from . import (
     expectation_grammar,
     expectations,
     inbox,
+    item_step,
     mcp_server,
     protocol,
     report,
@@ -138,8 +139,9 @@ def _standing_step_item(context: RunContext, title: str, text: str) -> int | Non
     return max(standing, default=None)
 
 
-def step(label: str, text: str, target: int | str) -> dict[str, object]:
-    """Marks the operator-only step `text` on the discovered repository `label`:
+def step(label: str, text: str, target: int | str, card: item_step.StepCard) -> dict[str, object]:
+    """Marks the operator-only step `text`, detailed by `card`, on the discovered
+    repository `label`:
     on item `target` when it is a number, in that item's turn; otherwise on the
     open item already holding the title `target` and that step, or on a new
     item of that title. Refused when no repository found has that label and
@@ -151,17 +153,22 @@ def step(label: str, text: str, target: int | str) -> dict[str, object]:
             "write it into the item's next with aco item edit"
         )
     if isinstance(target, int):
-        _mark_in_turn(context, target, text, standing_title=None)
+        _mark_in_turn(context, target, text, card, standing_title=None)
         return {"repository": label, "item": target, "step": text, "created": False}
     standing = _standing_step_item(context, target, text)
-    if standing is not None and _mark_in_turn(context, standing, text, standing_title=target):
+    if standing is not None and _mark_in_turn(context, standing, text, card, standing_title=target):
         return {"repository": label, "item": standing, "step": text, "created": False}
-    opened = decide.open_step_item(context, target, text)
+    opened = decide.open_step_item(context, target, text, card)
     return {"repository": label, "item": opened, "step": text, "created": True}
 
 
 def _mark_in_turn(
-    context: RunContext, number: int, text: str, *, standing_title: str | None
+    context: RunContext,
+    number: int,
+    text: str,
+    card: item_step.StepCard,
+    *,
+    standing_title: str | None,
 ) -> bool:
     """Marks item `number` in its turn. With a `standing_title`, the item must
     still hold that title and the step `text` as the turn reads it; one another
@@ -176,7 +183,7 @@ def _mark_in_turn(
             wanted_step=text,
         ):
             return False
-        decide.mark_step(context, fresh, text)
+        decide.mark_step(context, fresh, text, card)
     return True
 
 

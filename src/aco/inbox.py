@@ -25,6 +25,7 @@ from . import (
     checkout,
     expectations,
     forge,
+    item_step,
     lane_measure,
     lane_record,
     progress,
@@ -64,17 +65,25 @@ class Step:
     title: str
     next_step: str | None
     """The block's `next`; `None` when the body has no readable block."""
+    card: item_step.StepCard | None = None
+    """The block's `step` table; `None` for a step marked without one."""
+
+
+def _step_of(issue: workboard.Issue, storage: body.Storage) -> Step:
+    parsed = body.parse_body(issue.body, storage=storage)
+    card = (
+        item_step.parse_step(body.locate_block(issue.body).data)
+        if parsed.read_state is body.BodyReadState.VALID
+        else None
+    )
+    return Step(issue.number, issue.title, parsed.contract.next, card)
 
 
 def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[Step, ...]:
     """The members' readable items among `issues` that carry the
     `needs-operator` label, by descending number."""
     found = [
-        Step(
-            issue.number,
-            issue.title,
-            body.parse_body(issue.body, storage=storage).contract.next,
-        )
+        _step_of(issue, storage)
         for issue in issues
         if issue.author_is_member
         and issue.unreadable is None
@@ -293,7 +302,16 @@ def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbo
 
 
 def step_json(step: Step) -> dict[str, object]:
-    return {"number": step.number, "title": step.title, "step": step.next_step}
+    card = step.card
+    return {
+        "number": step.number,
+        "title": step.title,
+        "step": step.next_step,
+        item_step.PURPOSE_KEY: card and card.purpose,
+        item_step.ACTIONS_KEY: card and card.actions,
+        item_step.EXPECTED_KEY: card and card.expected,
+        item_step.ANSWER_KEY: card and card.answer,
+    }
 
 
 def inbox_json(inbox: Inbox) -> dict[str, object]:

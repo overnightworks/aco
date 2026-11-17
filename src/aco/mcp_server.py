@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final, cast
 
-from . import __version__, expectation_grammar, expectations, protocol
+from . import __version__, expectation_grammar, expectations, item_step, protocol
 
 SUPPORTED_PROTOCOL_VERSIONS: Final = ("2025-11-25", "2025-06-18")
 """Newest first: the first is the answer to a client that asks for another."""
@@ -35,11 +35,11 @@ type RecordAnswer = Callable[
 item of a repository, named as `read_inbox` lists it, given the card's hash, and
 answers as JSON; raises `protocol.ClaimError` when it refuses."""
 
-type Step = Callable[[str, str, int | str], Mapping[str, object]]
-"""Marks a step only the operator can take, given as text, in a repository named
-as `read_inbox` lists it: on the item whose number is the third argument, or, when
-that is a title, on the open item holding it or on a new one; answers as JSON;
-raises `protocol.ClaimError` when it refuses."""
+type Step = Callable[[str, str, int | str, item_step.StepCard], Mapping[str, object]]
+"""Marks a step only the operator can take, given as text and detailed by a card, in
+a repository named as `read_inbox` lists it: on the item whose number is the third
+argument, or, when that is a title, on the open item holding it or on a new one;
+answers as JSON; raises `protocol.ClaimError` when it refuses."""
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,17 @@ _REPOSITORY_DESCRIPTION: Final = "the repository as read_inbox lists it, owner/r
 _ITEM: Final = "item"
 _ENVELOPE_KEYS: Final = (_REPOSITORY, _ITEM)
 _TITLE: Final = "title"
-_STEP_KEYS: Final = (_REPOSITORY, STEP, _ITEM, _TITLE)
+_STEP_CARD_PURPOSES: Final = {
+    item_step.PURPOSE_KEY: "why the operator takes the step, in a sentence",
+    item_step.ACTIONS_KEY: (
+        "what the operator does: a paste-ready command block, or the exact link with each click"
+    ),
+    item_step.EXPECTED_KEY: "what the operator sees when it worked",
+    item_step.ANSWER_KEY: (
+        "what the operator reports back and why; leave out when yes or no is the answer"
+    ),
+}
+_STEP_KEYS: Final = (_REPOSITORY, STEP, _ITEM, _TITLE, *_STEP_CARD_PURPOSES)
 _OPTION: Final = "option"
 _OTHER: Final = "other"
 _RECORD_KEYS: Final = (*_ENVELOPE_KEYS, "line", "card_hash", _OPTION, _OTHER)
@@ -161,8 +171,9 @@ def _step_schema() -> dict[str, object]:
             STEP: _string("what the operator must do"),
             _ITEM: {"type": "integer", "description": "the number of an open item; or give title"},
             _TITLE: _string("the title of a new item; give this or item"),
+            **{key: _string(purpose) for key, purpose in _STEP_CARD_PURPOSES.items()},
         },
-        "required": [_REPOSITORY, STEP],
+        "required": [_REPOSITORY, STEP, *item_step.REQUIRED_KEYS],
         "additionalProperties": False,
     }
 
@@ -227,7 +238,9 @@ _TOOLS: Final = (
             "Marks a step that only the operator can take, such as a secret to set or an "
             "approval to give: it becomes the item's next, replacing the one that stood, "
             "and the item gets the label needs-operator, so the step shows in read_inbox "
-            "under steps. Give an open item's number as item, or a title to open a new item "
+            "under steps. The step is a short line; purpose, actions and expected are "
+            "required and answer is optional, each stored on the item and shown in "
+            "read_inbox. Give an open item's number as item, or a title to open a new item "
             "for the step; a title that an open item of the operator's already holds with "
             "this step marks that item instead. The head removes the label once the operator "
             "says the step is done; there is no tool for that. A refusal that says the step "
@@ -362,6 +375,18 @@ def _step(step: Step, arguments: Mapping[str, object]) -> Mapping[str, object]:
         cast(str, arguments[_REPOSITORY]),
         cast(str, arguments[STEP]).strip(),
         cast(int | str, target),
+        _step_card(arguments),
+    )
+
+
+def _step_card(arguments: Mapping[str, object]) -> item_step.StepCard:
+    """The card of `step` arguments whose defects were already refused."""
+    purpose, actions, expected = (
+        cast(str, arguments[key]).strip() for key in item_step.REQUIRED_KEYS
+    )
+    answer = arguments.get(item_step.ANSWER_KEY)
+    return item_step.StepCard(
+        purpose, actions, expected, None if answer is None else cast(str, answer).strip()
     )
 
 
@@ -428,7 +453,26 @@ def _step_defects(arguments: Mapping[str, object]) -> list[str]:
     if len(given) != 1:
         defects.append(f"give exactly one of {_ITEM} and {_TITLE}")
     defects.extend(
-        f"{key} must not be blank" for key in (STEP, *given) if _is_blank(arguments, key)
+        f"{key} must not be blank"
+        for key in (STEP, *given, *_STEP_CARD_PURPOSES)
+        if _is_blank(arguments, key)
+    )
+    defects.extend(_step_card_defects(arguments))
+    return defects
+
+
+def _step_card_defects(arguments: Mapping[str, object]) -> list[str]:
+    """The required card field that is missing, naming what it is for, and the card
+    field that is no string."""
+    defects = [
+        f"{key} is required: {_STEP_CARD_PURPOSES[key]}"
+        for key in item_step.REQUIRED_KEYS
+        if key not in arguments
+    ]
+    defects.extend(
+        f"{key} must be a string"
+        for key in _STEP_CARD_PURPOSES
+        if key in arguments and not isinstance(arguments[key], str)
     )
     return defects
 

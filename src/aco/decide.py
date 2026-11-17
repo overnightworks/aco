@@ -22,6 +22,7 @@ from . import (
     expectations,
     file_lock,
     forge,
+    item_step,
     item_wait,
     protocol,
     repositories,
@@ -331,22 +332,29 @@ def _label_as_a_step(client: forge.ForgeWriter, number: int, *, standing: str) -
         ) from error
 
 
-def mark_step(context: RunContext, fresh: FreshItem, step: str) -> None:
-    """Writes `step` as the `next` of the fresh item, every other field and byte
-    kept, then sets the label of an operator-only step. A body equal to the
+def mark_step(context: RunContext, fresh: FreshItem, step: str, card: item_step.StepCard) -> None:
+    """Writes `step` as the `next` and `card` as the `step` table of the fresh item,
+    every other field and byte kept, then sets the label of an operator-only step.
+    A body equal to the
     fresh one writes nothing and the label is set all the same, so a repeat
     finishes a call whose label failed. Raises `protocol.ClaimError` by name for
     a closed item and one a non-member wrote, before the write."""
     _refuse_an_item_the_inbox_omits(fresh, "step")
     wait = item_wait.operator_wait_table(step, context.today(), fresh.located.data)
-    folded = {**fresh.located.data, "next": step, item_wait.WAIT_KEY: wait}
+    folded = {
+        **fresh.located.data,
+        "next": step,
+        item_wait.WAIT_KEY: wait,
+        item_step.STEP_KEY: item_step.step_table(card),
+    }
     new_body = body.replace_block(fresh.body, fresh.located, folded)
     write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
     _label_as_a_step(context.forge_writer, fresh.number, standing=f"#{fresh.number} holds the step")
 
 
-def open_step_item(context: RunContext, title: str, step: str) -> int:
-    """Opens a task named `title` whose body names `step` as its `next`, sets the
+def open_step_item(context: RunContext, title: str, step: str, card: item_step.StepCard) -> int:
+    """Opens a task named `title` whose body names `step` as its `next` and holds
+    `card` as its `step` table, sets the
     label of an operator-only step on it and answers its number. A failure after
     the item exists names it and says repeating the same call finishes it."""
     client = context.forge_writer
@@ -354,6 +362,7 @@ def open_step_item(context: RunContext, title: str, step: str) -> int:
         "now": f"Opened by the step tool on {context.today().isoformat()}.",
         "next": step,
         item_wait.WAIT_KEY: item_wait.operator_wait_table(step, context.today()),
+        item_step.STEP_KEY: item_step.step_table(card),
         "done_when": (
             "The operator has taken the step and the head has removed the label "
             f"{workboard.NEEDS_OPERATOR_LABEL}."

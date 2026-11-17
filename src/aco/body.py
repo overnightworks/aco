@@ -24,6 +24,7 @@ from .body_fence import walk_fences
 from .body_planned import PLANNED_AT_FIRST_CUT_KEY, planned_defects, render_planned
 from .expectation_grammar import block_expectation_defects, render_expectations
 from .item_handover import handover_defects, render_handover
+from .item_step import STEP_KEY, render_step, step_defects
 from .item_wait import ItemWait, parse_wait, render_wait, wait_defects
 from .toml_text import toml_string
 
@@ -46,6 +47,7 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "done_when",
         "wait",
         "handover",
+        STEP_KEY,
         "scope",
         "size",
         "whole",
@@ -253,16 +255,11 @@ class ParsedBody:
 
 
 def _line_ending(raw_line: str) -> str:
-    if raw_line.endswith("\r\n"):
-        return "\r\n"
-    if raw_line.endswith("\n"):
-        return "\n"
-    return ""
+    return next((ending for ending in ("\r\n", "\n") if raw_line.endswith(ending)), "")
 
 
 def _line_without_ending(raw_line: str) -> str:
-    ending = _line_ending(raw_line)
-    return raw_line[: len(raw_line) - len(ending)] if ending else raw_line
+    return raw_line.removesuffix(_line_ending(raw_line))
 
 
 def first_line(body: str) -> str:
@@ -536,8 +533,8 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
     if version_defect is not None:
         defects.append(version_defect)
     defects.extend(_block_projection_defects(data))
-    defects.extend(ContractDefect(*defect) for defect in wait_defects(data))
-    defects.extend(ContractDefect(*defect) for defect in handover_defects(data))
+    for table_defects in (wait_defects, handover_defects, step_defects):
+        defects.extend(ContractDefect(*defect) for defect in table_defects(data))
     defects.extend(_block_scope_defects(data))
     defects.extend(ContractDefect(*defect) for defect in planned_defects(data))
     size_defect = _block_size_defect(data)
@@ -955,6 +952,7 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     lines.extend(_render_string_field(data, "whole"))
     lines.extend(render_planned(data))
     lines.extend(_render_empty_slice_table(data))
+    lines.extend(render_step(data))
     lines.extend(render_expectations(data))
     lines.extend(_render_slices(data))
     lines.extend(_render_record(data))
