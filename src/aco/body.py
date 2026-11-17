@@ -21,6 +21,7 @@ from typing import TypeGuard, cast
 
 from . import expectation_grammar, protocol
 from .body_fence import walk_fences
+from .body_planned import PLANNED_AT_FIRST_CUT_KEY, planned_defects, render_planned
 from .expectation_grammar import block_expectation_defects, render_expectations
 from .item_handover import handover_defects, render_handover
 from .item_wait import ItemWait, parse_wait, render_wait, wait_defects
@@ -48,6 +49,7 @@ BLOCK_TOP_LEVEL_KEYS = frozenset(
         "scope",
         "size",
         "whole",
+        PLANNED_AT_FIRST_CUT_KEY,
         "expectation",
         "slice",
     }
@@ -537,6 +539,7 @@ def _block_schema_defects(data: dict[str, object], storage: Storage) -> tuple[Co
     defects.extend(ContractDefect(*defect) for defect in wait_defects(data))
     defects.extend(ContractDefect(*defect) for defect in handover_defects(data))
     defects.extend(_block_scope_defects(data))
+    defects.extend(ContractDefect(*defect) for defect in planned_defects(data))
     size_defect = _block_size_defect(data)
     if size_defect is not None:
         defects.append(size_defect)
@@ -870,16 +873,10 @@ def _render_scope(data: Mapping[str, object]) -> list[str]:
     return ["", f"scope = {_render_scope_array(data['scope'])}"]
 
 
-def _render_size(data: Mapping[str, object]) -> list[str]:
-    if "size" not in data:
+def _render_string_field(data: Mapping[str, object], key: str) -> list[str]:
+    if key not in data:
         return []
-    return ["", f"size = {toml_string(data['size'])}"]
-
-
-def _render_whole(data: Mapping[str, object]) -> list[str]:
-    if "whole" not in data:
-        return []
-    return ["", f"whole = {toml_string(data['whole'])}"]
+    return ["", f"{key} = {toml_string(data[key])}"]
 
 
 def _render_empty_slice_table(data: Mapping[str, object]) -> list[str]:
@@ -954,8 +951,9 @@ def render_block(data: Mapping[str, object], newline: str = "\n") -> str:
     lines.extend(render_wait(data))
     lines.extend(render_handover(data))
     lines.extend(_render_scope(data))
-    lines.extend(_render_size(data))
-    lines.extend(_render_whole(data))
+    lines.extend(_render_string_field(data, "size"))
+    lines.extend(_render_string_field(data, "whole"))
+    lines.extend(render_planned(data))
     lines.extend(_render_empty_slice_table(data))
     lines.extend(render_expectations(data))
     lines.extend(_render_slices(data))
