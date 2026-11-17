@@ -1,0 +1,8 @@
+claim_id = "9d7725e246d842edb7f61e57f78c0eaf"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "2874be6a01aa62338abb63deae4081aefeb4c958"
+branch = "claude/issue-908-board-saves-on-page-leave"
+scope = ["frontend/e2e", "frontend/src", "specs/serve.spec.md", "src/aco/board/static"]
+opened_commit = "53fc7d83c361c10cdce64d4a3f6e5c874f275e2d"
+whole_reason = "The undo-strip label and the page-leave flush are pinned across many board components and e2e specs, so the claim takes the frontend tree, its rebuilt assets and the serve spec."
