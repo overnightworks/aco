@@ -140,24 +140,25 @@ for (const viewport of [
 			await expect(page.getByText('Das Board ist nicht erreichbar.')).toBeVisible();
 		});
 
-		test('[ABRD-153] a failed post on a card hidden by the back button keeps a strip naming it until the card is shown', async ({
-			page
-		}) => {
-			test.skip(!phone, 'the back button exists only on the phone');
-			await arrange([item(67, 'Only', card('Einzige?', 'Einziges'))]);
-			await visit(page);
-			await show(page, phone, 'Einzige?');
-			await page.route('**/api/rule', (route) => route.abort());
-			await pick(page, 'A').click();
-			await page.getByRole('button', { name: '‹ Open' }).click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
+		// The back button exists only on the phone.
+		if (phone)
+			test('[ABRD-153] a failed post on a card hidden by the back button keeps a strip naming it until the card is shown', async ({
+				page
+			}) => {
+				await arrange([item(67, 'Only', card('Einzige?', 'Einziges'))]);
+				await visit(page);
+				await show(page, phone, 'Einzige?');
+				await page.route('**/api/rule', (route) => route.abort());
+				await pick(page, 'A').click();
+				await page.getByRole('button', { name: '‹ Open' }).click();
+				await page.clock.runFor(PAST_UNDO_WINDOW_MS);
 
-			const failure = page.locator('.strips').getByText('Not saved: Einziges');
-			await expect(failure).toBeVisible();
+				const failure = page.locator('.strips').getByText('Not saved: Einziges');
+				await expect(failure).toBeVisible();
 
-			await listRow(page, 'Einzige?').click();
+				await listRow(page, 'Einzige?').click();
 
-			await expect(failure).toHaveCount(0);
-		});
+				await expect(failure).toHaveCount(0);
+			});
 	});
 }
