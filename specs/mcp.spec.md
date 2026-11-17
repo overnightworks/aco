@@ -131,7 +131,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-35] An unknown argument (`via` is none), a wrong type, not exactly one of `option` and `other`, or a blank `other` is a tool error naming each; nothing is read or written (see E-MCP-10).
 - [ ] [MCP-36] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
 - [ ] [MCP-37] `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
-- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`; `step` requires `repository`, `step`, `purpose`, `actions`, `expected`.
+- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`.
 - [ ] [MCP-39] An open item that carries the label `needs-operator`, in any letter case, is a step: `steps` lists its `number`, `title` and `step` (the block's `next`) and its card (MCP-67, see E-MCP-11).
 - [ ] [MCP-40] A step whose body has no readable block, or a malformed one, is listed with `step` null; it is never left out and its title is not given as the step.
 - [ ] [MCP-41] `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
@@ -156,7 +156,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-54] A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
 - [ ] [MCP-55] An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field is a tool error naming each; nothing is read or written (see E-MCP-17).
 - [ ] [MCP-56] A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
-- [ ] [MCP-67] `step` stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `next` and `wait` stay the short `step`.
+- [ ] [MCP-67] `step` requires and stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `next` and `wait` stay the short `step`.
 - [ ] [MCP-68] `answer`, optional, is what the operator reports and why; without it he answers yes or no. A step without a `step` table lists all four fields as null.
 - [ ] [MCP-69] The same call with the same card fields writes no body (MCP-45); other card fields rewrite the `step` table and keep every other field of the block (MCP-46).
 - [ ] [MCP-70] A missing, non-string or blank `purpose`, `actions` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
