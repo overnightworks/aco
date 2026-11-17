@@ -203,17 +203,38 @@ def _rehashed_after_reading(repository: BoardForge) -> None:
 
 
 @pytest.mark.parametrize(
+    ("count", "later"),
+    [(3, None), (2, _added_after_reading)],
+    ids=["point-missing", "point-added"],
+)
+def test_a_card_post_naming_some_open_lines_stores_them_and_leaves_the_others_open(
+    repository: BoardForge,
+    board: BoardClient,
+    count: int,
+    later: Callable[[BoardForge], None] | None,
+    show: _Show,
+) -> None:
+    """ABRD-79, ABRD-91."""
+    shown = show(_cards(*_CARDS[:count]))
+    if later is not None:
+        later(repository)
+
+    answered = board.decide_card_through_api(_ITEM, [shown[2], shown[3]], ["A", "B"])
+
+    assert answered.status_and_message() == {"status": "ruled", "message": None}
+    assert _stored(repository, (2, 3, 4)) == [*_picked("A", "B"), (None, None, None, None)]
+
+
+@pytest.mark.parametrize(
     ("count", "later", "posted"),
     [
-        (3, None, (2, 3)),
-        (2, _added_after_reading, (2, 3)),
         (2, _rehashed_after_reading, (2, 3)),
         (2, None, (2, 3, 9)),
         (2, None, (1, 2, 3)),
     ],
-    ids=["point-missing", "point-added", "card-changed", "line-not-listed", "yes-no-line"],
+    ids=["card-changed", "line-not-listed", "yes-no-line"],
 )
-def test_a_card_post_missing_a_point_or_naming_a_changed_line_reads_the_item_and_writes_nothing(
+def test_a_card_post_naming_a_changed_or_non_option_line_reads_the_item_and_writes_nothing(
     repository: BoardForge,
     board: BoardClient,
     count: int,

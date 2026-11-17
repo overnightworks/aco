@@ -108,9 +108,9 @@ def checked_card(
 ) -> CardDecision | None:
     """The posted card as a decision on the lines of its item just read, or None
     when it no longer reads as shown: every posted line must be an option line,
-    each open one with its posted fingerprint, and every open option line of the
-    item must be posted. A withdrawn line is no option line (ABRD-41). A posted
-    line that is no longer open is the source's own refusal to make."""
+    each open one with its posted fingerprint. Open lines not posted stay open.
+    A withdrawn line is no option line (ABRD-41). A posted line that is no
+    longer open is the source's own refusal to make."""
     options = {line.index: line for line in lines if isinstance(line, expectations.OptionLine)}
     checked: list[CardLine] = []
     for posted_line in posted.lines:
@@ -121,12 +121,6 @@ def checked_card(
         ):
             return None
         checked.append(CardLine(posted_line.index, shown.card_hash, posted_line.letter))
-    posted_indexes = {posted_line.index for posted_line in posted.lines}
-    if any(
-        expectations.is_open(line) and index not in posted_indexes
-        for index, line in options.items()
-    ):
-        return None
     return CardDecision(posted.item, tuple(checked), posted.answer)
 
 
