@@ -21,7 +21,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 |---|---|---|
 | an item a non-member wrote, or whose author is unknown | ABRD-06 | — (not shown) |
 | an item under `storage = "state-ref"` | ABRD-06, ABRD-112 | as its lines |
-| an open line | ABRD-06 | ABRD-58, ABRD-59 |
+| an open line | ABRD-06 | ABRD-58, ABRD-59, ABRD-152, ABRD-153 |
 | the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
 | a ruled option line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
 | a ruled yes/no line | ABRD-30, ABRD-37, ABRD-54 | — (read-only) |
@@ -105,8 +105,10 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-45] A refused post shows its sentence in the Decide row; "changed" (ABRD-02) or "already ruled" hide picks and `Accept all` behind `Neu laden`, whose read locks only that card; other failures keep them.
 - [ ] [ABRD-46] A `final` pick first opens a modal `Decide <X>?` with its Undo consequence and the warn mark, focus on `Cancel`; `Decide <X>` records it, and the window starts once every point is chosen (ABRD-87).
 - [ ] [ABRD-47] `Cancel` or `Esc` closes the confirm, posts nothing and returns focus to the pick; `Decide <X>` keeps the card as shown when the confirm opened, so a card changed since is refused (ABRD-02).
-- [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Decided: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
+- [ ] [ABRD-58] A one-point card's pick shows a strip above it for its 8 s window: the Decided shape, `Saves shortly: <letter> — <option> · <topic>` and `Undo`, in view as the card scrolls and atop a phone's list.
 - [ ] [ABRD-59] A pick that starts a window focuses its strip's `Undo`, so Enter undoes it; `Undo` cancels the post and focuses the shown card, else the list. An ended window removes its strip; ABRD-50 applies.
+- [ ] [ABRD-152] When the page is hidden or closed, every decision in its undo window is posted at once, each card its own write with the token header; the window ends there, and nothing not yet chosen is posted.
+- [ ] [ABRD-153] A refused or failed post keeps a warning strip `Not saved: <name>` with its sentence above the stage until that card is shown; the card's own banner stays (ABRD-45).
 - [ ] [ABRD-48] Option card rows carry the Open, With head (ABRD-61) or Saving (ABRD-100) shape; each shape names its state, each row's title is its question or name (ABRD-82).
 - [ ] [ABRD-61] A card with a line carrying `returned_on` is with its head: Open lists it muted, with the With head shape (ring, back chevron), after other option cards; it shows `with head`. Decide stays.
 - [ ] [ABRD-49] Readable repositories with nothing open are named once, in configured order, under `Nothing open:`; with no open line and no failed repository the list reads `All decided`.
@@ -133,7 +135,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-99] From the start of its undo window until its answer is applied, a card marks its chosen letters at full strength and dims the rest, without the accent; an `Other…` or `Unclear` answer marks none.
 - [ ] [ABRD-100] A saving card's row shows the Saving shape (a dashed ring, turning unless motion is reduced), also with its head; its meta reads `saving`; `Saving` replaces `Other…` and `Unclear`.
 - [ ] [ABRD-66] The typed answer is kept per card: closing the panel, switching cards, `Undo` and a failed post keep it; `Undo` reopens the panel with it, and a stored decision drops it.
-- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Decided: Other · <name>` (ABRD-82) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
+- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Saves shortly: Other · <name>` (ABRD-82) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
 - [ ] [ABRD-68] `Send` posts the card as shown when the panel opened, so a card changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] A card post's `unclear` (ABRD-78) stores no `via`; its note is trimmed, a blank one is none, and every posted line returns to its head (E-ABRD-14).
@@ -148,17 +150,17 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-84] Its points are rows in aco's order: `<k>`, the question, a warn mark when an option is `final`, one pick per option (the recommended one in the accent); no point is open at first.
 - [ ] [ABRD-85] Activating a point's question opens its Problem, Today (when given, ABRD-43), Options and Recommendation as on a one-point card and closes any other point; activating it again closes it.
 - [ ] [ABRD-86] A pick marks its point chosen (`aria-pressed`) and posts nothing; the Decide row reads `<c> of <n> chosen` on desktop; a pick on the open point opens the first unchosen point instead.
-- [ ] [ABRD-87] Once every point is chosen, the undo window starts with one strip `Decided: 1A 2B … · <name>` and `Undo`, which posts nothing and clears the picks; then the card posts every pick (ABRD-77).
+- [ ] [ABRD-87] Once every point is chosen, the undo window starts with one strip `Saves shortly: 1A 2B … · <name>` and `Undo`, which posts nothing and clears the picks; then the card posts every pick (ABRD-77).
 - [ ] [ABRD-88] A point's pick on a `final` option first asks as ABRD-46, its line reading `Point <k>: <consequence>`; `Cancel` leaves the point as it was.
 - [ ] [ABRD-89] `Accept all` leads a card of points' Decide row, in the accent: it picks each recommended letter, replacing earlier picks, and starts ABRD-87's window, after ABRD-90's confirm where one applies.
 - [ ] [ABRD-90] When a recommended option is `final`, `Accept all` first asks `Accept all recommendations?` with `Point <k>: <consequence>` per such point, focus on `Cancel`; `Cancel` or `Esc` posts nothing.
 - [ ] [ABRD-91] Picks keep their points as shown and the post names those fingerprints, so a point changed, added or ruled since is refused (ABRD-79, ABRD-80); a re-read drops a changed point's pick.
-- [ ] [ABRD-92] `Other…` and `Unclear` answer a card of points with one text: strips `Decided: Other · <name>` and `With head: <name>`; each posts every point of the card (ABRD-77).
+- [ ] [ABRD-92] `Other…` and `Unclear` answer a card of points with one text: strips `Saves shortly: Other · <name>` and `With head: <name>`; each posts every point of the card (ABRD-77).
 - [ ] [ABRD-52] An option card's Decide row sticks to the pane's foot while the card runs on beneath it and then casts a shadow over that content; at the card's end it rests in place without one.
 
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
-`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`, `frontend/e2e/quietStates.spec.ts` (ABRD-127, ABRD-128),
+`frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageLeave.spec.ts` (ABRD-152, ABRD-153), `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`, `frontend/e2e/quietStates.spec.ts` (ABRD-127, ABRD-128),
 `frontend/e2e/refresh.spec.ts`, `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 

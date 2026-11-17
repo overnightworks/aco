@@ -58,6 +58,7 @@ export async function postDecision(
 ): Promise<DecisionResult> {
 	const response = await fetchImpl(RULE_PATH, {
 		method: 'POST',
+		keepalive: true,
 		headers: { [TOKEN_HEADER]: token, 'Content-Type': 'application/json' },
 		body: JSON.stringify(decision)
 	});

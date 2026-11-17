@@ -53,6 +53,7 @@ withdrawn one.
 | line `N` was withdrawn by its head | RULE-37 | RULE-09 | — |
 | `--option` names a letter not on the card | RULE-18 | RULE-09 | — |
 | `--via default` names another letter than the recommended one | RULE-19 | RULE-09 | — |
+| `--via default`, the recommended option final or the line `money`, `access` or `data_risk` | RULE-45 | RULE-09 | — |
 | `--option` or `--other` on a line asked after today's UTC date | RULE-38 | RULE-09 | — |
 | item does not exist | RULE-07 | RULE-09 | — |
 | item is a pull request | RULE-08 | RULE-09 | — |
@@ -104,13 +105,14 @@ withdrawn one.
 - [ ] [RULE-17] A `--card-hash` other than the card's current hash refuses `line <k> changed since its card was shown; show it again and rule what it shows now`, exit `2`, before any write, after RULE-04.
 - [ ] [RULE-18] A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
 - [ ] [RULE-19] `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
+- [ ] [RULE-45] `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, exit `2`, before any write, after RULE-19.
 - [ ] [RULE-21] A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
 - [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
 - [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
 - [ ] [RULE-28] A MALFORMED item body refuses `#<n> <body defect sentence>; rule needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref` (see E-OUT-02).
-- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 38, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
+- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 38, 45, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
 - [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `brief`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
 - [ ] [RULE-33] A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call, after RULE-35 (see E-RULE-13).
 - [ ] [RULE-34] A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
@@ -135,7 +137,7 @@ withdrawn one.
 | RULE-04 (already ruled) | `already_ruled` |
 | RULE-05 (out of range) | `line_out_of_range` |
 | RULE-07 (missing item), RULE-08 (pull-request target), RULE-28 (malformed body) | `invalid_item` |
-| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-38 (asked after today's UTC date), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice), RULE-39 (`--via board`), the parser's own refusals | `invalid_usage` |
+| RULE-10 (`--repo` under `storage = state-ref`, cites PIN-04), RULE-15 (a flag combination), RULE-16 (a yes/no line), RULE-21 (a blank answer), RULE-26 (a blank note), RULE-18 (a letter not on the card), RULE-19 (not the recommended letter), RULE-45 (a default on a final or money, access or data-risk line), RULE-38 (asked after today's UTC date), RULE-33 (a line named twice), RULE-34 (a misplaced `--option` or `--card-hash`), RULE-35 (a flag given twice), RULE-39 (`--via board`), the parser's own refusals | `invalid_usage` |
 | RULE-17 (the card changed), RULE-37 (the line was withdrawn) | `card_changed` |
 | RULE-24 (already with its head), RULE-27 (`--via default` on such a line) | `with_head` |
 | RULE-11 (the write itself fails), RULE-41 (the item's lock) | `unavailable` |
@@ -146,6 +148,7 @@ withdrawn one.
 - `aco rule` never accepts two kinds of outcome, or none: `--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other`, `--unclear`, `--via` and `--card-hash` appear in `--help` with a help line each.
 - `aco rule --unclear` never stores `via` or `card_hash`: it decides nothing.
 - `aco rule` never checks who typed `--via`: it records what the writer was told. It is a tripwire for cooperative agents; an agent of the operator's own user that types `--via chat` for a word the operator never spoke is not stopped, and the forge's edit history is the record after the fact.
+- `aco rule --via default` never rules a final option or a money, access or data-risk line: a default ruling stands in only for a choice the operator can take back and that is not his by kind; its `<reason>` is `its recommended option <L> is final` or `its decision kind is <kind>`.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entries: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.

@@ -187,7 +187,7 @@ def test_land_judges_the_push_runs_of_the_trunk(
     landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     capsys.readouterr()
 
-    result = run_cli(["land", "12"], capsys)
+    result = run_cli(["land", "12", "--head", landed.landing.head], capsys)
 
     merged = f"merged: {landed.landing.forge.landings[12].merge_commit}\n"
     expected = RELEASED + merged + read.trunk_line.format(sha7=first_parent[:7])

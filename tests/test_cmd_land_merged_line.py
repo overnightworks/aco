@@ -18,7 +18,7 @@ class TestLandMergedLine:
         """Spec: LANDCMD-57."""
         landed = landed_world(github_clone, bare_remote, monkeypatch)
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         merge_commit = landed.landing.forge.landings[12].merge_commit
         assert merge_commit is not None
         assert result.stdout.splitlines()[3:5] == ["worktree: removed", f"merged: {merge_commit}"]
@@ -40,9 +40,9 @@ class TestLandMergedLine:
             ),
         )
         capsys.readouterr()
-        first = run_cli(["land", "12"], capsys)
+        first = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         landed.landing.forge.close_error = None
-        rerun = run_cli(["land", "12"], capsys)
+        rerun = run_cli(["land", "12", "--head", landed.landing.head], capsys)
         merge_commit = landed.landing.forge.landings[12].merge_commit
         assert (first.status, rerun.status) == (2, 0)
         assert rerun.stdout.splitlines()[-1] == f"merged: {merge_commit}"

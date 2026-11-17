@@ -16,6 +16,7 @@ function fakeFetch(status: number, body: unknown) {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
+	Reflect.deleteProperty(document, 'visibilityState');
 });
 
 test('the shell names the board in its heading, whatever the state', () => {
@@ -176,3 +177,84 @@ test.each([
 		expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 	}
 );
+
+function leaveScenario() {
+	vi.useFakeTimers();
+	const open = optionLine({ index: 1, topic: 'Jump', question: 'Keep the song open?' });
+	const repos = [repo({ items: [item({ number: 42, lines: [open] })] })];
+	const fetchMock = vi.fn(async (path: string) => ({
+		ok: true,
+		status: 200,
+		json: async () =>
+			path === '/api/rule' ? { status: 'ruled', item: repos[0]?.items[0] } : { repos }
+	}));
+	vi.stubGlobal('fetch', fetchMock);
+	const rulePosts = () => fetchMock.mock.calls.filter(([path]) => path === '/api/rule');
+	return { rulePosts };
+}
+
+async function decideInWindow(): Promise<void> {
+	render(App, { token: 'a-token' });
+	await vi.advanceTimersByTimeAsync(0);
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
+	await vi.advanceTimersByTimeAsync(0);
+}
+
+function setVisibility(state: DocumentVisibilityState): void {
+	Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+	document.dispatchEvent(new Event('visibilitychange'));
+}
+
+test('[ABRD-152] closing the page inside the undo window posts the decision at once', async () => {
+	const { rulePosts } = leaveScenario();
+	await decideInWindow();
+	expect(rulePosts()).toHaveLength(0);
+
+	window.dispatchEvent(new Event('pagehide'));
+
+	expect(rulePosts()).toHaveLength(1);
+});
+
+test('[ABRD-152] hiding the page posts the decision at once, showing it does not', async () => {
+	const { rulePosts } = leaveScenario();
+	await decideInWindow();
+
+	setVisibility('visible');
+	expect(rulePosts()).toHaveLength(0);
+	setVisibility('hidden');
+
+	expect(rulePosts()).toHaveLength(1);
+});
+
+test('[ABRD-153] a refused post on a card left behind keeps a strip naming it until the card is shown', async () => {
+	vi.useFakeTimers();
+	const first = optionLine({ index: 1, topic: 'Jump', question: 'Keep the song open?' });
+	const second = optionLine({ index: 1, topic: 'Hosts', question: 'Share the page?' });
+	const repos = [
+		repo({
+			items: [item({ number: 42, lines: [first] }), item({ number: 43, lines: [second] })]
+		})
+	];
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async (path: string) => ({
+			ok: true,
+			status: 200,
+			json: async () =>
+				path === '/api/rule' ? { status: 'already_ruled', message: 'ruled' } : { repos }
+		}))
+	);
+	render(App, { token: 'a-token' });
+	await vi.advanceTimersByTimeAsync(0);
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
+	await vi.advanceTimersByTimeAsync(0);
+	screen.getByRole('button', { name: /Hosts/ }).click();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(screen.getByText('Not saved: Jump')).toBeInTheDocument();
+
+	screen.getByRole('button', { name: /Jump/ }).click();
+	await vi.advanceTimersByTimeAsync(0);
+
+	expect(screen.queryByText('Not saved: Jump')).not.toBeInTheDocument();
+});

@@ -268,15 +268,10 @@ def _parent_body_finding(reference: workboard.IssueReference, parsed: body.Parse
 
 
 def _parent_reference_defect(
-    parent: workboard.ParentIssue, repository: str
+    parent: workboard.ParentIssue,
 ) -> workboard.ClassificationDefect | None:
-    """Whether the parent itself is even a same-repository container --
+    """Whether the same-repository parent is even a container --
     checked before its body is read at all."""
-    if parent.reference.repository != repository:
-        return workboard.ClassificationDefect(
-            f"has parent {parent.reference} in another repository, "
-            "whose children this check cannot read"
-        )
     if parent.kind is not body.ItemKind.CONTAINER:
         kind_text = parent.kind.value if parent.kind is not None else "unknown"
         return workboard.ClassificationDefect(
@@ -297,12 +292,13 @@ def _parent_requirement(
     parent holds no uncut `[[slice]]` row and its own `Next` line names no
     further work; with only `Next` work left, the landing may close the
     parent (its one remaining child) but need not. A parent keeping other
-    open children stays open, and must say what happens next.
+    open children stays open, and must say what happens next. A parent in
+    another repository sets no requirement: its own repository closes it.
     """
     parent = context.client.parent_issue(item.number)
-    if parent is None:
+    if parent is None or parent.reference.repository != context.repository:
         return None
-    reference_defect = _parent_reference_defect(parent, context.repository)
+    reference_defect = _parent_reference_defect(parent)
     if reference_defect is not None:
         return reference_defect
     parsed_parent = body.parse_body(parent.body, storage=context.storage)

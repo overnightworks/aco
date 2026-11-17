@@ -89,13 +89,13 @@ the issue body's block ends with
 Setup: E-HANDOVER-01's, pull request `#57` open, mergeable, every check green, its head branch the claim's branch
 
 ```console
-$ aco land 57
+$ aco land 57 --head <sha>
 2> ERROR: only the original claimant may release; take the claim over with `aco handover 42 --from 'Claude af547fd1' --reason <text>`, or use an explicit coordinator override (holder='Claude af547fd1 (builder)', this session='Ada (builder)')
 exit 2
 $ aco handover 42 --from 'Claude af547fd1' --reason 'restart order of the operator'
 HANDED OVER #42: Claude af547fd1 -> Ada
 exit 0
-$ aco land 57
+$ aco land 57 --head <sha>
 RELEASED issue #42: <claim-id>
 freed: none
 next: none

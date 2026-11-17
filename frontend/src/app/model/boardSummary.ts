@@ -148,6 +148,13 @@ export const STATE_LABEL: Record<RowState, string> = {
 	done: 'Decided'
 };
 
+/** How a waiting decision's strip reads: a ruling is only posted once its window
+ * ends or the page is left, so it does not yet read as decided. */
+export const UNDO_STRIP_LABEL: Record<StripState, string> = {
+	done: 'Saves shortly',
+	back: STATE_LABEL.back
+};
+
 /** Lower comes first; `openRows` and `nextOpenAfter` order by it, and `compareRows`
  * orders the groups of both tabs by it. */
 const ROW_RANK: Record<OrderedRowState, number> = { done: 0, open: 0, back: 1 };

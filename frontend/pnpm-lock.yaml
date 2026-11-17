@@ -1300,7 +1300,7 @@ packages:
     engines: {node: '>= 0.8.0'}
 
   overnightworks-design@https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz:
-    resolution: {tarball: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz}
+    resolution: {integrity: sha512-N1F6Mf0DIv92ufRHhtLgTXJ7M5vutFByKUV/DCHYli1CpMicIUa4BZD5GoKkFKv49jt27meSEiw8EI7ryHlSWg==, tarball: https://github.com/overnightworks/design/releases/download/v0.27.0/overnightworks-design-0.27.0.tgz}
     version: 0.27.0
     peerDependencies:
       svelte: ^5.20.0

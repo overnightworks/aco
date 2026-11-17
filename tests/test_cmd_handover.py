@@ -309,7 +309,7 @@ def test_the_new_holder_lands_the_pull_request_the_predecessor_left(
             forge.ItemState.OPEN, "Claims", complete_contract("Build it.")
         )
 
-    lane_landing_world(
+    world = lane_landing_world(
         github_clone,
         bare_remote,
         monkeypatch,
@@ -320,10 +320,10 @@ def test_the_new_holder_lands_the_pull_request_the_predecessor_left(
         holder=PREDECESSOR,
         arrange=serve_the_item,
     )
-    refused = run_cli(["land", "12"], capsys)
+    refused = run_cli(["land", "12", "--head", world.head], capsys)
 
     taken = run_cli(handover_arguments(), capsys)
-    landed = run_cli(["land", "12"], capsys)
+    landed = run_cli(["land", "12", "--head", world.head], capsys)
 
     assert (refused.status, taken.status, landed.status) == (2, 0, 0)
     assert f"aco handover {ISSUE} --from '{PREDECESSOR}' --reason <text>" in refused.stderr

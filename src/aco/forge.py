@@ -429,10 +429,10 @@ class CheckRun:
     conclusion: str | None
 
 
-def pin_names_head(head_sha: str, pin: str | None) -> bool:
-    """Whether a `land --head` pin names `head_sha`: no pin names every head, a pin is a
-    prefix of the head."""
-    return pin is None or head_sha.startswith(pin)
+def pin_names_head(head_sha: str, pin: str) -> bool:
+    """Whether a `land --head` pin names `head_sha`: the pin, always given, is a prefix of
+    the head."""
+    return head_sha.startswith(pin)
 
 
 @dataclass(frozen=True)

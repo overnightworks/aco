@@ -9507,12 +9507,12 @@ def _release_merged_of_an_open_item(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
 def _land(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     _land_scenario(monkeypatch, tmp_path)
-    return ["--repo", REPOSITORY, "land", "12"]
+    return ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]
 
 
 def _land_rerun(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     _land_with_its_release_failing_once(monkeypatch, tmp_path)
-    return ["--repo", REPOSITORY, "land", "12"]
+    return ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]
 
 
 def test_start_fetches_its_trunk_once_and_reads_the_recorded_head_after_the_fetch(
@@ -9928,7 +9928,7 @@ def _land_with_its_release_failing_once(
         raise ClaimError("forge unreachable (simulated)")
 
     monkeypatch.setattr(client, "close_landed_item", failing_close)
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12"])
+    status = issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA])
     monkeypatch.setattr(client, "close_landed_item", real_close)
     return repo, client, status
 
@@ -10530,7 +10530,7 @@ def _write_untracked_board_config(toplevel: Path) -> None:
         pytest.param(["bootstrap"], id="bootstrap"),
         pytest.param(["board", "--json"], id="board"),
         pytest.param(["claim", "1", "--scope", "README.md"], id="claim-ahead-of-clm-01"),
-        pytest.param(["--repo", REPOSITORY, "land", "12"], id="land"),
+        pytest.param(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA], id="land"),
     ],
 )
 def test_an_untrusted_board_config_refuses_every_store_command_by_name(
@@ -11973,7 +11973,7 @@ def _land_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRu
     release's fresh context, after its own write (CAS-54)."""
     repo, _client = _land_scenario(monkeypatch, tmp_path)
     return _CountedRun(
-        ["--repo", REPOSITORY, "land", "12"],
+        ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA],
         toplevel_reads={None: 2},
         config_reads={repo: 2},
         observations={repo: 1},

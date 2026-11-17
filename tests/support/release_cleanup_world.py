@@ -475,7 +475,8 @@ def verify_cleanup(
     record = InterventionRecord()
     case.intervention.install(CleanupIntervention(world, monkeypatch, lane, record))
     capsys.readouterr()
-    result = run_cli(list(case.command), capsys)
+    arguments = [*case.command, "--head", head] if case.command[0] == "land" else list(case.command)
+    result = run_cli(arguments, capsys)
     merged_line = f"merged: {world.landing.forge.landings[12].merge_commit}\n"
     values = {
         "head": head,

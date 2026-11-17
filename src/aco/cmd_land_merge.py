@@ -4,7 +4,7 @@ call that may still be running. `cmd_land` decides when it merges and what follo
 from . import forge, github, protocol, report
 
 _PENDING_REFUSAL = (
-    "pull request #{number} may still be merging ({foreign}); re-run aco land {number}"
+    "pull request #{number} may still be merging ({foreign}); re-run aco land {number} --head <sha>"
 )
 
 
