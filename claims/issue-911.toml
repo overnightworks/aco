@@ -1,0 +1,8 @@
+claim_id = "9b9a4a1b993243f1a067bae437406100"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "8f11c5b853b8844a9a966a44690b35d49cd28acb"
+branch = "claude/issue-911-step-card-fields"
+scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/body-block.spec.md", "specs/mcp.spec.md", "src/aco/body.py", "src/aco/cmd_mcp.py", "src/aco/decide.py", "src/aco/inbox.py", "src/aco/item_step.py", "src/aco/mcp_server.py", "tests/test_body_step.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_step.py", "tests/test_decide_step.py", "tests/test_inbox.py", "tests/test_item_step.py", "tests/test_mcp_server.py"]
+opened_commit = "db60878c10d85da72b0a76bb4560c0460b3a64c9"
+whole_reason = "step tool, its body table, the inbox reader and their specs move together"
