@@ -129,8 +129,8 @@ export class DecisionStore {
 	/** The card the stage shows, so a failure on any other card is told apart. */
 	#shownKey: string | null = null;
 	/** The cards whose refused or failed post came while another card was shown,
-	 * each with its name, until the card is shown. */
-	readonly #unseen = new SvelteMap<string, string>();
+	 * until the card is shown or its banner goes. */
+	readonly #unseen = new SvelteMap<string, UnseenFailure>();
 
 	constructor(
 		private readonly token: string,
@@ -170,10 +170,7 @@ export class DecisionStore {
 
 	/** The refused or failed posts of cards not shown, each naming its card. */
 	get unseenFailures(): UnseenFailure[] {
-		return [...this.#unseen].flatMap(([key, name]) => {
-			const banner = this.#banners[key];
-			return banner === undefined ? [] : [{ key, name, message: banner.message }];
-		});
+		return [...this.#unseen.values()];
 	}
 
 	/** The card the stage now shows; its failure strip goes, its own banner stays. */
@@ -334,7 +331,7 @@ export class DecisionStore {
 		held: readonly Pick[],
 		reopens: EscapePanel | null = null
 	): void {
-		this.#banners = withoutKey(this.#banners, key);
+		this.#clearBanner(key);
 		const entry: PendingEntry = {
 			request,
 			message,
@@ -377,7 +374,7 @@ export class DecisionStore {
 	 * picks of unchanged points stay, those of changed points go with the re-read.
 	 * This card alone is disabled until the read answers, however it ends. */
 	async reloadAfterBanner(key: string): Promise<void> {
-		this.#banners = withoutKey(this.#banners, key);
+		this.#clearBanner(key);
 		this.#reading.add(key);
 		try {
 			await this.board.reload();
@@ -414,9 +411,14 @@ export class DecisionStore {
 			if (key === this.#shownKey) {
 				this.#unseen.delete(key);
 			} else {
-				this.#unseen.set(key, name);
+				this.#unseen.set(key, { key, name, message: outcome.message });
 			}
 		}
+	}
+
+	#clearBanner(key: string): void {
+		this.#banners = withoutKey(this.#banners, key);
+		this.#unseen.delete(key);
 	}
 
 	#dropDrafts(key: string, kinds: EscapeKind[]): void {

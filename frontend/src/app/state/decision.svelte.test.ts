@@ -458,6 +458,30 @@ test('[ABRD-153] a failed post on a card not shown is an unseen failure too', as
 	expect(store.unseenFailures.map((failure) => failure.key)).toEqual([songKey]);
 });
 
+test.each([
+	[
+		'a new undo window starts on it',
+		(store: DecisionStore) =>
+			store.choose('repo', 42, songPoints, { shown: songCard, option: optionB })
+	],
+	[
+		'its banner is dropped for a re-read',
+		(store: DecisionStore) => store.reloadAfterBanner(songKey)
+	]
+])('[ABRD-153] an unseen failure goes when %s', async (_name, clearBanner) => {
+	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
+	const { wiring } = readyBoard();
+	const store = new DecisionStore('token', wiring, send);
+	store.showCard(otherKey);
+	store.choose('repo', 42, songPoints, { shown: songCard, option: optionA });
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(store.unseenFailures).toHaveLength(1);
+
+	await clearBanner(store);
+
+	expect(store.unseenFailures).toEqual([]);
+});
+
 test('[ABRD-153] a refused post on the card shown raises no failure strip', async () => {
 	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
 	const { wiring } = readyBoard();
