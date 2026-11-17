@@ -1,7 +1,7 @@
 # `aco brief`
 
 `aco brief <item>`: one dispatch brief composed from reads a lane step's body
-otherwise gets assembled from by hand -- the item's own body, its live issue
+otherwise gets assembled from by hand -- the item's own body (as BRIEF-29 to BRIEF-31 show it), its live issue
 claim, that claim's lane tip, and the files the lane itself changes since
 its merge base with trunk. `aco brief <item> --step <step>` adds two more sections, this
 repository's own rules and checks for that lane step, read from the tracked
@@ -32,12 +32,12 @@ object. A refusal reaching the shared collection point prints
 
 | state \ trigger | `aco brief <item>` (text) | `aco brief <item> --json` |
 |---|---|---|
-| a live issue claim, lane branch resolves | BRIEF-01, BRIEF-02, BRIEF-11, BRIEF-26, BRIEF-05 | BRIEF-06, BRIEF-10, BRIEF-27 |
+| a live issue claim, lane branch resolves | BRIEF-01, BRIEF-02, BRIEF-11, BRIEF-26, BRIEF-05, BRIEF-29, BRIEF-30, BRIEF-31 | BRIEF-06, BRIEF-10, BRIEF-27 |
 | a live issue claim, lane branch gone | BRIEF-04 | BRIEF-06, BRIEF-10, BRIEF-27 |
 | a live issue claim, lane branch read or `<trunk>` diff fails outright | BRIEF-18 | BRIEF-18 |
 | a live issue claim, lane branch resolves, no `<trunk>`, `<remote>` has no branch | BRIEF-20 | BRIEF-20 |
 | a live issue claim, lane branch resolves, no `<trunk>`, `<remote>` has branches | BRIEF-21 | BRIEF-21 |
-| no live issue claim | BRIEF-03 | BRIEF-06, BRIEF-27 |
+| no live issue claim | BRIEF-03, BRIEF-29, BRIEF-30, BRIEF-31 | BRIEF-06, BRIEF-27 |
 | `<item>` names no item at all | BRIEF-08 | BRIEF-08 |
 | the body holds a display control | BRIEF-23 | BRIEF-06 |
 | the live claim's text holds a display control | BRIEF-28 | BRIEF-28 |
@@ -47,7 +47,7 @@ object. A refusal reaching the shared collection point prints
 
 ## The four sections, always in this order
 
-- [ ] [BRIEF-01] `aco brief <item>` prints the body, a blank line, `CLAIM`, a blank line, `TIP`, a blank line, `TOUCHED` -- always these four headings in order (see E-BRIEF-01).
+- [ ] [BRIEF-01] `aco brief <item>` prints the body (as BRIEF-29 to BRIEF-31 show it), a blank line, `CLAIM`, a blank line, `TIP`, a blank line, `TOUCHED` -- always these four headings in order (see E-BRIEF-01).
 - [ ] [BRIEF-02] Under a live issue claim, `CLAIM` is followed by one line `<agent> (<role>) branch=<branch> base=<base>[ <age>]`, branch before base (see E-BRIEF-01).
 - [ ] [BRIEF-11] That claim line's indented lines are one per scope path, then `  whole: <reason>` only when the claim carries one (see E-BRIEF-01).
 - [ ] [BRIEF-26] After them, `  lane-shared: <entry>, <entry>` names what the claim may write beside its scope, in `aco status`'s own form (STAT-19, STAT-20, STAT-21); none configured, no such line.
@@ -59,6 +59,9 @@ object. A refusal reaching the shared collection point prints
 - [ ] [BRIEF-21] A `<remote>` with branches refuses instead `cannot determine the trunk: no <remote>/HEAD, <remote>/main or <remote>/master resolves; run git remote set-head <remote> -a`, exit `2` (see E-BRIEF-15).
 - [ ] [BRIEF-22] A `<remote>` with no URL configured refuses instead `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-BRIEF-17).
 - [ ] [BRIEF-08] `<item>` naming no item at all prints one empty line for the missing body, then every section exactly as BRIEF-01..06 describe with no live claim -- never a refusal (see E-BRIEF-06).
+- [ ] [BRIEF-29] Text prints a ruled option line of a valid body as its `text`, `ruling`, `ruled_on`, `via`, `question` and the chosen option's `name` and `contract` only; bytes outside the block stay (E-BRIEF-19).
+- [ ] [BRIEF-30] Text prints an option line ruled `other` as its `text`, `ruling`, `ruled_on`, `via`, the operator's `other` answer and `question`, and no option.
+- [ ] [BRIEF-31] Text prints open, returned, withdrawn and yes/no lines as stored; a body that is not valid, or holds no ruled option line, prints byte for byte. `--json`'s `"body"` is always as stored.
 - [ ] [BRIEF-23] Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `"body"` keeps it as stored.
 
 ## `--json`
@@ -404,4 +407,40 @@ $ aco brief 42 --json
 2> ERROR: cannot determine the trunk: canonical remote 'hub' is not configured
 {"ok": false, "reason": "unavailable", "message": "cannot determine the trunk: canonical remote 'hub' is not configured"}
 exit 2
+```
+
+### E-BRIEF-19 -- a ruled option line and an open one
+
+Setup: as E-BRIEF-02; the item's body is `Prose.` and an `aco` block with
+line 1 an option line ruled `A` through the board (options `A` "Song bleibt
+offen", `B` "Bleibt wie heute", each with effect, notice, cost and undo) and
+line 2 an open option line
+
+```console
+$ aco brief 42
+Prose.
+
+```aco
+[[expectation]]
+text = "<line 1 text>"
+ruling = "A"
+ruled_on = 2026-10-28
+via = "board"
+question = "<line 1 question>"
+
+[[expectation.option]]
+name = "Song bleibt offen"
+contract = "<option A contract>"
+
+[[expectation]]
+<line 2 as stored, every card key and both options>
+```
+
+CLAIM
+no active claim
+
+TIP
+
+TOUCHED
+exit 0
 ```
