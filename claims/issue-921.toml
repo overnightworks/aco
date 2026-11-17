@@ -1,8 +1,0 @@
-claim_id = "99ebc9c4328c45c6a2d4676b9d8f8a23"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "2874be6a01aa62338abb63deae4081aefeb4c958"
-branch = "claude/issue-921-land-requires-head"
-scope = [".aco/brief.toml", "README.md", "specs/handover.spec.md", "specs/land.spec.md", "src/aco/cli.py", "src/aco/cmd_handover.py", "src/aco/cmd_land.py", "src/aco/cmd_land_merge.py", "src/aco/cmd_land_queue.py", "src/aco/forge.py", "tests/support/landing_refusals.py", "tests/support/release_cleanup_world.py", "tests/test_cli.py", "tests/test_cmd_adopt.py", "tests/test_cmd_adopt_landing.py", "tests/test_cmd_brief.py", "tests/test_cmd_handover.py", "tests/test_cmd_land_after_merge.py", "tests/test_cmd_land_after_merge_rerun.py", "tests/test_cmd_land_head_safety.py", "tests/test_cmd_land_merge.py", "tests/test_cmd_land_merge_message.py", "tests/test_cmd_land_merged_line.py", "tests/test_cmd_land_newest_check.py", "tests/test_cmd_land_preflight.py", "tests/test_cmd_land_preflight_claim.py", "tests/test_cmd_land_queue.py", "tests/test_cmd_land_read_failure.py", "tests/test_cmd_land_trunk_push.py", "tests/test_cmd_land_trunk_state.py", "tests/test_cmd_stats.py", "tests/test_forge.py", "tests/test_github.py", "tests/test_github_landing_readiness.py"]
-opened_commit = "14605a54ec308a4763a3b273f7ee6f797025c6f1"
-whole_reason = "Requiring --head touches every land test module and the printers that show a land command."
