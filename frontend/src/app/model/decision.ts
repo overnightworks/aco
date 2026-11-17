@@ -15,7 +15,7 @@ import type {
 	ExpectationLine,
 	OptionLine
 } from '../../types';
-import type { StripState } from './boardSummary';
+import { STATE_LABEL, type StripState } from './boardSummary';
 import type { Pick } from './card';
 
 export const UNDO_SECONDS = 8;
@@ -26,7 +26,7 @@ export const UNDO_SECONDS = 8;
  * ends or the page is left, so it does not yet read as decided. */
 export const UNDO_STRIP_LABEL: Record<StripState, string> = {
 	done: 'Saves shortly',
-	back: 'With head'
+	back: STATE_LABEL.back
 };
 
 export const NOTE_MAX_LENGTH = 280;
