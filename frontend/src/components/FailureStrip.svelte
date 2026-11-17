@@ -4,13 +4,13 @@
 	let { name, message }: { name: string; message: string } = $props();
 </script>
 
-<div class="strip">
+<div class="failure">
 	<span class="head"><WarnMark />Not saved: {name}</span>
 	<span class="why">{message}</span>
 </div>
 
 <style>
-	.strip {
+	.failure {
 		display: grid;
 		gap: 2px;
 		width: 100%;

@@ -113,7 +113,7 @@ for (const viewport of [
 
 			await page.goto('about:blank');
 
-			expect(await storedLine(64, 1)).not.toHaveProperty('ruling');
+			expect(await storedLine(64, 1)).toMatchObject({ ruling: null });
 		});
 
 		test('[ABRD-153] a failed post on a card left behind keeps a strip naming it until the card is shown', async ({

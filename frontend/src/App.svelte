@@ -580,7 +580,7 @@
 		max-height: 35dvh;
 		overflow: auto;
 	}
-	.strips:has(:global(.strip)) {
+	.strips:has(:global(.strip, .failure)) {
 		padding: 24px 32px 16px;
 	}
 	.question-pane {
@@ -588,7 +588,7 @@
 		grid-row: 2;
 		padding: 24px 32px 0;
 	}
-	.strips:has(:global(.strip)) + .question-pane {
+	.strips:has(:global(.strip, .failure)) + .question-pane {
 		padding-top: 0;
 	}
 	.inner {
@@ -705,7 +705,7 @@
 		.strips {
 			background: var(--surface);
 		}
-		.strips:has(:global(.strip)) {
+		.strips:has(:global(.strip, .failure)) {
 			padding: 12px 16px 16px;
 		}
 		.question-pane {
