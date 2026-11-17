@@ -671,6 +671,12 @@ PARENT_ACCEPTANCES = {
     "other-child-and-next-names-no-work": accepted_with_parent(
         WORK_ITEM_BODY, ParentWorld(complete_contract("keiner"), other_open_children=1)
     ),
+    "parent-in-another-repository-sets-no-parent-rule": declares(
+        WORK_ITEM_BODY,
+        f"Work-Item: {WORK_ITEM}",
+        4,
+        PullRequestWorld(parent=ParentWorld(complete_contract("keiner"), repository="other/repo")),
+    ),
 }
 
 PARENT_CLOSING_REFUSALS = {
@@ -763,13 +769,6 @@ PARENT_REFUSALS = {
         ParentWorld(complete_contract("keiner"), kind=body.ItemKind.TASK),
         forge_requests=4,
     ),
-    "parent-in-another-repository": refused_with_parent(
-        WORK_ITEM_BODY,
-        f"has parent other/repo#{PARENT_ISSUE} in another repository, "
-        "whose children this check cannot read",
-        ParentWorld(complete_contract("Cut the next slice."), repository="other/repo"),
-        forge_requests=4,
-    ),
 }
 
 
@@ -777,7 +776,7 @@ PARENT_REFUSALS = {
 def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-21, LAND-22, LAND-23, LAND-25, LAND-86, CHECK-01"""
+    """Spec: LAND-21, LAND-22, LAND-23, LAND-25, LAND-28, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
@@ -793,5 +792,5 @@ def test_a_landing_that_contradicts_what_its_parent_still_holds_is_refused(
 def test_a_landing_whose_parent_cannot_be_read_or_holds_no_children_is_refused(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-18, LAND-26, LAND-27, LAND-28, CHECK-01"""
+    """Spec: LAND-18, LAND-26, LAND-27, CHECK-01"""
     check_pull_request(case, flags)

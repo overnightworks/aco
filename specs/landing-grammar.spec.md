@@ -74,7 +74,8 @@ through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 | other open children, no `Next` line | — | LAND-24 | — | — |
 | other open children, `Next` names work | — | LAND-25 | — | — |
 | an open sub-issue in another repository | — | LAND-86 | — | — |
-| malformed/wrong-kind/foreign parent | — | LAND-26, LAND-27, LAND-28 | — | — |
+| malformed/wrong-kind parent | — | LAND-26, LAND-27 | — | — |
+| parent in another repository | — | LAND-28 | — | — |
 | pull request not merged | — | — | LAND-30 | — |
 | PR names a different item / kind mismatch | — | — | LAND-62, LAND-64, LAND-66, LAND-67, LAND-85 | — |
 | work item still open | — | — | LAND-55, LAND-63 | — |
@@ -152,7 +153,7 @@ is `specs/body-block.spec.md`'s own fact, cited here as `<body defect
 sentence>`, not restated.
 
 The refusals apply in this order, the first match winning: the parent's own
-defects (LAND-26..28), then LAND-24 (also when `next` is empty), then LAND-18,
+defects (LAND-26, LAND-27), then LAND-24 (also when `next` is empty), then LAND-18,
 then LAND-79 and LAND-21, and only then LAND-19.
 
 - [ ] [LAND-21] With no uncut row and no `Next` work, a last-child landing omitting its parent refuses `closes the last open child of parent <ref>; close the parent too`, exit `2`.
@@ -164,7 +165,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-86] An open sub-issue of the parent in another repository counts as another open child: closing the last local child is no last-child landing (LAND-21 does not fire) and LAND-24 applies.
 - [ ] [LAND-26] A parent whose own body reads as malformed refuses `has parent <ref> with a <body defect sentence>`, exit `2`, before the last-child rule runs; a valid but incomplete parent proceeds to it.
 - [ ] [LAND-27] A recorded parent whose own kind is not `container` refuses `has parent <ref> of kind <kind>, which is not a container; only a container holds children`, exit `2`.
-- [ ] [LAND-28] A recorded parent living in another repository refuses `has parent <ref> in another repository, whose children this check cannot read`, exit `2`.
+- [ ] [LAND-28] A recorded parent in another repository sets no parent requirement (LAND-21..LAND-27, LAND-79 do not apply): the landing neither must nor may close it, its own repository closes it, exit `0`.
 
 ## What `release --merged` requires
 
