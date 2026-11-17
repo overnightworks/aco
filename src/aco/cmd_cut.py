@@ -9,8 +9,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
+from typing import cast
 
 from . import board_read, body, decide, forge, protocol, report, workboard
+from .body_planned import PLANNED_AT_FIRST_CUT_KEY
 from .session import RunContext
 
 _CONTAINER_KINDS = frozenset({body.ItemKind.CONTAINER})
@@ -458,6 +460,24 @@ _CUT_RERUN_RECOVERY = "re-run the same cut -- it adopts the child"
 _CUT_TYPE_RECOVERY = f"set that type on the forge by hand, then {_CUT_RERUN_RECOVERY}"
 
 
+def _stamp_first_cut(
+    data: dict[str, object], children_before: workboard.ChildList, child: int
+) -> dict[str, object]:
+    """`data` with the container's planned count -- this cut's child plus the rows
+    still uncut -- when it has no stamp and no child but this cut's own."""
+    if PLANNED_AT_FIRST_CUT_KEY in data:
+        return data
+    others = [
+        existing
+        for existing in children_before
+        if not (isinstance(existing, workboard.ChildItem) and existing.number == child)
+    ]
+    if others:
+        return data
+    rows_left = len(cast("list[object]", data["slice"]))
+    return {**data, PLANNED_AT_FIRST_CUT_KEY: 1 + rows_left}
+
+
 def _cut_slice(
     client: forge.ForgeWriter,
     target: workboard.Issue,
@@ -473,6 +493,7 @@ def _cut_slice(
     title = _child_title(label, link, parsed.title)
     child_scope = _cut_row_scope(link, requested_body_scope(parsed.scope))
     child_done_when = _cut_row_done_when(number, located, link, storage)
+    children_before = client.list_children(number) if link is not None else ()
     adopted = _adopt_existing_child(client, number, title, config, open_issues)
     if adopted is None and not parsed.not_a_twin:
         refuse_possible_twin(
@@ -490,7 +511,9 @@ def _cut_slice(
             )
         )
         if link is not None:
-            new_data = body.remove_slice_row(located, link.index)
+            new_data = _stamp_first_cut(
+                body.remove_slice_row(located, link.index), children_before, child
+            )
             removal = _SliceRowRemoval(
                 container=number,
                 replacing=target.body,

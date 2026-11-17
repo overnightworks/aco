@@ -61,6 +61,8 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | a linked row already names a `scope` | — | — | CUT-21 | — |
 | every successful cut's own child body | CUT-25 | CUT-25 | CUT-25 | — |
 | `storage = "state-ref"`, the row removed | CUT-26, CUT-27 | CUT-26 | — | — |
+| a container's first cut, or a later one | CUT-45, CUT-46 | CUT-45, CUT-46 | — | — |
+| a cut with no linked row | CUT-47 | — | — | — |
 
 ## The target
 
@@ -131,8 +133,14 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 
 ## `storage = "state-ref"`, the same command over one CAS write
 
-- [ ] [CUT-26] Removing a `[[slice]]` row under `storage = "state-ref"` preserves every byte outside the block's interior; the interior re-renders canonically (BODY-07), not byte-for-byte (see E-CUT-07).
+- [ ] [CUT-26] Removing a `[[slice]]` row under `storage = "state-ref"` preserves every byte outside the block's interior; the interior re-renders canonically (BODY-07), and gains only CUT-45's stamp (see E-CUT-07).
 - [ ] [CUT-27] Under `storage = "state-ref"`, the fresh child's body carries CUT-25's `Parent:` prose and a `[record]` table whose `parent` names the container's item id (PIN-16) (see E-CUT-07).
+
+## The planned count
+
+- [ ] [CUT-45] A container's first cut (no stamp, no child but this cut's own) writes `planned_at_first_cut = <n>` (BODY-118) in its row-removal write, `<n>` being that child plus the rows left uncut.
+- [ ] [CUT-46] A container with the stamp or another child (open or closed, any repository) gets no new one; an adoption or re-run (CUT-19) of the first cut writes the same count.
+- [ ] [CUT-47] A cut with no linked row (CUT-10), and `aco item new --parent`, write no container body and stamp nothing.
 
 ## Never
 
@@ -140,7 +148,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - `aco cut` never reaches CUT-17's own relation-write failure under `storage = "state-ref"`: the child's own mint is one CAS write that can fail before any child exists -- a plain re-run then starts over as a fresh cut, nothing to adopt -- and CUT-18's row-removal step can fail once the child exists.
 - `aco cut` never refuses a row for lacking a `done_when`: such a row cuts like any other, and its child's `done_when` stays `""` until someone fills it (CUT-25).
 - `aco cut` never drops a linked row's `done_when` from the fresh child it creates: the row's own is copied into that child, and the row is removed with the cut (CUT-26), so the done-when stands in one place.
-- `aco cut` never touches the container's own `now`, `next`, or `done_when` fields, or any `[[slice]]` row but the one linked: a row removal's own rewrite carries every other field forward unchanged (CUT-26).
+- `aco cut` never touches the container's own `now`, `next`, or `done_when` fields, or any `[[slice]]` row but the one linked: a row removal's own rewrite carries every other field forward unchanged, but for CUT-45's stamp (CUT-26).
 - `aco cut` never re-parents an issue by title alone: an orphan is adopted only through CUT-16's own recovery-shape check, never a bare string match.
 - `aco cut`'s own `--json` object never uses the storage-aware `<label>` form (`specs/landing-grammar.spec.md`): `container`, `child`, and `written` are always the bare number, under either storage pin.
 - CUT-25's own body shape differs between the storage pins only in `<label>`, in its `Parent:` line and its `now`; only `storage = "state-ref"` additionally sets `[record].parent` (CUT-27) -- GitHub carries no such field, so its own retry (CUT-19) reads the `Parent:` prose line instead, while a state-ref retry reads `record.parent` alone.

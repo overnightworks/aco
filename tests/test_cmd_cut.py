@@ -182,7 +182,7 @@ CHILD_BODY = (
     'done_when = "{0}"\n{1}```\n'
 )
 ONE_ROW = MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
-ROW_REMOVED = {79: block_body(MINIMAL_BLOCK_TOML + "\nslice = []")}
+ROW_REMOVED = {79: block_body(MINIMAL_BLOCK_TOML + "\nplanned_at_first_cut = 1\n\nslice = []")}
 TWIN_SEARCH_START = FROZEN_CLI_NOW - timedelta(days=30)
 
 
@@ -514,7 +514,7 @@ def test_cut_requires_an_open_top_level_container(case: CutCase, cut_check: CutC
                 {
                     79: block_body(
                         MINIMAL_BLOCK_TOML
-                        + "\n"
+                        + "\nplanned_at_first_cut = 2\n\n"
                         + SLICE_ROW.format(2, "Bad\\u000Btitle", "").rstrip("\n")
                     )
                 },
@@ -535,7 +535,7 @@ def test_cut_requires_an_open_top_level_container(case: CutCase, cut_check: CutC
                 {
                     79: block_body(
                         MINIMAL_BLOCK_TOML
-                        + "\n"
+                        + "\nplanned_at_first_cut = 2\n\n"
                         + SLICE_ROW.format(2, "Other", 'done_when = "a\\u001B[2Jb"').rstrip("\n")
                     )
                 },
@@ -566,7 +566,7 @@ def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check
                 {
                     79: block_body(
                         MINIMAL_BLOCK_TOML
-                        + "\n"
+                        + "\nplanned_at_first_cut = 2\n\n"
                         + SLICE_ROW.format(1, "Scheibe 1", 'done_when = "D"').rstrip("\n")
                     )
                 },
@@ -661,7 +661,7 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
                 {
                     79: block_body(
                         MINIMAL_BLOCK_TOML
-                        + "\n"
+                        + "\nplanned_at_first_cut = 2\n\n"
                         + SLICE_ROW.format(2, "Scheibe 2", 'done_when = "D"').rstrip("\n")
                     )
                 },
@@ -796,7 +796,7 @@ def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCh
                     1,
                     "Slice A",
                     CHILD_BODY.format("D", ""),
-                    ROW_REMOVED,
+                    {79: block_body(MINIMAL_BLOCK_TOML + "\nslice = []")},
                 ),
                 950,
                 workboard.ChildState.OPEN,
