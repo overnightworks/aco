@@ -41,6 +41,12 @@ from .expectation_grammar import (
 
 EXPECTATION_LINE_TEXT_MAXIMUM = 100
 
+# A default ruling stands in for an operator who stayed silent; these kinds are
+# his to decide, whatever the recommended option's undo.
+_OPERATOR_ONLY_DECISION_KINDS = frozenset(
+    {DecisionKind.MONEY, DecisionKind.ACCESS, DecisionKind.DATA_RISK}
+)
+
 
 class LineForm(StrEnum):
     """Which of the three line forms an `[[expectation]]` entry takes."""
@@ -517,8 +523,8 @@ def _refuse_an_asked_on_after_today(index: int, entry: dict[str, object], today:
 
 def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionChoice) -> None:
     """The choice checks after the card's: a letter is on it and, kept as
-    recommended, is the recommended one, in that order. An own answer needs no
-    letter."""
+    recommended, is the recommended one, in that order; a default ruling is then
+    refused on an operator-only decision. An own answer needs no letter."""
     letter = choice.answer
     if isinstance(letter, OtherAnswer):
         return
@@ -532,6 +538,24 @@ def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionC
         raise ExpectationOptionChoiceError(
             f"--via default keeps only the recommended option {recommended}, not {letter}"
         )
+    if choice.via is RulingVia.DEFAULT:
+        _refuse_a_default_on_an_operator_decision(index, entry)
+
+
+def _refuse_a_default_on_an_operator_decision(index: int, entry: dict[str, object]) -> None:
+    """A default ruling never decides a final option or a money, access or
+    data-risk line: the operator rules it."""
+    line = _option_line(index, entry)
+    recommended = next(option for option in line.options if option.letter == line.recommended)
+    if recommended.undo is Undo.FINAL:
+        reason = f"its recommended option {recommended.letter} is final"
+    elif line.decision_kind in _OPERATOR_ONLY_DECISION_KINDS:
+        reason = f"its decision kind is {line.decision_kind.value}"
+    else:
+        return
+    raise ExpectationOptionChoiceError(
+        f"line {index} cannot be ruled --via default: {reason}; the operator rules it"
+    )
 
 
 def rule_option(body: str, index: int, choice: OptionChoice, ruled_on: date) -> str:
