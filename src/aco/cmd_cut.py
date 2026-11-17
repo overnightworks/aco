@@ -493,7 +493,7 @@ def _cut_slice(
     title = _child_title(label, link, parsed.title)
     child_scope = _cut_row_scope(link, requested_body_scope(parsed.scope))
     child_done_when = _cut_row_done_when(number, located, link, storage)
-    children_before = client.list_children(number)
+    children_before = client.list_children(number) if link is not None else ()
     adopted = _adopt_existing_child(client, number, title, config, open_issues)
     if adopted is None and not parsed.not_a_twin:
         refuse_possible_twin(

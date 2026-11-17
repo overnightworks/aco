@@ -81,27 +81,30 @@ def test_the_first_cut_stamps_the_children_plus_the_rows(
     assert (status, block["planned_at_first_cut"], len(block["slice"])) == (0, 3, 2)  # type: ignore[arg-type]
 
 
-def test_a_later_cut_keeps_the_stamp(served: ServedCut, capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: CUT-46"""
-    toml = MINIMAL_BLOCK_TOML + "planned_at_first_cut = 3\n" + _rows(2)
-    fake = served.serve(
-        _forge(toml, (workboard.ChildItem(OLD_CHILD, workboard.ChildState.CLOSED, "Done earlier"),))
-    )
-
-    status = _cut(capsys)
-
-    assert (status, _written_block(fake)["planned_at_first_cut"]) == (0, 3)
-
-
-def test_a_cut_on_a_container_that_has_a_stamp_and_no_child_keeps_it(
-    served: ServedCut, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("stamp", "children"),
+    [
+        pytest.param(
+            3,
+            (workboard.ChildItem(OLD_CHILD, workboard.ChildState.CLOSED, "Done earlier"),),
+            id="stamp_with_a_closed_child",
+        ),
+        pytest.param(9, (), id="stamp_without_a_child"),
+    ],
+)
+def test_a_later_cut_keeps_the_stamp(
+    served: ServedCut,
+    capsys: pytest.CaptureFixture[str],
+    stamp: int,
+    children: tuple[workboard.ChildItem, ...],
 ) -> None:
     """Spec: CUT-46"""
-    fake = served.serve(_forge(MINIMAL_BLOCK_TOML + "planned_at_first_cut = 9\n" + _rows(2), ()))
+    toml = MINIMAL_BLOCK_TOML + f"planned_at_first_cut = {stamp}\n" + _rows(2)
+    fake = served.serve(_forge(toml, children))
 
     status = _cut(capsys)
 
-    assert (status, _written_block(fake)["planned_at_first_cut"]) == (0, 9)
+    assert (status, _written_block(fake)["planned_at_first_cut"]) == (0, stamp)
 
 
 @pytest.mark.parametrize(
