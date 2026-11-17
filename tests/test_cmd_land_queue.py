@@ -372,7 +372,8 @@ class TestLandThroughTheMergeQueue:
                     head_moved=True,
                     status=2,
                     stderr=(
-                        f"ERROR: pull request #{NUMBER} changed while it was checked; re-run land\n"
+                        f"ERROR: pull request #{NUMBER} changed while it was checked; "
+                        f"re-run aco land {NUMBER} --head <sha>\n"
                     ),
                     pauses=0,
                     waits=False,

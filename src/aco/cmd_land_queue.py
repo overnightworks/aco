@@ -43,7 +43,8 @@ def head_moved_refusal(number: int) -> protocol.ClaimUnavailableError:
     """The refusal of a pinned merge or enqueue whose pull request changed since the
     preflight read its head."""
     return protocol.ClaimUnavailableError(
-        f"pull request #{number} changed while it was checked; re-run land"
+        f"pull request #{number} changed while it was checked; "
+        f"re-run aco land {number} --head <sha>"
     )
 
 

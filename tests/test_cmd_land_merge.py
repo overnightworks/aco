@@ -674,7 +674,8 @@ class TestLandMergeForgeAnswer:
         [
             pytest.param(
                 MergeCase(
-                    "pull request #12 changed while it was checked; re-run land",
+                    "pull request #12 changed while it was checked; "
+                    "re-run aco land 12 --head <sha>",
                     error=forge.ForgeMergeConflictError(
                         "gh: Head branch was modified. Review and try the merge again. (HTTP 409)"
                     ),
