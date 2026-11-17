@@ -131,7 +131,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-35] An unknown argument (`via` is none), a wrong type, not exactly one of `option` and `other`, or a blank `other` is a tool error naming each; nothing is read or written (see E-MCP-10).
 - [ ] [MCP-36] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
 - [ ] [MCP-37] `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
-- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`; `step` requires `repository`, `step`.
+- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`; `step` requires `repository`, `step`, `purpose`, `actions`, `expected`.
 - [ ] [MCP-39] An open item that carries the label `needs-operator`, in any letter case, is a step: `steps` lists its `number`, `title` and `step` (the block's `next`) and its card (MCP-67, see E-MCP-11).
 - [ ] [MCP-40] A step whose body has no readable block, or a malformed one, is listed with `step` null; it is never left out and its title is not given as the step.
 - [ ] [MCP-41] `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
