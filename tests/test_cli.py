@@ -4396,7 +4396,9 @@ def _uncut_row_case(
         container_number,
         complete_contract(next_line, slice=_cuttable_slice_entries(row_title)),
         row_title,
-        lambda _child: {container_number: complete_contract(next_line, slice=[])},
+        lambda _child: {
+            container_number: complete_contract(next_line, planned_at_first_cut=1, slice=[])
+        },
         lambda child: f"CUT #{container_number} row 1 -> #{child}\n",
     )
 
