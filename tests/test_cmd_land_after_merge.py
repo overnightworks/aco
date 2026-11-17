@@ -55,7 +55,7 @@ class FailureCase:
 def release_failure_case() -> FailureCase:
     return FailureCase(
         "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
-        "release (forge unreachable); re-run aco land 12\n",
+        "release (forge unreachable); re-run aco land 12 --head <sha>\n",
         close_error="forge unreachable",
         expected_trunk=ExpectedTrunk.FAST_FORWARDED,
     )
@@ -79,7 +79,7 @@ class CanonicalRemote(Enum):
 class TrunkCase:
     canonical: CanonicalRemote
     main: MainBranchState
-    arguments: tuple[str, ...] = ("land", "12")
+    arguments: tuple[str, ...] = ()
     stdout: str = (
         "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\n"
         "merged: {merged}\n"
@@ -114,7 +114,7 @@ class PackageCase:
         "merged: {merged}\n"
     )
     rerun_stdout: str = "LANDED pull request #12 already; nothing left to release\n"
-    arguments: tuple[str, ...] = ("land", "12")
+    arguments: tuple[str, ...] = ()
     status: int = 0
     stderr: str = ""
     rerun_status: int = 0
@@ -129,7 +129,7 @@ class PackageWorld:
 
 @dataclass(frozen=True)
 class KeepCase:
-    arguments: tuple[str, ...] = ("land", "12", "--keep-worktree")
+    arguments: tuple[str, ...] = ("--keep-worktree",)
     status: int = 0
     stdout: str = (
         "RELEASED issue #72: landing\nfreed: none\nnext: none\n"
@@ -359,7 +359,7 @@ class TestLandAfterMerge:
         landing = keep_world.landing
         case = keep_world.case
         capsys.readouterr()
-        result = run_cli(list(case.arguments), capsys)
+        result = run_cli(["land", "12", "--head", landing.head, *case.arguments], capsys)
         claims = store.peek_state(worktree=landing.clone, remote=str(landing.remote)).claims
         observed = {
             "exit": result.status,
@@ -431,8 +431,9 @@ class TestLandAfterMerge:
         """
         case = package_world.case
         capsys.readouterr()
-        result = run_cli(list(case.arguments), capsys)
-        rerun = run_cli(list(case.arguments), capsys)
+        arguments = ["land", "12", "--head", package_world.landing.head, *case.arguments]
+        result = run_cli(arguments, capsys)
+        rerun = run_cli(arguments, capsys)
         observed = {
             "exit": result.status,
             "stdout": result.stdout,
@@ -483,7 +484,7 @@ class TestLandAfterMerge:
         calls = trunk_git_calls(monkeypatch, case.canonical.value)
         origin_calls = trunk_git_calls(monkeypatch, "origin")
         capsys.readouterr()
-        result = run_cli(list(case.arguments), capsys)
+        result = run_cli(["land", "12", "--head", landing.head, *case.arguments], capsys)
         land_calls = list(calls)
         origin_land_calls = list(origin_calls)
         observed = {
@@ -512,7 +513,8 @@ class TestLandAfterMerge:
             pytest.param(
                 FailureCase(
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
-                    "delete-branch (delete branch failed (simulated)); re-run aco land 12\n",
+                    "delete-branch (delete branch failed (simulated)); "
+                    "re-run aco land 12 --head <sha>\n",
                     delete_error="delete branch failed (simulated)",
                     deleted_branches=(),
                     fetch_calls=(),
@@ -522,7 +524,7 @@ class TestLandAfterMerge:
             pytest.param(
                 FailureCase(
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
-                    "fast-forward (fatal: unreachable); re-run aco land 12\n",
+                    "fast-forward (fatal: unreachable); re-run aco land 12 --head <sha>\n",
                     error="fatal: unreachable",
                 ),
                 id="fetch-fails",
@@ -531,7 +533,7 @@ class TestLandAfterMerge:
                 FailureCase(
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "fast-forward (fatal: unreachable\\n\\x1b[2Jhint: \\u202eretry); "
-                    "re-run aco land 12\n",
+                    "re-run aco land 12 --head <sha>\n",
                     error="fatal: unreachable\n\x1b[2Jhint: \u202eretry",
                 ),
                 id="fetch-fails-with-terminal-controls-escaped",
@@ -540,7 +542,7 @@ class TestLandAfterMerge:
                 FailureCase(
                     "ERROR: MERGED pull request #12 as <sha>; follow-up incomplete: "
                     "fast-forward (fatal: Not possible to fast-forward, aborting.); "
-                    "re-run aco land 12\n",
+                    "re-run aco land 12 --head <sha>\n",
                     trunk=TrunkState.DIVERGED,
                 ),
                 id="ff-only-fails",
@@ -564,7 +566,7 @@ class TestLandAfterMerge:
         landing = world.landing
         calls = trunk_git_calls(monkeypatch, "origin")
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", landing.head], capsys)
         land_calls = list(calls)
         remote = real_git(landing.remote, "rev-parse", landing.default_branch).stdout.strip()
         trunk = real_git(landing.clone, "rev-parse", landing.default_branch).stdout.strip()
@@ -623,12 +625,12 @@ class TestLandAfterMerge:
     ) -> None:
         """Spec: LANDCMD-26. Land preserves standalone release's failure sentence."""
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", world.landing.head], capsys)
         release = run_cli(
             ["release", "72", "--merged", "12", "--branch", "codex/issue-72-claims"], capsys
         )
         land_sentence = result.stderr.partition("release (")[2].rpartition(
-            "); re-run aco land 12\n"
+            "); re-run aco land 12 --head <sha>\n"
         )[0]
         release_sentence = release.stderr.removeprefix("ERROR: ").removesuffix("\n")
         observed = {
@@ -685,7 +687,7 @@ class TestLandAfterMerge:
             printed = json.loads(result.stdout)["next"]
             expected_next = lagging_world.case.next_number
         else:
-            result = run_cli(["land", "12"], capsys)
+            result = run_cli(["land", "12", "--head", lagging_world.landing.head], capsys)
             printed = [
                 line.split(" score")[0]
                 for line in result.stdout.splitlines()

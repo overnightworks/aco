@@ -204,7 +204,7 @@ def world(
 def assert_refusal(world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
     case = world.case
     capsys.readouterr()
-    result = run_cli(["land", "12", *case.arguments], capsys)
+    result = run_cli(["land", "12", "--head", MERGE_COMMIT_SHA, *case.arguments], capsys)
     observed, expected = refusal_observations(world, result, case.sentence, length=case.length)
     observed.update(
         {

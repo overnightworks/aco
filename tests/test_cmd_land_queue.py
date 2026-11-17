@@ -30,7 +30,7 @@ CLEAN_CHECKOUT_REFUSAL = "ERROR: land must run from a clean checkout of the defa
 def removed(reason: str) -> str:
     return (
         f"ERROR: pull request #{NUMBER} was removed from the merge queue ({reason}); "
-        f"re-run aco land {NUMBER}\n"
+        f"re-run aco land {NUMBER} --head <sha>\n"
     )
 
 
@@ -41,12 +41,11 @@ def removed_and_closed(reason: str) -> str:
 def not_queued(cause: str, failure: str) -> str:
     return (
         f"ERROR: pull request #{NUMBER} was not queued: {cause} failed ({failure}); "
-        f"re-run aco land {NUMBER}\n"
+        f"re-run aco land {NUMBER} --head <sha>\n"
     )
 
 
 class Pin(StrEnum):
-    NONE = "none"
     QUEUED_HEAD = "queued head"
     OTHER_HEAD = "other head"
 
@@ -74,7 +73,7 @@ class QueueCase:
     untracked_file: bool = False
     head_repository: str | None = None
     head_moved: bool = False
-    pin: Pin = Pin.NONE
+    pin: Pin = Pin.QUEUED_HEAD
     enqueue_error: forge.ForgeError | None = None
     rules_error: forge.ForgeError | None = None
     body_error: protocol.ClaimError | None = None
@@ -306,7 +305,7 @@ class TestLandThroughTheMergeQueue:
                     status=2,
                     stderr=(
                         f"ERROR: reading the merge queue state of pull request #{NUMBER} failed "
-                        f"(HTTP 502); re-run aco land {NUMBER}\n"
+                        f"(HTTP 502); re-run aco land {NUMBER} --head <sha>\n"
                     ),
                     pauses=1,
                 ),
@@ -397,7 +396,7 @@ class TestLandThroughTheMergeQueue:
                     status=2,
                     stderr=(
                         f"ERROR: pull request #{NUMBER} was not merged: reading its merge rules "
-                        f"failed (HTTP 502); re-run aco land {NUMBER}\n"
+                        f"failed (HTTP 502); re-run aco land {NUMBER} --head <sha>\n"
                     ),
                     written=(),
                     enqueues=0,
@@ -414,7 +413,6 @@ class TestLandThroughTheMergeQueue:
     ) -> None:
         capsys.readouterr()
         pin = {
-            Pin.NONE: [],
             Pin.QUEUED_HEAD: ["--head", world.landed.landing.head],
             Pin.OTHER_HEAD: ["--head", OTHER_HEAD],
         }[world.case.pin]

@@ -46,7 +46,6 @@ class LaneWorktree(Enum):
 
 
 class ReviewedHead(Enum):
-    OMITTED = "omitted"
     FULL = "full"
     UPPERCASE_PREFIX = "uppercase-prefix"
 
@@ -76,7 +75,7 @@ class MergeCase:
     holder: ClaimHolder = ClaimHolder.SELF
     role: HeldRole = HeldRole.BUILDER
     lane_worktree: LaneWorktree = LaneWorktree.ABSENT
-    reviewed: ReviewedHead = ReviewedHead.OMITTED
+    reviewed: ReviewedHead = ReviewedHead.FULL
     arguments: tuple[str, ...] = ()
     trunk_config: str = ""
     head_config: str = ""
@@ -252,14 +251,12 @@ def world(
 
 
 def land(world: MergeWorld, capsys: pytest.CaptureFixture[str]):
-    arguments = ["land", "12", *world.case.arguments]
-    if world.case.reviewed is not ReviewedHead.OMITTED:
-        arguments += [
-            "--head",
-            world.head[:7].upper()
-            if world.case.reviewed is ReviewedHead.UPPERCASE_PREFIX
-            else world.head,
-        ]
+    head = (
+        world.head[:7].upper()
+        if world.case.reviewed is ReviewedHead.UPPERCASE_PREFIX
+        else world.head
+    )
+    arguments = ["land", "12", "--head", head, *world.case.arguments]
     capsys.readouterr()
     return run_cli(arguments, capsys)
 
@@ -704,7 +701,7 @@ class TestLandMergeForgeAnswer:
             pytest.param(
                 MergeCase(
                     "pull request #12 may still be merging (gh: Server Error (HTTP 502)); "
-                    "re-run aco land 12",
+                    "re-run aco land 12 --head <sha>",
                     error=forge.ForgeMergeUnansweredError("gh: Server Error (HTTP 502)"),
                     reads_after_merge_request=1,
                 ),
@@ -713,7 +710,7 @@ class TestLandMergeForgeAnswer:
             pytest.param(
                 MergeCase(
                     "pull request #12 may still be merging (gh: Server Error (HTTP 502)); "
-                    "re-run aco land 12",
+                    "re-run aco land 12 --head <sha>",
                     error=forge.ForgeMergeUnansweredError("gh: Server Error (HTTP 502)"),
                     unreadable_after_merge_request=True,
                     reads_after_merge_request=1,
@@ -723,7 +720,7 @@ class TestLandMergeForgeAnswer:
             pytest.param(
                 MergeCase(
                     "pull request #12 may still be merging "
-                    "(gh: Merge already in progress (HTTP 405)); re-run aco land 12",
+                    "(gh: Merge already in progress (HTTP 405)); re-run aco land 12 --head <sha>",
                     error=forge.ForgeMergeInProgressError(
                         "gh: Merge already in progress (HTTP 405)"
                     ),

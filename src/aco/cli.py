@@ -307,7 +307,7 @@ def _add_land_parser(commands: usage.Subcommands, name: str) -> None:
         "--head",
         type=_reviewed_head,
         help=(
-            "the head sha the reviewers saw, in full or as a prefix of at least 7 hex digits; "
+            "required: the head sha the reviewers saw, in full or as a prefix of at least 7 hex digits; "
             "land refuses before any write when the pull request's head is another commit"
         ),
     )

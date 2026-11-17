@@ -21,13 +21,19 @@ _NO_REMOVAL_REASON = "no reason recorded"
 
 _WRITING_MESSAGE = "writing its landing message"
 _ENQUEUEING = "enqueueing it"
-_NOT_QUEUED = "pull request #{number} was not queued: {step} failed ({foreign}); re-run aco land {number} --head <sha>"
+_NOT_QUEUED = (
+    "pull request #{number} was not queued: {step} failed ({foreign}); "
+    "re-run aco land {number} --head <sha>"
+)
 _QUEUE_READ_FAILED = (
     "reading the merge queue state of pull request #{number} failed ({foreign}); "
     "re-run aco land {number} --head <sha>"
 )
 _WAITING = "waiting for pull request #{number} in the merge queue"
-_REMOVED = "pull request #{number} was removed from the merge queue ({foreign}); re-run aco land {number} --head <sha>"
+_REMOVED = (
+    "pull request #{number} was removed from the merge queue ({foreign}); "
+    "re-run aco land {number} --head <sha>"
+)
 _REMOVED_AND_CLOSED = (
     "pull request #{number} was removed from the merge queue and closed ({foreign})"
 )

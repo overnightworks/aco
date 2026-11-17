@@ -132,7 +132,7 @@ def assert_land_outcome(
     landed = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=arrange)
     capsys.readouterr()
 
-    result = run_cli(["land", "12"], capsys)
+    result = run_cli(["land", "12", "--head", landed.landing.head], capsys)
 
     merge_commit = landed.landing.forge.landings[12].merge_commit
     expected_stdout = case.stdout.format(merged=merge_commit)

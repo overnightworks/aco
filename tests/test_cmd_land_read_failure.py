@@ -141,7 +141,7 @@ def test_a_failed_read_refuses_naming_what_was_read(
         lane.forge.landings[12] = merged
     calls = fail_on_call(monkeypatch, lane.forge, failure)
     prefix = "pull request #12 was not merged: reading "
-    suffix = "); re-run aco land 12"
+    suffix = "); re-run aco land 12 --head <sha>"
     if failure.step is None:
         sentence = str(failure.error)
     elif failure.length is RefusalLength.UNCHECKED:

@@ -424,7 +424,7 @@ class TestLandQualityGate:
                     landing_readiness(),
                     "pull request #12 was not merged: reading its landing preconditions failed "
                     "(quality/config.toml is not valid TOML: Invalid value (at end of document)); "
-                    "re-run aco land 12",
+                    "re-run aco land 12 --head <sha>",
                     quality_config="gate =",
                     quality_reads=("main",),
                 ),
@@ -516,7 +516,7 @@ class TestLandQualityGate:
                 LandingCase(
                     landing_readiness(),
                     "pull request #12 was not merged: reading its landing preconditions failed "
-                    "(GitHub returned HTTP 500); re-run aco land 12",
+                    "(GitHub returned HTTP 500); re-run aco land 12 --head <sha>",
                     quality_config_error=forge.ForgeError("GitHub returned HTTP 500"),
                     quality_reads=("main",),
                 ),

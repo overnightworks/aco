@@ -200,7 +200,7 @@ def prepare_separate_rerun(
     world: SeparateWorld, capsys: pytest.CaptureFixture[str]
 ) -> tuple[str, SeparateRelease]:
     capsys.readouterr()
-    initial = run_cli(["land", "12"], capsys)
+    initial = run_cli(["land", "12", "--head", world.head], capsys)
     client = world.landing.forge
     merge = client.landings[12].merge_commit
     observed = {
@@ -347,7 +347,7 @@ class RerunCase:
     checks: tuple[forge.CheckRun, ...] = ()
     head_config: str | None = ""
     quality_error: str | None = None
-    arguments: tuple[str, ...] = ("land", "12")
+    arguments: tuple[str, ...] = ()
     status: int = 0
     stdout: str = (
         "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\nmerged: {merge}\n"
@@ -374,7 +374,7 @@ def prepare_merge(world: LandedWorld, case: RerunCase, capsys: pytest.CaptureFix
     client = landing.forge
     capsys.readouterr()
     if case.preparation is RerunPreparation.FAILED_LAND:
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", landing.head], capsys)
         merge = real_git(landing.remote, "rev-parse", landing.default_branch).stdout.strip()
         observed = {"exit": result.status, "stdout": result.stdout, "stderr": result.stderr}
         expected = {
@@ -555,7 +555,7 @@ class TestLandAfterMergeRerun:
         world = separate_world
         case = world.case
         capsys.readouterr()
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", world.head], capsys)
         observed = {
             "land.exit": result.status,
             "land.stdout": result.stdout,
@@ -648,7 +648,7 @@ class TestLandAfterMergeRerun:
         world = separate_world
         merge, release = prepare_separate_rerun(world, capsys)
         before_tip = release.tip
-        land_result = run_cli(["land", "12"], capsys)
+        land_result = run_cli(["land", "12", "--head", world.head], capsys)
         land_tip = state_ref_tip(world.landing.remote)
         release_result = release.run(monkeypatch, capsys)
         assert_separate_rerun_outcome(
@@ -678,7 +678,8 @@ class TestLandAfterMergeRerun:
                     land_stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
                     "release (branch 'dependabot/x' is not an issueless lane; "
                     "pass an issue number, "
-                    "or check out a branch prefixed 'docs/' or 'fix/'); re-run aco land 12\n",
+                    "or check out a branch prefixed 'docs/' or 'fix/'); "
+                    "re-run aco land 12 --head <sha>\n",
                     claims=((protocol.IssueIdentity(72), "dependabot/x", "bob-claim"),),
                     lane_exists=True,
                     branch_exists=True,
@@ -695,7 +696,7 @@ class TestLandAfterMergeRerun:
         world = separate_world
         merge, release = prepare_separate_rerun(world, capsys)
         before_tip = release.tip
-        result = run_cli(["land", "12"], capsys)
+        result = run_cli(["land", "12", "--head", world.head], capsys)
         assert_separate_rerun_outcome(
             world,
             release,
@@ -725,7 +726,7 @@ class TestLandAfterMergeRerun:
                     merge_message="feat: land the lane (#12)\n\nCloses #72\n\nWork-Item: #72\n",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
-                    "release (forge unreachable (simulated)); re-run aco land 12\n",
+                    "release (forge unreachable (simulated)); re-run aco land 12 --head <sha>\n",
                     quality_error="GitHub returned HTTP 500",
                 ),
                 id="work-item-resumes-release",
@@ -742,7 +743,8 @@ class TestLandAfterMergeRerun:
                     delete_error="delete branch failed (simulated)",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
-                    "delete-branch (delete branch failed (simulated)); re-run aco land 12\n",
+                    "delete-branch (delete branch failed (simulated)); "
+                    "re-run aco land 12 --head <sha>\n",
                     quality_error="GitHub returned HTTP 500",
                     stdout="RELEASED lane dependabot/x: landing\nfreed: none\nnext: none\n"
                     "worktree: removed\nmerged: {merge}\n",
@@ -756,14 +758,14 @@ class TestLandAfterMergeRerun:
                     close_error="forge unreachable (simulated)",
                     initial_stderr="ERROR: MERGED pull request #12 as {merge}; "
                     "follow-up incomplete: "
-                    "release (forge unreachable (simulated)); re-run aco land 12\n",
+                    "release (forge unreachable (simulated)); re-run aco land 12 --head <sha>\n",
                     changed_body="Advances #72",
                     merge_message="feat: land the lane (#12)\n\nCloses #72\n\nWork-Item: #72\n",
                 ),
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
-                RerunCase(arguments=("land", "12", "--head", "0000000")),
+                RerunCase(arguments=("--head", "0000000")),
                 id="squash-rerun-on-recorded-head",
             ),
         ],
@@ -777,7 +779,7 @@ class TestLandAfterMergeRerun:
         client = landing.forge
         case = world.case
         capsys.readouterr()
-        result = run_cli(list(case.arguments), capsys)
+        result = run_cli(["land", "12", "--head", landing.head, *case.arguments], capsys)
         claims = store.peek_state(worktree=landing.clone, remote=str(landing.remote)).claims
         observed = {
             "exit": result.status,
@@ -826,7 +828,7 @@ class TestLandAfterMergeRerun:
                     stdout="",
                     stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
                     "release (merge commit {merge} carries no `Work-Item:` or `No-Item:` trailer); "
-                    "re-run aco land 12\n",
+                    "re-run aco land 12 --head <sha>\n",
                 ),
                 id="missing-trailer-gap-17",
             ),
@@ -837,7 +839,7 @@ class TestLandAfterMergeRerun:
                     stdout="",
                     stderr="ERROR: MERGED pull request #12 as {merge}; follow-up incomplete: "
                     "release (merge commit {merge} carries no `Work-Item:` or `No-Item:` trailer); "
-                    "re-run aco land 12\n",
+                    "re-run aco land 12 --head <sha>\n",
                 ),
                 id="off-trunk-merge-commit-gap-17",
             ),
@@ -852,7 +854,9 @@ class TestLandAfterMergeRerun:
         """
         case = world.case
         capsys.readouterr()
-        result = run_cli(list(case.arguments), capsys)
+        result = run_cli(
+            ["land", "12", "--head", world.world.landing.head, *case.arguments], capsys
+        )
         observed = {"exit": result.status, "stdout": result.stdout, "stderr": result.stderr}
         expected = {
             "exit": case.status,
