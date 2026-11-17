@@ -196,7 +196,7 @@ def _refuse_land_readiness(
         raise protocol.ClaimUnavailableError(checks_refusal)
 
 
-def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: str | None) -> None:
+def _refuse_unreviewed_head(readiness: forge.LandingReadiness, reviewed_head: str) -> None:
     """`land --head`: the head this preflight read -- the one
     the merge pins -- must be the commit the reviewers saw, so a push after
     their review never lands unseen."""

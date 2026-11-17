@@ -205,7 +205,7 @@ plus a fixed, deterministic fake `gh`.
 
 ### E-LANDCMD-13 — a body ending in a trailer block keeps one trailer paragraph
 
-Setup: bare-remote, fake `gh`, pull request `#57` landed as a merge commit by `aco land 57`, its body `Fixes it.`, a blank line, `Work-Item: #42`, `Co-Authored-By: A <a@x>`
+Setup: bare-remote, fake `gh`, pull request `#57` landed as a merge commit by `aco land 57 --head <sha>`, its body `Fixes it.`, a blank line, `Work-Item: #42`, `Co-Authored-By: A <a@x>`
 
 ```console
 $ git log -1 --format=%B main
@@ -556,7 +556,7 @@ exit 0
 ### E-LANDCMD-18a — a rerun after a completed release finishes
 
 Setup: bare-remote, fake `gh`, pull request `#57` from `ada/issue-42` merged and released by an
-earlier `aco land 57` from this landing clone, which holds no worktree and no local `ada/issue-42`;
+earlier `aco land 57 --head <sha>` from this landing clone, which holds no worktree and no local `ada/issue-42`;
 the lane worktree lives in the original checkout
 
 ```console
