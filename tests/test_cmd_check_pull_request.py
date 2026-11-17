@@ -703,6 +703,13 @@ PARENT_CLOSING_REFUSALS = {
         f"closes {PARENT} besides its work item {WORK_ITEM}; a pull request lands one item",
         ParentWorld(complete_contract("Dispatch slice 4."), other_open_children=1),
     ),
+    "closing-a-parent-in-another-repository": refused_with_parent(
+        f"Work-Item: #72\n\nCloses #72\nCloses other/repo#{PARENT_ISSUE}",
+        f"closes other/repo#{PARENT_ISSUE} besides its work item {WORK_ITEM}; "
+        "a pull request lands one item",
+        ParentWorld(complete_contract("keiner"), repository="other/repo"),
+        forge_requests=4,
+    ),
     "closing-the-parent-with-an-uncut-row": refused_with_parent(
         CLOSES_ITEM_AND_PARENT,
         UNCUT_ROW,
