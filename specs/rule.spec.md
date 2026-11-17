@@ -105,7 +105,7 @@ withdrawn one.
 - [ ] [RULE-17] A `--card-hash` other than the card's current hash refuses `line <k> changed since its card was shown; show it again and rule what it shows now`, exit `2`, before any write, after RULE-04.
 - [ ] [RULE-18] A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
 - [ ] [RULE-19] `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
-- [ ] [RULE-45] `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, with `<reason>` either `its recommended option <L> is final` or `its decision kind is <kind>`, exit `2`, before any write, after RULE-19.
+- [ ] [RULE-45] `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, exit `2`, before any write, after RULE-19.
 - [ ] [RULE-21] A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
 - [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
@@ -148,7 +148,7 @@ withdrawn one.
 - `aco rule` never accepts two kinds of outcome, or none: `--option`/`--other`/`--unclear` are one mutually exclusive, required group, and `--option`, `--other`, `--unclear`, `--via` and `--card-hash` appear in `--help` with a help line each.
 - `aco rule --unclear` never stores `via` or `card_hash`: it decides nothing.
 - `aco rule` never checks who typed `--via`: it records what the writer was told. It is a tripwire for cooperative agents; an agent of the operator's own user that types `--via chat` for a word the operator never spoke is not stopped, and the forge's edit history is the record after the fact.
-- `aco rule --via default` never rules a final option or a money, access or data-risk line: a default ruling stands in only for a choice the operator can take back and that is not his by kind.
+- `aco rule --via default` never rules a final option or a money, access or data-risk line: a default ruling stands in only for a choice the operator can take back and that is not his by kind; its `<reason>` is `its recommended option <L> is final` or `its decision kind is <kind>`.
 - `aco rule` never changes a ruled line's own `ruling`: RULE-04 refuses before any write reaches it.
 - `aco rule` never rewrites a byte outside the ruled entries: the body's surrounding bytes stay exactly as written.
 - `aco rule` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it ever resolves the forge or the item.
