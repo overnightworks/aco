@@ -523,8 +523,8 @@ def _refuse_an_asked_on_after_today(index: int, entry: dict[str, object], today:
 
 def _refuse_a_wrong_choice(index: int, entry: dict[str, object], choice: OptionChoice) -> None:
     """The choice checks after the card's: a letter is on it and, kept as
-    recommended, is the recommended one, in that order. An own answer needs no
-    letter."""
+    recommended, is the recommended one, in that order; a default ruling is then
+    refused on an operator-only decision. An own answer needs no letter."""
     letter = choice.answer
     if isinstance(letter, OtherAnswer):
         return

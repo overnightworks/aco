@@ -105,7 +105,7 @@ withdrawn one.
 - [ ] [RULE-17] A `--card-hash` other than the card's current hash refuses `line <k> changed since its card was shown; show it again and rule what it shows now`, exit `2`, before any write, after RULE-04.
 - [ ] [RULE-18] A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
 - [ ] [RULE-19] `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
-- [ ] [RULE-45] `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, exit `2`, before any write, after RULE-19.
+- [ ] [RULE-45] `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, with `<reason>` either `its recommended option <L> is final` or `its decision kind is <kind>`, exit `2`, before any write, after RULE-19.
 - [ ] [RULE-21] A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
 - [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
 - [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
