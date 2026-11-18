@@ -5,6 +5,7 @@ import json
 
 import pytest
 from board_fixtures import REPOSITORY
+from github_fixtures import api_pull_request
 
 from aco import github
 from aco.forge import ForgeMalformedResponseError
@@ -46,20 +47,14 @@ def test_the_single_item_read_says_whether_a_member_wrote_the_item(
 
 
 def _landing_client(login: str, body: object = "") -> github.GitHubForge:
-    owner, _, name = REPOSITORY.partition("/")
-    payload = {
-        "number": 12,
-        "title": "Bump ruff",
-        "body": body,
-        "baseRefName": "main",
-        "headRefName": "dependabot/uv/ruff",
-        "headRefOid": "a" * 40,
-        "headRepository": {"name": name},
-        "headRepositoryOwner": {"login": owner},
-        "author": {"login": login},
-        "mergedAt": None,
-        "mergeCommit": None,
-    }
+    payload = api_pull_request(
+        body=body,
+        title="Bump ruff",
+        headRefName="dependabot/uv/ruff",
+        author={"login": login},
+        mergedAt=None,
+        mergeCommit=None,
+    )
     return github.GitHubForge(
         github.repository_id(REPOSITORY), run=lambda _arguments: json.dumps(payload)
     )
