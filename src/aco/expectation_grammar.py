@@ -11,6 +11,7 @@ reports its `FieldDefect` pairs as `ContractDefect`s.
 
 import argparse
 import hashlib
+import hmac
 import json
 import re
 from collections.abc import Callable, Iterator, Mapping
@@ -635,7 +636,7 @@ def _edited_ruled_card_defects(prefix: str, entry: dict[str, object]) -> list[Fi
     """A ruled option line whose stored `card_hash` no longer matches the
     card it carries: someone edited the card after the decision."""
     stored = entry.get("card_hash")
-    if stored is None or stored == card_hash(entry):
+    if stored is None or (isinstance(stored, str) and shows_card(entry, stored)):
         return []
     return [
         FieldDefect(
@@ -737,6 +738,11 @@ def card_hash(entry: Mapping[str, object]) -> str:
     covered["options"] = [_present_values(option, OPTION_KEYS) for option in options]
     canonical = json.dumps(covered, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return content_hash(canonical.encode("utf-8"))
+
+
+def shows_card(entry: Mapping[str, object], shown_hash: str) -> bool:
+    """Whether `shown_hash` is the hash of the card `entry` shows now."""
+    return hmac.compare_digest(card_hash(entry).encode("utf-8"), shown_hash.encode("utf-8"))
 
 
 def content_hash(content: bytes) -> str:

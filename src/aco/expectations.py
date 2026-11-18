@@ -37,6 +37,7 @@ from .expectation_grammar import (
     is_open_line,
     is_option_line,
     is_withdrawn_line,
+    shows_card,
 )
 
 EXPECTATION_LINE_TEXT_MAXIMUM = 100
@@ -536,7 +537,7 @@ class HeadReturn:
 
 def _refuse_a_changed_card(index: int, entry: dict[str, object], shown_card_hash: str) -> None:
     """The card shown is the card now."""
-    if shown_card_hash != card_hash(entry):
+    if not shows_card(entry, shown_card_hash):
         raise ExpectationCardChangedError(
             f"line {index} changed since its card was shown; show it again and rule what it "
             "shows now"
