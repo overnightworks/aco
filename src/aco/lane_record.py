@@ -513,11 +513,10 @@ class RecordFileError(Exception):
     """The first thing wrong with a lane record file, as a phrase that follows its name. A value
     the file states stands apart as `stated`, so the caller can cut it alone and keep the words."""
 
-    def __init__(self, before: str, stated: str = "", after: str = "") -> None:
-        super().__init__(before + stated + after)
+    def __init__(self, before: str, stated: str = "") -> None:
+        super().__init__(before + stated)
         self.before = before
         self.stated = stated
-        self.after = after
 
 
 # A valid file is a few hundred bytes of counts and tags plus one short entry per verdict; a file

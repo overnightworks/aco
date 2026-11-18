@@ -662,8 +662,9 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     `release --merged` path unchanged. A pull request `landing` already finds merged -- a resumed
     run after an earlier step failed -- skips preflight and the merge
     itself entirely: `merge_landing` never runs twice for the same pull
-    request. `--coordinator-override`'s own role and `--record`'s verdict head are validated
-    here, at entry, before that fresh/rerun split and before any read: a rerun skips
+    request. `--coordinator-override`'s own role and `--record`'s verdict are validated
+    here, at entry, once the repository root and board.toml are read and before that
+    fresh/rerun split and any forge read: a rerun skips
     `_land_preflight` entirely, so a check placed only there left a rerun free to delete the
     branch and fast-forward -- and `cmd_release.release_transition` free to close the item."""
     if parsed.head is None:

@@ -84,7 +84,7 @@ MALFORMED_RECORDS = [
         id="a-version-past-the-parser-digit-limit",
     ),
     pytest.param(
-        "﻿" + json.dumps(lane_record_object()),
+        "\ufeff" + json.dumps(lane_record_object()),
         "begins with a UTF-8 byte order mark; save it without one",
         id="a-byte-order-mark",
     ),
@@ -258,7 +258,7 @@ def test_a_record_file_larger_than_the_limit_is_refused_unread(
 def test_a_refusal_keeps_its_defect_and_the_file_name_however_long_the_file_path_is(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], command: list[str]
 ) -> None:
-    """Spec: LANREC-31."""
+    """Spec: LANREC-31, LANREC-45."""
     deep = tmp_path.joinpath(*["d" * 25] * 8)
     deep.mkdir(parents=True)
     path = deep / "lane-record.json"
