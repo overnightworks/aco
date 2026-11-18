@@ -295,7 +295,7 @@ def test_a_file_name_longer_than_the_line_stays_whole_and_the_line_passes_the_bo
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    in_working_directory: bool,  # noqa: FBT001
+    in_working_directory: bool,
     shown_prefix: str,
 ) -> None:
     """Spec: LANREC-45."""
