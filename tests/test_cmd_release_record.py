@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from board_fixtures import REPOSITORY
 from claim_worktrees import lane_held_by_ada, make_stand_in
-from cli_fixtures import real_git, run_cli
+from cli_fixtures import run_cli
 from lane_record_fixtures import (
     LANE_BRANCH,
     LANE_RECORD_TRAILERS,
@@ -15,17 +15,7 @@ from lane_record_fixtures import (
     lane_record_object,
     write_lane_record_file,
 )
-
-from aco import store
-
-
-def state_ref_tip(remote: Path) -> str:
-    return real_git(remote, "rev-parse", store.STATE_REF).stdout
-
-
-def lane_trailers(remote: Path) -> tuple[str, ...]:
-    message = real_git(remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
-    return tuple(line for line in message.splitlines() if line.startswith("lane_"))
+from store_fixtures import lane_trailers, state_ref_tip
 
 
 def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_the_reasons(

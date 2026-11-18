@@ -28,7 +28,7 @@ from lane_record_fixtures import (
     release_trailers_of,
 )
 from merged_release import arrange_merged_pull_request
-from store_fixtures import claim_intent
+from store_fixtures import claim_intent, lane_trailers, release_commit_message
 
 from aco import body, protocol, store, workboard
 from aco.lane_record import (
@@ -59,14 +59,6 @@ CLAIMED_AT = 1_700_000_000
 IDLE_SECONDS = 3600
 MERGED_AT = CLAIMED_AT + 600
 RELEASED_AT = CLAIMED_AT + 90
-
-
-def lane_trailers(message: str) -> tuple[str, ...]:
-    return tuple(line for line in message.splitlines() if line.startswith("lane_"))
-
-
-def release_commit_message(remote: Path) -> str:
-    return real_git(remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
 
 
 def test_a_record_renders_its_known_figures_in_order_and_leaves_unknown_ones_out() -> None:
@@ -591,7 +583,7 @@ def test_a_merged_release_leaves_its_record_on_the_release_commit(
     )
 
     merge = real_git(bare_remote, "rev-parse", "main").stdout.strip()
-    assert lane_trailers(message) == (
+    assert lane_trailers(bare_remote) == (
         "lane_outcome: landed",
         f"lane_merge: {merge}",
         "lane_wall_seconds: 0",
@@ -624,12 +616,12 @@ def test_a_merged_release_whose_merge_lost_the_routing_line_still_releases_with_
     bare_remote: Path,
 ) -> None:
     """Spec: LANREC-14, LANREC-21, REL-64."""
-    message, _forge = land_and_release(
+    _message, _forge = land_and_release(
         monkeypatch, capsys, pinned_clone, bare_remote, message_lines=("No-Item: docs",)
     )
 
     merge = real_git(bare_remote, "rev-parse", "main").stdout.strip()
-    assert lane_trailers(message) == (
+    assert lane_trailers(bare_remote) == (
         "lane_outcome: landed",
         f"lane_merge: {merge}",
         "lane_wall_seconds: 0",
@@ -661,7 +653,7 @@ def test_an_abandoned_release_leaves_a_record_from_its_reason(
             bare_remote, "log", "-2", "--first-parent", "--format=%ct", store.STATE_REF
         ).stdout.split()
     )
-    lines = lane_trailers(release_commit_message(bare_remote))
+    lines = lane_trailers(bare_remote)
     assert (result.status, result.stderr) == (0, "")
     assert lines[:2] == (
         "lane_outcome: abandoned",
@@ -719,7 +711,7 @@ def test_a_record_survives_a_push_that_loses_its_race(bare_remote: Path, worktre
         transport=transport,
     )
 
-    assert lane_trailers(release_commit_message(bare_remote)) == ("lane_outcome: abandoned",)
+    assert lane_trailers(bare_remote) == ("lane_outcome: abandoned",)
 
 
 class RejectsOnce:

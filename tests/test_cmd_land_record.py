@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from cli_fixtures import real_git, run_cli
+from cli_fixtures import run_cli
 from github_fixtures import MERGE_COMMIT_SHA, LaneLandingWorld, landed_world
 from landing_refusals import refusal_observations
 from lane_record_fixtures import (
@@ -12,8 +12,7 @@ from lane_record_fixtures import (
     lane_record_object,
     write_lane_record_file,
 )
-
-from aco import store
+from store_fixtures import lane_trailers
 
 
 @pytest.fixture
@@ -27,11 +26,6 @@ def verdict_on(sha: str) -> list[dict[str, str]]:
     return [{"stage": "gate", "verdict": "approve", "sha": sha}]
 
 
-def lane_trailers(world: LaneLandingWorld) -> tuple[str, ...]:
-    message = real_git(world.remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
-    return tuple(line for line in message.splitlines() if line.startswith("lane_"))
-
-
 def test_a_landing_with_a_record_writes_the_record_s_trailers(
     lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -40,7 +34,7 @@ def test_a_landing_with_a_record_writes_the_record_s_trailers(
 
     result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
 
-    trailers = lane_trailers(lane)
+    trailers = lane_trailers(lane.remote)
     assert (result.status, result.stderr) == (0, "")
     assert trailers[:1] == ("lane_outcome: landed",)
     assert trailers[-len(LANE_RECORD_TRAILERS) :] == LANE_RECORD_TRAILERS
