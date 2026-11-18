@@ -112,7 +112,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-58] Either storage keeps prose piped without a block byte for byte, CRLF and trailing blanks too, above a block the flags build in its line ending; a key no flag names stays `""` (see E-ITEM-16).
 - [ ] [ITEM-59] A piped body keeps its prose and fence lines byte for byte; a flag naming another value refuses `--<flag> <value> contradicts the piped block's <key> = <value>`, exit `2` (see E-ITEM-16).
 - [ ] [ITEM-60] Under either storage `item new` reads a body from a file or pipe on stdin, never dropping it; a socket, terminal, `/dev/null` or closed stdin is never read.
-- [ ] [ITEM-61] Under `storage = "state-ref"`, each section the stored body leaves empty prints one stderr line that names `item edit --base` and the `item show --json` hash source (see E-ITEM-01).
+- [ ] [ITEM-61] Under `storage = "state-ref"`, each empty section prints one stderr line naming `item edit <item-id> --base <body_hash>` and `item show <item-id> --json` for the hash (see E-ITEM-01).
 - [ ] [ITEM-62] A piped block is stored verbatim when the flags add nothing to it under `storage = "github"`, otherwise in its canonical rendering, a comment typed inside it not kept.
 
 ## `item new` under `storage = "github"`
