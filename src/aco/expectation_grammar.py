@@ -11,6 +11,7 @@ reports its `FieldDefect` pairs as `ContractDefect`s.
 
 import argparse
 import hashlib
+import hmac
 import json
 import re
 from collections.abc import Callable, Iterator, Mapping
@@ -741,7 +742,7 @@ def card_hash(entry: Mapping[str, object]) -> str:
 
 def shows_card(entry: Mapping[str, object], shown_hash: str) -> bool:
     """Whether `shown_hash` is the hash of the card `entry` shows now."""
-    return card_hash(entry) == shown_hash
+    return hmac.compare_digest(card_hash(entry).encode("utf-8"), shown_hash.encode("utf-8"))
 
 
 def content_hash(content: bytes) -> str:
