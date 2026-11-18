@@ -18,12 +18,19 @@ ISSUE_TYPE_KINDS: dict[str, ItemKind] = {
     "feature": ItemKind.FEATURE,
 }
 _MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")  # tuple: unhashable input is no member
+DEPENDENCY_BOT_LOGIN = "app/dependabot"
 _MALFORMED_ITEM_REFERENCE = "GitHub returned a malformed issue reference"
 
 
 def is_member(association: object) -> bool:
     """Whether a GitHub `author_association` names a member of the repository."""
     return association in _MEMBER_ASSOCIATIONS
+
+
+def is_dependency_bot(login: object) -> bool:
+    """Whether a pull request author login is the dependabot app; `gh` prefixes `app/` only for the
+    forge's bot actor, and a user login cannot hold a slash."""
+    return login == DEPENDENCY_BOT_LOGIN
 
 
 def issue_kind(value: object) -> ItemKind | None:

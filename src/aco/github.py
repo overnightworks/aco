@@ -467,9 +467,7 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
         number = value.get("number")
         title = value.get("title")
-        body = value.get("body")
-        if body is None:
-            body = ""
+        body = value.get("body") or ""
         base_ref_name = value.get("baseRefName")
         head_ref_name = value.get("headRefName")
         head_sha = value.get("headRefOid")
@@ -521,6 +519,7 @@ class GitHubForge:
             merge_commit,
             title,
             head_sha,
+            github_issue_payload.is_dependency_bot(login),
         )
 
     def landing(self, number: int) -> forge.Landing:

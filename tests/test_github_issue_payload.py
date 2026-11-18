@@ -1,4 +1,4 @@
-"""The member flag of the GitHub adapter's single-item read, decoded by
+"""The member and dependency-bot flags of the GitHub adapter reads, decoded by
 `aco.github_issue_payload`."""
 
 import json
@@ -42,3 +42,35 @@ def test_the_single_item_read_says_whether_a_member_wrote_the_item(
     reference = client.item_reference(10)
 
     assert reference.author_is_member is is_member
+
+
+@pytest.mark.parametrize(
+    ("login", "is_dependency_bot"),
+    [
+        pytest.param("app/dependabot", True, id="dependabot-app"),
+        pytest.param("dependabot", False, id="user-named-dependabot"),
+        pytest.param("ada", False, id="member"),
+    ],
+)
+def test_the_landing_read_flags_only_the_dependabot_app_as_a_dependency_bot(
+    login: str, is_dependency_bot: bool
+) -> None:
+    owner, _, name = REPOSITORY.partition("/")
+    payload = {
+        "number": 12,
+        "title": "Bump ruff",
+        "body": "",
+        "baseRefName": "main",
+        "headRefName": "dependabot/uv/ruff",
+        "headRefOid": "a" * 40,
+        "headRepository": {"name": name},
+        "headRepositoryOwner": {"login": owner},
+        "author": {"login": login},
+        "mergedAt": None,
+        "mergeCommit": None,
+    }
+    client = github.GitHubForge(
+        github.repository_id(REPOSITORY), run=lambda _arguments: json.dumps(payload)
+    )
+
+    assert client.landing(12).author_is_dependency_bot is is_dependency_bot

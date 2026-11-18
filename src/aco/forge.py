@@ -361,6 +361,7 @@ class Landing:
     merge_commit: str | None
     title: str
     head_sha: str
+    author_is_dependency_bot: bool = False
 
 
 @dataclass(frozen=True)

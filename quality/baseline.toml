@@ -19,7 +19,7 @@
 "src/aco/cli.py" = 822
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 875
-"src/aco/github.py" = 1439
+"src/aco/github.py" = 1438
 "src/aco/protocol.py" = 1837
 "src/aco/state_board.py" = 922
 "src/aco/store.py" = 1739
@@ -56,9 +56,6 @@
 [function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 94
 "release_transition" = 69
-
-[function_lines."src/aco/github.py"]
-"GitHubForge._landing" = 60
 
 [function_lines."src/aco/workboard.py"]
 "_board_item" = 97

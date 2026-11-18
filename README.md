@@ -52,7 +52,7 @@ names something to do or a card is ruled (`specs/wait.spec.md`).
 
 - **Issueless lanes.** On a `docs/` or `fix/` branch, `aco claim --scope PATH`
   claims without an issue; the pull request carries `No-Item: docs|fix|deps`
-  and `aco release --merged <pull request>` ends the claim once the forge shows
+  (a dependabot pull request without the line counts as `deps`) and `aco release --merged <pull request>` ends the claim once the forge shows
   the merge (`specs/claim.spec.md`, `specs/landing-grammar.spec.md`).
 - **Foreign pull requests.** `aco adopt <pull request> --no-item <kind>` turns
   a bot's pull request into such a lane (`specs/adopt.spec.md`).

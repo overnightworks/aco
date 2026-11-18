@@ -51,6 +51,7 @@ def landing_pull_request(
     merged: bool = False,
     merge_commit: str | None = None,
     title: str = "feat: land the lane",
+    author_is_dependency_bot: bool = False,
 ) -> forge.Landing:
     """`merge_commit` defaults to a shared sha once `merged` is true and to `None` otherwise."""
     return forge.Landing(
@@ -64,6 +65,7 @@ def landing_pull_request(
         merge_commit if merge_commit is not None else (MERGE_COMMIT_SHA if merged else None),
         title,
         MERGE_COMMIT_SHA,
+        author_is_dependency_bot,
     )
 
 
