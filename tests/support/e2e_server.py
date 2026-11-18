@@ -13,8 +13,9 @@ file, which the board finds by the production discovery.
 
 A second server beside the board, the control endpoint, arranges that
 forge: `PUT /board` stores the items a spec names, rendered by aco and
-refused when aco's grammar refuses them, and `GET /items/<n>/lines` reads an
-item's stored lines back in aco's own line JSON. An arrangement's `lane_records` are the
+refused when aco's grammar refuses them, `GET /items/<n>/lines` reads an
+item's stored lines back in aco's own line JSON, and `GET /items/<n>/now`
+reads the `now` of its stored block. An arrangement's `lane_records` are the
 finished items whose release commits the state ref holds.
 
 One line of JSON on stdout once both servers listen:
@@ -66,6 +67,7 @@ _DATE_KEYS = (
 )
 _FIRST_RELEASE = 1_700_000_000
 _ITEM_LINES_PATH = re.compile(r"/items/(?P<number>\d+)/lines")
+_ITEM_NOW_PATH = re.compile(r"/items/(?P<number>\d+)/now")
 
 
 class ArrangementRefusedError(Exception):
@@ -175,6 +177,10 @@ def control_handler(repository: BoardForge) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
 
         def do_GET(self) -> None:
+            if (match := _ITEM_NOW_PATH.fullmatch(self.path)) is not None:
+                stored = body.locate_block(repository.stored_body(int(match["number"]))).data
+                self._answer_json(HTTPStatus.OK, stored.get("now"))
+                return
             match = _ITEM_LINES_PATH.fullmatch(self.path)
             if match is None:
                 self.send_error(HTTPStatus.NOT_FOUND)
