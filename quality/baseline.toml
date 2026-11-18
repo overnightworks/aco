@@ -5,7 +5,7 @@
 
 [ccn."src/aco/github.py"]
 "GitHubForge._board_dependency" = 18
-"GitHubForge._landing" = 28
+"GitHubForge._landing" = 25
 
 [ccn."src/aco/workboard.py"]
 "build_board" = 26

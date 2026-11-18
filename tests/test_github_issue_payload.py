@@ -7,6 +7,7 @@ import pytest
 from board_fixtures import REPOSITORY
 
 from aco import github
+from aco.forge import ForgeMalformedResponseError
 
 
 def _item_reference_client(**fields: object) -> github.GitHubForge:
@@ -44,6 +45,26 @@ def test_the_single_item_read_says_whether_a_member_wrote_the_item(
     assert reference.author_is_member is is_member
 
 
+def _landing_client(login: str, body: object = "") -> github.GitHubForge:
+    owner, _, name = REPOSITORY.partition("/")
+    payload = {
+        "number": 12,
+        "title": "Bump ruff",
+        "body": body,
+        "baseRefName": "main",
+        "headRefName": "dependabot/uv/ruff",
+        "headRefOid": "a" * 40,
+        "headRepository": {"name": name},
+        "headRepositoryOwner": {"login": owner},
+        "author": {"login": login},
+        "mergedAt": None,
+        "mergeCommit": None,
+    }
+    return github.GitHubForge(
+        github.repository_id(REPOSITORY), run=lambda _arguments: json.dumps(payload)
+    )
+
+
 @pytest.mark.parametrize(
     ("login", "is_dependency_bot"),
     [
@@ -55,22 +76,20 @@ def test_the_single_item_read_says_whether_a_member_wrote_the_item(
 def test_the_landing_read_flags_only_the_dependabot_app_as_a_dependency_bot(
     login: str, is_dependency_bot: bool
 ) -> None:
-    owner, _, name = REPOSITORY.partition("/")
-    payload = {
-        "number": 12,
-        "title": "Bump ruff",
-        "body": "",
-        "baseRefName": "main",
-        "headRefName": "dependabot/uv/ruff",
-        "headRefOid": "a" * 40,
-        "headRepository": {"name": name},
-        "headRepositoryOwner": {"login": owner},
-        "author": {"login": login},
-        "mergedAt": None,
-        "mergeCommit": None,
-    }
-    client = github.GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda _arguments: json.dumps(payload)
-    )
+    assert _landing_client(login).landing(12).author_is_dependency_bot is is_dependency_bot
 
-    assert client.landing(12).author_is_dependency_bot is is_dependency_bot
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(0, id="zero"),
+        pytest.param(False, id="false"),
+        pytest.param([], id="empty-list"),
+        pytest.param({}, id="empty-object"),
+    ],
+)
+def test_the_landing_read_refuses_a_falsy_body_that_is_not_text(body: object) -> None:
+    client = _landing_client("app/dependabot", body)
+
+    with pytest.raises(ForgeMalformedResponseError):
+        client.landing(12)

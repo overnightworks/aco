@@ -184,6 +184,13 @@ def discover_repository(*, remote_url: str, directory: Path | None = None) -> fo
     raise ClaimError("cannot resolve GitHub repository; pass --repo OWNER/REPO")
 
 
+def _merge_commit_oid(merge_commit_field: object) -> str | None:
+    oid = merge_commit_field.get("oid") if isinstance(merge_commit_field, dict) else None
+    if merge_commit_field is not None and not isinstance(oid, str):
+        raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
+    return oid
+
+
 def _head_repository(pull_request: dict[str, object]) -> forge.RepositoryId | None:
     """The identity of the repository whose branch a pull request proposes,
     or None when GitHub does not name both halves — a fork deleted after the
@@ -467,7 +474,9 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
         number = value.get("number")
         title = value.get("title")
-        body = value.get("body") or ""
+        body = value.get("body")
+        if body is None:
+            body = ""
         base_ref_name = value.get("baseRefName")
         head_ref_name = value.get("headRefName")
         head_sha = value.get("headRefOid")
@@ -476,16 +485,7 @@ class GitHubForge:
         login = author.get("login") if isinstance(author, dict) else None
         merged_at = value.get("mergedAt")
         merged = merged_at is not None
-        merge_commit_field = value.get("mergeCommit")
-        if merge_commit_field is None:
-            merge_commit = None
-        elif isinstance(merge_commit_field, dict):
-            oid = merge_commit_field.get("oid")
-            if not isinstance(oid, str):
-                raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
-            merge_commit = oid
-        else:
-            raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
+        merge_commit = _merge_commit_oid(value.get("mergeCommit"))
         if (
             isinstance(number, bool)
             or not isinstance(number, int)
