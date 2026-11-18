@@ -178,8 +178,10 @@ def test_a_step_post_that_breaks_the_key_rules_is_refused_before_any_forge_reque
 
     response = board.post_step(payload)
 
-    assert (response.status, response.json()) == _BAD_REQUEST
-    assert (repository.request_log(), port.calls()) == arranged
+    refusal = (response.status, response.json())
+    requests_since = (repository.request_log(), port.calls())
+    assert refusal == _BAD_REQUEST
+    assert requests_since == arranged
 
 
 def test_a_step_post_naming_no_configured_repo_is_refused_before_any_forge_request(
@@ -192,7 +194,8 @@ def test_a_step_post_naming_no_configured_repo_is_refused_before_any_forge_reque
 
     response = board.post_step({**_BASE, "repo": "nowhere", "fingerprint": shown["fingerprint"]})
 
-    assert (response.status, response.json()) == _BAD_REQUEST
+    refusal = (response.status, response.json())
+    assert refusal == _BAD_REQUEST
     assert repository.request_log() == arranged
 
 

@@ -66,7 +66,9 @@ def test_a_step_listed_again_unchanged_keeps_its_fingerprint(
     """ABRD-163."""
     repository.put_item(7, complete_contract("Run it.", wait=OPERATOR_WAIT, step=STEP_TABLE))
 
-    assert board.listed_step(7)["fingerprint"] == board.listed_step(7)["fingerprint"]
+    first = board.listed_step(7)["fingerprint"]
+
+    assert board.listed_step(7)["fingerprint"] == first
 
 
 def test_a_step_with_an_answer_lists_it(repository: BoardForge, board: BoardClient) -> None:

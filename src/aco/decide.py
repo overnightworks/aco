@@ -383,10 +383,8 @@ def _unlabelled_as_a_step(client: forge.ForgeWriter, number: int) -> str | None:
     try:
         client.remove_label(number, label)
     except protocol.ClaimError as error:
-        return (
-            f"The label {label} was not removed: {error}; "
-            f"remove it with gh issue edit {number} --remove-label {label}"
-        )
+        repair = f"gh issue edit {number} --remove-label {label}"
+        return f"The label {label} was not removed: {error}; remove it with {repair}"
     return None
 
 
