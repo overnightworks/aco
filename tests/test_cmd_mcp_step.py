@@ -2,9 +2,7 @@
 board's test forge: marking an item, opening one, finding the one a failed call
 left, and what each refusal and each failure after a write leaves behind."""
 
-import io
 import json
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -18,9 +16,9 @@ from discovery_fixtures import (
     isolate_config_file,
     repository_with_card,
 )
-from mcp_lines import Script, call_line
+from mcp_lines import call_line, serve_mcp
 
-from aco import body, cli, forge, protocol, session, workboard
+from aco import body, forge, protocol, workboard
 
 STEP = "Rotate the deploy key."
 TITLE = "Rotate the deploy key"
@@ -68,14 +66,7 @@ def _inbox_line(request_id: int) -> str:
 
 def _serve(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
     """The results of every line `aco mcp` answers."""
-    replies = io.StringIO()
-    with monkeypatch.context() as served:
-        served.setattr(session, "run_context", board_forge.run_context)
-        served.setattr(sys, "stdin", Script(*lines))
-        served.setattr(sys, "stdout", replies)
-        exit_code = cli.main(["mcp"])
-    assert exit_code == 0
-    return [json.loads(line)["result"] for line in replies.getvalue().splitlines()]
+    return [reply["result"] for reply in serve_mcp(monkeypatch, *lines)]
 
 
 def _text(result: dict[str, Any]) -> str:

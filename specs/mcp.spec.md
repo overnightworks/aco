@@ -167,7 +167,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 ## Answering a step
 
-- [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (the line `read_inbox` showed), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`, and answers as `POST /api/step` does (see E-MCP-20).
+- [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (the line `read_inbox` showed), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`, and answers as `POST /api/step` does, but its `now` says the answer came `in chat` (see E-MCP-20).
 - [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` says to act on it, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
 - [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
 - [ ] [MCP-77] The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
@@ -395,4 +395,4 @@ Setup: `owner/a` holds the open item `#9` of E-MCP-12, waiting on its step, whic
 < {"jsonrpc":"2.0","id":20,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":9,"answered":true},"isError":false}}
 ```
 
-The block's `wait` and `step` are gone, `now` ends with `Fehlgeschlagen: The page shows an error.`, the item is open without the label `needs-operator`, and E-MCP-11's `read_inbox` no longer lists it. The same call again answers a tool error that the item no longer waits on that step.
+The block's `wait` and `step` are gone, `now` reads `The operator answered "Rotate the deploy key in the host's settings." in chat on <the day>: Fehlgeschlagen: The page shows an error.`, the item is open without the label `needs-operator`, and E-MCP-11's `read_inbox` no longer lists it. The same call again answers a tool error that the item no longer waits on that step.

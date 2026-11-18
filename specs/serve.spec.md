@@ -250,7 +250,7 @@ A closed child counts however it closed, not-planned included. A container whose
 - [ ] [ABRD-165] A step answer's `text` follows ABRD-05's rules and is not blank; a refused one reaches no forge.
 - [ ] [ABRD-166] A step no longer as shown on the item's fresh read (ABRD-113), because it changed, was answered, closed or removed, answers `failed` `This step changed; reload.`, nothing written (see E-ABRD-23).
 - [ ] [ABRD-167] A `yes` on a step that asks for a report, or a `report` on one that does not, answers `failed` with a sentence, nothing written; `no` fits every step (see E-ABRD-24).
-- [ ] [ABRD-168] A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" on the board on <date>: ` and `Erfolgreich`, `Fehlgeschlagen: <note>` or the report (see E-ABRD-25).
+- [ ] [ABRD-168] A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" <channel> on <date>: ` (`on the board` for `POST /api/step`, `in chat` for the MCP tool `answer_step`) and `Erfolgreich`, `Fehlgeschlagen: <note>` or the report (see E-ABRD-25).
 - [ ] [ABRD-169] Under `storage = "github"` the label `needs-operator` goes after the body write; a refused removal keeps the answer and adds a `note` naming `gh issue edit <n> --remove-label needs-operator`.
 - [ ] [ABRD-170] A write the forge's body check keeps answers `answered` with ABRD-129's note and removes the label; a lost or unverified write answers `failed` with the forge's sentence and leaves the label.
 - [ ] [ABRD-171] The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.

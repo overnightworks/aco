@@ -128,6 +128,7 @@ def answer_step(
         number,
         result,
         lambda step: step.wait_text == step_text,
+        item_step.AnswerChannel.CHAT,
         environment=os.environ,
         home=Path.home(),
     )

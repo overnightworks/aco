@@ -4,6 +4,7 @@ operator can take, behind the one-line `next` and `wait.operator` that name it."
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
+from enum import StrEnum
 from typing import cast
 
 from .toml_text import toml_multiline_string, toml_string
@@ -139,12 +140,20 @@ def result_fits(result: StepResult, card: StepCard | None) -> bool:
     return isinstance(result, StepReported) == asks_for_report(card)
 
 
-def answered_now(step: str, result: StepResult, today: date) -> str:
-    """The `now` of an item whose `step` the operator answered with `result` on `today`."""
+class AnswerChannel(StrEnum):
+    """Where the operator gave his answer to a step, as the `now` sentence says it."""
+
+    BOARD = "on the board"
+    CHAT = "in chat"
+
+
+def answered_now(step: str, result: StepResult, today: date, channel: AnswerChannel) -> str:
+    """The `now` of an item whose `step` the operator answered with `result` on `today`
+    through `channel`."""
     if isinstance(result, StepSucceeded):
         outcome = "Erfolgreich"
     elif isinstance(result, StepFailed):
         outcome = f"Fehlgeschlagen: {result.note}"
     else:
         outcome = result.report
-    return f'The operator answered "{step}" on the board on {today.isoformat()}: {outcome}'
+    return f'The operator answered "{step}" {channel} on {today.isoformat()}: {outcome}'

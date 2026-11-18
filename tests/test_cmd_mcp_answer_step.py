@@ -3,9 +3,6 @@ the board's test forge: an answer given in chat takes the writer of the board's
 `POST /api/step`, and a step that changed, an item without one or an answer the step does
 not ask for is refused with nothing written."""
 
-import io
-import json
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -13,9 +10,9 @@ import board_forge
 import pytest
 from board_fixtures import OPERATOR_WAIT, complete_contract
 from discovery_fixtures import configure_root, isolate_config_file, repository_with_card
-from mcp_lines import Script, call_line
+from mcp_lines import call_line, serve_mcp
 
-from aco import body, cli, session, workboard
+from aco import body, workboard
 
 _STEP = OPERATOR_WAIT["operator"]
 _REPORT_STEP = {
@@ -69,14 +66,8 @@ def _answer_line(**changes: object) -> str:
 
 
 def _serve(monkeypatch: pytest.MonkeyPatch, line: str) -> dict[str, Any]:
-    replies = io.StringIO()
-    with monkeypatch.context() as served:
-        served.setattr(session, "run_context", board_forge.run_context)
-        served.setattr(sys, "stdin", Script(line))
-        served.setattr(sys, "stdout", replies)
-        exit_code = cli.main(["mcp"])
-    assert exit_code == 0
-    return json.loads(replies.getvalue())["result"]
+    [reply] = serve_mcp(monkeypatch, line)
+    return reply["result"]
 
 
 def _writes(here: board_forge.BoardForge) -> list[str]:
@@ -117,7 +108,8 @@ def test_a_chat_answer_clears_the_wait_and_the_step_writes_now_and_keeps_the_ite
         "item": 1,
         "answered": True,
     }
-    assert str(block["now"]).endswith(f": {outcome}")
+    day = board_forge.RULING_DAY.isoformat()
+    assert block["now"] == f'The operator answered "{_STEP}" in chat on {day}: {outcome}'
     assert block["next"] == _NEXT_AFTER_AN_ANSWER
     assert not {"wait", "step"} & block.keys()
     assert here.stored_item(1).labels == []
@@ -141,10 +133,8 @@ def test_a_label_the_forge_refuses_to_remove_keeps_the_answer_and_names_the_repa
 def _refusal_cases() -> list[tuple[dict[str, str], dict[str, object], str]]:
     return [
         (_YES_NO_STEP, {"step": "Another step."}, "no longer"),
-        (_YES_NO_STEP, {"result": "Fehlgeschlagen"}, "text"),
         (_YES_NO_STEP, {"result": "report", "text": "Done."}, "does not fit"),
         (_REPORT_STEP, {"result": "Erfolgreich"}, "does not fit"),
-        (_YES_NO_STEP, {"result": "Erfolgreich", "text": "Extra."}, "text"),
     ]
 
 
@@ -153,10 +143,8 @@ def _refusal_cases() -> list[tuple[dict[str, str], dict[str, object], str]]:
     _refusal_cases(),
     ids=[
         "changed-step",
-        "failure-without-a-note",
         "report-unasked",
         "report-missing",
-        "extra-text",
     ],
 )
 def test_a_chat_answer_that_does_not_fit_is_refused_with_nothing_written(

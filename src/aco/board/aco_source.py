@@ -97,7 +97,13 @@ def _checked_and_answered(
 ) -> DecisionResult | CardChanged:
     """The answer of the one turn `decide.answer_step_in_turn` runs, as the board shows it."""
     answered = decide.answer_step_in_turn(
-        context, item, result, check, environment=os.environ, home=Path.home()
+        context,
+        item,
+        result,
+        check,
+        item_step.AnswerChannel.BOARD,
+        environment=os.environ,
+        home=Path.home(),
     )
     if answered is None:
         return CardChanged()
