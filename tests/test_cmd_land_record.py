@@ -97,3 +97,30 @@ def test_a_landing_whose_record_is_malformed_refuses_before_any_write(
     sentence = f"lane record {record} is invalid: version 2 is unknown; this aco reads version 1"
     observed, expected = refusal_observations(lane, result, sentence)
     assert observed == expected
+
+
+@pytest.mark.parametrize("merged", [False, True], ids=["first-run", "rerun"])
+@pytest.mark.parametrize("stage", ["review", "gate"])
+def test_a_landing_whose_record_ends_in_a_revise_verdict_refuses_before_any_write(
+    lane: LaneLandingWorld,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    stage: str,
+    merged: bool,
+) -> None:
+    """Spec: LANREC-44, LANREC-40 -- nothing is merged, deleted or written."""
+    verdicts = [
+        {"stage": "review", "verdict": "approve", "sha": "d" * 40},
+        {"stage": stage, "verdict": "revise", "sha": lane.head},
+    ]
+    record = write_lane_record_file(tmp_path, lane_record_object(verdicts=verdicts))
+    if merged:
+        landing = lane.forge.landings[12]
+        lane.forge.landings[12] = replace(landing, merged=True, merge_commit=MERGE_COMMIT_SHA)
+    capsys.readouterr()
+
+    result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
+
+    sentence = f"the lane record's last verdict is revise at {stage}, not approve"
+    observed, expected = refusal_observations(lane, result, sentence)
+    assert observed == expected

@@ -672,7 +672,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         raise protocol.ClaimUnavailableError(_LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:
         protocol.require_coordinator_override(parsed.role)
-    lane_record.require_landing_head(parsed.record, parsed.head)
+    lane_record.require_landable_record(parsed.record, parsed.head)
     client = cast(github.GitHubForge, context.forge)
     detail = _land_read_head_checked(client, parsed.pull_request, client.repository.path)
     # A rerun's own preflight never ran, so it verified no classification:

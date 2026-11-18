@@ -3,6 +3,7 @@
 The record is computed once, before the release commit is pushed. A figure that cannot be read
 is unknown and has no trailer: no failure here refuses or delays a release."""
 
+import codecs
 import dataclasses
 import json
 import re
@@ -528,11 +529,23 @@ RECORD_FILE_BYTES_LIMIT = 1024 * 1024
 def parse_record_file(content: bytes) -> LaneRecordFile:
     """The lane record file whose bytes are `content`, validated whole: one that is not exactly
     what the spec states raises `RecordFileError`."""
+    if content.startswith(codecs.BOM_UTF8):
+        raise RecordFileError("begins with a UTF-8 byte order mark; save it without one")
     try:
-        raw = json.loads(content, object_pairs_hook=_keys_once)
+        raw = json.loads(content, object_pairs_hook=_keys_once, parse_int=_bounded_whole_number)
     except (ValueError, RecursionError) as error:
         raise RecordFileError("not valid JSON") from error
     return _record_file(raw)
+
+
+# A whole number a record states is a count or a version, never this long; a longer one stays out
+# of `int`, which refuses a digit string past the parser's own limit as if the file were not JSON.
+_WHOLE_NUMBER_LENGTH_LIMIT = 20
+_OVERLONG_WHOLE_NUMBER = object()
+
+
+def _bounded_whole_number(text: str) -> object:
+    return int(text) if len(text) <= _WHOLE_NUMBER_LENGTH_LIMIT else _OVERLONG_WHOLE_NUMBER
 
 
 def _keys_once(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -543,14 +556,8 @@ def _keys_once(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _record_file(raw: object) -> LaneRecordFile:
+    _require_known_version(raw)
     fields = _members(raw, "the record", _RECORD_FIELDS, _OPTIONAL_RECORD_FIELDS)
-    version = fields["version"]
-    if type(version) is not int or version != RECORD_FILE_VERSION:
-        raise RecordFileError(
-            "version ",
-            json.dumps(version),
-            f" is unknown; this aco reads version {RECORD_FILE_VERSION}",
-        )
     fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
     blocking = _counts_by_stage(fields["blocking"], "blocking")
     return LaneRecordFile(
@@ -560,6 +567,20 @@ def _record_file(raw: object) -> LaneRecordFile:
         risk=_optional_tag(fields, "risk"),
         experiment=_optional_tag(fields, "experiment"),
     )
+
+
+def _require_known_version(raw: object) -> None:
+    """A record that states `version` is judged by it before any other key, so a record of a
+    version this aco does not read is refused for that, not for keys it may have renamed."""
+    if not isinstance(raw, dict) or "version" not in raw:
+        return
+    version = cast(dict[str, object], raw)["version"]
+    if type(version) is not int:
+        raise RecordFileError(f"version must be the whole number {RECORD_FILE_VERSION}")
+    if version != RECORD_FILE_VERSION:
+        raise RecordFileError(
+            f"version {version} is unknown; this aco reads version {RECORD_FILE_VERSION}"
+        )
 
 
 def _members(
@@ -637,18 +658,23 @@ def require_abandoned_release(record: LaneRecordFile | None, abandoned: str | No
         raise protocol.ClaimUnavailableError("--record applies to --abandoned only")
 
 
-def require_landing_head(record: LaneRecordFile | None, reviewed: str) -> None:
+def require_landable_record(record: LaneRecordFile | None, reviewed: str) -> None:
     """Refuse a landing whose lane record file judged another commit than `reviewed` (a full
-    sha or a prefix of one): nothing is merged or written for it. A landing without a record
-    file has nothing to compare."""
+    sha or a prefix of one), or whose last verdict is not an approval: nothing is merged or
+    written for it. A landing without a record file has nothing to compare."""
     if record is None:
         return
     if not record.verdicts:
         raise protocol.ClaimUnavailableError(
             "the lane record states no review or gate verdict, so it judged no head to land"
         )
-    judged = record.verdicts[-1].sha
-    if not judged.startswith(reviewed):
+    last = record.verdicts[-1]
+    if not last.sha.startswith(reviewed):
         raise protocol.ClaimUnavailableError(
-            f"the lane record's last verdict judged {judged}, not the reviewed {reviewed}"
+            f"the lane record's last verdict judged {last.sha}, not the reviewed {reviewed}"
+        )
+    if last.verdict is not Verdict.APPROVE:
+        raise protocol.ClaimUnavailableError(
+            f"the lane record's last verdict is {last.verdict} at {last.stage}, "
+            f"not {Verdict.APPROVE}"
         )
