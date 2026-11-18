@@ -88,8 +88,7 @@
 "world" = 99
 
 [function_lines."tests/test_cmd_land_merge_message.py"]
-"world" = 110
-"world.arrange" = 67
+"world" = 102
 
 [function_lines."tests/test_cmd_land_preflight_claim.py"]
 "world" = 104

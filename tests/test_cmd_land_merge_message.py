@@ -1,12 +1,12 @@
 """Land message literals and Git trailer interpretation on a real claimed lane."""
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
 
 import pytest
-from cli_fixtures import real_git, run_cli
+from cli_fixtures import real_git, run_cli, track_board_config
 from github_fixtures import (
     LANDING_BRANCH,
     FakeForge,
@@ -16,6 +16,7 @@ from github_fixtures import (
     lane_landing_world,
 )
 from landing_refusals import RefusalLength, refusal_observations
+from landing_world_parts import landing_listing
 
 from aco import forge, process, protocol, workboard
 
@@ -64,6 +65,8 @@ class MessageCase:
     branch: str = LANDING_BRANCH
     identity: protocol.ClaimIdentity = field(default_factory=lambda: protocol.IssueIdentity(72))
     body_trailers: str | None = None
+    author_is_dependency_bot: bool = False
+    dependency_paths: str = ""
 
 
 @dataclass
@@ -123,6 +126,29 @@ def arrange_trailer_read(
     assert observed == expected
 
 
+def arrange_git_configuration(
+    case: MessageCase, clone: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_git = process.run_git
+    if case.trailer_key is TrailerKey.RENAMED:
+        real_git(clone, "config", "trailer.work-item.key", case.trailer_key.value)
+    configured = run_git(["config", "--get", "trailer.work-item.key"], directory=clone)
+    observed = configured.stdout.decode()
+    expected = case.trailer_key.value + "\n" if case.trailer_key is TrailerKey.RENAMED else ""
+    assert observed == expected
+    if case.noise is GitNoise.CONFIGURATION_WARNING:
+        real_git(clone, "config", "trailer.foo.where", "bogus")
+    if case.noise is GitNoise.TRACE:
+        monkeypatch.setenv("GIT_TRACE", "1")
+    warning = run_git(["config", "--get", "trailer.foo.where"], directory=clone)
+    observed = (warning.stdout, os.environ.get("GIT_TRACE"))
+    expected = (
+        b"bogus\n" if case.noise is GitNoise.CONFIGURATION_WARNING else b"",
+        "1" if case.noise is GitNoise.TRACE else None,
+    )
+    assert observed == expected
+
+
 @pytest.fixture
 def world(
     request: pytest.FixtureRequest,
@@ -143,9 +169,16 @@ def world(
     expected = ("C", "1", str(isolated_global_git_config))
     assert observed == expected
     assert_github_world(github_clone, bare_remote)
-    run_git = process.run_git
+
+    if case.dependency_paths:
+        track_board_config(github_clone, case.dependency_paths)
+        real_git(github_clone, "push", "-q", "origin", "main")
 
     def arrange(client: FakeForge, head: str) -> None:
+        if case.dependency_paths:
+            client.changes_by_number[12] = landing_listing(head, "uv.lock")
+        if case.author_is_dependency_bot:
+            client.landings[12] = replace(client.landings[12], author_is_dependency_bot=True)
         detail = client.landings[12]
         readiness = client.readiness_by_number[12]
         observed = (
@@ -194,23 +227,7 @@ def world(
         )
         expected = (head, head, True, "", "main\n")
         assert observed == expected
-        if case.trailer_key is TrailerKey.RENAMED:
-            real_git(github_clone, "config", "trailer.work-item.key", case.trailer_key.value)
-        configured = run_git(["config", "--get", "trailer.work-item.key"], directory=github_clone)
-        observed = configured.stdout.decode()
-        expected = case.trailer_key.value + "\n" if case.trailer_key is TrailerKey.RENAMED else ""
-        assert observed == expected
-        if case.noise is GitNoise.CONFIGURATION_WARNING:
-            real_git(github_clone, "config", "trailer.foo.where", "bogus")
-        if case.noise is GitNoise.TRACE:
-            monkeypatch.setenv("GIT_TRACE", "1")
-        warning = run_git(["config", "--get", "trailer.foo.where"], directory=github_clone)
-        observed = (warning.stdout, os.environ.get("GIT_TRACE"))
-        expected = (
-            b"bogus\n" if case.noise is GitNoise.CONFIGURATION_WARNING else b"",
-            "1" if case.noise is GitNoise.TRACE else None,
-        )
-        assert observed == expected
+        arrange_git_configuration(case, github_clone, monkeypatch)
         arrange_trailer_read(case, github_clone, monkeypatch)
 
     method = case.outcome.method if isinstance(case.outcome, Landed) else Landed.method
@@ -223,6 +240,7 @@ def world(
         body=case.body,
         methods=frozenset({method}),
         arrange=arrange,
+        scope=("uv.lock",) if case.dependency_paths else None,
     )
     return MessageWorld(
         shared.clone,
@@ -471,6 +489,21 @@ class TestLandMessage:
                     identity=protocol.LaneIdentity(),
                 ),
                 id="classification-only-body",
+            ),
+            pytest.param(
+                MessageCase(
+                    "Bumps ruff.",
+                    Landed(
+                        Message("Bumps ruff.\n\nNo-Item: deps\n", ["No-Item"]),
+                        closed=frozenset(),
+                        release="RELEASED lane dependabot/ruff: landing\n",
+                    ),
+                    branch="dependabot/ruff",
+                    identity=protocol.LaneIdentity(),
+                    author_is_dependency_bot=True,
+                    dependency_paths='dependency_paths = ["uv.lock"]\n',
+                ),
+                id="dependabot-pull-request-without-a-line-lands-as-no-item-deps",
             ),
             pytest.param(
                 MessageCase(
