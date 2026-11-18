@@ -44,6 +44,16 @@ MALFORMED_RECORDS = [
     pytest.param("[" * 100000, "not valid JSON", id="arrays-nested-past-the-parser-limit"),
     pytest.param('{"a":' * 100000, "not valid JSON", id="objects-nested-past-the-parser-limit"),
     pytest.param('{"version": 1, "version": 1}', "a key stated twice", id="a-key-stated-twice"),
+    pytest.param(
+        '{"version": 2, "stages": {"build": 0, "build": 1}}',
+        "version 2 is unknown; this aco reads version 1",
+        id="an-unknown-version-with-a-key-stated-twice-below-it",
+    ),
+    pytest.param(
+        '{"version": 1, "stages": {"build": 0, "build": 1}}',
+        "a key stated twice",
+        id="a-key-stated-twice-below-the-record",
+    ),
     pytest.param("[]", "the record must be an object", id="not-an-object"),
     pytest.param(
         json.dumps(lane_record_object(version=2)),

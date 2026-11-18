@@ -530,10 +530,23 @@ def parse_record_file(content: bytes) -> LaneRecordFile:
     what the spec states raises `RecordFileError`."""
     if content.startswith(codecs.BOM_UTF8):
         raise RecordFileError("begins with a UTF-8 byte order mark; save it without one")
+    repeated_key_seen = False
+
+    def note_repeated_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        nonlocal repeated_key_seen
+        repeated_key_seen = repeated_key_seen or len({key for key, _ in pairs}) != len(pairs)
+        return dict(pairs)
+
     try:
-        raw = json.loads(content, object_pairs_hook=_keys_once, parse_int=_bounded_whole_number)
+        raw = json.loads(
+            content, object_pairs_hook=note_repeated_keys, parse_int=_bounded_whole_number
+        )
     except (ValueError, RecursionError) as error:
         raise RecordFileError("not valid JSON") from error
+    # `version` is judged before any other defect, a key stated twice included.
+    _require_known_version(raw)
+    if repeated_key_seen:
+        raise RecordFileError("a key stated twice")
     return _record_file(raw)
 
 
@@ -547,15 +560,7 @@ def _bounded_whole_number(text: str) -> object:
     return int(text) if len(text) <= _WHOLE_NUMBER_LENGTH_LIMIT else _OVERLONG_WHOLE_NUMBER
 
 
-def _keys_once(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    keys = [key for key, _ in pairs]
-    if len(set(keys)) != len(keys):
-        raise RecordFileError("a key stated twice")
-    return dict(pairs)
-
-
 def _record_file(raw: object) -> LaneRecordFile:
-    _require_known_version(raw)
     fields = _members(raw, "the record", _RECORD_FIELDS, _OPTIONAL_RECORD_FIELDS)
     fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
     blocking = _counts_by_stage(fields["blocking"], "blocking")
