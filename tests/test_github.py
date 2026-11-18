@@ -28,10 +28,13 @@ GitHubForge = github.GitHubForge
 
 
 def test_only_the_github_adapters_speak_gh_argv() -> None:
-    """Source check, not a runtime guarantee: import-linter's module contract
-    cannot see an argv string, so "only the adapters speak `gh`" is proven by
-    grepping every other module of the package, enumerated so that a new module
-    is covered the day it is added, for the literal command name instead."""
+    """Only the GitHub adapters construct a `gh` argv.
+
+    Import-linter's module contract cannot see an argv string, so this is a
+    source check, not a runtime guarantee: it greps every other module of the
+    package for the literal command name. The modules are enumerated, so a new
+    one is covered the day it is added.
+    """
     package = Path(__file__).parent.parent / "src" / "aco"
     adapters = {"github", "github_search", "github_probe"}
     others = sorted(p for p in package.glob("*.py") if p.stem not in adapters)
