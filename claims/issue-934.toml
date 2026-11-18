@@ -1,8 +1,0 @@
-claim_id = "a954536b40a3428f9c9879a8bd6db49f"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "e985ae794ccdbd7e9ddb1d33b1c8a38717f8d6d5"
-branch = "claude/issue-934-pnpm-12"
-scope = [".github/workflows/ci.yml", "frontend/.npmrc", "frontend/package.json", "frontend/pnpm-lock.yaml", "frontend/pnpm-workspace.yaml", "src/aco/board/static"]
-opened_commit = "ec1ecd29c377f1c6d2a11b291c5b6aa687b4cbfb"
-whole_reason = "A package-manager major moves its pin, lockfile, settings, CI setup and the rebuilt bundle together"
