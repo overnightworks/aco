@@ -1,0 +1,8 @@
+claim_id = "70ae1cd5daad4942a8880f467aae9fea"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "c2e5f2bdc0124f5329f5dfca3db7bbd386db65f6"
+branch = "claude/issue-923-land-checks-claim-paths"
+scope = [".aco/brief.toml", "docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/brief.spec.md", "specs/check.spec.md", "specs/land.spec.md", "specs/landing-grammar.spec.md", "src/aco/cmd_brief.py", "src/aco/policy.py", "src/aco/session.py", "tests/support", "tests/test_cli.py", "tests/test_cmd_check_pull_request.py", "tests/test_cmd_land_preflight.py", "tests/test_cmd_land_preflight_claim.py", "tests/test_policy.py"]
+opened_commit = "c68669da6978d9a2df39334af11011e7d3a90d3c"
+whole_reason = "the claim-path rule, its one owner in session, the brief reuse, specs and every landing fixture move together"
