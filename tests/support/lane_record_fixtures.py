@@ -11,6 +11,13 @@ import pytest
 from aco import forge, lane_record, protocol, store, workboard
 from aco.session import RunContext
 
+LANE_BRANCH = "docs/tidy-readme"
+ROUTING = (
+    "Routing: build sonnet-5.5/high; fix none; review opus-5.5/medium; test sonnet-5.5/medium; "
+    "gate none; land haiku-5.5/low. Fix rounds: 1. Experiment: builder-sonnet. "
+    "Blocking: a red check → ci"
+)
+
 
 def stub_lane_record(monkeypatch: pytest.MonkeyPatch) -> None:
     """An in-memory store holds no state-ref commit, and a faked git answers no commit read,

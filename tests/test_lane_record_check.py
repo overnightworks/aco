@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from aco import report
 from cli_fixtures import run_cli
 from lane_record_fixtures import lane_record_object
+
+from aco import report
 
 MISSING = object()
 

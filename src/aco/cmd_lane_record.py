@@ -7,7 +7,6 @@ from pathlib import Path
 from . import lane_record, protocol, report, usage
 from .session import RunContext
 
-
 _INVALID = "lane record {foreign} is invalid: {defect}"
 # The defect may repeat foreign text (a key the file states); capped so the file's path keeps room.
 _DEFECT_LENGTH_LIMIT = 100

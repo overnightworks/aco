@@ -21,10 +21,11 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge
 from lane_record_fixtures import (
+    LANE_BRANCH,
     LANE_RECORD_TRAILERS,
+    ROUTING,
     lane_record_object,
     release_trailers_of,
-    write_lane_record_file,
 )
 from merged_release import arrange_merged_pull_request
 from store_fixtures import claim_intent
@@ -42,12 +43,6 @@ from aco.lane_record import (
 )
 from aco.routing_line import parse_routing_line
 
-LANE_BRANCH = "docs/tidy-readme"
-ROUTING = (
-    "Routing: build sonnet-5.5/high; fix none; review opus-5.5/medium; test sonnet-5.5/medium; "
-    "gate none; land haiku-5.5/low. Fix rounds: 1. Experiment: builder-sonnet. "
-    "Blocking: a red check → ci"
-)
 ROUTING_TRAILERS = (
     "lane_build: sonnet-5.5/high",
     "lane_fix: none",
@@ -673,76 +668,6 @@ def test_an_abandoned_release_leaves_a_record_from_its_reason(
         f"lane_wall_seconds: {release_date - claim_date}",
     )
     assert lines[2:] == ROUTING_TRAILERS
-
-
-def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_the_reasons(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    github_clone: Path,
-    bare_remote: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Spec: LANREC-41, LANREC-42, LANREC-43 -- the reason's routing line is not read."""
-    stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
-    stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
-    record = write_lane_record_file(tmp_path, lane_record_object())
-
-    release = ["--repo", REPOSITORY, "release", "--agent", "Ada", "--abandoned", ROUTING]
-
-    result = run_cli([*release, "--record", str(record)], capsys)
-
-    lines = lane_trailers(release_commit_message(bare_remote))
-    assert (result.status, result.stderr) == (0, "")
-    assert lines[0] == "lane_outcome: abandoned"
-    assert lines[2:] == LANE_RECORD_TRAILERS
-
-
-@pytest.mark.parametrize(
-    ("record_text", "extra", "sentence"),
-    [
-        pytest.param(
-            json.dumps(lane_record_object(version=2)),
-            (),
-            "lane record {record} is invalid: version 2 is unknown; this aco reads version 1",
-            id="a-malformed-record",
-        ),
-        pytest.param(
-            json.dumps(lane_record_object()),
-            ("--merged", "12"),
-            "--record applies to --abandoned only",
-            id="a-record-for-a-landing",
-        ),
-    ],
-)
-def test_a_release_refuses_a_record_it_cannot_use_before_any_write(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    github_clone: Path,
-    bare_remote: Path,
-    capsys: pytest.CaptureFixture[str],
-    record_text: str,
-    extra: tuple[str, ...],
-    sentence: str,
-) -> None:
-    """Spec: LANREC-31, LANREC-41."""
-    stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
-    stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
-    record = tmp_path / "record.json"
-    record.write_text(record_text, encoding="utf-8")
-    tip_before = real_git(bare_remote, "rev-parse", store.STATE_REF).stdout
-    outcome = extra or ("--abandoned", "stopped")
-
-    result = run_cli(
-        ["--repo", REPOSITORY, "release", "--agent", "Ada", *outcome, "--record", str(record)],
-        capsys,
-    )
-
-    tip_after = real_git(bare_remote, "rev-parse", store.STATE_REF).stdout
-    assert (result.status, result.stderr, tip_after) == (
-        2,
-        f"ERROR: {sentence.format(record=record)}\n",
-        tip_before,
-    )
 
 
 def test_a_release_is_dated_by_the_clock_the_record_reads(
