@@ -3,6 +3,6 @@ agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
 role = "builder"
 base = "369e6d74c089e71ae697c29f02a61a867898b34e"
 branch = "claude/issue-922-edit-base-hash"
-scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/cut.spec.md", "specs/item.spec.md", "specs/next.spec.md", "specs/output.spec.md", "specs/storage-pin.spec.md", "src/aco/cli.py", "src/aco/cmd_item.py", "src/aco/cmd_item_edit.py", "src/aco/decide.py", "src/aco/expectation_grammar.py", "src/aco/items.py", "src/aco/state_board.py", "tests/board/test_aco_source_state_ref.py", "tests/support", "tests/test_cli.py", "tests/test_cmd_item_base.py", "tests/test_cmd_item_turn.py", "tests/test_cmd_item_whole.py", "tests/test_state_board.py"]
+scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/cut.spec.md", "specs/item.spec.md", "specs/next.spec.md", "specs/output.spec.md", "specs/storage-pin.spec.md", "src/aco/cli.py", "src/aco/cmd_item.py", "src/aco/cmd_item_edit.py", "src/aco/decide.py", "src/aco/expectation_grammar.py", "src/aco/items.py", "src/aco/protocol.py", "src/aco/state_board.py", "tests/board/test_aco_source_state_ref.py", "tests/support", "tests/test_cli.py", "tests/test_cmd_item_base.py", "tests/test_cmd_item_base_state_ref.py", "tests/test_cmd_item_turn.py", "tests/test_cmd_item_whole.py", "tests/test_state_board.py"]
 opened_commit = "13b062b6aa6def97ada137ccb779f706e97f2700"
 whole_reason = "the base-hash write spans the item command, its decider, both storages' specs and the tests that call a bare item edit"
