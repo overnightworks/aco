@@ -77,7 +77,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-03] A host that closed the pipe ends the process, exit `0`, with no traceback on stderr.
 - [ ] [MCP-04] One message is one line holding one JSON object. Unparsable JSON is answered error `-32700`; an array (no batching), another JSON value or a non-request object, error `-32600`; each with a null `id`.
 - [ ] [MCP-05] A message without an `id` is a notification and is never answered; an empty line is skipped.
-- [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all four tools.
+- [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all five tools.
 - [ ] [MCP-07] `ping` is answered with the empty result.
 - [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` (`destructiveHint` true), `answer_step` (`destructiveHint` true, `idempotentHint` false); the last four: `readOnlyHint` false, the first three of them `idempotentHint` true.
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
