@@ -22,6 +22,7 @@ from . import (
     expectations,
     file_lock,
     forge,
+    inbox,
     item_step,
     item_wait,
     protocol,
@@ -352,6 +353,81 @@ def mark_step(context: RunContext, fresh: FreshItem, step: str, card: item_step.
     _label_as_a_step(context.forge_writer, fresh.number, standing=f"#{fresh.number} holds the step")
 
 
+@dataclass(frozen=True)
+class StepAnswered:
+    """How an answer to a step stands: whether the forge kept the written body over a
+    change aco had not read (only in the edit history), and why the label of the step
+    could not be removed, when it could not."""
+
+    written_over: bool
+    label_note: str | None
+
+
+def step_of(fresh: FreshItem) -> inbox.Step | None:
+    """The step the operator is asked for on the fresh item, as the inbox lists it:
+    `None` unless the item is open, a member wrote it and its `wait` names the operator."""
+    wait = item_wait.parse_wait(fresh.located.data)
+    if (
+        fresh.state is not forge.ItemState.OPEN
+        or not fresh.author_is_member
+        or not item_wait.waits_on_operator(wait)
+    ):
+        return None
+    return inbox.Step(
+        fresh.number, fresh.title, wait.step, item_step.parse_step(fresh.located.data)
+    )
+
+
+def _unlabelled_as_a_step(client: forge.ForgeWriter, number: int) -> str | None:
+    """Removes the label of an operator-only step from item `number`; the note that
+    names the repair when the forge refused, `None` once it is gone."""
+    label = workboard.NEEDS_OPERATOR_LABEL
+    try:
+        client.remove_label(number, label)
+    except protocol.ClaimError as error:
+        return (
+            f"The label {label} was not removed: {error}; "
+            f"remove it with gh issue edit {number} --remove-label {label}"
+        )
+    return None
+
+
+def answer_step(
+    context: RunContext, fresh: FreshItem, step: inbox.Step, result: item_step.StepResult
+) -> StepAnswered:
+    """Writes the operator's `result` to `step`, the one `step_of` read from the fresh
+    item: the `wait` and the `step` table go, `now` tells the outcome and `next` says to
+    act on it, every other field and byte is kept. The body is written once; only after
+    a write that stands, verified or kept over a change aco had not read, the label of
+    the step is removed (a state-ref item has none). The item stays open. Raises
+    `protocol.ClaimError` by name before the write for a `result` the step does not ask
+    for, and the forge's own error for a write that was lost or not verified, leaving
+    the label."""
+    if not item_step.result_fits(result, step.card):
+        asked = "a report" if item_step.asks_for_report(step.card) else "Erfolgreich or a failure"
+        raise protocol.ClaimError(f"#{fresh.number} asks for {asked}; the answer does not fit")
+    kept = {
+        key: value
+        for key, value in fresh.located.data.items()
+        if key not in (item_wait.WAIT_KEY, item_step.STEP_KEY)
+    }
+    answered = {
+        "now": item_step.answered_now(step.wait_text, result, context.today()),
+        "next": item_step.NEXT_AFTER_ANSWER,
+    }
+    new_body = body.replace_block(fresh.body, fresh.located, {**kept, **answered})
+    written_over = False
+    try:
+        write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
+    except forge.ForgeBodyOverwrittenError as error:
+        if not error.kept:
+            raise
+        written_over = True
+    if fresh.storage is not body.Storage.GITHUB:
+        return StepAnswered(written_over, None)
+    return StepAnswered(written_over, _unlabelled_as_a_step(context.forge_writer, fresh.number))
+
+
 def open_step_item(context: RunContext, title: str, step: str, card: item_step.StepCard) -> int:
     """Opens a task named `title` whose body names `step` as its `next` and holds
     `card` as its `step` table, sets the
@@ -364,9 +440,9 @@ def open_step_item(context: RunContext, title: str, step: str, card: item_step.S
         item_wait.WAIT_KEY: item_wait.operator_wait_table(step, context.today()),
         item_step.STEP_KEY: item_step.step_table(card),
         "done_when": (
-            "The operator has taken the step and the head has cleared the wait and "
-            "removed the label "
-            f"{workboard.NEEDS_OPERATOR_LABEL}."
+            "The operator has given the step an Erfolgreich answer, or the head has acted "
+            "on its note; its wait and the label "
+            f"{workboard.NEEDS_OPERATOR_LABEL} are cleared."
         ),
     }
     opened = body.prose_above_fresh_block(

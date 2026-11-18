@@ -32,8 +32,8 @@ from aco_board_fixtures import (
 from board_forge import BoardForge, ForgeRequest, item_body
 from option_cards import open_option_entry
 
-from aco import inbox, rulings
-from aco.board.ports import CardChanged, CardCheck, DecisionResult
+from aco import inbox, item_step, rulings
+from aco.board.ports import CardChanged, CardCheck, DecisionResult, StepCheck
 from aco.board.server import LOOPBACK_HOST, read_before_deadline
 
 _OPEN_CARD = item_body(open_option_entry())
@@ -52,18 +52,21 @@ def _aco_traffic(
     return port.calls(), repository.request_log()
 
 
-def _post(body: bytes, length: bytes | None = None) -> bytes:
-    """A raw `POST /api/rule`, its token still a `{token}` placeholder for
+def _post(body: bytes, length: bytes | None = None, path: bytes = b"/api/rule") -> bytes:
+    """A raw `POST` to `path`, its token still a `{token}` placeholder for
     the caller to fill in once the serving board has minted one."""
     declared = str(len(body)).encode() if length is None else length
     return (
-        b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {token}\r\nContent-Length: "
+        b"POST "
+        + path
+        + b" HTTP/1.1\r\nHost: x\r\nX-Board-Token: {token}\r\nContent-Length: "
         + declared
         + b"\r\n\r\n"
         + body
     )
 
 
+_STEP_PATH = b"/api/step"
 _NO_CONTENT_LENGTH = b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {token}\r\n\r\n"
 
 
@@ -77,6 +80,8 @@ _NO_CONTENT_LENGTH = b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {tok
         _post(b"{}", b"9" * 5000),
         _post(b"{}", b"16385"),
         _post(b"x" * 16385),
+        _post(b"x" * 16385, path=_STEP_PATH),
+        _post(b"{}", b"16385", path=_STEP_PATH),
         _post(b"[" * 16000),
         _post(b'{"item": 1' + b"0" * 5000 + b"}"),
         _post(b'{"token": "\xed\xa0\x80"}'),
@@ -89,6 +94,8 @@ _NO_CONTENT_LENGTH = b"POST /api/rule HTTP/1.1\r\nHost: x\r\nX-Board-Token: {tok
         "content-length-past-int-limit",
         "content-length-over-limit",
         "body-over-limit",
+        "step-body-over-limit",
+        "step-content-length-over-limit",
         "body-nested-too-deep",
         "body-integer-past-int-limit",
         "body-not-utf8",
@@ -134,8 +141,9 @@ _SHORT_DEADLINE_SECONDS = 0.2
     [
         (b"POST /api/rule HTTP/1.1\r\nHost: x\r\n", None),
         (_post(b'{"item": 42}', b"40"), b"408"),
+        (_post(b'{"item": 42}', b"40", path=_STEP_PATH), b"408"),
     ],
-    ids=["headers-unfinished", "body-unfinished"],
+    ids=["headers-unfinished", "body-unfinished", "step-body-unfinished"],
 )
 def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
     repository: BoardForge,
@@ -220,6 +228,11 @@ def test_a_browser_leaving_mid_answer_prints_no_traceback(
         def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
             return port.rule_card(item, check)
 
+        def answer_step(
+            self, item: int, result: item_step.StepResult, check: StepCheck
+        ) -> DecisionResult | CardChanged:
+            return port.answer_step(item, result, check)
+
     with serving(ReadAfterTheBrowserLeft()) as board:
         board.send_and_reset(
             f"GET /api/board HTTP/1.1\r\nHost: x\r\nX-Board-Token: {board.token}\r\n\r\n".encode()
@@ -275,6 +288,11 @@ class _HugeLineSource:
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
         raise AssertionError("listing the board must not write")
 
+    def answer_step(
+        self, item: int, result: item_step.StepResult, check: StepCheck
+    ) -> DecisionResult | CardChanged:
+        raise AssertionError("listing the board must not write")
+
 
 def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
     repository: BoardForge, capsys: pytest.CaptureFixture[str]
@@ -304,6 +322,11 @@ class _BrokenPipeSource:
         raise BrokenPipeError("aco's pipe broke")
 
     def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
+        raise AssertionError("the board must not write after a failed read")
+
+    def answer_step(
+        self, item: int, result: item_step.StepResult, check: StepCheck
+    ) -> DecisionResult | CardChanged:
         raise AssertionError("the board must not write after a failed read")
 
 

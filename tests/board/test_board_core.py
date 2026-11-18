@@ -15,11 +15,12 @@ from datetime import date
 
 import pytest
 from aco_board_fixtures import CallPhase, PortCall, decision_port, fixed_boards
+from board_fixtures import OPERATOR_WAIT, complete_contract
 from board_forge import BoardForge, item_body
 from option_cards import open_option_entry
 
-from aco import expectations, inbox, rulings
-from aco.board.board import SHUTTING_DOWN, Board, Boards, wire_fingerprint
+from aco import expectations, inbox, item_step, rulings
+from aco.board.board import SHUTTING_DOWN, Board, Boards, step_fingerprint, wire_fingerprint
 from aco.board.ports import (
     CardChanged,
     CardCheck,
@@ -29,10 +30,14 @@ from aco.board.ports import (
     DecisionStatus,
     PostedCard,
     PostedLine,
+    StepCheck,
+    StepPost,
 )
+from aco.item_step import StepSucceeded
 
 _WAIT_SECONDS = 5
 _LABEL = "repo"
+_STEP = {"purpose": "Why.", "actions": "Do this.", "expected": "See it."}
 
 
 def test_a_snapshot_reads_a_ruled_yes_no_lines_ruling_and_date(repository: BoardForge) -> None:
@@ -71,6 +76,11 @@ class _HeldDecisions:
         assert self.may_finish.wait(_WAIT_SECONDS)
         self.ruled_cards.append(decision)
         return DecisionResult(DecisionStatus.RULED)
+
+    def answer_step(
+        self, item: int, result: item_step.StepResult, check: StepCheck
+    ) -> DecisionResult | CardChanged:
+        raise AssertionError("a held port only rules cards")
 
 
 def _posted(rows: tuple[rulings.Row, ...], label: str, item: int) -> PostedCard:
@@ -219,3 +229,50 @@ def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
         decisions_b.may_finish.set()
         assert waiting_in_b.result(_WAIT_SECONDS).status is DecisionStatus.RULED
     assert running_in_a.result().status is DecisionStatus.RULED
+
+
+def test_a_step_answer_waits_for_the_turn_of_a_card_being_written_and_is_then_stored(
+    repository: BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ABRD-17: the answer to a step takes the one write turn the cards take."""
+    repository.put_item(42, item_body(open_option_entry()))
+    repository.put_item(
+        7, complete_contract("Run it.", wait=OPERATOR_WAIT, step=_STEP), title="Release"
+    )
+    port = decision_port(repository)
+    reading = Board(port).snapshot()
+    [step] = reading.steps
+    card = _posted(reading.rows, _LABEL, 42)
+    answer = StepPost(7, step_fingerprint(_LABEL, 7, step), StepSucceeded())
+    boards = Boards(fixed_boards({_LABEL: Board(port)}))
+    waiting_for_turn = _signal_when_a_decision_waits_for_its_turn(boards, monkeypatch)
+    held = port.hold_next_rule_card(_WAIT_SECONDS)
+
+    with ThreadPoolExecutor(max_workers=2) as threads:
+        running = threads.submit(boards.decide_card, _LABEL, card)
+        assert held.entered.wait(_WAIT_SECONDS)
+        calls_while_held = port.calls()
+        waiting = threads.submit(boards.answer_step, _LABEL, answer)
+        assert waiting_for_turn.wait(_WAIT_SECONDS)
+
+        assert port.calls() == calls_while_held
+        held.release.set()
+        answers = [running.result(_WAIT_SECONDS).status, waiting.result(_WAIT_SECONDS).status]
+
+    assert answers == [DecisionStatus.RULED, DecisionStatus.ANSWERED]
+    assert _each_call_completes_before_the_next_enters(port.calls())
+
+
+def test_a_step_answer_after_stopping_began_is_refused_and_reaches_no_source(
+    repository: BoardForge,
+) -> None:
+    """ABRD-17, ABRD-18."""
+    repository.put_item(7, complete_contract("Run it.", wait=OPERATOR_WAIT, step=_STEP))
+    port = decision_port(repository)
+    boards = Boards(fixed_boards({_LABEL: Board(port)}))
+    boards.close_writes()
+
+    refused = boards.answer_step(_LABEL, StepPost(7, "shown", StepSucceeded()))
+
+    assert refused == DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
+    assert (port.calls(), repository.body_writes()) == ((), [])

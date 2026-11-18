@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from .. import expectations, inbox
+from .. import expectations, inbox, item_step
 
 NOTE_MAX_LENGTH = 280
 """The longest note a decision may carry, after trimming. The item body stores
@@ -73,7 +73,18 @@ class CardDecision:
     answer: CardAnswer
 
 
+@dataclass(frozen=True)
+class StepPost:
+    """The operator's answer to a step as the browser posted it: the fingerprint of
+    the step it was shown with, before it is checked against a fresh read."""
+
+    item: int
+    fingerprint: str
+    result: item_step.StepResult
+
+
 class DecisionStatus(StrEnum):
+    ANSWERED = "answered"
     RULED = "ruled"
     RETURNED = "returned"
     ALREADY_RULED = "already_ruled"
@@ -100,15 +111,17 @@ class DecisionResult:
     status: DecisionStatus
     message: str | None = None
     item: ListedItem | None = None
-    """The item as written, set on a stored answer (`ruled`, `returned`)."""
+    """The item as written, set on a stored card answer (`ruled`, `returned`)."""
     note: str | None = None
-    """What the operator should know of a stored answer; set only beside `item`."""
+    """What the operator should know of a stored answer; set only beside `item`
+    or on an `answered` step."""
 
 
 @dataclass(frozen=True)
 class CardChanged:
-    """The item's fresh read no longer shows the card as posted: a line changed,
-    went, or was withdrawn, or the item itself is gone, malformed or closed."""
+    """The item's fresh read no longer shows the card or step as posted: a line
+    changed, went, or was withdrawn, the step was answered or marked again, or the
+    item itself is gone, malformed or closed."""
 
 
 class DecisionSourceUnavailableError(Exception):
@@ -119,6 +132,11 @@ type CardCheck = Callable[[Sequence[expectations.ExpectationLine]], CardDecision
 """The board's own check of a posted card against aco's lines of the one item
 just read: the card as a decision on them, or None when it no longer reads as
 shown."""
+
+
+type StepCheck = Callable[[inbox.Step], bool]
+"""The board's own check of a posted step against aco's step of the one item just
+read: whether it still reads as shown."""
 
 
 class DecisionPort(Protocol):
@@ -134,4 +152,12 @@ class DecisionPort(Protocol):
         """Read `item` once, run `check` on its lines, and write the decision it
         returns in one write that stores every line or none; `CardChanged` when
         the item no longer holds the card `check` was built for."""
+        ...
+
+    def answer_step(
+        self, item: int, result: item_step.StepResult, check: StepCheck
+    ) -> DecisionResult | CardChanged:
+        """Read `item` once, run `check` on the step that read shows, and write
+        `result` as its answer; `CardChanged` when the item shows no step of the
+        operator's or `check` refuses it."""
         ...

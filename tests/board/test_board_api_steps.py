@@ -4,7 +4,7 @@ real `aco` read and a fake forge (specs/serve.spec.md, ABRD-157 to ABRD-159)."""
 from datetime import date
 from typing import Any, cast
 
-from aco_board_fixtures import BoardClient
+from aco_board_fixtures import BoardClient, serving_two
 from board_fixtures import OPERATOR_WAIT, complete_contract
 from board_forge import BoardForge
 
@@ -30,15 +30,43 @@ def test_a_step_with_its_table_lists_purpose_actions_expected_and_no_answer(
         title="Release",
     )
 
-    assert _repo(board)["steps"] == [
-        {
-            "number": 7,
-            "title": "Release",
-            "step": OPERATOR_WAIT["operator"],
-            **STEP_TABLE,
-            "answer": None,
-        }
+    (step,) = _repo(board)["steps"]
+
+    del step["fingerprint"]
+    assert step == {
+        "number": 7,
+        "title": "Release",
+        "step": OPERATOR_WAIT["operator"],
+        **STEP_TABLE,
+        "answer": None,
+    }
+
+
+def test_a_step_lists_a_fingerprint_that_follows_its_text_and_every_field_of_its_card(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-163."""
+    variants = [
+        (OPERATOR_WAIT, STEP_TABLE),
+        ({**OPERATOR_WAIT, "operator": "Another."}, STEP_TABLE),
+        *((OPERATOR_WAIT, {**STEP_TABLE, key: "Other."}) for key in STEP_TABLE),
+        (OPERATOR_WAIT, {**STEP_TABLE, "answer": "the report"}),
     ]
+    fingerprints: list[str] = []
+    for wait, table in variants:
+        repository.put_item(7, complete_contract("Run it.", wait=wait, step=table))
+        fingerprints.append(board.listed_step(7)["fingerprint"])
+
+    assert len(set(fingerprints)) == len(variants)
+
+
+def test_a_step_listed_again_unchanged_keeps_its_fingerprint(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-163."""
+    repository.put_item(7, complete_contract("Run it.", wait=OPERATOR_WAIT, step=STEP_TABLE))
+
+    assert board.listed_step(7)["fingerprint"] == board.listed_step(7)["fingerprint"]
 
 
 def test_a_step_with_an_answer_lists_it(repository: BoardForge, board: BoardClient) -> None:
@@ -91,3 +119,16 @@ def test_an_item_that_waits_on_nobody_lists_no_step(
     repository.put_item(7, complete_contract("Run it."))
 
     assert _repo(board)["steps"] == []
+
+
+def test_a_step_identical_in_two_repos_lists_a_fingerprint_for_each(
+    two_repositories: tuple[BoardForge, BoardForge],
+) -> None:
+    """ABRD-163."""
+    for repository in two_repositories:
+        repository.put_item(7, complete_contract("Run it.", wait=OPERATOR_WAIT, step=STEP_TABLE))
+
+    with serving_two(two_repositories) as board:
+        fingerprints = {board.listed_step(7, repo)["fingerprint"] for repo in ("a", "b")}
+
+    assert len(fingerprints) == 2

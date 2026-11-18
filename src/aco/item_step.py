@@ -3,6 +3,7 @@ operator can take, behind the one-line `next` and `wait.operator` that name it."
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from typing import cast
 
 from .toml_text import toml_multiline_string, toml_string
@@ -97,3 +98,53 @@ def render_step(data: Mapping[str, object]) -> list[str]:
         f"[{STEP_KEY}]",
         *(f"{key} = {_toml_text(cast(str, fields[key]))}" for key in fields),
     ]
+
+
+@dataclass(frozen=True)
+class StepSucceeded:
+    """The operator took the step and it worked: Erfolgreich."""
+
+
+@dataclass(frozen=True)
+class StepFailed:
+    """The operator took the step and it failed, with the note that says how."""
+
+    note: str
+
+
+@dataclass(frozen=True)
+class StepReported:
+    """The operator took the step and gives the report it asks for."""
+
+    report: str
+
+
+type StepResult = StepSucceeded | StepFailed | StepReported
+
+NEXT_AFTER_ANSWER = "Act on the operator's answer in now."
+"""The `next` of an item whose step the operator answered."""
+
+
+def asks_for_report(card: StepCard | None) -> bool:
+    """Whether the operator answers `card` with a report; a step without a card, or
+    without an `answer`, is answered with yes or no."""
+    return card is not None and card.answer is not None
+
+
+def result_fits(result: StepResult, card: StepCard | None) -> bool:
+    """Whether `result` answers a step with `card`: a report only a step that asks
+    for one, Erfolgreich only one that does not, a failure either."""
+    if isinstance(result, StepFailed):
+        return True
+    return isinstance(result, StepReported) == asks_for_report(card)
+
+
+def answered_now(step: str, result: StepResult, today: date) -> str:
+    """The `now` of an item whose `step` the operator answered with `result` on `today`."""
+    if isinstance(result, StepSucceeded):
+        outcome = "Erfolgreich"
+    elif isinstance(result, StepFailed):
+        outcome = f"Fehlgeschlagen: {result.note}"
+    else:
+        outcome = result.report
+    return f'The operator answered "{step}" on the board on {today.isoformat()}: {outcome}'

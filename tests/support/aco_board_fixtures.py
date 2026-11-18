@@ -28,10 +28,16 @@ from board_fixtures import write_repository_config
 from board_forge import BoardForge
 from cli_fixtures import real_git
 
-from aco import expectations, inbox, rulings, workboard
+from aco import expectations, inbox, item_step, rulings, workboard
 from aco.board.aco_source import AcoSource
 from aco.board.board import Board, Boards, Found
-from aco.board.ports import CardChanged, CardCheck, DecisionPort, DecisionResult
+from aco.board.ports import (
+    CardChanged,
+    CardCheck,
+    DecisionPort,
+    DecisionResult,
+    StepCheck,
+)
 from aco.board.server import TOKEN_HEADER, start_board
 
 DEFAULT_LABEL = "repo"
@@ -75,6 +81,7 @@ def fixed_boards(boards: Mapping[str, Board]) -> Callable[[], Found]:
 class PortOperation(StrEnum):
     READING = "reading"
     RULE_CARD = "rule_card"
+    ANSWER_STEP = "answer_step"
 
 
 class CallPhase(StrEnum):
@@ -144,6 +151,15 @@ class RecordedPort:
             return self._port.rule_card(item, check)
         finally:
             self._record(PortCall(PortOperation.RULE_CARD, CallPhase.COMPLETED, item))
+
+    def answer_step(
+        self, item: int, result: item_step.StepResult, check: StepCheck
+    ) -> DecisionResult | CardChanged:
+        self._record(PortCall(PortOperation.ANSWER_STEP, CallPhase.ENTERED, item))
+        try:
+            return self._port.answer_step(item, result, check)
+        finally:
+            self._record(PortCall(PortOperation.ANSWER_STEP, CallPhase.COMPLETED, item))
 
     def _record(self, call: PortCall) -> HeldRuling | None:
         """Logs `call`; an entering `rule_card` takes the hold set for it."""
@@ -380,6 +396,36 @@ class BoardClient:
     def post_rule(self, payload: Mapping[str, object]) -> Response:
         """Post `payload` to `/api/rule` with the board token, as given."""
         return self.call_api("POST", "/api/rule", json.dumps(payload), presented=self.token)
+
+    def listed_steps(self, repo: str | None = None) -> list[dict[str, Any]]:
+        """The steps `GET /api/board` lists for `repo`, the first repo unless named."""
+        repos = cast(list[dict[str, Any]], self.get_board_json().json()["repos"])
+        [listed_repo] = [entry for entry in repos if entry["name"] == (repo or self.repo)]
+        return cast(list[dict[str, Any]], listed_repo["steps"])
+
+    def listed_step(self, item: int, repo: str | None = None) -> dict[str, Any]:
+        """The step of `item` as `GET /api/board` lists it for `repo`."""
+        [step] = [step for step in self.listed_steps(repo) if step["number"] == item]
+        return step
+
+    def answer_step_through_api(
+        self, item: int, result: str, text: str | None = None, *, repo: str | None = None
+    ) -> Response:
+        """Post `result` (`yes`, `no` or `report`, with `text` for the last two)
+        for the step of `item` exactly as `GET /api/board` lists it now."""
+        return self.post_step(
+            {
+                "repo": self.repo if repo is None else repo,
+                "item": item,
+                "fingerprint": self.listed_step(item, repo)["fingerprint"],
+                "result": result,
+                **({} if text is None else {"text": text}),
+            }
+        )
+
+    def post_step(self, payload: Mapping[str, object]) -> Response:
+        """Post `payload` to `/api/step` with the board token, as given."""
+        return self.call_api("POST", "/api/step", json.dumps(payload), presented=self.token)
 
     def _request(
         self,
