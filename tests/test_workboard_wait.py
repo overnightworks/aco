@@ -15,8 +15,12 @@ STEP = "Rotate the deploy key."
 
 
 def _item(wait: Mapping[str, object] | None, today: date, labels: tuple[str, ...] = ()):
-    entries = {} if wait is None else {"wait": wait}
-    contract = complete_contract("Claim it.", scope=["src/widget.py"], **entries)
+    scope = ["src/widget.py"]
+    contract = (
+        complete_contract("Claim it.", scope=scope)
+        if wait is None
+        else complete_contract("Claim it.", scope=scope, wait=wait)
+    )
     issue = board_issue(NUMBER, "Held", contract, labels=labels)
     board = projected_board((issue,), (), (), (), BoardConfig(), today=today)
     return board, board.items[0]
