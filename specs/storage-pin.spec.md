@@ -160,10 +160,10 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 ## Never
 
-- `aco item close` never reaches a GitHub API call: it is refused by name under `storage = "github"` before the item forge is ever resolved; `item new` there opens the issue itself (ITEM-26) and `item edit` reaches the forge only through its locked base-hash write (ITEM-72).
+- `aco item close` never reaches a GitHub API call: it is refused by name under `storage = "github"` before the item forge is ever resolved; `item new` there opens the issue itself (ITEM-26) and a whole-body `item edit` reaches the forge only through its locked base-hash write (ITEM-72); a narrow `--size`/`--whole` edit names no base (ITEM-50).
 - Under `storage = "state-ref"`, `aco status`, `aco bootstrap`, `aco rescope`, `aco release`, and a lane or already-observed `aco claim` never resolve the item forge, so PIN-04/PIN-05 never gate them.
 - `--repo` never selects a repository under `storage = "state-ref"`: there is no host-based target to override.
-- `aco item edit`/`close` never overwrite a concurrent writer's change: a stale expected oid refuses by name instead (CAS-20; `item edit` reports it `stale`, ITEM-72), and the item's stored bytes stay exactly what the last landed write left.
+- Under `storage = "state-ref"`, `aco item edit`/`close` never overwrite a concurrent writer's change: a stale expected oid refuses by name instead (CAS-20; `item edit` reports it `stale`, ITEM-72), and the item's stored bytes stay exactly what the last landed write left. Under `storage = "github"` the forge has no conditional write: a change between the read and the write is overwritten and only the history check afterwards reports it (ITEM-76).
 - `item edit --kind` never lands beside an item that turned malformed after PIN-29's check: its write commits only onto the `items/` it checked (`specs/ref-store-cas.spec.md` CAS-51), else refuses `items/ was written since this write checked it; re-read and retry`.
 - A replayed `aco claim` (CLM-15) and an `aco start` resuming its live claim (START-06) never read the board: a wide scope naming no `--whole` reads its own item's `whole` alone.
 - `aco item close` never deletes an item file or any of its other bytes: only `state`, `closed_at`, and `updated_at` move.
