@@ -23,6 +23,7 @@ from . import (
     repositories,
     rulings,
     usage,
+    workboard,
 )
 from .session import RunContext
 
@@ -177,10 +178,15 @@ def step(label: str, text: str, target: int | str, card: item_step.StepCard) -> 
     under `storage = "state-ref"`, before any read of its items."""
     context = _context_of(label)
     if context.config.storage is body.Storage.STATE_REF:
+        item_argument = (
+            workboard.item_argument(target, context.config.storage)
+            if isinstance(target, int)
+            else "<item>"
+        )
         raise protocol.ClaimError(
             f"{label} keeps its items in state-ref storage, where a step cannot be labelled; "
-            "write it into the item's wait with aco item edit --base <body_hash>; "
-            "aco item show --json prints the body_hash"
+            f"write it into the item's wait with aco item edit {item_argument} --base <body_hash>; "
+            f"aco item show {item_argument} --json prints the body_hash"
         )
     if isinstance(target, int):
         _mark_in_turn(context, target, text, card, standing_title=None)

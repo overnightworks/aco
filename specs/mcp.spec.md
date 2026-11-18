@@ -154,7 +154,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-49] `step`, `title`, `purpose`, `actions`, `expected` and `answer` are stripped before use; the stored text and the title matched are the stripped text.
 - [ ] [MCP-66] A step written to an item or opened as one also sets its block's `wait` to `operator = <step>` and `since` today; a repeat of the same step keeps the `since`.
 - [ ] [MCP-50] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
-- [ ] [MCP-51] A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit` as the way (see E-MCP-15).
+- [ ] [MCP-51] A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit <item> --base <body_hash>` as the way (see E-MCP-15).
 - [ ] [MCP-52] A body write whose check answers `not verified` or `overwritten` is a tool error with that sentence and sets no label; the same call again finishes it.
 - [ ] [MCP-53] A label that fails after the body is written or the item opened is a tool error naming the item and the forge's reason; the same call again sets it (see E-MCP-16).
 - [ ] [MCP-54] A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
@@ -342,7 +342,7 @@ An item a non-member wrote answers `item 7 was not written by a member; its step
 Setup: `owner/a` is pinned to `storage = "state-ref"`
 
 ```text
-< {"jsonrpc":"2.0","id":15,"result":{"content":[{"type":"text","text":"owner/a keeps its items in state-ref storage, where a step cannot be labelled; write it into the item's wait with aco item edit --base <body_hash>; aco item show --json prints the body_hash"}],"isError":true}}
+< {"jsonrpc":"2.0","id":15,"result":{"content":[{"type":"text","text":"owner/a keeps its items in state-ref storage, where a step cannot be labelled; write it into the item's wait with aco item edit <item> --base <body_hash>; aco item show <item> --json prints the body_hash"}],"isError":true}}
 ```
 
 Nothing was read or written.

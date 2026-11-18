@@ -3,6 +3,7 @@ board's test forge: marking an item, opening one, finding the one a failed call
 left, and what each refusal and each failure after a write leaves behind."""
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -389,7 +390,7 @@ def test_a_state_ref_repository_refuses_before_any_lookup_or_write(
     [result] = _serve(monkeypatch, _step_line(1, **changes))
 
     assert result["isError"] is True
-    assert "aco item edit" in _text(result)
+    assert re.search(r"aco item edit (?!--)\S+ --base <body_hash>", _text(result))
     assert here.request_log() == ()
 
 
