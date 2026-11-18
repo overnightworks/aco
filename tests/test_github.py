@@ -2285,7 +2285,7 @@ def test_bounded_command_rejects_non_utf8_output() -> None:
 def test_bounded_command_classifies_every_forge_failure_signal(
     monkeypatch: pytest.MonkeyPatch,
     outcome: process.BoundedResult | process.ProcessError,
-    expected_type: type[forge.ForgeError],
+    expected_type: type[Exception],
     expected_message: str,
 ) -> None:
     """Driven through `GitHubForge.default_branch` with `process.run_bounded`
