@@ -1,7 +1,0 @@
-claim_id = "60df223a635a4dd4ad9236b8b441d193"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "7a13491904bf8848883c2264c311a8d0870b4018"
-branch = "claude/issue-875-probe-tests-runner"
-scope = ["tests/test_github.py", "tests/test_github_probe.py"]
-opened_commit = "4f62f852ba743808f0aead6de6531c4cf5669b54"
