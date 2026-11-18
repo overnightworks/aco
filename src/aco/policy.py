@@ -211,11 +211,16 @@ def claim_scope_defect(
     paths = listed()
     if isinstance(paths, workboard.ClassificationDefect):
         return paths
-    outside = paths_outside_claim(
-        claim.scope,
-        trunk_lane_shared_reading(context.run.configured_canonical_remote, context.run.toplevel),
-        sorted(paths),
-    )
+    outside = paths_outside_claim(claim.scope, (), sorted(paths))
+    if outside:
+        # The trunk is read only when the scope alone leaves a path uncovered.
+        outside = paths_outside_claim(
+            claim.scope,
+            trunk_lane_shared_reading(
+                context.run.configured_canonical_remote, context.run.toplevel
+            ),
+            outside,
+        )
     if outside:
         named = protocol.named_with_overflow_count(
             tuple(

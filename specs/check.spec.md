@@ -3,7 +3,7 @@
 `aco check <n>`: one read that dispatches a bare number to one of three
 answers, since GitHub gives issues and pull requests the same number space.
 A pull request reads `specs/landing-grammar.spec.md`'s own classification,
-closing, and parent grammar (LAND-04..LAND-28, LAND-70..LAND-77, LAND-79); this file cites those IDs
+closing, and parent grammar (LAND-04..LAND-28, LAND-70..LAND-77, LAND-79, LAND-87..LAND-90); this file cites those IDs
 rather than restating them and owns only the command's own three-way
 dispatch, its issue-mode read of an item's own body contract, and the
 checkout it needs to run at all. `specs/output.spec.md` owns the `--json`
@@ -40,7 +40,7 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 
 | state \ trigger | `aco check <n>`, `<sha>` or `-` (text) | `aco check <n>`, `<sha>` or `-` with `--json` |
 |---|---|---|
-| `<n>` is a pull request | LAND-04..LAND-28, LAND-70..LAND-77, LAND-79 (cited) | CHECK-01 |
+| `<n>` is a pull request | LAND-04..LAND-28, LAND-70..LAND-77, LAND-79, LAND-87..LAND-90 (cited) | CHECK-01 |
 | `<n>` exists in neither number space | CHECK-02 | CHECK-03 |
 | `<n>` is an issue, sound and unblocked | CHECK-04 | CHECK-05 |
 | `<n>` is an issue, malformed body | CHECK-06 | CHECK-05 |
@@ -74,7 +74,7 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 | outcome | `reason` | exit |
 |---|---|---|
 | pull request classified (LAND-04..LAND-28's own accepted case, LAND-79) | `valid` | `0` |
-| pull request refused (LAND-04..LAND-28, LAND-70..LAND-77, LAND-79) | `invalid_classification` | `2` |
+| pull request refused (LAND-04..LAND-28, LAND-70..LAND-77, LAND-79, LAND-87..LAND-90) | `invalid_classification` | `2` |
 | `<n>` in neither number space (CHECK-02/03) | `missing` | `2` |
 | issue valid, complete, unblocked (CHECK-04) | `valid` | `0` |
 | issue malformed (CHECK-06) | `malformed` | `2` |

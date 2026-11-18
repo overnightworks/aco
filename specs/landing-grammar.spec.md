@@ -44,8 +44,8 @@ through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 | single `Work-Item:` trailer | LAND-01 | LAND-48 | LAND-47, LAND-52, LAND-59 | LAND-42 |
 | repeated `Work-Item:` trailer | LAND-02 | LAND-48 | LAND-52, LAND-59 | LAND-42 |
 | control byte inside a trailer value | — (lands nothing, LAND-42) | LAND-03 | — | — |
-| valid `Work-Item:` + closing reference | — | LAND-04 | LAND-29, LAND-49, LAND-82 | LAND-41 |
-| valid `No-Item:` + lane claim | — | LAND-05 | LAND-37 | — |
+| valid `Work-Item:` + closing reference | — | LAND-04, LAND-87..90 | LAND-29, LAND-49, LAND-82 | LAND-41 |
+| valid `No-Item:` + lane claim | — | LAND-05, LAND-87..90 | LAND-37 | — |
 | `No-Item: deps` PR with configured dependency paths | — | LAND-71..77 | — | — |
 | `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
 | `No-Item: deps` merge commit trailer | — | LAND-48 | LAND-37, LAND-64 | — |
@@ -110,8 +110,8 @@ trailer, and never trimmed by that function either. Here, the `Work-Item`/
 and the value itself has its surrounding spaces and tabs trimmed before it
 is read (`parse_pull_request_classification`).
 
-- [ ] [LAND-04] A body carrying `Work-Item: #10` and a closing reference for #10 makes `aco check <pr>` print `PR #<n> by <author> declares Work-Item: <owner>/<repo>#10`, exit `0`.
-- [ ] [LAND-05] A body carrying `No-Item: docs` with an active issue-less lane claim on the pull request's head branch prints `PR #<n> by <author> declares No-Item: docs`, exit `0`.
+- [ ] [LAND-04] A body carrying `Work-Item: #10` and a closing reference for #10 makes `aco check <pr>` print `PR #<n> by <author> declares Work-Item: <owner>/<repo>#10`, exit `0`, when it passes LAND-87.
+- [ ] [LAND-05] A body carrying `No-Item: docs` with an active issue-less lane claim on the pull request's head branch prints `PR #<n> by <author> declares No-Item: docs`, exit `0`, when it passes LAND-87.
 - [ ] [LAND-06] A body carrying neither `Work-Item:` nor `No-Item:` makes `check` print `REFUSED: pull request #<n> carries no \`Work-Item:\` or \`No-Item:\` line`, exit `2`.
 - [ ] [LAND-07] A `Work-Item:`/`No-Item:` line inside a fenced code block is documentation, not a declaration: a body carrying one only there refuses the same as LAND-06.
 - [ ] [LAND-08] A body carrying two classification lines (a `Work-Item:` and a `No-Item:`, or two `No-Item:` lines) refuses `carries <n> classification lines; exactly one is required`, exit `2`.
@@ -126,15 +126,19 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-17] A `No-Item:` body that also carries a closing reference refuses `declares no work item but closes <ref>; name it as the work item`, exit `2`.
 - [ ] [LAND-70] A `deps` pull request under a configuration naming no `dependency_paths` refuses `declares No-Item: deps, but .aco/board.toml names no dependency_paths`, exit `2`.
 - [ ] [LAND-71] A `deps` pull request changing a path no `dependency_paths` entry covers refuses `changes <paths>, which dependency_paths in .aco/board.toml does not name`, exit `2`; past three, `and <k> more`.
-- [ ] [LAND-72] A `No-Item: deps` pull request passing LAND-16, LAND-17, LAND-70, LAND-71 and LAND-73..76 prints `PR #<n> by <author> declares No-Item: deps`, exit `0`.
+- [ ] [LAND-72] A `No-Item: deps` pull request passing LAND-16, LAND-17, LAND-70, LAND-71, LAND-73..76 and LAND-87 prints `PR #<n> by <author> declares No-Item: deps`, exit `0`.
 - [ ] [LAND-73] A file listing holding fewer or more records than the forge's own changed-file count refuses `lists <k> of its <n> changed files; aco judges only a complete listing`, exit `2`.
 - [ ] [LAND-74] A renamed file's record counts its old and new path, a deleted file's its path; the path set is taken after LAND-73 compares record counts, never before.
 - [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
 - [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
-- [ ] [LAND-77] LAND-71 names escape display controls, then truncate to 40 characters with `…`; `land` also bounds the whole refusal to 200 characters including `ERROR: `, on one line.
+- [ ] [LAND-77] LAND-71 and LAND-87 names escape display controls, then truncate to 40 characters with `…`; `land` also bounds the whole refusal to 200 characters including `ERROR: `, on one line.
 - [ ] [LAND-78] A `#n`, slice-title or trunk `Work-Item:` number has at most 18 ASCII digits; a longer or non-ASCII one is no reference, never truncated, and a trunk trailer carrying one lands nothing.
+- [ ] [LAND-87] A pull request changing a path its live claim leaves uncovered refuses `changes <paths>, which its claim does not cover; rescope the claim or revert them`, exit `2`; past three, `and <k> more`.
+- [ ] [LAND-88] A claim covers a path a scope entry equals or is an ancestor of, or a tracked `lane_shared` entry covers it (PIN-41); `--whole` widens nothing; a rename needs both paths covered (LAND-74).
+- [ ] [LAND-89] LAND-87 judges the listing LAND-73..76 proves, which the forge computes against the merge base: merging the default branch into the lane adds none of its paths, a merge's own resolution counts.
+- [ ] [LAND-90] LAND-87 holds for `Work-Item:` and every `No-Item:` kind, after LAND-16..19 and LAND-70/71, on the run's one listing, before any `land` write; `lane_shared` is read only if the scope leaves a path.
 
-Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77.
+Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77, LAND-87.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
 - [ ] [LAND-19] Other closing references refuse `closes <ref> besides its work item <item>; a pull request lands one item`, exit `2`; LAND-23 permits a parent, LAND-79 takes precedence.
 - [ ] [LAND-20] `Implements #n`/`Lands #n` name work a pull request touched, but GitHub closes on neither word: a body carrying one beside its own closing reference for the declared item still passes, exit `0`.
@@ -218,6 +222,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 ## Never
 
 - `dependency_paths` never certifies a change safe: it bounds where a `deps` pull request may write; review still judges workflow and tool-configuration changes.
+- LAND-71 and LAND-87 are tripwires for cooperative agents, not boundaries: push rights to the canonical remote stop outsiders, and nothing stops an agent acting under the operator's own identity, which can rescope its claim before `aco land` or merge without `aco land`; the merge commit records who merged. Neither the forge's branch protection nor its review is claimed to stop anyone.
 - A force-push back to the exact head preflight read, during the bracketed listing or before the pinned merge, is not detected (an accepted ABA residual).
 
 - A merge commit trailer `No-Item: deps` releases a lane as `docs`/`fix` do (LAND-37); `release --merged` never re-judges its paths: the trailer decides (LAND-64).
@@ -290,6 +295,16 @@ Setup: bare-remote, fake `gh`, parent `#5` a container with one open child `#42`
 ```console
 $ aco check 57
 2> REFUSED: pull request #57 closes the last open child of parent <owner>/<repo>#5; close the parent too
+exit 2
+```
+
+### E-LAND-87 — a work-item pull request changing a path its claim does not cover
+
+Setup: bare-remote, fake `gh`, an active claim on `#72` with scope `README.md`, pull request `#12` on its branch, body `Work-Item: #72\n\nCloses #72`, changed files `README.md` and `docs/x.md`
+
+```console
+$ aco check 12
+2> REFUSED: pull request #12 changes docs/x.md, which its claim does not cover; rescope the claim or revert them
 exit 2
 ```
 

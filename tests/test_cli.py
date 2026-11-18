@@ -92,6 +92,7 @@ from github_fixtures import (
     landing_pull_request,
     landing_readiness,
 )
+from landing_world_parts import landing_listing
 from option_cards import card, decide, open_option_entry
 from store_fixtures import (
     RaceOnceTransport,
@@ -9896,10 +9897,9 @@ def _land_scenario(
     `protocol.LaneIdentity` branch."""
     repo = _land_repository(tmp_path, set_head=set_head, branch=branch, board_config=board_config)
     standing = request("landing", claim_agent, issue=issue, branch=branch, scope=("src",))
-    client = FakeForge()
+    client = FakeForge(changes_by_number={12: landing_listing(MERGE_COMMIT_SHA, "src/x.py")})
     client.landings[12] = landing_pull_request(
         body=body or f"Work-Item: #{WORK_ITEM_ISSUE}\n\nCloses #{WORK_ITEM_ISSUE}",
-        merged=False,
         head_ref_name=branch,
     )
     client.readiness_by_number[12] = landing_readiness()

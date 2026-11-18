@@ -140,7 +140,8 @@ when the host closes stdin; it keeps no state and scans the same root
 
 The trust model is cooperating clients: the state ref and `aco rule --via` are
 aids for cooperative agents (`specs/rule.spec.md` declares `--via` a
-tripwire). The `record_answer` tool of `aco mcp` takes the agent's word that the
+tripwire; `specs/landing-grammar.spec.md` does the same for the landing checks
+of changed paths, LAND-71 and LAND-87). The `record_answer` tool of `aco mcp` takes the agent's word that the
 operator spoke and checks nothing of it. Against anyone else the forge's permissions enforce who may write,
 and its edit history records afterward what was written; neither stops an
 agent acting under the operator's own identity. Claimants need push rights to

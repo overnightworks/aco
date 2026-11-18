@@ -21,6 +21,7 @@ from cli_fixtures import (
     real_git,
     worktrees_and_branches,
 )
+from landing_world_parts import landing_listing, observe_merge_entry
 from store_fixtures import (
     claim_intent,
     lineage_observation,
@@ -572,23 +573,25 @@ def lane_landing_world(
     rules: tuple[frozenset[MergeMethod], ...] = (),
     head_config: str = "",
     arrange: Callable[[FakeForge, str], None] | None = None,
+    scope: tuple[str, ...] | None = None,
 ) -> LaneLandingWorld:
     """Publish a claimed lane and snapshot it after the caller's final arrangement."""
     head = push_lane_branch(clone, branch)
+    changed = tuple(real_git(clone, "diff", "--name-only", default_branch, head).stdout.split())
     intent = claim_intent(
         identity=identity,
         branch=branch,
         agent=holder,
         role=role,
         claim_id="landing",
+        scope=scope or changed,
         base=protocol.ObjectId(real_git(clone, "rev-parse", default_branch).stdout.strip()),
     )
     seeded = publish_claims_from_a_second_clone(clone, remote, (intent,))
     observed = tuple(
         (c.identity, c.branch, c.agent, c.role, str(c.claim_id)) for c in seeded.claims.values()
     )
-    expected = ((identity, branch, holder, role, "landing"),)
-    assert observed == expected
+    assert observed == ((identity, branch, holder, role, "landing"),)
     detail = replace(
         landing_pull_request(body=body, head_ref_name=branch, base_ref_name=default_branch),
         head_sha=real_git(clone, "rev-parse", default_branch).stdout.strip()
@@ -600,6 +603,7 @@ def lane_landing_world(
         FakeForge(
             landings={12: detail, 13: replace(detail, number=13)},
             readiness_by_number={12: landing_readiness(head_sha=head)},
+            changes_by_number={n: landing_listing(head, *(scope or changed)) for n in (12, 13)},
             merge_remote=remote,
             merge_error=error,
             allowed_methods=methods,
@@ -613,16 +617,7 @@ def lane_landing_world(
     shared = landing_world(
         clone, remote, client, remote_tip=seeded.tip, default_branch=default_branch
     )
-    entry: list[tuple[object, object]] = []
-    merge = client.merge_landing
-
-    def observe_entry(
-        number: int, *, head_sha: str, method: MergeMethod, title: str, body: str
-    ) -> str:
-        entry.append(lineage_observation(clone))
-        return merge(number, head_sha=head_sha, method=method, title=title, body=body)
-
-    monkeypatch.setattr(client, "merge_landing", observe_entry)
+    entry = observe_merge_entry(monkeypatch, client, clone)
     return LaneLandingWorld(
         clone, remote, client, shared.unchanged, head, entry, default_branch=shared.default_branch
     )
