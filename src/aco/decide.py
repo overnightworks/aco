@@ -286,17 +286,22 @@ def _refuse_a_shape_verdict(check: body.BodyShapeCheck, verdict: body.BodyShapeV
         raise protocol.ClaimError("; ".join(check.defects))
 
 
+def _inbox_lists(fresh: FreshItem) -> bool:
+    return fresh.state is forge.ItemState.OPEN and fresh.author_is_member
+
+
 def _refuse_an_item_the_inbox_omits(fresh: FreshItem, noun: str) -> None:
     """Refuses a closed item and one a non-member wrote: the inbox and the board
     list neither, so a `noun` written on it would show nowhere."""
+    if _inbox_lists(fresh):
+        return
     if fresh.state is not forge.ItemState.OPEN:
         raise protocol.ClaimError(
             f"item {fresh.number} is closed; a {noun} on it would show nowhere"
         )
-    if not fresh.author_is_member:
-        raise protocol.ClaimError(
-            f"item {fresh.number} was not written by a member; its {noun}s are not listed"
-        )
+    raise protocol.ClaimError(
+        f"item {fresh.number} was not written by a member; its {noun}s are not listed"
+    )
 
 
 def ask(context: RunContext, fresh: FreshItem, card: Mapping[str, object]) -> Asked:
@@ -365,17 +370,10 @@ class StepAnswered:
 
 def step_of(fresh: FreshItem) -> inbox.Step | None:
     """The step the operator is asked for on the fresh item, as the inbox lists it:
-    `None` unless the item is open, a member wrote it and its `wait` names the operator."""
-    wait = item_wait.parse_wait(fresh.located.data)
-    if (
-        fresh.state is not forge.ItemState.OPEN
-        or not fresh.author_is_member
-        or not item_wait.waits_on_operator(wait)
-    ):
+    `None` unless the inbox lists the item and its `wait` names the operator."""
+    if not _inbox_lists(fresh):
         return None
-    return inbox.Step(
-        fresh.number, fresh.title, wait.step, item_step.parse_step(fresh.located.data)
-    )
+    return inbox.step_in(fresh.number, fresh.title, fresh.body, storage=fresh.storage)
 
 
 def _unlabelled_as_a_step(client: forge.ForgeWriter, number: int) -> str | None:
