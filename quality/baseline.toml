@@ -25,7 +25,7 @@
 "src/aco/store.py" = 1739
 "src/aco/workboard.py" = 2785
 "tests/support/cli_fixtures.py" = 888
-"tests/support/github_fixtures.py" = 808
+"tests/support/github_fixtures.py" = 803
 "tests/test_board.py" = 3582
 "tests/test_checkout.py" = 2037
 "tests/test_cli.py" = 12070
@@ -67,7 +67,7 @@
 
 [function_lines."tests/support/github_fixtures.py"]
 "landed_observations" = 61
-"lane_landing_world" = 71
+"lane_landing_world" = 65
 
 [function_lines."tests/test_checkout.py"]
 "_trunk_history_repository" = 62
@@ -89,7 +89,7 @@
 "separate_world" = 76
 
 [function_lines."tests/test_cmd_land_merge.py"]
-"world" = 100
+"world" = 99
 
 [function_lines."tests/test_cmd_land_merge_message.py"]
 "world" = 110

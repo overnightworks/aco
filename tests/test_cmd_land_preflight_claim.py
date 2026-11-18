@@ -50,6 +50,11 @@ class IdentityState(Enum):
     AUTHOR_ONLY = "author-only"
 
 
+ITEM_CLAIM = claim_intent(
+    identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, scope=("uv.lock",)
+)
+
+
 @dataclass(frozen=True)
 class ClaimCase:
     sentence: str
@@ -57,11 +62,7 @@ class ClaimCase:
         default_factory=lambda: landing_pull_request(body="Work-Item: #72\n\nCloses #72")
     )
     readiness: forge.LandingReadiness = field(default_factory=landing_readiness)
-    intents: tuple[protocol.ClaimIntent, ...] = field(
-        default_factory=lambda: (
-            claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH),
-        )
-    )
+    intents: tuple[protocol.ClaimIntent, ...] = field(default_factory=lambda: (ITEM_CLAIM,))
     trunk_config: str = ""
     head_config: str | None = ""
     closed_items: frozenset[int] = frozenset()
@@ -506,11 +507,7 @@ class TestLandClassification:
                     "pull request #12 carries no closing reference for its "
                     "work item example/agent-coordination#72",
                     pull_request=landing_pull_request(body="Work-Item: #72"),
-                    intents=(
-                        claim_intent(
-                            identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
-                        ),
-                    ),
+                    intents=(replace(ITEM_CLAIM, agent="Grok"),),
                 ),
                 id="no-closing-reference-and-foreign-claim",
             ),
@@ -642,6 +639,19 @@ class TestLandItemAndClaim:
         [
             pytest.param(
                 ClaimCase(
+                    "pull request #12 changes docs/x.md, which its claim does not cover; "
+                    "rescope the claim or revert them",
+                    listing=pull_request_listing(
+                        MERGE_COMMIT_SHA, forge.ChangedFile("docs/x.md", None)
+                    ),
+                    changes_reads=(12,),
+                    check_claims=True,
+                    length=RefusalLength.WITHIN_LIMIT,
+                ),
+                id="path-outside-the-claim",
+            ),
+            pytest.param(
+                ClaimCase(
                     "work item #72 is not open; it cannot be landed", closed_items=frozenset({72})
                 ),
                 id="closed-item",
@@ -686,12 +696,9 @@ class TestLandItemAndClaim:
                     "with `aco handover 72 --from Grok --reason <text>`, or use "
                     "an explicit coordinator override (holder='Grok "
                     "(builder)', this session='Ada (builder)')",
-                    intents=(
-                        claim_intent(
-                            identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
-                        ),
-                    ),
+                    intents=(replace(ITEM_CLAIM, agent="Grok"),),
                     arguments=(),
+                    changes_reads=(12,),
                 ),
                 id="foreign-claim",
             ),
@@ -701,12 +708,9 @@ class TestLandItemAndClaim:
                     "with `aco handover 72 --from Grok --reason <text>`, or use "
                     "an explicit coordinator override (holder='Grok "
                     "(builder)', this session='Ada (builder)')",
-                    intents=(
-                        claim_intent(
-                            identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
-                        ),
-                    ),
+                    intents=(replace(ITEM_CLAIM, agent="Grok"),),
                     arguments=("--keep-worktree",),
+                    changes_reads=(12,),
                 ),
                 id="foreign-claim-keeps-the-worktree-flag",
             ),
@@ -716,12 +720,9 @@ class TestLandItemAndClaim:
                     "with `aco handover 72 --from Grok --reason <text>`, or use "
                     "an explicit coordinator override (holder='Grok "
                     "(builder)', this session='Ada (builder)')",
-                    intents=(
-                        claim_intent(
-                            identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
-                        ),
-                    ),
+                    intents=(replace(ITEM_CLAIM, agent="Grok"),),
                     arguments=("--keep-worktree", "--head", "A1B2C3D"),
+                    changes_reads=(12,),
                 ),
                 id="foreign-claim-keeps-the-reviewed-head",
             ),
@@ -730,14 +731,9 @@ class TestLandItemAndClaim:
                     "only the original claimant may release; use an explicit "
                     "coordinator override (holder='Ada "
                     "(coordinator)', this session='Ada (builder)')",
-                    intents=(
-                        claim_intent(
-                            identity=protocol.IssueIdentity(72),
-                            branch=LANDING_BRANCH,
-                            role="coordinator",
-                        ),
-                    ),
+                    intents=(replace(ITEM_CLAIM, role="coordinator"),),
                     arguments=("--role", "builder"),
+                    changes_reads=(12,),
                 ),
                 id="foreign-role",
             ),
@@ -747,13 +743,10 @@ class TestLandItemAndClaim:
                     "with `aco handover 72 --from Grok --reason <text>`, or use "
                     "an explicit coordinator override (holder='Grok "
                     "(builder)', this session='Ada (builder)')",
-                    intents=(
-                        claim_intent(
-                            identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, agent="Grok"
-                        ),
-                    ),
+                    intents=(replace(ITEM_CLAIM, agent="Grok"),),
                     arguments=(),
                     checkout=CheckoutState.UNTRACKED_FILE,
+                    changes_reads=(12,),
                 ),
                 id="foreign-claim-and-dirty-checkout",
             ),
@@ -761,7 +754,7 @@ class TestLandItemAndClaim:
         indirect=True,
     )
     def test_refusal(self, world: ClaimWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-08, LANDCMD-10 -- exact refusal and no writes."""
+        """Spec: LANDCMD-08, LANDCMD-10, LAND-87 -- exact refusal and no writes."""
         assert_refusal(world, capsys)
 
 
@@ -773,6 +766,7 @@ class TestLandCheckout:
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
                     checkout=CheckoutState.UNTRACKED_FILE,
+                    changes_reads=(12,),
                 ),
                 id="dirty-checkout",
             ),
@@ -780,6 +774,7 @@ class TestLandCheckout:
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
                     checkout=CheckoutState.TRACKED_CHANGE,
+                    changes_reads=(12,),
                 ),
                 id="tracked-change",
             ),
@@ -787,6 +782,7 @@ class TestLandCheckout:
                 ClaimCase(
                     "land must run from a clean checkout of the default branch 'main'",
                     checkout=CheckoutState.OTHER_BRANCH,
+                    changes_reads=(12,),
                 ),
                 id="other-branch",
             ),
@@ -795,6 +791,7 @@ class TestLandCheckout:
                     "land must run from a clean checkout of the default branch 'main'",
                     checkout=CheckoutState.UNTRACKED_FILE,
                     identity=IdentityState.ABSENT,
+                    changes_reads=(12,),
                 ),
                 id="dirty-checkout-and-no-identity",
             ),
@@ -806,6 +803,7 @@ class TestLandCheckout:
                     identity=IdentityState.ABSENT,
                     lane_worktree=True,
                     claims_present=True,
+                    changes_reads=(12,),
                 ),
                 id="no-identity-refuses-before-the-merge",
             ),
@@ -829,6 +827,7 @@ class TestLandCheckout:
                     "set user.name and user.email there so its release can "
                     "commit to the claim state",
                     identity=IdentityState.AUTHOR_ONLY,
+                    changes_reads=(12,),
                 ),
                 id="committer-only",
             ),
@@ -840,6 +839,7 @@ class TestLandCheckout:
                     ),
                     default_branch="trunk",
                     lane_worktree=True,
+                    changes_reads=(12,),
                 ),
                 id="checkout-on-main-names-trunk",
             ),

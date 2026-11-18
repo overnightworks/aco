@@ -12,7 +12,6 @@ from cli_fixtures import (
     landed_from_another_clone,
     local_branches,
     move_trunk,
-    pull_request_listing,
     real_git,
     run_cli,
     track_board_config,
@@ -26,6 +25,7 @@ from github_fixtures import (
     lane_landing_world,
 )
 from landing_refusals import RefusalLength, refusal_observations
+from landing_world_parts import landing_listing
 
 from aco import cmd_land, forge, protocol, workboard
 
@@ -189,9 +189,7 @@ def world(
         expected = (case.lane_worktree.value, head, head, "", default_branch + "\n", True)
         assert observed == expected
         if case.dependency_listing:
-            client.changes_by_number[12] = pull_request_listing(
-                head, forge.ChangedFile("uv.lock", None)
-            )
+            client.changes_by_number[12] = landing_listing(head, "uv.lock")
         if case.oversized_foreign_text:
             oversized = "1" * 4301
             client.board_open_pull_requests = (
@@ -222,6 +220,7 @@ def world(
         rules=case.rules,
         head_config=case.head_config,
         arrange=arrange,
+        scope=("uv.lock",) if case.dependency_listing else None,
     )
     if main_state is not None:
         observed = (

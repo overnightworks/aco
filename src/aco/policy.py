@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import cache
 
 from . import body, checkout, forge, protocol, workboard
-from .session import RunContext
+from .session import RunContext, paths_outside_claim, trunk_lane_shared_reading
 
 
 def _scope_cost(versioned: tuple[str, ...], scope: tuple[str, ...]) -> tuple[int, int, float]:
@@ -117,11 +117,11 @@ def reject_ungrounded_comma_scope(
             )
 
 
-def _claim_defect(
+def _matching_claim(
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
     identity: protocol.ClaimIdentity,
-) -> workboard.ClassificationDefect | None:
+) -> workboard.ClassificationDefect | protocol.ActiveClaim:
     """A landing declares only what its own head branch holds a live store claim on."""
     matching = next(
         (
@@ -140,7 +140,7 @@ def _claim_defect(
         return workboard.ClassificationDefect(
             f"has no active {subject} on branch {detail.source_branch!r}"
         )
-    return None
+    return matching
 
 
 def listed_paths(
@@ -189,6 +189,50 @@ def dependency_rule_defect(
     return None
 
 
+def _landing_listing(
+    context: LandingCheckContext, detail: forge.Landing, expected_head: str
+) -> Callable[[], workboard.ClassificationDefect | frozenset[str]]:
+    """The listing of `detail`'s changed paths, read at most once per check."""
+
+    @cache
+    def listing() -> workboard.ClassificationDefect | frozenset[str]:
+        return listed_paths(context.client.pull_request_changes(detail.number), expected_head)
+
+    return listing
+
+
+def claim_scope_defect(
+    context: LandingCheckContext,
+    claim: protocol.ActiveClaim,
+    listed: Callable[[], workboard.ClassificationDefect | frozenset[str]],
+) -> workboard.ClassificationDefect | None:
+    """Why the pull request changes paths its live `claim` and the trunk's
+    lane-shared entries do not cover (LAND-87, LAND-88)."""
+    paths = listed()
+    if isinstance(paths, workboard.ClassificationDefect):
+        return paths
+    outside = paths_outside_claim(claim.scope, (), sorted(paths))
+    if outside:
+        # The trunk is read only when the scope alone leaves a path uncovered.
+        outside = paths_outside_claim(
+            claim.scope,
+            trunk_lane_shared_reading(
+                context.run.configured_canonical_remote, context.run.toplevel
+            ),
+            outside,
+        )
+    if outside:
+        named = protocol.named_with_overflow_count(
+            tuple(
+                workboard.truncated_display_name(protocol.terminal_text(path)) for path in outside
+            )
+        )
+        return workboard.ClassificationDefect(
+            f"changes {named}, which its claim does not cover; rescope the claim or revert them"
+        )
+    return None
+
+
 def _no_item_defect(
     context: LandingCheckContext,
     claims: tuple[protocol.ActiveClaim, ...],
@@ -203,18 +247,18 @@ def _no_item_defect(
     no `Work-Item:` line ever named. A deps lane must also stay inside the
     configured dependency paths, proven by a complete listing at the expected head.
     """
-    claim_defect = _claim_defect(claims, detail, protocol.LaneIdentity())
-    if claim_defect is not None:
-        return claim_defect
+    claim = _matching_claim(claims, detail, protocol.LaneIdentity())
+    if isinstance(claim, workboard.ClassificationDefect):
+        return claim
     closing_defect = closing_reference_defect(detail.body, context.repository)
     if closing_defect is not None:
         return closing_defect
+    listing = _landing_listing(context, detail, expected_head)
     if kind is workboard.NoItemKind.DEPS:
-        return dependency_rule_defect(
-            context.run.config,
-            lambda: listed_paths(context.client.pull_request_changes(detail.number), expected_head),
-        )
-    return None
+        dependency_defect = dependency_rule_defect(context.run.config, listing)
+        if dependency_defect is not None:
+            return dependency_defect
+    return claim_scope_defect(context, claim, listing)
 
 
 def closing_reference_defect(body: str, repository: str) -> workboard.ClassificationDefect | None:
@@ -378,19 +422,23 @@ def _work_item_defect(
     claims: tuple[protocol.ActiveClaim, ...],
     detail: forge.Landing,
     item: workboard.IssueReference,
+    expected_head: str,
 ) -> workboard.ClassificationDefect | None:
     """Why this repository does not accept `item` as the landing pull request's work item."""
     if item.repository != context.repository:
         return workboard.ClassificationDefect(
             f"names work item {item} of another repository, which holds no claim here"
         )
-    claim_defect = _claim_defect(claims, detail, protocol.IssueIdentity(item.number))
-    if claim_defect is not None:
-        return claim_defect
+    claim = _matching_claim(claims, detail, protocol.IssueIdentity(item.number))
+    if isinstance(claim, workboard.ClassificationDefect):
+        return claim
     requirement = _parent_requirement(context, item)
     if isinstance(requirement, workboard.ClassificationDefect):
         return requirement
-    return _closing_defect(detail, context.repository, item, requirement)
+    closing_defect = _closing_defect(detail, context.repository, item, requirement)
+    if closing_defect is not None:
+        return closing_defect
+    return claim_scope_defect(context, claim, _landing_listing(context, detail, expected_head))
 
 
 def cross_repository_defect(
@@ -461,7 +509,7 @@ def classification_defect(
     for one just to read the pull request's own shape."""
     if isinstance(classification, workboard.NoItemClassification):
         return _no_item_defect(context, claims, detail, classification.kind, expected_head)
-    return _work_item_defect(context, claims, detail, classification.item)
+    return _work_item_defect(context, claims, detail, classification.item, expected_head)
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,7 @@
 """`aco check <pr>`: declarations, dependency paths and parents in the real GitHub world."""
 
 from dataclasses import replace
+from typing import NoReturn
 
 import pytest
 from board_fixtures import REPOSITORY, block_body, complete_contract, slice_entries
@@ -24,7 +25,7 @@ from cli_fixtures import pull_request_listing
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
 from store_fixtures import claim_intent
 
-from aco import body, forge, protocol
+from aco import body, forge, policy, protocol
 
 WORK_ITEM_BODY = "Work-Item: #72\n\nCloses #72"
 NO_ITEM_BODY = "No-Item: docs\n\nTidy the README."
@@ -321,6 +322,123 @@ def test_a_deps_pull_request_is_judged_only_on_a_complete_unchanged_listing(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
     """Spec: LAND-73, LAND-75, LAND-76, CHECK-10, CHECK-01"""
+    check_pull_request(case, flags)
+
+
+def item_world(
+    listing: forge.PullRequestChanges, *, scope: tuple[str, ...] = ("README.md",), shared: str = ""
+) -> PullRequestWorld:
+    claim = claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, scope=scope)
+    return PullRequestWorld(
+        claims=(claim,), listing=listing, lane_shared=(shared,) if shared else ()
+    )
+
+
+def uncovered(named: str) -> str:
+    return f"changes {named}, which its claim does not cover; rescope the claim or revert them"
+
+
+def item_refused(named: str, world: PullRequestWorld) -> PullRequestCase:
+    return refused(WORK_ITEM_BODY, uncovered(named), 5, world, (12,))
+
+
+NARROW_DEPS_WORLD = replace(
+    DEPS_WORLD,
+    dependency_paths=("uv.lock",),
+    claims=(claim_intent(identity=protocol.LaneIdentity(), branch=LANE_BRANCH, scope=("docs",)),),
+    listing=listing_of("uv.lock"),
+)
+
+COVERED_PATHS = {
+    "directory-scope-covers-a-nested-path": declares(
+        WORK_ITEM_BODY,
+        f"Work-Item: {WORK_ITEM}",
+        4,
+        item_world(listing_of("docs/a/b.md"), scope=("docs",)),
+    ),
+    "tracked-lane-shared-file-covers": declares(
+        WORK_ITEM_BODY,
+        f"Work-Item: {WORK_ITEM}",
+        4,
+        item_world(listing_of("README.md", ".aco/board.toml"), shared=".aco/board.toml"),
+    ),
+}
+
+UNCOVERED_PATHS = {
+    "incomplete-listing": refused(
+        WORK_ITEM_BODY,
+        "lists 2 of its 1 changed files; aco judges only a complete listing",
+        5,
+        item_world(listing_of_files(2, reported=1)),
+        (12,),
+    ),
+    "work-item-path-outside": item_refused(
+        "docs/x.md", item_world(listing_of("README.md", "docs/x.md"))
+    ),
+    "four-paths-outside": item_refused("a, b, c, and 1 more", item_world(listing_of(*"dcba"))),
+    "untracked-lane-shared-covers-nothing": item_refused(
+        "scripts/registry.txt",
+        item_world(listing_of("scripts/registry.txt"), shared="scripts/registry.txt"),
+    ),
+    "rename-from-outside-into-scope": item_refused(
+        "docs/old.md",
+        item_world(
+            pull_request_listing(MERGE_COMMIT_SHA, forge.ChangedFile("README.md", "docs/old.md"))
+        ),
+    ),
+    "scope-below-a-changed-path-covers-no-ancestor": item_refused(
+        "a",
+        item_world(
+            pull_request_listing(
+                MERGE_COMMIT_SHA, forge.ChangedFile("a", None), forge.ChangedFile("a/b", None)
+            ),
+            scope=("a/b",),
+        ),
+    ),
+    "directory-prefix-is-no-directory": item_refused(
+        "docsX/a.md", item_world(listing_of("docsX/a.md"), scope=("docs",))
+    ),
+    "docs-lane-outside-its-scope": refused(
+        NO_ITEM_BODY,
+        uncovered("other/x.py"),
+        4,
+        replace(LANE_WORLD, listing=listing_of("other/x.py")),
+        (12,),
+    ),
+    "deps-lane-inside-dependency-paths-outside-its-claim": refused(
+        DEPS_BODY, uncovered("uv.lock"), 4, NARROW_DEPS_WORLD, (12,)
+    ),
+}
+
+
+@pytest.mark.parametrize(("case", "flags"), rendered(COVERED_PATHS))
+def test_a_pull_request_changing_only_paths_its_claim_covers_is_accepted(
+    case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
+) -> None:
+    """Spec: LAND-87, LAND-88, LAND-90, CHECK-01"""
+    check_pull_request(case, flags)
+
+
+def test_a_listing_the_claim_scope_covers_never_reads_the_trunk_configuration(
+    check_pull_request: PullRequestCheck, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: LAND-90"""
+
+    def trunk_read(*_: object) -> NoReturn:
+        raise AssertionError("the trunk's lane_shared was read")
+
+    monkeypatch.setattr(policy, "trunk_lane_shared_reading", trunk_read)
+    covered = declares(
+        WORK_ITEM_BODY, f"Work-Item: {WORK_ITEM}", 4, item_world(listing_of("README.md"))
+    )
+    check_pull_request(covered, [])
+
+
+@pytest.mark.parametrize(("case", "flags"), rendered(UNCOVERED_PATHS))
+def test_a_pull_request_changing_a_path_its_claim_does_not_cover_is_refused(
+    case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
+) -> None:
+    """Spec: LAND-87, LAND-88, LAND-74, LAND-77, LAND-90, CHECK-01"""
     check_pull_request(case, flags)
 
 
