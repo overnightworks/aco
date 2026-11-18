@@ -146,11 +146,11 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 `step` takes `repository`, `step`, `purpose`, `actions`, `expected`, optionally `answer`, and exactly one of `item` and `title`.
 
-- [ ] [MCP-44] `step` on an open `item` a member wrote writes `step` as its `next` and `wait.operator`, then sets the label `needs-operator`; it answers `repository`, `item`, `step`, `created` false (E-MCP-12).
+- [ ] [MCP-44] `step` on an open `item` a member wrote sets its `wait.operator` to `step`, leaves `next`, then sets the label `needs-operator`; it answers `repository`, `item`, `step`, `created` false (E-MCP-12).
 - [ ] [MCP-45] The same call again writes no body and sets the label again; it answers the same, so a repeat finishes a call whose label failed.
 - [ ] [MCP-46] The rewritten body keeps every other field of the block, every ruling and every byte outside the block; the body is written before the label, both in the item's turn.
-- [ ] [MCP-47] `step` with a `title` no open item holds opens one task whose `next` and `wait.operator` are `step`, sets the label and answers `created` true; `read_inbox` lists it (E-MCP-13).
-- [ ] [MCP-48] A `title` that an open, readable item a member wrote holds with that exact `next` marks it (the highest number of several) and answers `created` false; a changed title or `next` opens a new item.
+- [ ] [MCP-47] `step` with a `title` no open item holds opens a task with `wait.operator` `step` and `next` `Act on the operator's answer in now.`, sets the label, `created` true; `read_inbox` lists it (E-MCP-13).
+- [ ] [MCP-48] A `title` that an open, readable item a member wrote holds with that exact `wait.operator` marks it (highest number of several), `created` false; a changed title or `wait.operator` opens a new item.
 - [ ] [MCP-49] `step`, `title`, `purpose`, `actions`, `expected` and `answer` are stripped before use; the stored text and the title matched are the stripped text.
 - [ ] [MCP-66] A step written to an item or opened as one also sets its block's `wait` to `operator = <step>` and `since` today; a repeat of the same step keeps the `since`.
 - [ ] [MCP-50] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
@@ -160,7 +160,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-54] A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
 - [ ] [MCP-55] An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field is a tool error naming each; nothing is read or written (see E-MCP-17).
 - [ ] [MCP-56] A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
-- [ ] [MCP-67] `step` requires and stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `next` and `wait` stay the short `step`.
+- [ ] [MCP-67] `step` requires and stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `wait` stays the short `step`.
 - [ ] [MCP-68] `answer`, optional, is what the operator reports and why; without it he answers yes or no. A step without a `step` table lists all four fields as null.
 - [ ] [MCP-69] The same call with the same card fields writes no body (MCP-45); other card fields rewrite the `step` table and keep every other field of the block (MCP-46).
 - [ ] [MCP-70] A missing, non-string or blank `purpose`, `actions` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
@@ -169,7 +169,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 ## Answering a step
 
 - [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
-- [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` says to act on it, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
+- [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` stays as it is, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
 - [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
 - [ ] [MCP-77] The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
 - [ ] [MCP-74] A `step` that is no longer the item's current step, an item with no step for the operator, or a `result` the step does not ask for is a tool error with a sentence; nothing is written.
@@ -177,7 +177,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 ## Never
 
-- `aco mcp` writes only through `ask`, `record_answer`, `step` and `answer_step`: `ask` and `record_answer` one line per call, `answer_step` one item's step answer, `step` one item's `next` in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
+- `aco mcp` writes only through `ask`, `record_answer`, `step` and `answer_step`: `ask` and `record_answer` one line per call, `answer_step` one item's step answer, `step` one item's `wait` and `step` table in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
 - `step` never clears `wait.operator` and never removes the label `needs-operator`: the board's step answer and `answer_step` do both (ABRD-168, ABRD-169, MCP-72).
 - `record_answer` never checks that the operator spoke: it records what the agent says he answered, and the forge's edit history is the record after the fact.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
@@ -314,7 +314,7 @@ Setup: `owner/a` holds the open item `#9`, written by a member, with a complete 
 < {"jsonrpc":"2.0","id":12,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","created":false},"isError":false}}
 ```
 
-The block's `next` and `wait.operator` are the step and the item carries `needs-operator`, so E-MCP-11's `read_inbox` lists it. The same call again answers the same and writes no body.
+The block's `wait.operator` is the step, its `next` is as it was, and the item carries `needs-operator`, so E-MCP-11's `read_inbox` lists it. The same call again answers the same and writes no body.
 
 ### E-MCP-13 -- a step on a new item
 
@@ -342,7 +342,7 @@ An item a non-member wrote answers `item 7 was not written by a member; its step
 Setup: `owner/a` is pinned to `storage = "state-ref"`
 
 ```text
-< {"jsonrpc":"2.0","id":15,"result":{"content":[{"type":"text","text":"owner/a keeps its items in state-ref storage, where a step cannot be labelled; write it into the item's next with aco item edit"}],"isError":true}}
+< {"jsonrpc":"2.0","id":15,"result":{"content":[{"type":"text","text":"owner/a keeps its items in state-ref storage, where a step cannot be labelled; write it into the item's wait with aco item edit"}],"isError":true}}
 ```
 
 Nothing was read or written.
@@ -355,7 +355,7 @@ Setup: as E-MCP-12, and the forge refuses the label with `HTTP 403`
 < {"jsonrpc":"2.0","id":16,"result":{"content":[{"type":"text","text":"#9 holds the step, but the label needs-operator was not set: HTTP 403; repeat the same call to set it once that cause is gone"}],"isError":true}}
 ```
 
-The step stands in the item's `next`. The same call, sent once the cause is gone, writes no body and sets the label.
+The step stands in the item's `wait`. The same call, sent once the cause is gone, writes no body and sets the label.
 
 ### E-MCP-17 -- arguments that do not fit
 
