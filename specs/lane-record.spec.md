@@ -74,10 +74,10 @@ Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effo
 ## The lane record file
 
 The lane record file is the JSON file a lane hands `aco land` or `aco release` with
-`--record`: counts, model names, tags and shas, never a finding's text (LANREC-05).
+`--record`: counts, model names, tags and shas, never a finding's text (LANREC-05). A file larger than 1048576 bytes `cannot be read` (LANREC-31).
 
 - [ ] [LANREC-30] `aco lane-record check <file>` reads the file alone, writes nothing, needs no checkout, and prints `lane record <file> is valid`, exit `0`.
-- [ ] [LANREC-31] A file that `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, which includes a file larger than 1048576 bytes, `not valid JSON`, or LANREC-32..LANREC-37's (E-LANREC-03).
+- [ ] [LANREC-31] A file that `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, `not valid JSON`, or LANREC-32..LANREC-37's (E-LANREC-03).
 - [ ] [LANREC-32] The file is one JSON object of `version`, `stages`, `fix_rounds`, `blocking`, `verdicts` and the optional `risk` and `experiment`; a key beyond them, a missing one or a key stated twice refuses.
 - [ ] [LANREC-33] `version` is the whole number `1`; any other value refuses `version <value> is unknown; this aco reads version 1`.
 - [ ] [LANREC-34] `stages` names `build`, `fix`, `review`, `test`, `gate` and `land`, each `<model>/<effort>` as LANREC-17 reads it, or `none` for `fix`, `test` and `gate`; `land` is the model dispatched to land.
