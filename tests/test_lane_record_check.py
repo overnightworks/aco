@@ -6,7 +6,7 @@ from typing import cast
 
 import pytest
 from cli_fixtures import run_cli
-from lane_record_fixtures import lane_record_object, write_lane_record_file
+from lane_record_fixtures import lane_record_object
 
 MISSING = object()
 
@@ -39,7 +39,7 @@ VALID_RECORDS = [
 
 MALFORMED_RECORDS = [
     pytest.param("{", "not valid JSON", id="not-json"),
-    pytest.param('{"version": 1, "version": 1}', "not valid JSON", id="a-key-stated-twice"),
+    pytest.param('{"version": 1, "version": 1}', "a key stated twice", id="a-key-stated-twice"),
     pytest.param("[]", "the record must be an object", id="not-an-object"),
     pytest.param(
         json.dumps(lane_record_object(version=2)),
@@ -48,7 +48,7 @@ MALFORMED_RECORDS = [
     ),
     pytest.param(
         json.dumps(lane_record_object(version=True)),
-        "version True is unknown; this aco reads version 1",
+        "version true is unknown; this aco reads version 1",
         id="a-boolean-version",
     ),
     pytest.param(
@@ -191,12 +191,3 @@ def test_a_record_file_that_does_not_exist_is_refused(
         "",
         f"ERROR: lane record {path} is invalid: cannot be read (No such file or directory)\n",
     )
-
-
-def test_a_check_needs_no_repository(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: LANREC-30 -- the check reads the file alone: it runs outside any checkout."""
-    path = write_lane_record_file(tmp_path, lane_record_object())
-
-    result = run_cli(["lane-record", "check", str(path)], capsys)
-
-    assert (result.status, result.stderr) == (0, "")

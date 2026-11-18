@@ -518,7 +518,7 @@ def parse_record_file(content: bytes) -> LaneRecordFile:
 def _keys_once(pairs: list[tuple[str, object]]) -> dict[str, object]:
     keys = [key for key, _ in pairs]
     if len(set(keys)) != len(keys):
-        raise ValueError("a key stated twice")
+        raise RecordFileError("a key stated twice")
     return dict(pairs)
 
 
@@ -527,7 +527,8 @@ def _record_file(raw: object) -> LaneRecordFile:
     version = fields["version"]
     if type(version) is not int or version != RECORD_FILE_VERSION:
         raise RecordFileError(
-            f"version {version!r} is unknown; this aco reads version {RECORD_FILE_VERSION}"
+            f"version {json.dumps(version)} is unknown; "
+            f"this aco reads version {RECORD_FILE_VERSION}"
         )
     fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
     blocking = _counts_by_stage(fields["blocking"], "blocking")
