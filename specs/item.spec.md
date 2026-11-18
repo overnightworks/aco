@@ -161,7 +161,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-15] `item edit ITEM --base HASH --json` prints the envelope, `reason: "edited"`, then `item`, `number`, `body_hash` of the body written, and under state-ref the written blob's `oid` (see E-ITEM-03).
 - [ ] [ITEM-71] A whole-body `item edit` whose `--base` is the stored body's hash replaces the body and prints `EDITED <item-id>`, exit `0`; github stores it as piped, under both storages (see E-ITEM-19).
 - [ ] [ITEM-72] The compare runs under the item's lock (RULE-40) on a fresh read; a changed body, or under state-ref a store write meanwhile (CAS-20), refuses `stale`, exit `2`, nothing written (see E-ITEM-19).
-- [ ] [ITEM-73] No `--base` refuses `item edit <item-id> needs --base <hash>; aco item show <item> --json prints it`, exit `2`, before stdin is read or any write (see E-ITEM-19); `<item>` is the argument a command takes, the bare number under github, the item id under state-ref.
+- [ ] [ITEM-73] No `--base` refuses `item edit <item-id> needs --base <hash>; aco item show <item> --json prints it`, exit `2`, before stdin is read or any write (see E-ITEM-19).
 - [ ] [ITEM-74] The piped body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock is taken and the item read, and refuses `body_invalid` (ITEM-25) whatever the base is.
 - [ ] [ITEM-75] Under `storage = "github"` a body equal to the stored one prints `UNCHANGED <item-id>` (`--json`: `reason: "unchanged"`, ITEM-15's keys), exit `0`, writing nothing; state-ref always writes (ITEM-13).
 - [ ] [ITEM-76] Under `storage = "github"` a write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the body is written.
@@ -573,4 +573,4 @@ UNCHANGED #<n>
 exit 0
 ```
 
-The refused runs write nothing; the stale one reads `#<n>` afresh under its lock first.
+The refused runs write nothing; the stale one reads `#<n>` afresh under its lock first. In the refusal's `aco item show <item>`, `<item>` is the argument a command takes: the bare number under github, the item id under state-ref.
