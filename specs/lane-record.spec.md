@@ -269,7 +269,7 @@ exit 2
 
 ### E-LANREC-11 — a record whose misses exceed its blocking findings
 
-Setup: a file `lane-record.json` stating `"blocking": {"review": 3, "gate": 0, "ci": 1, "test": 0}` and `"misses": {"review": 1, "gate": 0, "ci": 2, "test": 0}`, no checkout
+Setup: a file `lane-record.json` stating `"blocking": {"review": 3, "gate": 0, "ci": 1, "test": 0}` and `"misses": {"review": 0, "gate": 0, "ci": 2, "test": 0}`, no checkout
 
 ```console
 $ aco lane-record check lane-record.json
