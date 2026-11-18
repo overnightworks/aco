@@ -41,6 +41,8 @@ VALID_RECORDS = [
 
 MALFORMED_RECORDS = [
     pytest.param("{", "not valid JSON", id="not-json"),
+    pytest.param("[" * 100000, "not valid JSON", id="arrays-nested-past-the-parser-limit"),
+    pytest.param('{"a":' * 100000, "not valid JSON", id="objects-nested-past-the-parser-limit"),
     pytest.param('{"version": 1, "version": 1}', "a key stated twice", id="a-key-stated-twice"),
     pytest.param("[]", "the record must be an object", id="not-an-object"),
     pytest.param(

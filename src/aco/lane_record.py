@@ -517,7 +517,7 @@ def parse_record_file(content: bytes) -> LaneRecordFile:
     what the spec states raises `RecordFileError`."""
     try:
         raw = json.loads(content, object_pairs_hook=_keys_once)
-    except ValueError as error:
+    except (ValueError, RecursionError) as error:
         raise RecordFileError("not valid JSON") from error
     return _record_file(raw)
 
