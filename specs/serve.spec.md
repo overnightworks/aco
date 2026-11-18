@@ -255,7 +255,7 @@ A closed child counts however it closed, not-planned included. A container whose
 - [ ] [ABRD-169] Under `storage = "github"` the label `needs-operator` goes after the body write; a refused removal keeps the answer and adds a `note` naming `gh issue edit <n> --remove-label needs-operator`.
 - [ ] [ABRD-170] A write the forge's body check keeps answers `answered` with ABRD-129's note and removes the label; a lost or unverified write answers `failed` with the forge's sentence and leaves the label.
 - [ ] [ABRD-171] The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.
-- [ ] [ABRD-172] A stored answer writes `next` as `Act on the operator's answer in now.`, in one body write, and answers `answered` with no `item`.
+- [ ] [ABRD-172] A stored answer leaves `next` as it is, in one body write, and answers `answered` with no `item`.
 
 - [ ] [ABRD-173] A step with its fields shows `Erfolgreich` and `Fehlgeschlagen`; `Erfolgreich` posts `yes`. A step that names an answer shows a text field `Bericht` with `Senden` instead, which posts `report`.
 - [ ] [ABRD-174] `Fehlgeschlagen` opens a field `Notiz`; `Senden` stays disabled while it is blank and then posts `no` with the note.
@@ -610,5 +610,5 @@ body: {"repo": "<repo>", "item": 7, "fingerprint": "<as listed>", "result": "no"
 forge requests: read #7, write #7's body, remove the label needs-operator from #7
 answer 200: {"status": "answered", "message": null}
 stored block: no `wait`, no `[step]`, now = The operator answered "Decide." on the board on 2026-10-03: Fehlgeschlagen: Stayed red.
-              next = Act on the operator's answer in now.
+              next = as it was before the answer
 ```

@@ -339,8 +339,8 @@ def _label_as_a_step(client: forge.ForgeWriter, number: int, *, standing: str) -
 
 
 def mark_step(context: RunContext, fresh: FreshItem, step: str, card: item_step.StepCard) -> None:
-    """Writes `step` as the `next` and as the operator wait (`wait.operator`), and `card`
-    as the `step` table, of the fresh item, every other field and byte kept, then sets
+    """Writes `step` as the operator wait (`wait.operator`), and `card` as the `step`
+    table, of the fresh item, every other field (`next` included) and byte kept, then sets
     the label of an operator-only step. A body equal to the
     fresh one writes nothing and the label is set all the same, so a repeat
     finishes a call whose label failed. Raises `protocol.ClaimError` by name for
@@ -349,7 +349,6 @@ def mark_step(context: RunContext, fresh: FreshItem, step: str, card: item_step.
     wait = item_wait.operator_wait_table(step, context.today(), fresh.located.data)
     folded = {
         **fresh.located.data,
-        "next": step,
         item_wait.WAIT_KEY: wait,
         item_step.STEP_KEY: item_step.step_table(card),
     }
@@ -408,8 +407,8 @@ def answer_step(
     channel: item_step.AnswerChannel,
 ) -> StepAnswered:
     """Writes the operator's `result` to `step`, the one `step_of` read from the fresh
-    item: the `wait` and the `step` table go, `now` tells the outcome and `next` says to
-    act on it, every other field and byte is kept. The body is written once; only after
+    item: the `wait` and the `step` table go and `now` tells the outcome, every other
+    field (`next` included) and byte is kept. The body is written once; only after
     a write that stands, verified or kept over a change aco had not read, the label of
     the step is removed (a state-ref item has none). The item stays open. Raises
     `protocol.ClaimError` by name before the write for a `result` the step does not ask
@@ -423,11 +422,8 @@ def answer_step(
         for key, value in fresh.located.data.items()
         if key not in (item_wait.WAIT_KEY, item_step.STEP_KEY)
     }
-    answered = {
-        "now": item_step.answered_now(step.wait_text, result, context.today(), channel),
-        "next": item_step.NEXT_AFTER_ANSWER,
-    }
-    new_body = body.replace_block(fresh.body, fresh.located, {**kept, **answered})
+    now = item_step.answered_now(step.wait_text, result, context.today(), channel)
+    new_body = body.replace_block(fresh.body, fresh.located, {**kept, "now": now})
     written_over = False
     try:
         write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
@@ -462,14 +458,14 @@ def answer_step_in_turn(  # noqa: PLR0913 - the turn keywords plus the item; the
 
 
 def open_step_item(context: RunContext, title: str, step: str, card: item_step.StepCard) -> int:
-    """Opens a task named `title` whose body names `step` as its `next` and holds
-    `card` as its `step` table, sets the
+    """Opens a task named `title` that waits on `step` for the operator, holds
+    `card` as its `step` table and says in its `next` to act on the answer, sets the
     label of an operator-only step on it and answers its number. A failure after
     the item exists names it and says repeating the same call finishes it."""
     client = context.forge_writer
     fields = {
         "now": f"Opened by the step tool on {context.today().isoformat()}.",
-        "next": step,
+        "next": item_step.NEXT_OF_STEP_ITEM,
         item_wait.WAIT_KEY: item_wait.operator_wait_table(step, context.today()),
         item_step.STEP_KEY: item_step.step_table(card),
         "done_when": (

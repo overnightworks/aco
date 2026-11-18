@@ -275,9 +275,8 @@ _TOOLS: Final = (
         "title": "Mark a step only the operator can take",
         "description": (
             "Marks a step that only the operator can take, such as a secret to set or an "
-            "approval to give: it becomes the item's next, replacing the one that stood, "
-            "and the item gets that wait and the label needs-operator, so the step shows "
-            "in read_inbox "
+            "approval to give: the item gets that wait and the label needs-operator, its next "
+            "stays as it is, so the step shows in read_inbox "
             "under steps. The step is a short line; purpose, actions and expected are "
             "required and answer is optional, each stored on the item and shown in "
             "read_inbox. Give an open item's number as item, or a title to open a new item "

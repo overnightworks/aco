@@ -1,5 +1,5 @@
 """The one typed `step` table of an item's `aco` block: the detail of a step only the
-operator can take, behind the one-line `next` and `wait.operator` that name it."""
+operator can take, behind the one-line `wait.operator` that names it."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -122,8 +122,9 @@ class StepReported:
 
 type StepResult = StepSucceeded | StepFailed | StepReported
 
-NEXT_AFTER_ANSWER = "Act on the operator's answer in now."
-"""The `next` of an item whose step the operator answered."""
+NEXT_OF_STEP_ITEM = "Act on the operator's answer in now."
+"""The `next` of an item the step tool opens; a step on an existing item and its answer
+leave that item's `next` as it is."""
 
 
 def asks_for_report(card: StepCard | None) -> bool:

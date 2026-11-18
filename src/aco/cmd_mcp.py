@@ -16,6 +16,7 @@ from . import (
     expectations,
     inbox,
     item_step,
+    item_wait,
     mcp_server,
     protocol,
     report,
@@ -140,16 +141,18 @@ def answer_step(
     return {"repository": label, "item": number, "answered": True, **note}
 
 
-def _holds_step(title: str, step: object, *, wanted_title: str, wanted_step: str) -> bool:
-    """Whether an item with `title` and `next` value `step` is the one a call
-    for `wanted_title` and `wanted_step` marks, padding of `next` ignored."""
-    return title == wanted_title and isinstance(step, str) and step.strip() == wanted_step
+def _holds_step(
+    title: str, wait: item_wait.ItemWait | None, *, wanted_title: str, wanted_step: str
+) -> bool:
+    """Whether an item with `title` and `wait` is the one a call for `wanted_title`
+    and `wanted_step` marks: it waits on the operator for exactly that step."""
+    return title == wanted_title and item_wait.waits_on_operator(wait) and wait.step == wanted_step
 
 
 def _standing_step_item(context: RunContext, title: str, text: str) -> int | None:
     """The highest number among the open, readable items a member wrote with
-    exactly `title` and a block `next` equal to `text`, whether or not they
-    carry the label: what an earlier call of the same `step` left behind."""
+    exactly `title` and a block `wait.operator` equal to `text`, whether or not
+    they carry the label: what an earlier call of the same `step` left behind."""
     storage = context.config.storage
     standing = (
         issue.number
@@ -157,7 +160,7 @@ def _standing_step_item(context: RunContext, title: str, text: str) -> int | Non
         if issue.author_is_member
         and _holds_step(
             issue.title,
-            body.parse_body(issue.body, storage=storage).contract.next,
+            body.parse_body(issue.body, storage=storage).wait,
             wanted_title=title,
             wanted_step=text,
         )
@@ -176,7 +179,7 @@ def step(label: str, text: str, target: int | str, card: item_step.StepCard) -> 
     if context.config.storage is body.Storage.STATE_REF:
         raise protocol.ClaimError(
             f"{label} keeps its items in state-ref storage, where a step cannot be labelled; "
-            "write it into the item's next with aco item edit"
+            "write it into the item's wait with aco item edit"
         )
     if isinstance(target, int):
         _mark_in_turn(context, target, text, card, standing_title=None)
@@ -204,7 +207,7 @@ def _mark_in_turn(
     ) as fresh:
         if standing_title is not None and not _holds_step(
             fresh.title,
-            fresh.located.data.get("next"),
+            body.parse_body(fresh.body, storage=fresh.storage).wait,
             wanted_title=standing_title,
             wanted_step=text,
         ):
