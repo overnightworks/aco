@@ -13,7 +13,13 @@ afterEach(() => {
 });
 
 function readingsOf(store: BoardStore) {
-	return store.repos.map(({ name, error, items, progress }) => ({ name, error, items, progress }));
+	return store.repos.map(({ name, error, items, progress, steps }) => ({
+		name,
+		error,
+		items,
+		progress,
+		steps
+	}));
 }
 
 function throwingFetch(): typeof fetch {
@@ -114,7 +120,8 @@ test('[ABRD-101] a repository that fails inside an answer keeps its items and re
 		name: 'b',
 		error: 'gh down',
 		items: keptItems,
-		progress: null
+		progress: null,
+		steps: []
 	});
 	expect(store.repos[1]?.readAt?.getTime()).toBe(firstReadAt);
 	expect(store.repos[0]?.items).toEqual(newItems);
@@ -130,7 +137,8 @@ test('[ABRD-101] a repository that fails on its first read has the sentence, no 
 		name: 'b',
 		error: 'gh down',
 		items: [],
-		progress: null
+		progress: null,
+		steps: []
 	});
 	expect(store.repos[1]?.readAt).toBeNull();
 });
@@ -148,7 +156,8 @@ test('[ABRD-101] a repository that reads again replaces its kept items, sentence
 		name: 'b',
 		error: null,
 		items: fresh,
-		progress: null
+		progress: null,
+		steps: []
 	});
 	expect(store.repos[0]?.readAt?.getTime()).toBe(new Date(2026, 9, 31, 11, 30).getTime());
 });

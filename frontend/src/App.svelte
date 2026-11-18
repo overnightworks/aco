@@ -15,6 +15,7 @@
 		tabCounts
 	} from './app/model/boardSummary';
 	import { PROGRESS_TAB_LABEL } from './app/model/progress';
+	import { STEPS_TAB_LABEL, stepCount } from './app/model/steps';
 	import { BoardStore } from './app/state/board.svelte';
 	import { cardKey } from './app/model/decision';
 	import { DecisionStore } from './app/state/decision.svelte';
@@ -22,6 +23,7 @@
 	import ProgressView from './components/ProgressView.svelte';
 	import QuietSign from './components/QuietSign.svelte';
 	import RefreshButton from './components/RefreshButton.svelte';
+	import StepsView from './components/StepsView.svelte';
 	import Stage from './components/Stage.svelte';
 	import TrackList from './components/TrackList.svelte';
 	import UndoStrip from './components/UndoStrip.svelte';
@@ -38,6 +40,7 @@
 	let showDecidedCard = $state(false);
 	let view: BoardView = $state('open');
 	const counts = $derived(tabCounts(board.repos));
+	const stepTotal = $derived(stepCount(board.repos));
 	const hasViews = $derived(board.status === 'ready' && decisions !== null);
 	const cardView = $derived(view === 'open' ? showQuestion : view === 'decided' && showDecidedCard);
 	let initialized = $state(false);
@@ -258,6 +261,13 @@
 					aria-current={view === 'progress' ? 'page' : undefined}
 					onclick={() => (view = 'progress')}>{PROGRESS_TAB_LABEL}</button
 				>
+				<button
+					type="button"
+					aria-current={view === 'steps' ? 'page' : undefined}
+					onclick={() => (view = 'steps')}
+					>{STEPS_TAB_LABEL}
+					<span class="n waiting" class:zero={stepTotal === 0}>{stepTotal}</span></button
+				>
 			</nav>
 			{#if token !== null}
 				{@const readToken = token}
@@ -309,6 +319,9 @@
 				</div>
 			</div>
 		</div>
+		{#if view === 'steps'}
+			<StepsView repos={board.repos} />
+		{/if}
 		{#if view === 'progress'}
 			<ProgressView repos={board.repos} />
 		{/if}

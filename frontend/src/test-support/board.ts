@@ -16,6 +16,7 @@ import type {
 	ProgressRead,
 	RepoReading,
 	RuledOptionLine,
+	StepRead,
 	YesNoLine
 } from '../types';
 
@@ -134,6 +135,21 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 		error: null,
 		items: [item()],
 		progress: null,
+		steps: [],
+		...overrides
+	};
+}
+
+/** A step waiting on the operator, as `GET /api/board` lists it, with its table. */
+export function stepRead(overrides: Partial<StepRead> = {}): StepRead {
+	return {
+		number: 7,
+		title: 'Release',
+		step: 'Run the release.',
+		purpose: 'Release the build.',
+		actions: 'open https://example.test/run\nclick Run',
+		expected: 'The page shows green.',
+		answer: null,
 		...overrides
 	};
 }
