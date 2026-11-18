@@ -23,7 +23,7 @@ from .session import (
     LaneSharedReading,
     RepoMeaninglessUnderStateRefError,
     RunContext,
-    lane_shared_covers,
+    paths_outside_claim,
     trunk_lane_shared_reading,
 )
 
@@ -188,12 +188,9 @@ def _brief_json(composition: _BriefComposition) -> int:
         "touched": list(composition.touched),
         "outside_claim": None
         if live is None
-        else [
-            path
-            for path in composition.touched
-            if not protocol.scopes_overlap(live.claim.scope, (path,))
-            and not lane_shared_covers(composition.lane_shared, path)
-        ],
+        else list(
+            paths_outside_claim(live.claim.scope, composition.lane_shared, composition.touched)
+        ),
     }
     step_rules = composition.step_rules
     if step_rules is not None:

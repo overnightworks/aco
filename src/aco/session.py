@@ -22,7 +22,7 @@ branch, trunk -- so the next ask re-reads only the state ref.
 """
 
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from functools import cached_property
@@ -272,6 +272,19 @@ def lane_shared_covers(reading: LaneSharedReading, path: str) -> bool:
     return any(
         entry.tracked and workboard.repository_path_entry_covers(entry.path, path)
         for entry in reading
+    )
+
+
+def paths_outside_claim(
+    scope: tuple[str, ...], lane_shared: LaneSharedReading, paths: Iterable[str]
+) -> tuple[str, ...]:
+    """The `paths` neither a `scope` entry (equal, or an ancestor directory)
+    nor a lane-shared entry covers, in the order given: the one decider of
+    what a claim leaves uncovered, which `brief` and the landing check share."""
+    return tuple(
+        path
+        for path in paths
+        if not protocol.scopes_overlap(scope, (path,)) and not lane_shared_covers(lane_shared, path)
     )
 
 

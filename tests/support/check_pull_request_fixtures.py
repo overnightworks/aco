@@ -21,9 +21,15 @@ from store_fixtures import claim_intent, publish_claims_from_a_second_clone
 
 from aco import body, forge, protocol, workboard
 
-ITEM_CLAIM = claim_intent(identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH)
+ITEM_CLAIM = claim_intent(
+    identity=protocol.IssueIdentity(72), branch=LANDING_BRANCH, scope=("README.md",)
+)
 LANE_BRANCH = "docs/tidy-readme"
-LANE_CLAIM = claim_intent(identity=protocol.LaneIdentity(), branch=LANE_BRANCH)
+LANE_CLAIM = claim_intent(
+    identity=protocol.LaneIdentity(),
+    branch=LANE_BRANCH,
+    scope=("README.md", "pyproject.toml", "uv.lock", ".github/workflows", "src/x.py"),
+)
 WORK_ITEM = f"{REPOSITORY}#72"
 PARENT_ISSUE = 79
 PARENT = f"{REPOSITORY}#{PARENT_ISSUE}"
@@ -52,6 +58,7 @@ class PullRequestWorld:
     target_branch: str = "main"
     default_branch: str = "main"
     dependency_paths: tuple[str, ...] = ()
+    lane_shared: tuple[str, ...] = ()
     listing: forge.PullRequestChanges | forge.ForgeError = README_LISTING
     parent: ParentWorld | None = None
 
@@ -108,15 +115,17 @@ def declares(
     world: PullRequestWorld = ITEM_WORLD,
     changes_reads: tuple[int, ...] = (),
 ) -> PullRequestCase:
+    """An accepted declaration has read the listing once; only `deps` rows count that read."""
+    already_counted = bool(changes_reads)
     return PullRequestCase(
         body=body,
         exit=0,
         stdout=f"PR #12 by ada declares {label}\n",
         stderr="",
         envelope={"ok": True, "reason": "valid", "kind": "pull_request", "number": 12},
-        forge_requests=forge_requests,
+        forge_requests=forge_requests if already_counted else forge_requests + 1,
         world=world,
-        changes_reads=changes_reads,
+        changes_reads=(12,),
     )
 
 
@@ -267,14 +276,17 @@ def check_pull_request(
     assert_github_world(github_clone, bare_remote)
 
     def check(case: PullRequestCase, flags: Flags) -> None:
-        if case.world.dependency_paths:
+        if case.world.dependency_paths or case.world.lane_shared:
             track_board_config(
                 github_clone,
-                f"dependency_paths = {json.dumps(list(case.world.dependency_paths))}\n",
+                f"dependency_paths = {json.dumps(list(case.world.dependency_paths))}\n"
+                f"lane_shared = {json.dumps(list(case.world.lane_shared))}\n",
             )
+            real_git(github_clone, "push", "-q", "origin", "main")
         tracked = real_git(github_clone, "show", f"HEAD:{workboard.CONFIG_PATH}").stdout
         configured = workboard.parse_config(tracked, workboard.CONFIG_PATH)
         assert configured.dependency_paths == case.world.dependency_paths
+        assert configured.lane_shared == case.world.lane_shared
         seeded = publish_claims_from_a_second_clone(github_clone, bare_remote, case.world.claims)
         assert tuple((claim.identity, claim.branch) for claim in seeded.claims.values()) == tuple(
             (claim.identity, claim.branch) for claim in case.world.claims
