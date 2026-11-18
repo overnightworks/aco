@@ -11,12 +11,14 @@ from typing import cast
 from . import (
     checkout,
     cmd_status,
+    expectations,
     forge,
     protocol,
     report,
     store,
     workboard,
 )
+from .body import Storage
 from .session import (
     LaneSharedReading,
     RepoMeaninglessUnderStateRefError,
@@ -122,8 +124,8 @@ class _BriefComposition:
     lane_shared: LaneSharedReading
 
 
-def _print_brief(composition: _BriefComposition) -> None:
-    print(protocol.terminal_block(composition.body))
+def _print_brief(composition: _BriefComposition, storage: Storage) -> None:
+    print(protocol.terminal_block(expectations.briefed_body(composition.body, storage=storage)))
     print()
     print("CLAIM")
     if composition.live is None:
@@ -280,5 +282,5 @@ def _brief_report(parsed: argparse.Namespace, context: RunContext) -> int:
     )
     if parsed.json:
         return _brief_json(composition)
-    _print_brief(composition)
+    _print_brief(composition, context.config.storage)
     return 0

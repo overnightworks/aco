@@ -315,6 +315,38 @@ def expectation_lines(
     )
 
 
+_BRIEFED_RULED_KEYS = ("text", "ruling", "ruled_on", "via", OTHER, "question")
+
+
+def _briefed_entry(entry: dict[str, object]) -> dict[str, object]:
+    """A ruled option line cut to its binding sentence: its question and the
+    chosen option's name and contract, or the operator's own answer; every
+    other entry as stored."""
+    if not is_option_line(entry) or "ruling" not in entry:
+        return entry
+    briefed = {key: entry[key] for key in _BRIEFED_RULED_KEYS if key in entry}
+    ruling = cast(str, entry["ruling"])
+    if ruling != OTHER:
+        chosen = cast(list[dict[str, object]], entry["option"])[OPTION_LETTERS.index(ruling)]
+        briefed["option"] = [{"name": chosen["name"], "contract": chosen["contract"]}]
+    return briefed
+
+
+def briefed_body(body: str, *, storage: Storage = Storage.GITHUB) -> str:
+    """`body` with each ruled option line cut to its binding sentence and
+    every byte outside the block as stored -- `body` itself when it is not
+    VALID or holds no ruled option line. The result is a reading aid, no
+    valid body."""
+    if parse_body(body, storage=storage).read_state is not BodyReadState.VALID:
+        return body
+    located = locate_block(body)
+    entries = block_expectation_dicts(located.data)
+    briefed = [_briefed_entry(entry) for entry in entries]
+    if all(new is old for new, old in zip(briefed, entries, strict=True)):
+        return body
+    return replace_block(body, located, {**located.data, "expectation": briefed})
+
+
 def returned_line_indexes(body: str, *, storage: Storage = Storage.GITHUB) -> tuple[int, ...]:
     """The indexes of `body`'s option lines sent back to their head, in
     block order -- empty for a body `expectation_lines` cannot read."""
