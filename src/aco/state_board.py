@@ -14,13 +14,10 @@ port: one compare-and-swap write to `items/<id>.md`, implemented in
 `commit_transition` with an `ItemWriteIntent`; `close_item` through the port's own
 `close_item` and an `ItemCloseIntent`) -- so this module never imports `store` itself.
 
-`landing` and `pull_request_changes` raise `ForgeUnsupportedError`: this adapter has
-no data for them; `create_issue` raises it because `compose_item` mints a state-ref
-item's id and records its parent and origin in one write, and `add_label` because an
-item here carries no forge label. The two pull-request listings
-still return an empty tuple rather than raising: `board_read.build_board` calls them
-unconditionally for every board read, and "no pull requests exist here" is this adapter's
-honest answer, not a refusal; `lists_pull_requests` is `False`.
+`landing` and `pull_request_changes` raise `ForgeUnsupportedError`: this adapter has no data for
+them. The two pull-request listings still return an empty tuple rather than raising:
+`board_read.build_board` calls them unconditionally for every board read, and "no pull requests
+exist here" is this adapter's honest answer, not a refusal; `lists_pull_requests` is `False`.
 `Board.recovery` -- purely pull-request-body-declared -- stays empty from that same emptiness.
 `Stage.CODE_LANDED` and the board's own Landungen view do not: both read
 `checkout.trunk_landings`'s trailer block from local git history instead.
@@ -729,6 +726,9 @@ class StateRefBoard:
         raise forge.ForgeUnsupportedError(NO_BARE_ISSUE)
 
     def add_label(self, number: int, label: str) -> None:
+        raise forge.ForgeUnsupportedError("a state-ref item carries no forge label")
+
+    def remove_label(self, number: int, label: str) -> None:
         raise forge.ForgeUnsupportedError("a state-ref item carries no forge label")
 
     def set_item_kind(self, number: int, kind: ItemKind) -> None:

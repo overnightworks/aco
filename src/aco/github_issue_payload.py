@@ -127,6 +127,26 @@ def sub_issue_title(value: object) -> str:
     return title
 
 
+def created_issue_number(raw: str, kind: ItemKind, type_name: str) -> int:
+    """The number of the issue `raw`, GitHub's answer to a create, names. Raises
+    `forge.ForgeMalformedResponseError` unless it is an issue with a number, and
+    `forge.ForgeIssueTypeNotSetError` naming the issue and `type_name` unless it
+    holds the type of `kind`."""
+    try:
+        created = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise forge.ForgeMalformedResponseError(
+            "GitHub returned invalid created-issue JSON"
+        ) from error
+    number = created.get("number") if isinstance(created, dict) else None
+    if not _is_count(number, minimum=1):
+        raise forge.ForgeMalformedResponseError("GitHub did not return a created issue")
+    issue_type = created.get("type")
+    if not isinstance(issue_type, dict) or issue_kind(issue_type.get("name")) is not kind:
+        raise forge.ForgeIssueTypeNotSetError(created=number, type_name=type_name)
+    return number
+
+
 def require_label(raw: str, label: str) -> None:
     """Raises `forge.ForgeMalformedResponseError` unless `raw`, GitHub's answer to a
     label write, is the issue's label list and holds `label`."""

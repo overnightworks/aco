@@ -88,12 +88,12 @@ from github_fixtures import (
     MERGE_COMMIT_SHA,
     WORK_ITEM_ISSUE,
     FakeForge,
-    ReaderOnlyForge,
     landing_pull_request,
     landing_readiness,
 )
 from landing_world_parts import landing_listing
 from option_cards import card, decide, open_option_entry
+from reader_only_forge import ReaderOnlyForge
 from store_fixtures import (
     RaceOnceTransport,
     blob,

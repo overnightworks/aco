@@ -72,3 +72,34 @@ def test_an_answer_without_the_label_is_a_malformed_response(
 
     with pytest.raises(forge.ForgeMalformedResponseError):
         client.add_label(484, _LABEL)
+
+
+def test_removing_the_label_deletes_it_from_the_issues_label_list(
+    requests: list[tuple[list[str], bytes | None]],
+) -> None:
+    client = _forge_answering(_labels("bug"), requests)
+
+    client.remove_label(484, _LABEL)
+
+    assert requests == [
+        (["api", "--method", "DELETE", f"repos/{REPOSITORY}/issues/484/labels/{_LABEL}"], None)
+    ]
+
+
+def test_a_label_the_issue_does_not_hold_counts_as_removed() -> None:
+    def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
+        raise forge.ForgeNotFoundError("gh: Label does not exist (HTTP 404)")
+
+    client = github.GitHubForge(github.repository_id(REPOSITORY), run=run)
+
+    client.remove_label(484, _LABEL)
+
+
+def test_a_refused_label_removal_stays_a_failure() -> None:
+    def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
+        raise forge.ForgePermissionDeniedError("gh: Resource not accessible (HTTP 403)")
+
+    client = github.GitHubForge(github.repository_id(REPOSITORY), run=run)
+
+    with pytest.raises(forge.ForgePermissionDeniedError):
+        client.remove_label(484, _LABEL)

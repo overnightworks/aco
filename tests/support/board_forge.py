@@ -41,6 +41,7 @@ _WRITE_FAILURE = "write_failure"
 _WRITE_ANSWER = "write_answer"
 _REPLACINGS = "replacings"
 _CLOSED = "closed"
+_LABEL_FAILURE = "label_failure"
 RULING_DAY = date(2026, 10, 3)
 """The day aco rules on over this forge, so a page shows a date it can name."""
 
@@ -53,6 +54,7 @@ class ForgeOperation(StrEnum):
     WRITE_BODY = "update_item_body"
     CREATE_ISSUE = "create_issue"
     ADD_LABEL = "add_label"
+    REMOVE_LABEL = "remove_label"
 
 
 @dataclass(frozen=True)
@@ -102,6 +104,7 @@ class _ForgeState:
     write_answer: _CheckAnswer | None = None
     replacings: list[str] = field(default_factory=list[str])
     closed: set[int] = field(default_factory=set[int])
+    label_failure: str | None = None
 
     @classmethod
     def from_json(cls, text: str) -> _ForgeState:
@@ -116,6 +119,7 @@ class _ForgeState:
             _answer_from_json(stored[_WRITE_ANSWER]),
             stored[_REPLACINGS],
             set(stored[_CLOSED]),
+            stored[_LABEL_FAILURE],
         )
 
     def to_json(self) -> str:
@@ -130,6 +134,7 @@ class _ForgeState:
                 _WRITE_ANSWER: _answer_to_json(self.write_answer),
                 _REPLACINGS: self.replacings,
                 _CLOSED: sorted(self.closed),
+                _LABEL_FAILURE: self.label_failure,
             }
         )
 
@@ -251,6 +256,12 @@ class BoardForge:
         and stores nothing; the write after it stores again."""
         state = self._state()
         state.write_failure = message
+        self._replace_state(state)
+
+    def fail_label_removals(self, message: str) -> None:
+        """Every later label removal is logged, then raises a forge failure carrying `message`."""
+        state = self._state()
+        state.label_failure = message
         self._replace_state(state)
 
     def answer_next_write(self, answer: _CheckAnswer) -> None:
@@ -437,6 +448,15 @@ class BoardForge:
         state = self._state()
         if label not in state.items[number].labels:
             state.items[number].labels.append(label)
+        self._replace_state(state)
+
+    def remove_label(self, number: int, label: str) -> None:
+        self._log(ForgeRequest(ForgeOperation.REMOVE_LABEL, number))
+        state = self._state()
+        if state.label_failure is not None:
+            raise forge.ForgeError(state.label_failure)
+        if label in state.items[number].labels:
+            state.items[number].labels.remove(label)
         self._replace_state(state)
 
     def create_child(self, *, parent: int, title: str, body: str, kind: ItemKind) -> int:

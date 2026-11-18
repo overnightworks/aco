@@ -166,6 +166,7 @@ class FakeForge:
     retyped_items: list[tuple[int, body.ItemKind]] = field(default_factory=list)
     added_labels: list[tuple[int, str]] = field(default_factory=list)
     add_label_error: protocol.ClaimError | None = None
+    removed_labels: list[tuple[int, str]] = field(default_factory=list)
     next_created_child_number: int = 900
     item_bodies: dict[int, str] = field(default_factory=dict)
     fail_update_item_body: bool = False
@@ -288,6 +289,9 @@ class FakeForge:
         self.added_labels.append((number, label))
         if self.add_label_error is not None:
             raise self.add_label_error
+
+    def remove_label(self, number: int, label: str) -> None:
+        self.removed_labels.append((number, label))
 
     def close_landed_item(self, number: int, *, pull_request: int) -> None:
         """Records the comment and the close as state."""
@@ -485,41 +489,6 @@ class FakeForge:
         self._run()
         self.closed_issue_cutoffs.append(since)
         return self.recently_closed_issues
-
-
-class ReaderOnlyForge(FakeForge):
-    """A `FakeForge` whose write operations fail the test instead of quietly succeeding --
-    the enforcement that a read-only command never writes, independent of the
-    `ForgeReader`/`ForgeWriter` annotations (documentation only)."""
-
-    def create_issue(self, *, title: str, body: str, kind: body.ItemKind) -> int:
-        pytest.fail("a read-only command must never create an issue")
-
-    def link_child(self, parent: int, child: int) -> None:
-        pytest.fail("a read-only command must never link a child")
-
-    def create_child(self, *, parent: int, title: str, body: str, kind: body.ItemKind) -> int:
-        pytest.fail("a read-only command must never create a child")
-
-    def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
-        pytest.fail("a read-only command must never update an item body")
-
-    def set_item_kind(self, number: int, kind: body.ItemKind) -> None:
-        pytest.fail("a read-only command must never retype an item")
-
-    def add_label(self, number: int, label: str) -> None:
-        pytest.fail("a read-only command must never add a label")
-
-    def close_landed_item(self, number: int, *, pull_request: int) -> None:
-        pytest.fail("a read-only command must never close a landed item")
-
-    def merge_landing(
-        self, number: int, *, head_sha: str, method: MergeMethod, title: str, body: str
-    ) -> str:
-        pytest.fail("a read-only command must never merge a pull request")
-
-    def delete_branch(self, branch: str) -> None:
-        pytest.fail("a read-only command must never delete a branch")
 
 
 def assert_github_world(github_clone: Path, bare_remote: Path) -> None:

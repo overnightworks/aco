@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import TypeVar
+from urllib.parse import quote
 
 from . import (
     forge,
@@ -1272,24 +1273,21 @@ class GitHubForge:
                 {"title": title, "body": body, "type": ITEM_KIND_TYPE_NAMES[kind]}
             ).encode("utf-8"),
         )
+        return github_issue_payload.created_issue_number(raw, kind, ITEM_KIND_TYPE_NAMES[kind])
+
+    def remove_label(self, number: int, label: str) -> None:
+        """A label the issue does not hold is already removed: GitHub answers it 404."""
         try:
-            created = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise forge.ForgeMalformedResponseError(
-                "GitHub returned invalid created-issue JSON"
-            ) from error
-        number = created.get("number") if isinstance(created, dict) else None
-        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
-            raise forge.ForgeMalformedResponseError("GitHub did not return a created issue")
-        issue_type = created.get("type")
-        if (
-            not isinstance(issue_type, dict)
-            or github_issue_payload.issue_kind(issue_type.get("name")) is not kind
-        ):
-            raise forge.ForgeIssueTypeNotSetError(
-                created=number, type_name=ITEM_KIND_TYPE_NAMES[kind]
+            self._run(
+                [
+                    "api",
+                    "--method",
+                    "DELETE",
+                    f"repos/{self.repository}/issues/{number}/labels/{quote(label, safe='')}",
+                ]
             )
-        return number
+        except forge.ForgeNotFoundError:
+            return
 
     def add_label(self, number: int, label: str) -> None:
         """GitHub creates a label the repository lacks; the answer is the issue's
