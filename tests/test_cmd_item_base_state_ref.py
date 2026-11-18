@@ -159,6 +159,29 @@ def test_a_malformed_item_is_repaired_with_the_hash_item_show_refused_with(
     assert run_cli(["item", "show", ITEM_ID, "--json"], capsys).status == 0
 
 
+def test_the_hint_item_new_prints_for_a_missing_section_leads_to_a_working_edit(
+    seed_item: SeedItem, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ITEM-61, ITEM-70 -- pasted, the `item show` the hint names prints the hash
+    the `item edit` it names takes."""
+    seed_item(_item_body("Seed.").encode())
+    created = run_cli(["item", "new", "--title", "Importer", "--kind", "task"], capsys, stdin="")
+    assert created.status == 0, created.stderr
+    new_id = created.stdout.split()[-1]
+    hint = created.stderr.splitlines()[0]
+    assert hint.startswith(f"{new_id} misses Now; aco item edit {new_id} --base <body_hash> ")
+    assert f"(hash: aco item show {new_id} --json)" in hint
+
+    shown = run_cli(["item", "show", new_id, "--json"], capsys)
+    edited = run_cli(
+        ["item", "edit", new_id, "--base", json.loads(shown.stdout)["body_hash"]],
+        capsys,
+        stdin=_item_body("Filled."),
+    )
+
+    assert (edited.status, edited.stdout) == (0, f"EDITED {new_id}\n")
+
+
 def test_an_edit_of_an_unknown_item_refuses(
     seed_item: SeedItem, capsys: pytest.CaptureFixture[str]
 ) -> None:

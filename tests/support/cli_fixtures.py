@@ -665,6 +665,7 @@ def dependabot_pull_request(head_sha: str) -> forge.Landing:
         merge_commit=None,
         title="Bump x",
         head_sha=head_sha,
+        author_is_dependency_bot=True,
     )
 
 

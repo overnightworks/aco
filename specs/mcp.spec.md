@@ -342,7 +342,7 @@ An item a non-member wrote answers `item 7 was not written by a member; its step
 Setup: `owner/a` is pinned to `storage = "state-ref"`
 
 ```text
-< {"jsonrpc":"2.0","id":15,"result":{"content":[{"type":"text","text":"owner/a keeps its items in state-ref storage, where a step cannot be labelled; write it into the item's wait with aco item edit"}],"isError":true}}
+< {"jsonrpc":"2.0","id":15,"result":{"content":[{"type":"text","text":"owner/a keeps its items in state-ref storage, where a step cannot be labelled; write it into the item's wait with aco item edit --base <body_hash>; aco item show --json prints the body_hash"}],"isError":true}}
 ```
 
 Nothing was read or written.

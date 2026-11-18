@@ -91,6 +91,9 @@ from aco.workboard import BlockerState, IssueDependency, IssueReference
 REPOSITORY_PATH = "acme/items"
 REPOSITORY = forge.RepositoryId("file", ("acme",), "items")
 DEFAULT_BRANCH = "main"
+MISSING_SECTION_HINT = (
+    "aco item edit {item} --base <body_hash> fills it (hash: aco item show {item} --json)"
+)
 
 CONTAINER_ID = "aco-000001"
 CHILD_A_ID = "aco-000002"
@@ -3357,8 +3360,7 @@ class TestCliStateRefForge:
                     'now = "Ready."\nnext = ""\ndone_when = ""\n```\n'
                 ),
                 ("--now", "Ready.", "--size", "S"),
-                "{item} misses Next; aco item edit {item} fills it\n"
-                "{item} misses Done when; aco item edit {item} fills it\n",
+                "{item} misses Next; {hint}\n{item} misses Done when; {hint}\n",
                 "Ship the importer.\n\n```aco\n",
                 {"now": "Ready.", "next": "", "done_when": "", "size": "S"},
                 id="a_piped_block_matching_the_flags_kept_and_its_gaps_named",
@@ -3366,9 +3368,9 @@ class TestCliStateRefForge:
             pytest.param(
                 piping(""),
                 (),
-                "{item} misses Now; aco item edit {item} fills it\n"
-                "{item} misses Next; aco item edit {item} fills it\n"
-                "{item} misses Done when; aco item edit {item} fills it\n",
+                "{item} misses Now; {hint}\n"
+                "{item} misses Next; {hint}\n"
+                "{item} misses Done when; {hint}\n",
                 "```aco\n",
                 {"now": "", "next": "", "done_when": ""},
                 id="nothing_piped_writes_the_skeleton_and_names_each_gap",
@@ -3376,9 +3378,9 @@ class TestCliStateRefForge:
             pytest.param(
                 empty_harness_socket_on_stdin,
                 (),
-                "{item} misses Now; aco item edit {item} fills it\n"
-                "{item} misses Next; aco item edit {item} fills it\n"
-                "{item} misses Done when; aco item edit {item} fills it\n",
+                "{item} misses Now; {hint}\n"
+                "{item} misses Next; {hint}\n"
+                "{item} misses Done when; {hint}\n",
                 "```aco\n",
                 {"now": "", "next": "", "done_when": ""},
                 id="a_harness_socket_is_never_read_and_the_skeleton_is_written",
@@ -3412,7 +3414,10 @@ class TestCliStateRefForge:
 
         captured = capsys.readouterr()
         printed = captured.out.strip()
-        assert (status, captured.err) == (0, err.format(item=printed))
+        assert (status, captured.err) == (
+            0,
+            err.format(item=printed, hint=MISSING_SECTION_HINT.format(item=printed)),
+        )
         state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
         assert state.tip is not None
         stored = store.read_item_files(worktree, state.tip)[f"{printed}.md"].decode()

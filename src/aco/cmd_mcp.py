@@ -179,7 +179,8 @@ def step(label: str, text: str, target: int | str, card: item_step.StepCard) -> 
     if context.config.storage is body.Storage.STATE_REF:
         raise protocol.ClaimError(
             f"{label} keeps its items in state-ref storage, where a step cannot be labelled; "
-            "write it into the item's wait with aco item edit"
+            "write it into the item's wait with aco item edit --base <body_hash>; "
+            "aco item show --json prints the body_hash"
         )
     if isinstance(target, int):
         _mark_in_turn(context, target, text, card, standing_title=None)

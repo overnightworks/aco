@@ -234,7 +234,11 @@ def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> i
     item_id = client.create_item(new_item)
     _print_item_new_result(item_id, items.item_number(item_id), as_json=parsed.json)
     for section in body.missing_or_empty_sections(body.parse_body(new_body).contract):
-        print(f"{item_id} misses {section}; aco item edit {item_id} fills it", file=sys.stderr)
+        print(
+            f"{item_id} misses {section}; aco item edit {item_id} --base <body_hash> fills it "
+            f"(hash: aco item show {item_id} --json)",
+            file=sys.stderr,
+        )
     return 0
 
 
