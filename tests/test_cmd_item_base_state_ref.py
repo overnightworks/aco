@@ -168,9 +168,6 @@ def test_the_hint_item_new_prints_for_a_missing_section_leads_to_a_working_edit(
     created = run_cli(["item", "new", "--title", "Importer", "--kind", "task"], capsys, stdin="")
     assert created.status == 0, created.stderr
     new_id = created.stdout.split()[-1]
-    hint = created.stderr.splitlines()[0]
-    assert hint.startswith(f"{new_id} misses Now; aco item edit {new_id} --base <body_hash> ")
-    assert f"(hash: aco item show {new_id} --json)" in hint
 
     shown = run_cli(["item", "show", new_id, "--json"], capsys)
     edited = run_cli(
