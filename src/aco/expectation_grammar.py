@@ -9,6 +9,7 @@ it never imports `body`, which calls it while parsing and rendering a block and
 reports its `FieldDefect` pairs as `ContractDefect`s.
 """
 
+import argparse
 import hashlib
 import json
 import re
@@ -51,7 +52,8 @@ RETURNED_NOTE = "returned_note"
 # The day a head withdrew a line nobody had ruled; beside `text` the line's only key.
 WITHDRAWN_ON = "withdrawn_on"
 OPTION_COUNT_MINIMUM = 2
-_CARD_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
+_CONTENT_HASH_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
+_NOT_A_CONTENT_HASH = "must be sha256: followed by 64 lowercase hex digits"
 _CAPTION_NEEDS_PICTURE = "needs a picture beside it"
 _PICTURE = "picture"
 SAME_AS_TODAY = "same_as_today"
@@ -393,9 +395,9 @@ def _partial_decision_defect(prefix: str, entry: dict[str, object]) -> FieldDefe
 
 
 def _card_hash_defect(value: object) -> str | None:
-    if isinstance(value, str) and _CARD_HASH_PATTERN.fullmatch(value):
+    if isinstance(value, str) and _CONTENT_HASH_PATTERN.fullmatch(value):
         return None
-    return "must be sha256: followed by 64 lowercase hex digits"
+    return _NOT_A_CONTENT_HASH
 
 
 def _ruling_defect(letters: tuple[str, ...]) -> Callable[[object], str | None]:
@@ -734,7 +736,20 @@ def card_hash(entry: Mapping[str, object]) -> str:
     options = cast(list[Mapping[str, object]], entry[_OPTION_TABLES])
     covered["options"] = [_present_values(option, OPTION_KEYS) for option in options]
     canonical = json.dumps(covered, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+    return content_hash(canonical.encode("utf-8"))
+
+
+def content_hash(content: bytes) -> str:
+    """`content` hashed with SHA-256 and written `sha256:<64 lowercase hex>`, the
+    one format of a card hash and of an item body's hash (ITEM-70)."""
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def hash_argument(text: str) -> str:
+    """An argparse `type` for a hash `content_hash` wrote; any other text is refused."""
+    if _CONTENT_HASH_PATTERN.fullmatch(text) is None:
+        raise argparse.ArgumentTypeError(_NOT_A_CONTENT_HASH)
+    return text
 
 
 def _rendered_value(key: str, value: object) -> str:

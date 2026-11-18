@@ -51,15 +51,6 @@ def _refuse_a_body_on_stdin(command: str) -> None:
         raise protocol.ClaimUnavailableError(f"{command} reads no stdin; drop the redirect")
 
 
-def _snapshot_body(client: state_board.StateRefBoard, number: int) -> str:
-    """`number`'s snapshot body; the snapshot read refuses a malformed item, so
-    the edit names no replaced text."""
-    try:
-        return client.item_reference(number).body or ""
-    except protocol.MalformedStateTreeError:
-        return ""
-
-
 def _state_ref_board(context: RunContext) -> state_board.StateRefBoard:
     """`context`'s own forge as the state-ref board, for an item command
     that has already refused every other storage pin: under `state-ref`
@@ -76,9 +67,9 @@ class _ItemReason(StrEnum):
     """`aco item`'s own `--json` `reason` vocabulary, shared across its four
     subcommands (`specs/item.spec.md`): `created`/`edited`/
     `closed`/`shown` name each subcommand's own success; `unchanged`, an
-    `item edit --size/--whole/--kind` whose value is already set, which
-    writes nothing. `body_invalid`
-    covers only `item new`'s and `item edit`'s own piped-body shape check
+    `item edit` whose value or body is already stored, which writes nothing;
+    `stale`, a whole-body `item edit` whose `--base` is no longer the item's
+    body hash. `body_invalid` covers only `item new`'s and `item edit`'s own piped-body shape check
     (`_body_shape_defects`, the same check `check -` runs), carrying
     `defects` the same way (`cmd_check._CheckReason`); `partial_write`
     only a GitHub issue `item new` created but could not type or record under
@@ -94,6 +85,7 @@ class _ItemReason(StrEnum):
     CLOSED = "closed"
     SHOWN = "shown"
     PRECONDITION_FAILED = "precondition_failed"
+    STALE = "stale"
     BODY_INVALID = "body_invalid"
     PARTIAL_WRITE = "partial_write"
 
@@ -309,75 +301,96 @@ def _print_item_new_result(item_id: str, number: int, *, as_json: bool) -> None:
         print(item_id)
 
 
-_ITEM_EDIT_GITHUB_REFUSAL = "forge issues are edited on the forge; aco never governs them"
-
-
 def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM`: with `--size`, `--whole`, or `--kind`,
-    a narrow write of only that one field (`_cmd_item_edit_size`/
-    `_cmd_item_edit_whole`/`_cmd_item_edit_kind`, both storages); with none,
-    the state-ref item's own body, replaced from
-    stdin only -- refused before any write when the piped body carries no
-    valid `aco` block (`check -`'s own sentences,
-    `_body_shape_defects`). The CAS `expected` oid is this process's own
-    already-read snapshot (`StateRefBoard.update_item_body`'s
-    `current.oid`, set once at `session._state_ref_forge` construction): a second
-    process writing from that same snapshot refuses with a stale-write
-    sentence, never merged, never silently overwritten. `parent`, `state`,
-    `origin`, `created_at`, and `closed_at` stay this item's own stored
-    values regardless of what the piped body's `[record]` names for them --
-    `update_item_body`'s own owner rule; `updated_at` always moves to now;
-    `title`, `labels`, `blocked_by` come from the piped record when it
-    carries one -- except a malformed item (ITEM-39), which takes the piped
-    record whole and refuses a body without one; a delivered `blocked_by`
-    naming one blocker twice, or a blocker the item does not already carry
-    that names no item, a malformed item or the item itself, refuses before
-    any write (ITEM-43, ITEM-44). Refuses under
-    `storage = "github"`: forge issues are edited on the forge, never
-    governed by aco. Narrows the context's forge to the state-ref board,
-    as `item new`'s state-ref path does. A malformed piped body reports through
-    the shared envelope as `body_invalid`, with `check -`'s own
-    `defects`; every other refusal is `precondition_failed`."""
-    if parsed.size is not None:
-        return _cmd_item_edit_size(parsed, context)
-    if parsed.whole is not None:
-        return _cmd_item_edit_whole(parsed, context)
-    if parsed.kind is not None:
-        return _cmd_item_edit_kind(parsed, context)
+    """`aco item edit ITEM`: with `--size`, `--whole`, or `--kind`, a narrow write of
+    only that one field (both storages); with none, the item's whole body replaced
+    from stdin against `--base`, the hash `item show --json` printed. Every refusal is
+    `precondition_failed` except a malformed piped body (`body_invalid`, with `check -`'s
+    own `defects`), a stale base (`stale`) and a write the forge's check answers (ITEM-66)."""
+    for value, narrow_edit in (
+        (parsed.size, _cmd_item_edit_size),
+        (parsed.whole, _cmd_item_edit_whole),
+        (parsed.kind, _cmd_item_edit_kind),
+    ):
+        if value is not None:
+            return narrow_edit(parsed, context)
     as_json = parsed.json
     try:
-        if context.config.storage is not body.Storage.STATE_REF:
-            raise protocol.ClaimUnavailableError(_ITEM_EDIT_GITHUB_REFUSAL)
-        new_body = _read_item_edit_body(parsed.item)
-        defects = _body_shape_defects(new_body, storage=body.Storage.STATE_REF)
+        number = parsed.item
+        storage = context.config.storage
+        new_body = _read_item_edit_body(number, storage, base=parsed.base)
+        defects = _body_shape_defects(new_body, storage=storage)
         if defects:
             return _refuse_item_body_invalid(defects, as_json=as_json)
-        client = _state_ref_board(context)
-        number = parsed.item
-        if not client.holds(number):
-            raise protocol.ClaimUnavailableError(
-                board_read.missing_item_refusal(number, client, context.config.storage)
-            )
-        client.update_item_body(number, new_body, replacing=_snapshot_body(client, number))
-        _print_item_edit_result(
-            items.format_item_id(number), number, client.item_oid(number), as_json=as_json
-        )
+        replaced = _replace_whole_body(context, number, new_body, base=parsed.base)
+        item_id = workboard.item_label(number, storage)
+        _print_item_edit_result(item_id, number, replaced, as_json=as_json)
         return 0
+    except decide.StaleBodyError as error:
+        return report.refuse(_ItemReason.STALE, error, as_json=as_json)
+    except forge.ForgeBodyWrittenError as error:
+        return report.refuse_checked_write(error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
-def _read_item_edit_body(number: int) -> str:
-    """`item edit`'s new body, read only when stdin carries one
-    (`report.stdin_carries_a_body`): an idle socket, a terminal,
-    `/dev/null` or a closed stdin refuses at once, naming the redirect,
-    rather than hanging on a read or replacing the body with nothing."""
-    if not report.stdin_carries_a_body():
-        item_id = items.format_item_id(number)
+def _read_item_edit_body(number: int, storage: body.Storage, *, base: str | None) -> str:
+    """`item edit`'s new body: refused, unread, without a `--base` (ITEM-73), and
+    read only when stdin carries one (`report.stdin_carries_a_body`) -- an idle
+    socket, a terminal, `/dev/null` or a closed stdin refuses at once, naming the
+    redirect, rather than hanging on a read or replacing the body with nothing."""
+    item_id = workboard.item_label(number, storage)
+    if base is None:
         raise protocol.ClaimUnavailableError(
-            f"item edit {item_id} needs the new body on stdin: aco item edit {item_id} < body.md"
+            f"item edit {item_id} needs --base <hash>; aco item show {item_id} --json prints it"
+        )
+    if not report.stdin_carries_a_body():
+        raise protocol.ClaimUnavailableError(
+            f"item edit {item_id} needs the new body on stdin: "
+            f"aco item edit {item_id} --base <hash> < body.md"
         )
     return report.read_piped_body()
+
+
+@dataclass(frozen=True)
+class _WholeBodyEdit:
+    """What a whole-body `item edit` left: `outcome` (`EDITED` or `UNCHANGED`), the hash
+    of the body now stored and, under state-ref, the written blob's `oid`."""
+
+    outcome: _ItemReason
+    body_hash: str
+    oid: protocol.ObjectId | None = None
+
+
+def _replace_whole_body(
+    context: RunContext, number: int, new_body: str, *, base: str
+) -> _WholeBodyEdit:
+    """Replaces item `number`'s body with `new_body` if it still has the body `base` hashes,
+    read afresh under the item's lock (ITEM-72), else refuses `StaleBodyError` and writes
+    nothing. The state-ref board is built inside the lock, so the snapshot hashed is the
+    one written against, and its write always lands (ITEM-13)."""
+    storage = context.config.storage
+    item_id = workboard.item_label(number, storage)
+    with decide.item_lock(context, number, environment=os.environ, home=Path.home()):
+        if storage is body.Storage.STATE_REF:
+            board = _state_ref_board(context)
+            if not board.holds(number):
+                raise protocol.ClaimUnavailableError(
+                    board_read.missing_item_refusal(number, board, storage)
+                )
+            decide.require_current(base, board.stored_body_hash(number), item_id=item_id)
+            board.update_item_body(number, new_body, replacing="")
+            stored = board.item_reference(number).body or ""
+            return _WholeBodyEdit(
+                _ItemReason.EDITED, decide.body_hash(stored), board.item_oid(number)
+            )
+        client = context.forge_writer
+        reference = board_read.item_or_refuse(client, number, command="item edit", storage=storage)
+        current = reference.body or ""
+        decide.require_current(base, decide.body_hash(current), item_id=item_id)
+        written = decide.write_item_body(client, number, new_body, replacing=current)
+        outcome = _ItemReason.EDITED if written else _ItemReason.UNCHANGED
+        return _WholeBodyEdit(outcome, decide.body_hash(new_body))
 
 
 _ITEM_EDIT_SIZE_COMMAND = "item edit --size"
@@ -541,12 +554,15 @@ def _print_item_edit_kind_result(
 
 
 def _print_item_edit_result(
-    item_id: str, number: int, oid: protocol.ObjectId, *, as_json: bool
+    item_id: str, number: int, replaced: _WholeBodyEdit, *, as_json: bool
 ) -> None:
     if as_json:
-        report.emit_json(True, _ItemReason.EDITED, item=item_id, number=number, oid=oid)
+        oid = {} if replaced.oid is None else {"oid": replaced.oid}
+        report.emit_json(
+            True, replaced.outcome, item=item_id, number=number, body_hash=replaced.body_hash, **oid
+        )
     else:
-        print(f"EDITED {item_id}")
+        print(f"{_narrow_edit_word(replaced.outcome)} {item_id}")
 
 
 _ITEM_CLOSE_GITHUB_REFUSAL = "the forge closes its issues; aco never governs them"
@@ -738,6 +754,10 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
                 board_read.missing_item_refusal(number, client, storage)
             )
         parent = client.parent_number(number)
+    except items.MalformedItemError as error:
+        return report.refuse(
+            _ItemReason.PRECONDITION_FAILED, error, as_json=as_json, body_hash=error.body_hash
+        )
     except protocol.ClaimError as error:
         return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
     body = reference.body or ""
@@ -751,6 +771,7 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
             parent=_item_parent_id(parent),
             origin=reference.origin,
             body=body,
+            body_hash=decide.body_hash(body),
         )
         return 0
     print(_item_header(number, reference, parent))

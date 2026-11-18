@@ -37,6 +37,7 @@ from . import (
     cmd_status,
     cmd_wait,
     cmd_withdraw,
+    expectation_grammar,
     github,
     items,
     protocol,
@@ -548,27 +549,25 @@ def _add_item_parser(commands: usage.Subcommands, name: str) -> None:
     )
     report.add_json_flag(show)
     edit = item_commands.add_parser(
-        "edit", help="replace one item's body from stdin, aco keeping its own record fields"
+        "edit", help="replace one item's whole body from stdin against --base, or set one field"
     )
     edit.add_argument(
         "item", type=workboard.parse_item_reference, help=f"the item to edit, {ITEM_REF_HELP}"
     )
     one_field = edit.add_mutually_exclusive_group()
     refuses_stdin = "reads no stdin; a piped or redirected body is refused"
+    for flag, field, choices, metavar in (
+        ("--size", "size class", tuple(body.Size), None),
+        ("--whole", "whole reason", None, "REASON"),
+        ("--kind", "kind", ITEM_EDIT_KINDS, None),
+    ):
+        help_text = f"set only this item's {field} (any storage); {refuses_stdin}"
+        one_field.add_argument(flag, choices=choices, metavar=metavar, help=help_text)
     one_field.add_argument(
-        "--size",
-        choices=tuple(body.Size),
-        help=f"set only this item's size class (any storage); {refuses_stdin}",
-    )
-    one_field.add_argument(
-        "--whole",
-        metavar="REASON",
-        help=f"set only this item's whole reason (any storage); {refuses_stdin}",
-    )
-    one_field.add_argument(
-        "--kind",
-        choices=ITEM_EDIT_KINDS,
-        help=f"set only this item's kind (any storage); {refuses_stdin}",
+        "--base",
+        metavar="HASH",
+        type=expectation_grammar.hash_argument,
+        help="the body hash item show --json printed; the stdin body then replaces the whole body",
     )
     report.add_json_flag(edit)
     close = item_commands.add_parser(

@@ -50,6 +50,7 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge
+from item_base import CURRENT_BASE, edit_item, edit_with_base, with_current_base
 from option_cards import decide, open_option_entry
 from store_fixtures import (
     item_record,
@@ -330,7 +331,8 @@ def _malformed_block(defect: str) -> str:
 def _malformed_item_refusal(problem: str, item_id: str = MALFORMED_ID) -> str:
     return (
         f"item {item_id} {problem}; repair it with aco item edit {item_id} "
-        "and a body whose aco block carries a valid [record]"
+        "--base <body_hash> and a body whose aco block carries a valid [record]; "
+        f"aco item show {item_id} --json prints the body_hash"
     )
 
 
@@ -2096,7 +2098,7 @@ class TestCliStateRefForge:
             "rescope-body": ["rescope", MALFORMED_ID, "--add", "x.py"],
             "edit-body": ["item", "edit", MALFORMED_ID, "--whole", "ok"],
             "new-body": ["item", "new", "--title", "Fresh"],
-            "pipe-edit": ["item", "edit", MALFORMED_ID],
+            "pipe-edit": ["item", "edit", MALFORMED_ID, "--base", CURRENT_BASE],
             "claim-flag": [*claim, "--whole", "x" * 513],
             "start-flag": [*start, "--whole", "a\nb"],
             "rescope-flag": ["rescope", MALFORMED_ID, "--whole", " a"],
@@ -2105,10 +2107,11 @@ class TestCliStateRefForge:
             "resume-flag": [*start, "--whole", "a\nb"],
         }
         piped = invalid.decode() if operation in {"new-body", "pipe-edit"} else ""
-        result = run_cli(commands[operation], capsys, stdin=piped or None)
+        arguments = with_current_base(commands[operation], capsys)
+        result = run_cli(arguments, capsys, stdin=piped or None)
         _assert_whole_state_result(cell, result.status, result.stdout, result.stderr)
         if cell in {20, 21, 22, 23, 25, 28, 29}:
-            json_result = run_cli([*commands[operation], "--json"], capsys, stdin=piped or None)
+            json_result = run_cli([*arguments, "--json"], capsys, stdin=piped or None)
             assert json_result.status == 2
             payload = json.loads(json_result.stdout)
             assert json_result.stderr == result.stderr
@@ -2243,9 +2246,7 @@ class TestCliStateRefForge:
         after = store.fetch_state(worktree=worktree, remote=remote)
         assert after.items == before.items
         assert after.claims == before.claims
-        repaired = run_cli(
-            ["item", "edit", MALFORMED_ID], capsys, stdin=_whole_state_item("ok").decode()
-        )
+        repaired = edit_item(MALFORMED_ID, capsys, stdin=_whole_state_item("ok").decode())
         assert repaired.status == 0
         assert repaired.stdout.startswith(f"EDITED {MALFORMED_ID}")
         assert issue_claim.main(["next"]) == 0
@@ -3646,7 +3647,7 @@ class TestCliStateRefForge:
         assert json.loads(capsys.readouterr().out)["origin"] == "gitlab#42"
 
         filled_body = _github_body(_Projection("Build it.", "Ship it.", "It ships."))
-        edited = run_cli(["item", "edit", printed], capsys, stdin=filled_body)
+        edited = edit_item(printed, capsys, stdin=filled_body)
         assert edited.status == 0
 
         head = _enter_claim_lane(monkeypatch, worktree)
@@ -3781,7 +3782,7 @@ class TestCliStateRefForge:
                 ["item", "edit", MALFORMED_ID, "--size", "S"], case_id="edit-size"
             ),
             _malformed_item_refusal_case(
-                ["item", "edit", MALFORMED_ID],
+                ["item", "edit", MALFORMED_ID, "--base", CURRENT_BASE],
                 piped_body=CONTAINER_BODY,
                 case_id="edit-without-a-record",
             ),
@@ -3859,6 +3860,7 @@ class TestCliStateRefForge:
         stdin_source = closed_stdin if piped_body is None else piping(piped_body)
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
+        arguments = with_current_base(arguments, capsys)
 
         with stdin_source(tmp_path) as stdin:
             monkeypatch.setattr(sys, "stdin", stdin)
@@ -3897,7 +3899,7 @@ class TestCliStateRefForge:
                 id="edit-kind",
             ),
             pytest.param(
-                ["item", "edit", CHILD_B_ID],
+                ["item", "edit", CHILD_B_ID, "--base", CURRENT_BASE],
                 _item_files()[f"{CHILD_B_ID}.md"].decode(),
                 f"EDITED {CHILD_B_ID}\n",
                 id="edit-body",
@@ -3931,6 +3933,7 @@ class TestCliStateRefForge:
         stdin_source = closed_stdin if piped_body is None else piping(piped_body)
         foreign_paths = [f"items/{name}".encode() for name in foreign]
         before = state_ref_listing(bare_remote)
+        arguments = with_current_base(arguments, capsys)
 
         with stdin_source(tmp_path) as stdin:
             monkeypatch.setattr(sys, "stdin", stdin)
@@ -4188,7 +4191,7 @@ class TestCliStateRefForge:
         repaired = _state_ref_body(
             _CHILD_A_PROJECTION, item_record(title="Repaired", state="open", kind="task")
         )
-        edited = run_cli(["item", "edit", MALFORMED_ID], capsys, stdin=repaired)
+        edited = edit_item(MALFORMED_ID, capsys, stdin=repaired)
 
         assert (edited.status, edited.stdout) == (0, f"EDITED {MALFORMED_ID}\n")
         assert issue_claim.main(["item", "show", MALFORMED_ID, "--json"]) == 0
@@ -4305,7 +4308,7 @@ class TestCliStateRefForge:
         stored_body = json.loads(capsys.readouterr().out)["body"]
         before_record = _decoded_record(stored_body, CHILD_A_ID)
         edited_body = stored_body.replace("Prose.", "Edited prose.", 1)
-        edited = run_cli(["item", "edit", str(CHILD_A_NUMBER)], capsys, stdin=edited_body)
+        edited = edit_item(str(CHILD_A_NUMBER), capsys, stdin=edited_body)
 
         assert edited.status == 0
         assert edited.stdout.strip() == f"EDITED {CHILD_A_ID}"
@@ -4492,7 +4495,7 @@ class TestCliStateRefForge:
         assert shown == 0
         stored_body = json.loads(capsys.readouterr().out)["body"]
         edited = run_cli(
-            ["item", "edit", str(CHILD_A_NUMBER), "--json"],
+            [*edit_with_base(str(CHILD_A_NUMBER), capsys), "--json"],
             capsys,
             stdin=stored_body.replace("Prose.", "Edited.", 1),
         )
@@ -4516,7 +4519,7 @@ class TestCliStateRefForge:
     ) -> None:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         result = run_cli(
-            ["item", "edit", "aco-abcdef"], capsys, stdin=_github_body(_CHILD_A_PROJECTION)
+            ["item", "edit", "aco-abcdef", "--base", "sha256:" + "0" * 64],
         )
 
         assert result.status == 2
@@ -4553,7 +4556,7 @@ class TestCliStateRefForge:
         )
         hostile_record["created_at"] = "2020-01-01T00:00:00Z"
         delivered_body = _state_ref_body(_CHILD_B_PROJECTION, hostile_record)
-        edited = run_cli(["item", "edit", str(CHILD_B_NUMBER)], capsys, stdin=delivered_body)
+        edited = edit_item(str(CHILD_B_NUMBER), capsys, stdin=delivered_body)
 
         assert edited.status == 0
         state = store.fetch_state(worktree=worktree, remote=remote_url)
@@ -4586,8 +4589,7 @@ class TestCliStateRefForge:
             _EDIT_TARGET_PROJECTION,
             item_record(title="Target", state="open", kind="task", blocked_by=(EDIT_BLOCKER_ID,)),
         )
-        edit_target = ["item", "edit", str(EDIT_TARGET_NUMBER)]
-        assert run_cli(edit_target, capsys, stdin=blocked_body).status == 0
+        assert edit_item(str(EDIT_TARGET_NUMBER), capsys, stdin=blocked_body).status == 0
 
         assert issue_claim.main(["next"]) == 0
         blocked_out = capsys.readouterr().out
@@ -4600,7 +4602,7 @@ class TestCliStateRefForge:
         freed_body = _state_ref_body(
             _EDIT_TARGET_PROJECTION, item_record(title="Target", state="open", kind="task")
         )
-        assert run_cli(edit_target, capsys, stdin=freed_body).status == 0
+        assert edit_item(str(EDIT_TARGET_NUMBER), capsys, stdin=freed_body).status == 0
 
         assert issue_claim.main(["next"]) == 0
         freed_out = capsys.readouterr().out
@@ -4610,26 +4612,26 @@ class TestCliStateRefForge:
         ("command", "piped_body", "refusal"),
         [
             pytest.param(
-                ["item", "edit", EDIT_TARGET_ID],
+                ["item", "edit", EDIT_TARGET_ID, "--base", CURRENT_BASE],
                 _edit_target_body(blocked_by=("aco-ffffff",)),
                 f"item {EDIT_TARGET_ID} lists blocker aco-ffffff, which does not exist",
                 id="unknown-blocker",
             ),
             pytest.param(
-                ["item", "edit", EDIT_TARGET_ID],
+                ["item", "edit", EDIT_TARGET_ID, "--base", CURRENT_BASE],
                 _edit_target_body(blocked_by=(EDIT_TARGET_ID,)),
                 f"item {EDIT_TARGET_ID} is listed as its own blocker",
                 id="itself",
             ),
             pytest.param(
-                ["item", "edit", EDIT_TARGET_ID],
+                ["item", "edit", EDIT_TARGET_ID, "--base", CURRENT_BASE],
                 _edit_target_body(blocked_by=(EDIT_BLOCKER_ID, EDIT_BLOCKER_ID)),
                 f"item {EDIT_TARGET_ID} lists blocker {EDIT_BLOCKER_ID} more than once",
                 id="repeated-blocker",
             ),
             *(
                 pytest.param(
-                    ["item", "edit", EDIT_TARGET_ID],
+                    ["item", "edit", EDIT_TARGET_ID, "--base", CURRENT_BASE],
                     _edit_target_body(slice_title=f"Line one{character}Line two"),
                     f"body malformed: slice[0].title: slice[0].title of row 1 holds {codepoint}; "
                     "a slice title stays on one line",
@@ -4685,7 +4687,7 @@ class TestCliStateRefForge:
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
 
-        result = run_cli(command, capsys, stdin=piped_body)
+        result = run_cli(with_current_base(command, capsys), capsys, stdin=piped_body)
         err = result.stderr
 
         assert (result.status, err.startswith("ERROR: "), err.endswith(f"{refusal}\n")) == (
@@ -4728,7 +4730,7 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, _edit_target_item_files()
         )
-        edited = run_cli(["item", "edit", EDIT_TARGET_ID], capsys, stdin=piped_body)
+        edited = edit_item(EDIT_TARGET_ID, capsys, stdin=piped_body)
         shown = issue_claim.main(["item", "show", EDIT_TARGET_ID])
 
         assert (edited.status, shown) == (0, 0)
@@ -4759,7 +4761,7 @@ class TestCliStateRefForge:
         assert shown == 0
         stored_body = json.loads(capsys.readouterr().out)["body"]
         first_body = stored_body.replace("Prose.", "First writer.", 1)
-        edited = run_cli(["item", "edit", str(CHILD_A_NUMBER)], capsys, stdin=first_body)
+        edited = edit_item(str(CHILD_A_NUMBER), capsys, stdin=first_body)
         assert edited.status == 0
 
         second_writer_body = second_body.replace("Prose.", "Second writer.", 1)
@@ -4786,7 +4788,7 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
-        result = run_cli(["item", "edit", str(CHILD_A_NUMBER)], capsys, stdin="no block\n")
+        result = edit_item(str(CHILD_A_NUMBER), capsys, stdin="no block\n")
 
         assert result.status == 2
         assert result.stderr == ("ERROR: body malformed: aco: no aco block\n")
@@ -4822,16 +4824,17 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         remote_url = f"file://{bare_remote}"
         before = store.fetch_state(worktree=worktree, remote=remote_url)
+        edit = edit_with_base(str(CHILD_A_NUMBER), capsys)
 
         with stdin_source(tmp_path) as stdin:
             monkeypatch.setattr(sys, "stdin", stdin)
-            status = issue_claim.main(["item", "edit", str(CHILD_A_NUMBER)])
+            status = issue_claim.main(edit)
 
         captured = capsys.readouterr()
         wrote = store.fetch_state(worktree=worktree, remote=remote_url).tip != before.tip
         refusal = (
             f"ERROR: item edit {CHILD_A_ID} needs the new body on stdin: "
-            f"aco item edit {CHILD_A_ID} < body.md\n"
+            f"aco item edit {CHILD_A_ID} --base <hash> < body.md\n"
         )
         observed = (status, captured.out, captured.err, wrote)
         expected = (0, f"EDITED {CHILD_A_ID}\n", "", True) if edits else (2, "", refusal, False)
@@ -5603,7 +5606,7 @@ class TestCliStateRefForge:
 
         assert run_cli(["check", "-"], capsys, stdin=container_body).expect_success() == "body ok\n"
 
-        edit_container = ["item", "edit", container_id]
+        edit_container = edit_with_base(container_id, capsys)
         edited_container = run_cli(edit_container, capsys, stdin=container_body)
         assert edited_container.status == 0
         assert edited_container.stdout == f"EDITED {container_id}\n"
@@ -5625,7 +5628,7 @@ class TestCliStateRefForge:
 
         assert run_cli(["check", "-"], capsys, stdin=child_body).expect_success() == "body ok\n"
 
-        edited_child = run_cli(["item", "edit", child_id], capsys, stdin=child_body)
+        edited_child = edit_item(child_id, capsys, stdin=child_body)
         assert edited_child.status == 0
         assert edited_child.stdout == f"EDITED {child_id}\n"
 

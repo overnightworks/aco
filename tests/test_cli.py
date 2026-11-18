@@ -11366,29 +11366,14 @@ def test_item_new_json_reports_ok_reason_created(
     }
 
 
-@pytest.mark.parametrize(
-    ("command", "sentence"),
-    [
-        pytest.param(
-            "edit",
-            "ERROR: forge issues are edited on the forge; aco never governs them\n",
-            id="edit",
-        ),
-        pytest.param(
-            "close",
-            "ERROR: the forge closes its issues; aco never governs them\n",
-            id="close",
-        ),
-    ],
-)
-def test_item_mutation_refuses_under_github_storage(
-    capsys: pytest.CaptureFixture[str], command: str, sentence: str, empty_checkout: Path
+def test_item_close_refuses_under_github_storage(
+    capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
-    """The forge owns whole-body edits and closing."""
-    status = issue_claim.main(["item", command, "42"])
+    """The forge closes its own issues."""
+    status = issue_claim.main(["item", "close", "42"])
 
     observed = (status, capsys.readouterr().err)
-    expected = (2, sentence)
+    expected = (2, "ERROR: the forge closes its issues; aco never governs them\n")
     assert observed == expected
 
 
@@ -11572,6 +11557,7 @@ def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
 
     assert status == 0
     payload = json.loads(capsys.readouterr().out)
+    body_hash = payload.pop("body_hash")
     assert payload == {
         "ok": True,
         "reason": "shown",
@@ -11582,6 +11568,7 @@ def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
         "origin": None,
         "body": "Body text.\n",
     }
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", body_hash)
 
 
 def test_item_show_refuses_an_unknown_id(
@@ -11638,12 +11625,6 @@ def _item_new_github_storage_refusal(
     return ["item", "new", "--title", "X", "--origin", "gitlab#5", "--json"]
 
 
-def _item_edit_github_storage_refusal(
-    _monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
-) -> list[str]:
-    return ["item", "edit", "42", "--json"]
-
-
 def _item_close_github_storage_refusal(
     _monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
 ) -> list[str]:
@@ -11661,11 +11642,10 @@ def _item_show_unknown_id_refusal(monkeypatch: pytest.MonkeyPatch, _tmp_path: Pa
     "build_arguments",
     [
         _item_new_github_storage_refusal,
-        _item_edit_github_storage_refusal,
         _item_close_github_storage_refusal,
         _item_show_unknown_id_refusal,
     ],
-    ids=["new", "edit", "close", "show"],
+    ids=["new", "close", "show"],
 )
 def test_item_refuses_through_the_shared_precondition_failed_envelope(
     monkeypatch: pytest.MonkeyPatch,
@@ -11720,8 +11700,10 @@ def _state_ref_item_edit(
     client = _state_ref_item_client(tmp_path)
     monkeypatch.setattr(client, "holds", lambda _number: True, raising=False)
     monkeypatch.setattr(client, "item_oid", lambda _number: "a" * 40, raising=False)
+    stored_hash = "sha256:" + "a" * 64
+    monkeypatch.setattr(client, "stored_body_hash", lambda _number: stored_hash, raising=False)
     pipe(_state_ref_item_body("Edited Title"))
-    return client, ["item", "edit", "42"]
+    return client, ["item", "edit", "42", "--base", stored_hash]
 
 
 def _state_ref_item_close(
@@ -11777,7 +11759,8 @@ def test_item_edit_json_reports_body_invalid_with_defects(
     `reason: "body_invalid"`, with `check -`'s own `defects` list as a
     structured sibling, before any forge is ever resolved."""
     _write_state_ref_pin(empty_checkout)
-    result = run_cli(["item", "edit", "42", "--json"], capsys, stdin="no block")
+    base = "sha256:" + "b" * 64
+    result = run_cli(["item", "edit", "42", "--base", base, "--json"], capsys, stdin="no block")
 
     assert result.status == 2
     defect = "body malformed: aco: no aco block"
@@ -11890,7 +11873,13 @@ def _state_ref_next_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
 def _state_ref_item_edit_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRun:
     run = _state_ref_command(["item", "edit", "314"], monkeypatch, tmp_path)
-    return replace(run, piped=_state_ref_item_body("Edited Title"))
+    shown = io.StringIO()
+    with contextlib.redirect_stdout(shown):
+        assert issue_claim.main(["item", "show", "314", "--json"]) == 0
+    base = json.loads(shown.getvalue())["body_hash"]
+    return replace(
+        run, argv=[*run.argv, "--base", base], piped=_state_ref_item_body("Edited Title")
+    )
 
 
 def _state_ref_release_merged_command(
