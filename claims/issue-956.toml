@@ -1,0 +1,8 @@
+claim_id = "c176e98916e9458aa7d55351996b1bc7"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "9a0cad5c2a43ae275cc7eff63140b1541d129061"
+branch = "claude/issue-956-step-keeps-next"
+scope = ["docs/ARCHITECTURE.md", "specs/mcp.spec.md", "specs/serve.spec.md", "src/aco/cmd_mcp.py", "src/aco/decide.py", "src/aco/item_step.py", "src/aco/mcp_server.py", "tests/board/test_board_api_step_answers.py", "tests/test_cmd_mcp_answer_step.py", "tests/test_cmd_mcp_step.py", "tests/test_decide_step.py"]
+opened_commit = "a0f3910d77fdf5e32c5c8986d97695428b09b379"
+whole_reason = "the step's next write spans its specs, decider, MCP adapter, board answer path and their test pins"
