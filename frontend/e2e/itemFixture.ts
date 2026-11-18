@@ -186,6 +186,11 @@ export async function storedLine(number: number, index: number): Promise<Record<
 }
 
 /** A container with these sub-issues, no card of its own. */
+export async function storedNow(number: number): Promise<string> {
+	const response = await fetch(`${readBoardRuntime().controlUrl}/items/${number}/now`);
+	return (await response.json()) as string;
+}
+
 export function container(
 	number: number,
 	title: string,

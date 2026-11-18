@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 import { expect, test } from './consoleGuard';
-import { arrange, item, stepTable } from './itemFixture';
+import { arrange, item, stepTable, storedNow } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 test.describe.configure({ mode: 'serial' });
@@ -44,6 +44,7 @@ for (const viewport of [
 				.getByRole('button', { name: /^Steps/ })
 				.click();
 			await expect(page.getByText('No step is waiting for you.')).toBeVisible();
+			expect(await storedNow(7)).toMatch(/ on the board on [^:]+: Erfolgreich$/);
 		});
 
 		test('[ABRD-174] Fehlgeschlagen cannot send without a note and stores with one', async ({
@@ -60,6 +61,7 @@ for (const viewport of [
 			await expect(page.getByText('Saves shortly: Fehlgeschlagen · #7')).toBeVisible();
 
 			await expect(stepCard(page)).toHaveCount(0, { timeout: SAVED_WITHIN_MS });
+			expect(await storedNow(7)).toMatch(/ on the board on [^:]+: Fehlgeschlagen: Stayed red\.$/);
 		});
 
 		test('[ABRD-173] a report step stores its report', async ({ page }, testInfo) => {
@@ -75,6 +77,7 @@ for (const viewport of [
 			await stepCard(page).getByRole('button', { name: 'Senden' }).click();
 
 			await expect(stepCard(page)).toHaveCount(0, { timeout: SAVED_WITHIN_MS });
+			expect(await storedNow(7)).toMatch(/ on the board on [^:]+: run 4711$/);
 		});
 
 		test('[ABRD-175] Undo inside the window posts nothing', async ({ page }) => {
