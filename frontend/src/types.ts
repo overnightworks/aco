@@ -177,6 +177,18 @@ interface ProgressUnknown {
 	error: string;
 }
 
+/** A step waiting on the operator (ABRD-157): `step` is its one line; the other fields are
+ * `null` for a step marked without a `step` table. */
+export interface StepRead {
+	number: number;
+	title: string;
+	step: string;
+	purpose: string | null;
+	actions: string | null;
+	expected: string | null;
+	answer: string | null;
+}
+
 export interface RepoReading {
 	name: string;
 	/** aco's own failure sentence once this repo's read failed, else null. */
@@ -184,6 +196,8 @@ export interface RepoReading {
 	items: BoardItem[];
 	/** `null` once this repo's read failed. */
 	progress: ProgressRead | ProgressUnknown | null;
+	/** The members' steps waiting on the operator, newest first (ABRD-157). */
+	steps: StepRead[];
 }
 
 export interface BoardResponse {
