@@ -47,7 +47,7 @@ flowchart LR
     Plans --> Repos
     Plans --> Inbox
     Stats["aco stats<br/>cmd_stats.py, lane_measure.py"] --> Store
-    Mcp -->|"ask, record_answer, step: one write per call"| Dec
+    Mcp -->|"ask, record_answer, step, answer_step: one write per call"| Dec
     Board --> Repos["repositories<br/>(the checkouts under one root)"]
     Board -->|"same library code, in process"| Session
     Board --> Protocol

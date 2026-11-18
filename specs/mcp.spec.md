@@ -79,7 +79,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-05] A message without an `id` is a notification and is never answered; an empty line is skipped.
 - [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all four tools.
 - [ ] [MCP-07] `ping` is answered with the empty result.
-- [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` (`destructiveHint` true); the last three: `readOnlyHint` false, `idempotentHint` true.
+- [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` (`destructiveHint` true), `answer_step` (`destructiveHint` true, `idempotentHint` false); the last four: `readOnlyHint` false, the first three of them `idempotentHint` true.
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
 - [ ] [MCP-10] `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
 - [ ] [MCP-20] Standard output carries only these answers, one per line; logs go to standard error; every child process reads the null device or only data aco pipes to it, never the host's stream.
