@@ -1,5 +1,6 @@
 import { expect, test } from './consoleGuard';
 import { ALREADY_RULED_MESSAGE, LINE_CHANGED_MESSAGE } from '../src/app/model/decision';
+import { arrange, storedLine } from './itemFixture';
 import {
 	PAST_UNDO_WINDOW_MS,
 	point,

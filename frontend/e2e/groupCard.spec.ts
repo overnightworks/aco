@@ -32,6 +32,8 @@ import {
 	fits,
 	cardPost
 } from './groupCardFixture';
+import { arrange, item, storedLine } from './itemFixture';
+import { readBoardRuntime } from './runtime';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); each test arranges the whole board.
