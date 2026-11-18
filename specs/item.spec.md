@@ -6,14 +6,15 @@ under `storage = "github"`, which opens the GitHub issue itself.
 This file owns each command's own flags (`--title`, `--kind`, `--parent`,
 `--origin`, `--scope`, `--size`, `--whole`, `--now`, `--next`, `--done-when`,
 `--not-a-twin`), the body `item new` builds from them, its printed and
-`--json` shapes, and `item edit`'s record-merge rule; `specs/cut.spec.md`
+`--json` shapes, `item edit`'s record-merge rule and the `--base` hash a
+whole-body `item edit` names (ITEM-70..ITEM-76); `specs/cut.spec.md`
 owns the twin search `item new` shares with `cut` (CUT-29..CUT-31). `specs/body-block.spec.md` also owns the stored
 `size` field's own schema (BODY-57..BODY-59), cited by ITEM-20 rather than
 restated, and the stored `whole` field's own schema (BODY-60..BODY-62),
 cited by ITEM-23/24; `specs/claim.spec.md` owns what `claim`/`start` do
 with a stored `whole` (CLM-21/22).
 `specs/storage-pin.spec.md` already owns the storage-pin refusals under
-`storage = "github"` (PIN-10, PIN-11), the id-argument grammar (PIN-08), the
+`storage = "github"` (PIN-11), the id-argument grammar (PIN-08), the
 fresh-id mint and its collision refusal (PIN-06, PIN-07, PIN-19), the unknown-
 parent and unknown-id refusals (PIN-18, PIN-23, PIN-28), the `--origin` write
 and its header read (PIN-20), and `item close`'s live-claim and already-
@@ -59,7 +60,11 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | `--parent` an open Task, or `--kind` given, either storage | ITEM-45, ITEM-46 | — | ITEM-47..ITEM-51 | — |
 | an item, open or closed | — | ITEM-07, ITEM-08, ITEM-56 | — | — |
 | an unknown id | PIN-18 | ITEM-10 | PIN-23 | PIN-28 |
-| `storage = "github"` | ITEM-26..ITEM-31 | ITEM-11 | PIN-10 | PIN-11 |
+| `storage = "github"` | ITEM-26..ITEM-31 | ITEM-11 | ITEM-71, ITEM-75, ITEM-76 | PIN-11 |
+| an item's body, read for a whole-body `item edit` | — | ITEM-70 | ITEM-71 | — |
+| `--base` no longer the body's hash, or the store's compare-and-swap lost | — | — | ITEM-72 | — |
+| no `--base` | — | — | ITEM-73 | — |
+| a piped body failing the shape check | — | — | ITEM-74 | — |
 | `storage = "github"`, the `--parent` relation write fails | ITEM-32 | — | — | — |
 | `storage = "github"`, GitHub drops the issue type | ITEM-34 | — | — | — |
 | an open or recently closed look-alike title, either storage | ITEM-33 | — | — | — |
@@ -72,7 +77,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | a malformed piped body | ITEM-27 | — | ITEM-25 | — |
 | another item malformed | ITEM-37, ITEM-42 | ITEM-37 | ITEM-53, ITEM-54, PIN-29 | ITEM-53, ITEM-54, PIN-29 |
 | an `items/` entry whose file name names no item | PIN-36 | PIN-35 | PIN-35 | PIN-35 |
-| the item itself malformed | — | ITEM-38 | ITEM-39..ITEM-41 | ITEM-38 |
+| the item itself malformed | — | ITEM-38, ITEM-77 | ITEM-39..ITEM-41 | ITEM-38 |
 | another item naming a blocker `items/` lacks | — | — | — | ITEM-55 |
 | `--size` or `--whole` on `github`, the body check answers the write | — | — | ITEM-66 | — |
 | a refusal reached with `--json` | ITEM-17, ITEM-18 | ITEM-17, ITEM-18 | ITEM-17, ITEM-18 | ITEM-17, ITEM-18 |
@@ -133,26 +138,33 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-07] `aco item show ITEM` prints one header, `<id> · #<n> · <state> · parent <parent-or-none> · origin <origin-or-none>`, then the stored body as ITEM-56 shows it, exit `0` (see E-ITEM-02).
 - [ ] [ITEM-56] Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `body` keeps it as stored.
 - [ ] [ITEM-08] A closed item prints ITEM-07's same header, `state closed`; closing rewrites the body's `[record]` with `state = "closed"`, `closed_at`, and `updated_at`, the rest byte-identical.
-- [ ] [ITEM-09] `aco item show ITEM --json` prints the envelope, `reason: "shown"`, then `item`, `number`, `state`, `parent`, `origin`, `body` (`parent`/`origin` `null` when unset) (see E-ITEM-02).
+- [ ] [ITEM-09] `aco item show ITEM --json` prints the envelope, `reason: "shown"`, then `item`, `number`, `state`, `parent`, `origin`, `body`, `body_hash` (`parent`/`origin` `null` when unset) (see E-ITEM-02).
 - [ ] [ITEM-10] `aco item show ITEM` against an unknown id refuses `#<n> does not exist in <owner/repo>`, exit `2`.
 - [ ] [ITEM-11] `aco item show ITEM` under `storage = "github"` reads the forge issue's own body through ITEM-07/ITEM-09's same header and `--json` shape.
+- [ ] [ITEM-70] `item show --json`'s `body_hash` is `sha256:` and 64 lowercase hex digits over the UTF-8 body it shows, under both storages; the text header is unchanged (see E-ITEM-02).
 
 ## `item edit`
 
-- [ ] [ITEM-12] `aco item edit ITEM < BODY` takes `title`, `labels`, `blocked_by` from a delivered `[record]` when the piped body carries one valid (see E-ITEM-03).
+- [ ] [ITEM-12] Under `storage = "state-ref"`, `aco item edit ITEM --base HASH < BODY` takes `title`, `labels`, `blocked_by` from a delivered `[record]` when the piped body carries one valid (see E-ITEM-03).
 - [ ] [ITEM-13] `item edit`'s every other field — `parent`, `state`, `origin`, `kind`, `created_at`, `closed_at` — stays stored, except a malformed item (ITEM-39) or `--kind` (ITEM-47); `updated_at` moves to now.
 - [ ] [ITEM-14] A delivered body carrying no `[record]` table at all leaves `title`, `labels`, `blocked_by` unchanged too, exactly `item edit`'s own behaviour, except a malformed item (ITEM-39).
 - [ ] [ITEM-43] A delivered `blocked_by` refuses before any write when it names one blocker twice, `item <item-id> lists blocker <blocker-id> more than once`, or a new one naming no item, PIN-17's (see E-ITEM-11).
 - [ ] [ITEM-44] So does a new blocker naming a malformed item, PIN-14/PIN-15's then ITEM-38's, or the item itself, `item <item-id> is listed as its own blocker`; a stored list delivered unchanged is never re-judged.
 - [ ] [ITEM-52] A state-ref write whose stored body PIN-14/PIN-15 would refuse prints `<defect>; stored, that body would not read back, so nothing was written`, exit `2`, before any write (see E-ITEM-14).
-- [ ] [ITEM-63] With no flag, a socket, terminal, `/dev/null` or closed stdin refuses `item edit <item-id> needs the new body on stdin: aco item edit <item-id> < body.md`, exit `2`, unread, before any write.
+- [ ] [ITEM-63] With `--base`, a socket, terminal, `/dev/null` or closed stdin refuses `item edit <item-id> needs the new body on stdin: aco item edit <item-id> --base <hash> < body.md`, exit `2`, before any write.
 
   ```console
-  $ aco item edit aco-00013a
-  2> ERROR: item edit aco-00013a needs the new body on stdin: aco item edit aco-00013a < body.md
+  $ aco item edit aco-00013a --base sha256:0000000000000000000000000000000000000000000000000000000000000000
+  2> ERROR: item edit aco-00013a needs the new body on stdin: aco item edit aco-00013a --base <hash> < body.md
   exit 2
   ```
-- [ ] [ITEM-15] `aco item edit ITEM --json` prints the envelope, `reason: "edited"`, then `item`, `number`, `oid` (the freshly written blob's own oid) (see E-ITEM-03).
+- [ ] [ITEM-15] `item edit ITEM --base HASH --json` prints the envelope, `reason: "edited"`, then `item`, `number`, `body_hash` of the body written, and under state-ref the written blob's `oid` (see E-ITEM-03).
+- [ ] [ITEM-71] A whole-body `item edit` whose `--base` is the stored body's hash replaces the body and prints `EDITED <item-id>`, exit `0`; github stores it as piped, under both storages (see E-ITEM-19).
+- [ ] [ITEM-72] The compare runs under the item's lock (RULE-40) on a fresh read; a changed body, or under state-ref a store write meanwhile (CAS-20), refuses `stale`, exit `2`, nothing written (see E-ITEM-19).
+- [ ] [ITEM-73] No `--base` refuses `item edit <item-id> needs --base <hash>; aco item show <item-id> --json prints it`, exit `2`, before stdin is read or any write (see E-ITEM-19).
+- [ ] [ITEM-74] The piped body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock is taken and the item read, and refuses `body_invalid` (ITEM-25) whatever the base is.
+- [ ] [ITEM-75] Under `storage = "github"` a body equal to the stored one prints `UNCHANGED <item-id>` (`--json`: `reason: "unchanged"`, ITEM-15's keys), exit `0`, writing nothing; state-ref always writes (ITEM-13).
+- [ ] [ITEM-76] Under `storage = "github"` a write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the body is written.
 - [ ] [ITEM-21] `item edit --size S|M|L` patches only the top-level `size`, reads no stdin, works under both storages; state-ref also bumps `record.updated_at`.
 
   ```
@@ -181,7 +193,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
   ```
 - [ ] [ITEM-65] `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
 - [ ] [ITEM-66] A `--size` or `--whole` write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the field is written (see E-ITEM-18).
-- [ ] [ITEM-50] `--size`, `--whole` and `--kind` exclude one another: a second one refuses at argparse, `argument <second>: not allowed with argument <first>`, exit `2`, before any write.
+- [ ] [ITEM-50] `--size`, `--whole`, `--kind`, `--base` exclude one another: a second refuses at argparse, `argument <second>: not allowed with argument <first>`, exit `2`, as does a `--base` that is no ITEM-70 hash.
 - [ ] [ITEM-51] A socket, terminal, `/dev/null` or closed stdin on `--kind`, `--size` or `--whole` passes unread, as an agent harness hands a socket when nothing was piped.
 
 ## `item close`
@@ -195,8 +207,9 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-42] That item's `record.title`, while it still reads as a non-empty string, joins ITEM-33's twin search as an open item's title.
 - [ ] [ITEM-53] Beside a malformed item, `item close` refuses only if it is its item, its parent, or a child, and `item edit --kind` only if it is its item or a child; any other malformed item stops neither (PIN-29).
 - [ ] [ITEM-54] For ITEM-53 and the board's child counts alike, a malformed item whose `[record]`, or its `parent`, does not read is an open child of every Container; one read without a parent is no child.
-- [ ] [ITEM-38] Reading that item itself (`item show`, `item close`, `item edit --size`/`--whole`/`--kind`) refuses PIN-14/PIN-15's sentence, then the repair clause of E-ITEM-10.
-- [ ] [ITEM-39] `aco item edit <id> < BODY` on that item takes BODY's complete `[record]` as the item's own, `updated_at` moved to now; BODY without a `[record]` refuses as ITEM-38 (see E-ITEM-10).
+- [ ] [ITEM-38] Reading that item itself (`item show`, `item close`, `item edit --size`/`--whole`/`--kind`) refuses PIN-14/PIN-15's sentence, then the repair clause of E-ITEM-10 (naming `--base`).
+- [ ] [ITEM-77] `item show --json` of that item adds `body_hash` before `message`, over its stored bytes (a file that is not UTF-8 too), the base `item edit` compares under the lock (see E-ITEM-10).
+- [ ] [ITEM-39] `aco item edit <id> --base HASH < BODY` on that item takes BODY's complete `[record]` as the item's own, `updated_at` moved to now; BODY without a `[record]` refuses as ITEM-38 (see E-ITEM-10).
 - [ ] [ITEM-40] That `[record]`'s `parent` or `blocked_by` naming a missing item refuses PIN-16/PIN-17's sentence, a malformed one or the item itself ITEM-38's, before any write.
 - [ ] [ITEM-41] That `[record]` naming `state = "closed"` refuses `a repair records state = "open"; close <id> afterwards with aco item close <id>`, before any write.
 
@@ -262,7 +275,7 @@ updated_at = "<updated_at>"
 ```
 exit 0
 $ aco item show <item-id> --json
-{"ok": true, "reason": "shown", "item": "<item-id>", "number": <n>, "state": "open", "parent": null, "origin": null, "body": "```aco\nversion = 1\nnow = \"\"\nnext = \"\"\ndone_when = \"\"\n\n[record]\ntitle = \"Ship it\"\nstate = \"open\"\nkind = \"task\"\nlabels = []\nblocked_by = []\ncreated_at = \"<created_at>\"\nupdated_at = \"<updated_at>\"\n```\n"}
+{"ok": true, "reason": "shown", "item": "<item-id>", "number": <n>, "state": "open", "parent": null, "origin": null, "body": "```aco\nversion = 1\nnow = \"\"\nnext = \"\"\ndone_when = \"\"\n\n[record]\ntitle = \"Ship it\"\nstate = \"open\"\nkind = \"task\"\nlabels = []\nblocked_by = []\ncreated_at = \"<created_at>\"\nupdated_at = \"<updated_at>\"\n```\n", "body_hash": "sha256:<hex>"}
 exit 0
 ````
 
@@ -272,7 +285,7 @@ Setup: bare-remote, `storage = "state-ref"` tracked, bootstrapped, `<item-id>`
 already open
 
 ````console
-$ aco item edit <item-id> <<'BODY'
+$ aco item edit <item-id> --base sha256:<hex> <<'BODY'
 ```aco
 version = 1
 now = "Cut on 19.09.2026."
@@ -282,7 +295,7 @@ done_when = "It is built."
 BODY
 EDITED <item-id>
 exit 0
-$ aco item edit <item-id> --json <<'BODY'
+$ aco item edit <item-id> --base sha256:<hex> --json <<'BODY'
 ```aco
 version = 1
 now = "Cut on 19.09.2026."
@@ -290,7 +303,7 @@ next = "Ship it."
 done_when = "It is built."
 ```
 BODY
-{"ok": true, "reason": "edited", "item": "<item-id>", "number": <n>, "oid": "<oid>"}
+{"ok": true, "reason": "edited", "item": "<item-id>", "number": <n>, "body_hash": "sha256:<hex>", "oid": "<oid>"}
 exit 0
 ````
 
@@ -310,15 +323,12 @@ $ aco item close <item-c> --json
 exit 0
 ```
 
-### E-ITEM-05 — the `storage = "github"` refusals
+### E-ITEM-05 — the `storage = "github"` refusal
 
 Setup: bare-remote, `.aco/board.toml` tracked with no `storage` key
 (the default)
 
 ```console
-$ aco item edit 42
-2> ERROR: forge issues are edited on the forge; aco never governs them
-exit 2
 $ aco item close 42
 2> ERROR: the forge closes its issues; aco never governs them
 exit 2
@@ -329,7 +339,7 @@ exit 2
 Setup: bare-remote, `storage = "state-ref"` tracked, bootstrapped, `<item-id>` already open
 
 ```console
-$ aco item edit <item-id> --json <<'BODY'
+$ aco item edit <item-id> --base sha256:<hex> --json <<'BODY'
 no block
 BODY
 {"ok": false, "reason": "body_invalid", "defects": ["body malformed: aco: no aco block"], "message": "body malformed: aco: no aco block"}
@@ -395,7 +405,11 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-3e
 
 ```console
 $ aco item show aco-3e26d9
-2> ERROR: item aco-3e26d9 has a malformed aco block (body malformed: record.title: record.title must be a non-empty string); repair it with aco item edit aco-3e26d9 and a body whose aco block carries a valid [record]
+2> ERROR: item aco-3e26d9 has a malformed aco block (body malformed: record.title: record.title must be a non-empty string); repair it with aco item edit aco-3e26d9 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-3e26d9 --json prints the body_hash
+exit 2
+$ aco item show aco-3e26d9 --json
+2> ERROR: item aco-3e26d9 has a malformed aco block (body malformed: record.title: record.title must be a non-empty string); repair it with aco item edit aco-3e26d9 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-3e26d9 --json prints the body_hash
+{"ok": false, "reason": "precondition_failed", "body_hash": "sha256:<hex>", "message": "item aco-3e26d9 has a malformed aco block (body malformed: record.title: record.title must be a non-empty string); repair it with aco item edit aco-3e26d9 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-3e26d9 --json prints the body_hash"}
 exit 2
 $ aco item new --title "Fresh item"
 <item-id>
@@ -403,7 +417,7 @@ $ aco item new --title "Fresh item"
 2> <item-id> misses Next; aco item edit <item-id> fills it
 2> <item-id> misses Done when; aco item edit <item-id> fills it
 exit 0
-$ aco item edit aco-3e26d9 < repaired.md
+$ aco item edit aco-3e26d9 --base sha256:<hex> < repaired.md
 EDITED aco-3e26d9
 exit 0
 ```
@@ -416,13 +430,13 @@ and no `items/aco-ffffff.md`, `itself.md` one naming `blocked_by = ["<item-id>"]
 `twice.md` one naming `blocked_by = ["<blocker-id>", "<blocker-id>"]` of an open item
 
 ```console
-$ aco item edit <item-id> < unknown.md
+$ aco item edit <item-id> --base sha256:<hex> < unknown.md
 2> ERROR: item <item-id> lists blocker aco-ffffff, which does not exist
 exit 2
-$ aco item edit <item-id> < itself.md
+$ aco item edit <item-id> --base sha256:<hex> < itself.md
 2> ERROR: item <item-id> is listed as its own blocker
 exit 2
-$ aco item edit <item-id> < twice.md
+$ aco item edit <item-id> --base sha256:<hex> < twice.md
 2> ERROR: item <item-id> lists blocker <blocker-id> more than once
 exit 2
 ```
@@ -465,7 +479,7 @@ Under `storage = "state-ref"` a child written since the parent was read is caugh
 Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open, `vt.md` a body whose `[[slice]]` title is `"Line one\u000bLine two"`
 
 ```console
-$ aco item edit <item-id> < vt.md
+$ aco item edit <item-id> --base sha256:<hex> < vt.md
 2> ERROR: body malformed: slice[0].title: slice[0].title of row 1 holds U+000B; a slice title stays on one line
 exit 2
 $ aco item new --title "$(printf 'a\377b')"
@@ -536,3 +550,27 @@ $ aco item edit <n> --size L --json
 {"ok": false, "reason": "overwritten", "kept": false, "message": "#<n> body written, but overwritten in the meantime by ghost at 2026-11-08T10:05:00Z"}
 exit 2
 ```
+
+### E-ITEM-19 — a whole-body edit against the hash `item show` printed
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, `#<n>` open with a valid `aco` block; `body.md` a complete `aco` block; a second writer rules a line in `#<n>` after the first `item show`
+
+```console
+$ aco item show <n> --json
+{"ok": true, "reason": "shown", "item": "#<n>", "number": <n>, "state": "open", "parent": null, "origin": null, "body": "<body>", "body_hash": "sha256:<first>"}
+exit 0
+$ aco item edit <n>
+2> ERROR: item edit #<n> needs --base <hash>; aco item show <n> --json prints it
+exit 2
+$ aco item edit <n> --base sha256:<first> < body.md
+2> ERROR: #<n> changed since it was read (base sha256:<first>, now sha256:<second>); read it again with aco item show #<n> --json and apply your change to that body
+exit 2
+$ aco item edit <n> --base sha256:<second> --json < body.md
+{"ok": true, "reason": "edited", "item": "#<n>", "number": <n>, "body_hash": "sha256:<third>"}
+exit 0
+$ aco item edit <n> --base sha256:<third> < body.md
+UNCHANGED #<n>
+exit 0
+```
+
+The refused runs write nothing; the stale one reads `#<n>` afresh under its lock first.

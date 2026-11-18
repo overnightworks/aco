@@ -7391,7 +7391,7 @@ def test_a_pinned_claim_refuses_once_its_item_closes_between_its_rejection_and_r
     ) as raised:
         store.commit_transition(observed=observed, subject=subject, intent=claim, transport=racer)
 
-    assert type(raised.value) is protocol.ClaimUnavailableError
+    assert type(raised.value) is protocol.ItemWrittenSinceReadError
     refetched = store.fetch_state(worktree=worktree, remote=str(bare_remote))
     assert refetched.items[item_id] == closed_oid
     assert not refetched.claims
@@ -8152,8 +8152,8 @@ def test_every_output_names_a_github_item_by_its_number(
 ) -> None:
     """The `storage = github` twin of
     `TestCliStateRefForge`'s id proof: the same commands name an item
-    `#<n>`, and a pasteable argument its bare `n`. `item edit`/`close` have
-    no twin: under `github` they refuse outright (PIN-10, PIN-11)."""
+    `#<n>`, and a pasteable argument its bare `n`. `item close` has no
+    twin: under `github` it refuses outright (PIN-11)."""
     unfilled_body = unfilled_block_body()
     incomplete = board_issue(10, "Fresh work", unfilled_body)
     actionable = board_issue(11, "Slice A", complete_contract("Ship slice A."))

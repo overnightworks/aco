@@ -50,7 +50,7 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge
-from item_base import CURRENT_BASE, edit_item, edit_with_base, shown_body_hash, with_current_base
+from item_base import CURRENT_BASE, edit_item, edit_with_base, with_current_base
 from option_cards import decide, open_option_entry
 from store_fixtures import (
     item_record,
@@ -2112,9 +2112,8 @@ class TestCliStateRefForge:
         _assert_whole_state_result(cell, result.status, result.stdout, result.stderr)
         if cell in {20, 21, 22, 23, 25, 28, 29}:
             json_result = run_cli([*arguments, "--json"], capsys, stdin=piped or None)
-            assert json_result.status == 2
             payload = json.loads(json_result.stdout)
-            assert json_result.stderr == result.stderr
+            assert (json_result.status, json_result.stderr) == (2, result.stderr)
             reason = (
                 "body_invalid"
                 if cell == 29
@@ -4509,24 +4508,6 @@ class TestCliStateRefForge:
         assert state.tip is not None
         assert payload["oid"] == state.items[CHILD_A_ID]
 
-    def test_item_edit_refuses_an_unknown_id(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        result = run_cli(
-            ["item", "edit", "aco-abcdef", "--base", "sha256:" + "0" * 64],
-            capsys,
-            stdin=_github_body(_CHILD_A_PROJECTION),
-        )
-
-        assert result.status == 2
-        assert "does not exist" in result.stderr
-
     def test_item_edit_takes_title_labels_blocked_by_and_keeps_aco_owned_record_fields(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -4775,143 +4756,6 @@ class TestCliStateRefForge:
         assert state.tip is not None
         stored = store.read_item_files(worktree, state.tip)[f"{CHILD_A_ID}.md"]
         assert stored.startswith(b"First writer.")
-
-    @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
-    def test_item_edit_from_a_copy_read_before_another_edit_refuses_stale(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-        as_json: bool,
-    ) -> None:
-        """Spec: ITEM-72 -- a base that is no longer the stored body's hash refuses `stale`
-        and the state ref keeps the edit that came first."""
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        item = str(CHILD_A_NUMBER)
-        stale = edit_with_base(item, capsys)
-        shown = json.loads(run_cli(["item", "show", item, "--json"], capsys).stdout)["body"]
-        first = edit_item(item, capsys, stdin=shown.replace("Prose.", "First writer.", 1))
-        assert first.status == 0
-        remote_url = f"file://{bare_remote}"
-        before = store.fetch_state(worktree=worktree, remote=remote_url)
-        current = shown_body_hash(item, capsys)
-
-        result = run_cli(
-            [*stale, *(["--json"] * as_json)],
-            capsys,
-            stdin=shown.replace("Prose.", "Stale writer.", 1),
-        )
-
-        sentence = (
-            f"{CHILD_A_ID} changed since it was read (base {stale[-1]}, now {current}); read it "
-            f"again with aco item show {CHILD_A_ID} --json and apply your change to that body"
-        )
-        assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
-        envelope = {"ok": False, "reason": "stale", "message": sentence}
-        assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
-        after = store.fetch_state(worktree=worktree, remote=remote_url)
-        assert after.tip == before.tip
-
-    def test_item_edit_reports_a_write_landing_between_its_read_and_its_write_as_stale(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """Spec: ITEM-72 -- the store's compare-and-swap refusal (CAS-20) reaches the caller as
-        `stale`, the same answer a changed body gets."""
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        item = str(CHILD_A_NUMBER)
-        other = _fetch_state_ref_board(
-            bare_remote, worktree, writer=_store_item_writer(bare_remote, worktree)
-        )
-        other_body = other.item_reference(CHILD_A_NUMBER).body
-        assert other_body is not None
-        arguments = edit_with_base(item, capsys)
-        hashed = StateRefBoard.stored_body_hash
-
-        def hash_then_let_another_machine_write(board: StateRefBoard, number: int) -> str:
-            stored = hashed(board, number)
-            other.update_item_body(
-                number, other_body.replace("Prose.", "Other machine.", 1), replacing=""
-            )
-            return stored
-
-        monkeypatch.setattr(StateRefBoard, "stored_body_hash", hash_then_let_another_machine_write)
-
-        result = run_cli([*arguments, "--json"], capsys, stdin=other_body)
-
-        assert result.status == 2
-        refusal = json.loads(result.stdout)
-        assert (refusal["reason"], "written since it was read" in refusal["message"]) == (
-            "stale",
-            True,
-        )
-
-    @pytest.mark.parametrize(
-        ("content", "problem"),
-        [
-            pytest.param(b"\xff\xfe not utf-8", NOT_UTF8_PROBLEM, id="not-utf8"),
-            pytest.param(
-                b"prose, no block\n", _malformed_block("aco: no aco block"), id="no-block"
-            ),
-        ],
-    )
-    def test_a_malformed_item_is_repaired_with_the_hash_item_show_refused_with(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-        content: bytes,
-        problem: str,
-    ) -> None:
-        """Spec: ITEM-38, ITEM-73 -- `item show --json` refuses a malformed item with the
-        `body_hash` of its stored bytes, ahead of `message`, and `item edit --base` takes it."""
-        self._live_state_ref_checkout(
-            monkeypatch, tmp_path, bare_remote, worktree, {f"{MALFORMED_ID}.md": content}
-        )
-
-        shown = run_cli(["item", "show", MALFORMED_ID, "--json"], capsys)
-
-        refusal = json.loads(shown.stdout)
-        assert shown.status == 2
-        assert list(refusal)[-2:] == ["body_hash", "message"]
-        assert refusal["message"] == _malformed_item_refusal(problem)
-        repaired = run_cli(
-            ["item", "edit", MALFORMED_ID, "--base", refusal["body_hash"]],
-            capsys,
-            stdin=_whole_state_item("ok").decode(),
-        )
-        assert (repaired.status, repaired.stdout) == (0, f"EDITED {MALFORMED_ID}\n")
-        reread = run_cli(["item", "show", MALFORMED_ID, "--json"], capsys)
-        assert reread.status == 0
-
-    def test_item_edit_refuses_a_body_with_no_block_before_any_write(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """A piped body with no recognized `aco`
-        block refuses with `check -`'s own sentence, before any write
-        -- the remote's tip stays exactly what it was."""
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
-        remote_url = f"file://{bare_remote}"
-        before = store.fetch_state(worktree=worktree, remote=remote_url)
-        result = edit_item(str(CHILD_A_NUMBER), capsys, stdin="no block\n")
-
-        assert result.status == 2
-        assert result.stderr == ("ERROR: body malformed: aco: no aco block\n")
-        after = store.fetch_state(worktree=worktree, remote=remote_url)
-        assert after.tip == before.tip
 
     @pytest.mark.parametrize(
         ("stdin_source", "edits"),

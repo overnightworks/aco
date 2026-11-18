@@ -180,28 +180,30 @@ writes the outcome into `now` and removes the label `needs-operator` through the
 
 ### The per-item turn
 
-Every write of an item's body except the bare `state-ref` `aco item edit`'s runs under
+Every write of an item's body runs under
 one per-item lock (`decide.item_lock`):
 an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file per
 item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
-decision and step answer, `aco item edit --size/--whole`, `aco rescope` and `aco handover` (each through its claim
+decision and step answer, `aco item edit` (a whole body against `--base`, or `--size/--whole`), `aco rescope` and `aco handover` (each through its claim
 transition) and the `ask`, `record_answer`, `step` and `answer_step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
 `decide.write_item_body`, the one writer, which skips a body equal to the text it
 replaces and hands the port that text. A writer that finds the lock held prints
 one line to stderr and waits. Writers on this machine therefore never overwrite each other's
-bodies. A GitHub body write has no precondition, so a hand edit or another machine
-is not prevented: after each GitHub write the adapter reads the item's newest two
+bodies. A whole-body `aco item edit` also names the hash `aco item show --json` printed
+(`--base`) and compares it with a fresh read under the lock, so a head writing from a stale
+copy is refused, never merged. GitHub's REST API has no conditional body write, so a hand edit
+or another machine between that read and the write is not prevented, and a write past aco
+(`gh issue edit`, a browser tab) is not seen. After each GitHub write the adapter reads the item's newest two
 edit revisions and raises a typed answer when its write was overwritten, kept over
 an unread change, or cannot be verified. Every `--json` writer answers it with the
 check's sentence and `overwritten` (with `kept`) or `not_verified`, through one owner in
 `report`; `cut` wraps the sentence in its own and `adopt` states its own; the board shows `failed`. The history is read once, right after the write, so a hand
 edit saved after that read over an older copy still overwrites the write unseen. Under `state-ref` the store's
-compare-and-swap refuses a stale write, and it alone guards the bare `aco item edit`, which writes outside the
-lock. The board keeps its own in-process turn for its shutdown drain
+compare-and-swap also refuses a write from a stale snapshot, which `aco item edit` reports as `stale` like a changed hash. The board keeps its own in-process turn for its shutdown drain
 (`specs/serve.spec.md`).
 
 ### The ruling signal

@@ -18,7 +18,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | `.aco/board.toml` absent, `origin` unconfigured | CHECK-15 (cited) | CHECK-15 (cited) | CHECK-15 (cited) | CHECK-15 (cited) | — |
 | `.aco/board.toml` absent | PIN-32 | PIN-32 | PIN-32 | PIN-32 | — |
 | `.aco/board.toml` present but untracked or ignored | PIN-01 | PIN-01 | PIN-01 | PIN-01 | — |
-| `storage` unset (default `github`) | PIN-02 | ITEM-26..ITEM-35 | PIN-10, PIN-11 | — | PIN-08 |
+| `storage` unset (default `github`) | PIN-02 | ITEM-26..ITEM-35 | ITEM-71..ITEM-76, PIN-11 | — | PIN-08 |
 | `storage` names an unrecognized value | PIN-03 | PIN-03 | PIN-03 | PIN-03 | — |
 | a key the configuration does not define | PIN-33 | PIN-33 | PIN-33 | PIN-33 | — |
 | `lane_shared` is no list of unique paths inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
@@ -124,7 +124,7 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 ## Commands refused by the wrong pin
 
 - PIN-09 (retired).
-- [ ] [PIN-10] `aco item edit ITEM` under `storage = "github"` refuses `forge issues are edited on the forge; aco never governs them`.
+- PIN-10 (retired).
 - [ ] [PIN-11] `aco item close ITEM` under `storage = "github"` refuses `the forge closes its issues; aco never governs them`.
 - PIN-12 (retired).
 
@@ -150,9 +150,9 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 ## Editing and closing a state-ref item
 
-- [ ] [PIN-22] `aco item edit ITEM < body.md` under `storage = "state-ref"` replaces the item's stored body and prints `EDITED aco-xxxxxx`, exit `0` (see E-PIN-08).
-- [ ] [PIN-23] `aco item edit ITEM` against an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>` (`<repository>`: PIN-28).
-- [ ] [PIN-24] `aco item edit ITEM` piping a body with no valid `aco` block refuses with that body's own first defect sentence (`specs/body-block.spec.md`, BODY-01..BODY-50).
+- [ ] [PIN-22] `aco item edit ITEM --base HASH < body.md` under `storage = "state-ref"` replaces the item's stored body (ITEM-71) and prints `EDITED aco-xxxxxx`, exit `0` (see E-PIN-08).
+- [ ] [PIN-23] `aco item edit ITEM --base HASH` against an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>` (`<repository>`: PIN-28).
+- [ ] [PIN-24] `aco item edit ITEM --base HASH` piping a body with no valid `aco` block refuses with that body's own first defect sentence (`specs/body-block.spec.md`, BODY-01..BODY-50).
 - [ ] [PIN-25] `aco item close ITEM` under `storage = "state-ref"` prints `CLOSED aco-xxxxxx` then a `freed: ` line naming every item `ITEM`'s own close just freed, or `freed: none`, exit `0` (see E-PIN-09).
 - [ ] [PIN-26] `aco item close ITEM` against an item still carrying a live claim refuses `<item-id> has a live claim (<agent> (<role>)); release the claim first`, before any write.
 - [ ] [PIN-27] A second `aco item close ITEM` on an already-closed item refuses `<item-id> is already closed (closed on <closed_at>)`.
@@ -160,10 +160,10 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 ## Never
 
-- `aco item edit`/`close` never reach a GitHub API call: each is refused by name under `storage = "github"` before the item forge is ever resolved; `item new` there opens the issue itself (`specs/item.spec.md`, ITEM-26).
+- `aco item close` never reaches a GitHub API call: it is refused by name under `storage = "github"` before the item forge is ever resolved; `item new` there opens the issue itself (ITEM-26) and `item edit` reaches the forge only through its locked base-hash write (ITEM-72).
 - Under `storage = "state-ref"`, `aco status`, `aco bootstrap`, `aco rescope`, `aco release`, and a lane or already-observed `aco claim` never resolve the item forge, so PIN-04/PIN-05 never gate them.
 - `--repo` never selects a repository under `storage = "state-ref"`: there is no host-based target to override.
-- `aco item edit`/`close` never overwrite a concurrent writer's change: a stale expected oid refuses by name instead (`specs/ref-store-cas.spec.md`, CAS-20), and the item's stored bytes stay exactly what the last landed write left.
+- `aco item edit`/`close` never overwrite a concurrent writer's change: a stale expected oid refuses by name instead (CAS-20; `item edit` reports it `stale`, ITEM-72), and the item's stored bytes stay exactly what the last landed write left.
 - `item edit --kind` never lands beside an item that turned malformed after PIN-29's check: its write commits only onto the `items/` it checked (`specs/ref-store-cas.spec.md` CAS-51), else refuses `items/ was written since this write checked it; re-read and retry`.
 - A replayed `aco claim` (CLM-15) and an `aco start` resuming its live claim (START-06) never read the board: a wide scope naming no `--whole` reads its own item's `whole` alone.
 - `aco item close` never deletes an item file or any of its other bytes: only `state`, `closed_at`, and `updated_at` move.
@@ -350,10 +350,10 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-00
 
 ```console
 $ aco item show aco-000001
-2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash
 exit 2
 $ aco item close <child-id>
-2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash
 exit 2
 $ aco item close <item-id>
 CLOSED <item-id>
@@ -395,7 +395,7 @@ exit 0
 Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` already open
 
 ````console
-$ aco item edit <item-id> <<'BODY'
+$ aco item edit <item-id> --base sha256:<hex> <<'BODY'
 ```aco
 version = 1
 now = "Cut on 19.09.2026."

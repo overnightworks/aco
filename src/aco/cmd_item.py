@@ -306,7 +306,7 @@ def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
     only that one field (both storages); with none, the item's whole body replaced
     from stdin against `--base`, the hash `item show --json` printed. Every refusal is
     `precondition_failed` except a malformed piped body (`body_invalid`, with `check -`'s
-    own `defects`), a stale base (`stale`) and a write the forge's check answers (ITEM-66)."""
+    own `defects`), a stale base (`stale`) and a write the forge's check answers (ITEM-76)."""
     for value, narrow_edit in (
         (parsed.size, _cmd_item_edit_size),
         (parsed.whole, _cmd_item_edit_whole),

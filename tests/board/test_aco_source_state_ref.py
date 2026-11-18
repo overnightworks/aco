@@ -185,7 +185,7 @@ def _card_edited(capsys: pytest.CaptureFixture[str]) -> None:
     edited = _item_file(
         {**open_option_entry(), "question": "Anders gefragt?"}, _two_open_lines()[1]
     )
-    assert edit_item(_FIRST_ID, capsys, stdin=edited).status == 0
+    assert edit_item(_FIRST_ID, capsys, stdin=edited.decode()).status == 0
 
 
 def _line_ruled_in_chat(capsys: pytest.CaptureFixture[str]) -> None:
