@@ -8,10 +8,14 @@ from . import lane_record, protocol, report, usage
 from .session import RunContext
 
 
+_INVALID = "lane record {foreign} is invalid: {defect}"
+# The defect may repeat foreign text (a key the file states); capped so the file's path keeps room.
+_DEFECT_LENGTH_LIMIT = 100
+
+
 def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
     """The lane record file at `path_text`, read once and validated whole; one that is not
     exactly what the spec states refuses, naming the first thing wrong with it."""
-    shown = protocol.terminal_text(path_text)
     try:
         return lane_record.parse_record_file(Path(path_text).read_bytes())
     except OSError as error:
@@ -19,7 +23,9 @@ def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
     except lane_record.RecordFileError as error:
         defect = str(error)
     raise protocol.ClaimUnavailableError(
-        report.bounded_refusal(f"lane record {shown} is invalid: {defect}")
+        report.refusal_around_foreign_text(
+            _INVALID, path_text, defect=report.cut_foreign_text(defect, _DEFECT_LENGTH_LIMIT)
+        )
     )
 
 

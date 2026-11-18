@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from aco import report
 from cli_fixtures import run_cli
 from lane_record_fixtures import lane_record_object
 
@@ -191,3 +192,41 @@ def test_a_record_file_that_does_not_exist_is_refused(
         "",
         f"ERROR: lane record {path} is invalid: cannot be read (No such file or directory)\n",
     )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        pytest.param(["lane-record", "check"], id="check"),
+        pytest.param(["land", "12", "--head", "a" * 40, "--record"], id="land"),
+        pytest.param(["release", "--abandoned", "reason", "--record"], id="release"),
+    ],
+)
+def test_a_refusal_keeps_its_defect_however_long_the_file_path_is(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], command: list[str]
+) -> None:
+    """Spec: LANREC-31."""
+    deep = tmp_path.joinpath(*["d" * 25] * 6)
+    deep.mkdir(parents=True)
+    path = deep / "lane-record.json"
+    path.write_text(json.dumps(lane_record_object(version=2)), encoding="utf-8")
+
+    result = run_cli([*command, str(path)], capsys)
+
+    assert result.status == 2
+    assert result.stderr.endswith("version 2 is unknown; this aco reads version 1\n")
+
+
+def test_a_refusal_cuts_a_long_unknown_key_and_stays_one_bounded_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-31, LANREC-32."""
+    path = tmp_path / "lane-record.json"
+    path.write_text(json.dumps({**lane_record_object(), "k" * 300: 1}), encoding="utf-8")
+
+    result = run_cli(["lane-record", "check", str(path)], capsys)
+
+    assert result.status == 2
+    assert "is invalid: the record has an unknown key 'kkk" in result.stderr
+    assert result.stderr.endswith("…\n")
+    assert len(result.stderr.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
