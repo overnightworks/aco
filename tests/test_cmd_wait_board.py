@@ -11,18 +11,21 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import (
+    OPERATOR_WAIT,
     REPOSITORY,
     FakeBoardProbe,
     block_dependency,
     blocked_issue,
     board_issue,
     complete_contract,
+    holding_for_the_operator,
     serve_board_probe,
 )
 from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, set_git_identity
 from cli_fixtures import track_board_config as pin_board_config
 from github_fixtures import FakeForge, serve_forge
-from option_cards import card, decide, group_body, open_option_entry, ruled_card
+from option_cards import card, decide, open_option_entry, ruled_card
+from option_cards import group_body as open_group_body
 from store_fixtures import (
     claim_intent,
     item_record,
@@ -99,9 +102,14 @@ def blocked_board(*, closed: bool) -> UnreadableBoardForge:
     return UnreadableBoardForge(board_issues=(issue,), board_dependencies=dependencies)
 
 
+def group_body(*cards: str) -> str:
+    """The open-card body of item 7, held for the operator by its `wait`."""
+    return holding_for_the_operator(open_group_body(*cards))
+
+
 def card_issue(raw: str) -> workboard.Issue:
-    """Item 7 holding open cards, labelled as its head labels an item that waits on them."""
-    return board_issue(ITEM, "Karte", raw, labels=(workboard.NEEDS_OPERATOR_LABEL,))
+    """Item 7 holding open cards in a body that waits on the operator."""
+    return board_issue(ITEM, "Karte", raw)
 
 
 def free_item() -> workboard.Issue:
@@ -665,15 +673,14 @@ class TestUnderStateRef:
         github_clone: Path,
     ) -> None:
         set_git_identity(monkeypatch)
-        record = item_record(
-            title="Karte", state="open", kind="task", labels=(workboard.NEEDS_OPERATOR_LABEL,)
-        )
+        record = item_record(title="Karte", state="open", kind="task")
         data: dict[str, object] = {
             "version": 1,
             "now": "Now.",
             "next": "Next.",
             "done_when": "Done.",
             "record": record,
+            "wait": OPERATOR_WAIT,
             "expectation": [open_option_entry()],
         }
         text = f"Prose.\n\n```{BLOCK_FENCE_INFO}\n{render_block(data)}```\n"

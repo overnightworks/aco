@@ -4,7 +4,7 @@
 import json
 
 import pytest
-from board_fixtures import board_issue
+from board_fixtures import board_issue, holding_for_the_operator
 from cli_fixtures import freeze_cli_now, run_cli
 from github_fixtures import FakeForge, serve_forge
 from option_cards import RETURNED_ON, YES_NO_LINE, card, card_body, item_body, returned_today
@@ -28,7 +28,7 @@ class TestNextWithHead:
         serve_board(
             monkeypatch,
             board_issue(7, "Karte", item_body(returned_today())),
-            board_issue(8, "Wartet", item_body(returned_today()), labels=("needs-operator",)),
+            board_issue(8, "Wartet", holding_for_the_operator(item_body(returned_today()))),
         )
 
         lines = run_cli(["next"], capsys).stdout.splitlines()

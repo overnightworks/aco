@@ -26,10 +26,9 @@ from aco_board_fixtures import (
     serving,
     serving_two,
 )
+from board_fixtures import OPERATOR_WAIT, complete_contract, holding_for_the_operator
 from board_forge import BoardForge, item_body
 from option_cards import open_option_entry
-
-from aco import workboard
 
 _ORIGIN_ELSEWHERE = {"Origin": "http://elsewhere.example"}
 _OPEN_CARD = item_body(open_option_entry())
@@ -452,9 +451,8 @@ def test_a_repo_lists_only_its_name_error_items_and_progress(
     repository.put_item(42, _OPEN_CARD, title="Share page")
     repository.put_item(
         9,
-        item_body(next_step="Rotate the key."),
+        complete_contract("Rotate the key.", wait=OPERATOR_WAIT),
         title="Key",
-        labels=[workboard.NEEDS_OPERATOR_LABEL],
     )
 
     [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
@@ -465,18 +463,17 @@ def test_a_repo_lists_only_its_name_error_items_and_progress(
     )
 
 
-def test_a_labelled_item_lists_its_decided_cards_and_one_without_a_card_is_not_listed(
+def test_a_waiting_item_lists_its_decided_cards_and_one_without_a_card_is_not_listed(
     repository: BoardForge, board: BoardClient, listed_items: Lister
 ) -> None:
-    """The label for the operator hides no card; an item without a card is on no list."""
-    labels = [workboard.NEEDS_OPERATOR_LABEL]
-    decided = item_body(_ruled_yes_no("Decided before?", "yes"))
-    repository.put_item(8, decided, title="Labelled and decided", labels=labels)
-    repository.put_item(9, item_body(), title="Labelled, no card", labels=labels)
+    """An operator wait hides no card; an item without a card is on no list."""
+    decided = holding_for_the_operator(item_body(_ruled_yes_no("Decided before?", "yes")))
+    repository.put_item(8, decided, title="Waiting and decided")
+    repository.put_item(9, holding_for_the_operator(item_body()), title="Waiting, no card")
 
     listed = listed_items(board)
 
     assert listed == [
-        {"number": 8, "title": "Labelled and decided", "lines": rulings_lines(repository, 8)},
+        {"number": 8, "title": "Waiting and decided", "lines": rulings_lines(repository, 8)},
     ]
     assert len(listed[0]["lines"]) == 1
