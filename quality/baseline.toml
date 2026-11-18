@@ -34,7 +34,7 @@
 "tests/test_cmd_land_preflight_claim.py" = 851
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2759
+"tests/test_github.py" = 2741
 "tests/test_state_board.py" = 5898
 "tests/test_store.py" = 5103
 
