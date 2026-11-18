@@ -1,6 +1,6 @@
 """The one read-modify-write of an item's block (`specs/rule.spec.md`,
 `specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
-decision board and the MCP `ask`, `record_answer` and `step` read an item through the
+decision board and the MCP `ask`, `record_answer`, `step` and `answer_step` read an item through the
 target gate and write its folded body once, here, so every ruling, withdrawal, card and
 step takes the same path, and a ruling or withdrawal touches the item's signal
 (`specs/wait.spec.md`). `item_lock` serializes the writers of one item on this
