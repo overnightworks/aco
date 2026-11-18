@@ -1,0 +1,8 @@
+claim_id = "d29b237752674416acf40dac59530394"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "091433c66b4899dfbcd922554bb8711a02cb422d"
+branch = "claude/issue-943-board-step-buttons"
+scope = ["frontend/e2e", "frontend/src", "quality/baseline.toml", "specs/board.spec.md", "src/aco/board/static", "tests/board/test_board_api.py", "tests/support/aco_board_fixtures.py", "tests/support/board_fixtures.py", "tests/support/e2e_server.py"]
+opened_commit = "ec177e73d08440bee871f317bc8531ae86dfa6b2"
+whole_reason = "The step card answers touch the frontend state, card, client, e2e specs and fixtures, the static bundle and the board spec together"
