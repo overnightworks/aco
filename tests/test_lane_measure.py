@@ -298,21 +298,21 @@ def test_a_block_counts_the_outcomes_of_its_own_lanes() -> None:
 def test_a_stage_total_sums_the_known_values_and_counts_the_lanes_that_state_none() -> None:
     """Spec: STATS-24."""
     lanes = [
-        lane_of_risk("material", {FindingStage.REVIEW: StageCounts(2, 3, 1)}),
-        lane_of_risk("material", {FindingStage.REVIEW: StageCounts(1, None, None)}),
+        lane_of_risk("material", {FindingStage.CI: StageCounts(2, 3, 1)}),
+        lane_of_risk("material", {FindingStage.CI: StageCounts(1, None, None)}),
         lane_of_risk("material"),
     ]
 
     stages = measure(NOVEMBER, lanes).risks[0].stages
 
-    review, ci = stages[FindingStage.REVIEW], stages[FindingStage.CI]
-    assert [
-        (figure.total, figure.n, figure.unknown) for figure in (review.fix_rounds, review.misses)
-    ] == [
+    ci, review = stages[FindingStage.CI], stages[FindingStage.REVIEW]
+    assert [(figure.total, figure.n, figure.unknown) for figure in (ci.fix_rounds, ci.misses)] == [
         (3, 2, 1),
         (1, 1, 2),
     ]
-    assert [(figure.total, figure.n, figure.unknown) for figure in (ci.fix_rounds, ci.misses)] == [
+    assert [
+        (figure.total, figure.n, figure.unknown) for figure in (review.fix_rounds, review.misses)
+    ] == [
         (None, 0, 3),
         (None, 0, 3),
     ]

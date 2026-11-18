@@ -35,7 +35,7 @@ VALID_RECORDS = [
     pytest.param(record_text_without("risk"), id="no-risk"),
     pytest.param(record_text_without("experiment"), id="no-experiment"),
     pytest.param(record_text_without("misses"), id="no-misses"),
-    pytest.param(record_text_with("misses", "review", 3), id="misses-equal-to-blocking"),
+    pytest.param(record_text_with("misses", "ci", 1), id="misses-equal-to-blocking"),
     pytest.param(json.dumps(lane_record_object(verdicts=[])), id="no-verdict"),
     pytest.param(record_text_with("stages", "fix", "grok-4.6/high"), id="a-fix-stage-that-ran"),
     pytest.param(record_text_with("blocking", "ci", 999), id="the-largest-count"),
