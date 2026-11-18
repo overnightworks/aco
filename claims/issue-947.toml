@@ -1,8 +1,0 @@
-claim_id = "0e54e67aad2746d598849eeaed444b40"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "7a13491904bf8848883c2264c311a8d0870b4018"
-branch = "claude/issue-947-e2e-raw-body"
-scope = ["frontend/e2e/itemFixture.ts", "frontend/e2e/stepAnswer.spec.ts", "frontend/e2e/support.ts", "tests/support/e2e_server.py"]
-opened_commit = "72ecd6412066ba4c0f04e04669de966accd8a987"
-whole_reason = "The browser proof, its item fixture and the e2e control server change together"
