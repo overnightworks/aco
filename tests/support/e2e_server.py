@@ -110,7 +110,7 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     parent = arranged.get("parent")
     return StoredItem(
         str(arranged["title"]),
-        _held(raw_body, arranged) if arranged.get("waiting") else raw_body,
+        _held(raw_body, arranged) if arranged.get("waiting") or arranged.get("step") else raw_body,
         kind=body.ItemKind.CONTAINER.value if container is not None else None,
         children=children,
         parent=parent if isinstance(parent, int) else None,

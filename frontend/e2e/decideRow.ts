@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { TOKEN_HEADER } from '../src/client';
+import { repoReading } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 /** The Decide row's group of picks on the shown card. */
@@ -53,9 +54,7 @@ export async function routeRepositories(
 		await route.fulfill({
 			json: {
 				repos: names.map((name) =>
-					name in failed
-						? { name, error: failed[name], items: [], steps: [] }
-						: { ...board.repos[0], name }
+					name in failed ? repoReading(name, { error: failed[name] }) : { ...board.repos[0], name }
 				)
 			}
 		});

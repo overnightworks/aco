@@ -1,5 +1,5 @@
 import { expect, test } from './consoleGuard';
-import { arrange, item } from './itemFixture';
+import { arrange, item, stepTable } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 test.describe.configure({ mode: 'serial' });
@@ -7,18 +7,8 @@ test.describe.configure({ mode: 'serial' });
 const ACTIONS =
 	'open https://example.test/release/with/a/very/long/path/that/must/wrap/somewhere\nclick Run';
 
-/** The step table the real read lists for an item that stores one; the arranging endpoint
- * stores only the old one-line step, so the board's own answer is completed with this card
- * (`tests/board/test_board_api_steps.py` proves the real wire form). */
-const STEP_CARD = {
-	number: 7,
-	title: 'Release the build',
-	step: 'Run the release.',
-	purpose: 'Release the build.',
-	actions: ACTIONS,
-	expected: 'The page shows green.',
-	answer: 'the green run id'
-};
+/** The step table the arranged item stores, listed as its card. */
+const STEP_TABLE = stepTable({ actions: ACTIONS, answer: 'the green run id' });
 
 for (const viewport of [
 	{ width: 1280, height: 900 },
@@ -30,13 +20,10 @@ for (const viewport of [
 		test('[ABRD-159] [ABRD-160] the step card shows purpose, block, expected and answer; Copy copies the block', async ({
 			page
 		}, testInfo) => {
-			await arrange([{ ...item(8, 'Old step'), waiting: true }]);
-			await page.route('**/api/board', async (route) => {
-				const response = await route.fetch();
-				const board = await response.json();
-				board.repos[0].steps = [STEP_CARD, ...board.repos[0].steps];
-				await route.fulfill({ response, json: board });
-			});
+			await arrange([
+				{ ...item(8, 'Old step'), waiting: true },
+				{ ...item(7, 'Release the build'), step: STEP_TABLE }
+			]);
 			const { appUrl, token } = readBoardRuntime();
 			await page.goto(`${appUrl}#t=${token}`);
 
