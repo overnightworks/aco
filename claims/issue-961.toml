@@ -1,8 +1,0 @@
-claim_id = "39948b5d98df4a58bb265164b6a8c213"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "c85c03cdea94408d7a384667aec3dbfadf39751c"
-branch = "claude/issue-961-dependabot-deps"
-scope = ["README.md", "quality/baseline.toml", "specs/land.spec.md", "specs/landing-grammar.spec.md", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_issue_payload.py", "src/aco/policy.py", "tests/support/check_pull_request_fixtures.py", "tests/support/github_fixtures.py", "tests/test_cmd_check_pull_request.py", "tests/test_cmd_land_merge_message.py", "tests/test_github.py", "tests/test_github_issue_payload.py", "tests/test_policy.py"]
-opened_commit = "4f9ff151cb0f1afbccbeafa4d699f8a18a929f34"
-whole_reason = "one classification rule spans the forge port, the GitHub adapter, policy, two specs and their tests"
