@@ -30,12 +30,12 @@ _YES_NO_STEP = {key: value for key, value in _REPORT_STEP.items() if key != "ans
 _READ = ForgeRequest(ForgeOperation.READ_ITEM, _ITEM)
 _WRITE = ForgeRequest(ForgeOperation.WRITE_BODY, _ITEM)
 _UNLABEL = ForgeRequest(ForgeOperation.REMOVE_LABEL, _ITEM)
-_NEXT_AFTER_AN_ANSWER = "Act on the operator's answer in now."
+_SLICE_PLAN = "S1 Prepare the run.\nS2 Run it.\nS3 Read the result."
 _STEP_CHANGED = {"status": "failed", "message": "This step changed; reload."}
 _BAD_REQUEST = (400, {"error": "bad request: step"})
 _ANSWERED = {"status": "answered", "message": None}
 _LABEL = workboard.NEEDS_OPERATOR_LABEL
-_ANSWER_KEYS = ("wait", "step", "now", "next")
+_ANSWER_KEYS = ("wait", "step", "now")
 
 
 def _put_step(
@@ -46,7 +46,7 @@ def _put_step(
 ) -> None:
     repository.put_item(
         _ITEM,
-        complete_contract("Run it.", wait=OPERATOR_WAIT, step=table),
+        complete_contract(_SLICE_PLAN, wait=OPERATOR_WAIT, step=table),
         title="Release",
         labels=(_LABEL,),
         author_is_member=author_is_member,
@@ -94,7 +94,7 @@ def test_an_answer_ends_the_wait_writes_the_outcome_and_removes_the_label_after_
 
     block = _block(repository.stored_body(_ITEM))
     assert answer.json() == _ANSWERED
-    assert (block["now"], block["next"]) == (now, _NEXT_AFTER_AN_ANSWER)
+    assert (block["now"], block["next"]) == (now, _SLICE_PLAN)
     assert not {"wait", "step"} & block.keys()
     assert _unchanged(block) == _unchanged(before)
     assert repository.item_requests() == (_READ, _WRITE, _UNLABEL)

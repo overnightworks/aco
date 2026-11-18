@@ -21,6 +21,8 @@ from mcp_lines import call_line, serve_mcp
 from aco import body, forge, protocol, workboard
 
 STEP = "Rotate the deploy key."
+PLAN = "S1 Prepare the vault.\nS2 Rotate the key.\nS3 Verify."
+NEXT_OF_A_STEP_ITEM = "Act on the operator's answer in now."
 TITLE = "Rotate the deploy key"
 _LABEL = workboard.NEEDS_OPERATOR_LABEL
 _WRITES = (
@@ -124,7 +126,7 @@ def _witness_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, operation: st
 def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_turn(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    here.put_item(1, complete_contract("Old step."), title="Key")
+    here.put_item(1, complete_contract(PLAN), title="Key")
     lock_held_at_body = _witness_lock(monkeypatch, tmp_path, "update_item_body")
     lock_held_at_label = _witness_lock(monkeypatch, tmp_path, "add_label")
 
@@ -138,7 +140,9 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
         "step": STEP,
         "created": False,
     }
-    assert body.locate_block(here.stored_body(1)).data["next"] == STEP
+    stored = body.locate_block(here.stored_body(1)).data
+    assert stored["next"] == PLAN
+    assert stored["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert here.stored_item(1).labels == [_LABEL]
     assert _writes(here) == [("update_item_body", 1), ("add_label", 1)]
     assert (lock_held_at_body, lock_held_at_label) == ([True], [True])
@@ -179,7 +183,7 @@ def test_a_call_with_other_fields_rewrites_the_step_table_and_keeps_the_rest_of_
         "expected": "The vault shows a new key.",
         "answer": "Report the new key id.",
     }
-    assert stored["next"] == STEP
+    assert stored["wait"]["operator"] == STEP
     assert _writes(here) == [
         ("update_item_body", 1),
         ("add_label", 1),
@@ -219,7 +223,8 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
     }
     assert (created.title, created.kind, created.labels) == (TITLE, "task", [_LABEL])
     assert (checked.status, json.loads(checked.stdout)["ok"]) == (0, True)
-    assert data["next"] == STEP
+    assert data["next"] == NEXT_OF_A_STEP_ITEM
+    assert data["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert board_forge.RULING_DAY.isoformat() in str(data["now"])
     assert _writes(here) == [("create_issue", 2), ("add_label", 2)]
     assert data["step"] == {
@@ -242,10 +247,16 @@ def test_the_same_title_call_again_opens_no_second_item_and_calls_the_label_agai
     assert _writes(here) == [("create_issue", 2), ("add_label", 2), ("add_label", 2)]
 
 
+def _waiting_on(step: str, *, next_step: str = PLAN) -> str:
+    """A complete body whose block waits on the operator for `step`."""
+    wait = {"operator": step, "since": board_forge.RULING_DAY}
+    return complete_contract(next_step, wait=wait)
+
+
 def _standing(
     number: int, step: str = STEP, *, member: bool = True
 ) -> dict[int, board_forge.StoredItem]:
-    return {number: board_forge.StoredItem(TITLE, complete_contract(step), author_is_member=member)}
+    return {number: board_forge.StoredItem(TITLE, _waiting_on(step), author_is_member=member)}
 
 
 @pytest.mark.parametrize(
@@ -253,19 +264,26 @@ def _standing(
     [
         pytest.param(_standing(2), TITLE, 2, False, id="same-title-and-step-without-the-label"),
         pytest.param(_standing(2), f"  {TITLE}\n", 2, False, id="padded-title"),
-        pytest.param(_standing(2, f"  {STEP}\n"), TITLE, 2, False, id="hand-written-padded-next"),
+        pytest.param(_standing(2, f"  {STEP}\n"), TITLE, 2, False, id="hand-written-padded-wait"),
         pytest.param(
             {**_standing(2), **_standing(4), **_standing(3)}, TITLE, 4, False, id="highest"
         ),
         pytest.param(_standing(2, "Another step."), TITLE, 3, True, id="same-title-another-step"),
         pytest.param(
-            {2: board_forge.StoredItem("Another title", complete_contract(STEP))},
+            {2: board_forge.StoredItem("Another title", _waiting_on(STEP))},
             TITLE,
             3,
             True,
             id="same-step-another-title",
         ),
         pytest.param(_standing(2, member=False), TITLE, 3, True, id="a-non-members-item"),
+        pytest.param(
+            {2: board_forge.StoredItem(TITLE, complete_contract(STEP))},
+            TITLE,
+            3,
+            True,
+            id="the-step-only-in-next",
+        ),
         pytest.param(
             {2: board_forge.StoredItem(TITLE, "no block here")}, TITLE, 3, True, id="unreadable"
         ),
@@ -295,7 +313,7 @@ def test_the_lookup_marks_the_item_a_member_wrote_with_that_title_and_step_or_op
 def test_a_title_with_another_step_leaves_the_first_item_as_it_was(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    here.put_item(2, complete_contract("Another step."), title=TITLE)
+    here.put_item(2, _waiting_on("Another step."), title=TITLE)
     before = here.stored_item(2)
 
     _serve(monkeypatch, _step_line(1, item=None, title=TITLE))
@@ -316,12 +334,12 @@ def test_an_item_another_session_changed_after_the_lookup_is_not_overwritten(
     here: board_forge.BoardForge,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    here.put_item(2, complete_contract(STEP), title=TITLE)
+    here.put_item(2, _waiting_on(STEP), title=TITLE)
     real = board_forge.BoardForge.list_open_board_issues
 
     def listing_before_the_rewrite(self: board_forge.BoardForge) -> object:
         earlier = real(self)
-        here.put_item(2, complete_contract(rewritten_step), title=rewritten_title)
+        here.put_item(2, _waiting_on(rewritten_step), title=rewritten_title)
         return earlier
 
     monkeypatch.setattr(
@@ -333,7 +351,7 @@ def test_an_item_another_session_changed_after_the_lookup_is_not_overwritten(
     assert result["structuredContent"]["item"] == 3
     assert result["structuredContent"]["created"] is True
     assert here.stored_item(2).title == rewritten_title
-    assert here.stored_item(2).body == complete_contract(rewritten_step)
+    assert here.stored_item(2).body == _waiting_on(rewritten_step)
 
 
 @pytest.mark.parametrize("arrange", ["close", "stranger", "missing", "malformed", "unknown"])
@@ -405,7 +423,7 @@ def test_a_body_check_that_fails_is_the_calls_error_and_a_repeat_sets_the_label(
     [repeated] = _serve(monkeypatch, _step_line(2))
 
     assert repeated["isError"] is False
-    assert body.locate_block(here.stored_body(1)).data["next"] == STEP
+    assert body.locate_block(here.stored_body(1)).data["wait"]["operator"] == STEP
     assert here.stored_item(1).labels == [_LABEL]
 
 

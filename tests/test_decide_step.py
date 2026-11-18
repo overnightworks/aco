@@ -57,17 +57,17 @@ def _mark(context: RunContext, step: str = STEP, card: item_step.StepCard = _CAR
     decide.mark_step(context, fresh, step, card)
 
 
-def test_the_step_replaces_next_and_keeps_every_other_field_and_byte(clone: Path) -> None:
-    before = _stepped_item()
+def test_the_step_keeps_a_multi_line_next_and_every_other_field_and_byte(clone: Path) -> None:
+    before = _stepped_item().replace('next = "X"', 'next = "S1 First.\\nS2 Second."')
     context, client = _world(clone, before)
 
     _mark(context)
 
     written = client.item_bodies[NUMBER]
     old, new = body.locate_block(before), body.locate_block(written)
+    assert old.data["next"] == "S1 First.\nS2 Second."
     assert new.data == {
         **old.data,
-        "next": STEP,
         "wait": {"operator": STEP, "since": TODAY},
         "step": {"purpose": "Why.", "actions": "Do this.\nThen that.", "expected": "See it."},
     }

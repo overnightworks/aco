@@ -22,7 +22,7 @@ _REPORT_STEP = {
     "answer": "the run report",
 }
 _YES_NO_STEP = {key: value for key, value in _REPORT_STEP.items() if key != "answer"}
-_NEXT_AFTER_AN_ANSWER = "Act on the operator's answer in now."
+_SLICE_PLAN = "S1 Prepare the run.\nS2 Run it.\nS3 Read the result."
 _WRITES = (
     board_forge.ForgeOperation.WRITE_BODY,
     board_forge.ForgeOperation.REMOVE_LABEL,
@@ -48,7 +48,7 @@ def here(tmp_path: Path, config_file: Path) -> board_forge.BoardForge:
 def _put_step(here: board_forge.BoardForge, table: dict[str, str] = _YES_NO_STEP) -> None:
     here.put_item(
         1,
-        complete_contract("Run it.", wait=OPERATOR_WAIT, step=table),
+        complete_contract(_SLICE_PLAN, wait=OPERATOR_WAIT, step=table),
         title="Release",
         labels=(workboard.NEEDS_OPERATOR_LABEL,),
     )
@@ -110,7 +110,7 @@ def test_a_chat_answer_clears_the_wait_and_the_step_writes_now_and_keeps_the_ite
     }
     day = board_forge.RULING_DAY.isoformat()
     assert block["now"] == f'The operator answered "{_STEP}" in chat on {day}: {outcome}'
-    assert block["next"] == _NEXT_AFTER_AN_ANSWER
+    assert block["next"] == _SLICE_PLAN
     assert not {"wait", "step"} & block.keys()
     assert here.stored_item(1).labels == []
     assert _writes(here) == ["update_item_body", "remove_label"]
