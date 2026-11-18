@@ -17,7 +17,7 @@ def test_a_record_with_its_risk_and_stage_figures_renders_them_after_the_routing
         LaneOutcome.LANDED,
         risk="material",
         counts={
-            FindingStage.REVIEW: StageCounts(fix_rounds=1, blocking=3, misses=2),
+            FindingStage.REVIEW: StageCounts(fix_rounds=1, blocking=3, misses=0),
             FindingStage.CI: StageCounts(fix_rounds=0, blocking=1, misses=None),
         },
     )
@@ -29,7 +29,7 @@ def test_a_record_with_its_risk_and_stage_figures_renders_them_after_the_routing
         "lane_fix_rounds_ci: 0",
         "lane_blocking_review: 3",
         "lane_blocking_ci: 1",
-        "lane_misses_review: 2",
+        "lane_misses_review: 0",
     )
 
 
@@ -60,6 +60,16 @@ def test_a_record_with_its_risk_and_stage_figures_renders_them_after_the_routing
             ("lane_misses_ci: many", "lane_misses_gate: -1", "lane_blocking_ci: 3"),
             ("lane_blocking_ci: 3",),
             id="a-malformed-count-is-unknown-and-the-others-still-read",
+        ),
+        pytest.param(
+            (
+                "lane_misses_ci: 1000",
+                "lane_fix_rounds_gate: 1000",
+                "lane_blocking_test: 1000",
+                "lane_blocking_ci: 999",
+            ),
+            ("lane_blocking_ci: 999",),
+            id="a-count-above-999-is-unknown-and-the-others-still-read",
         ),
         pytest.param(
             ("lane_misses_ci:", "lane_fix_rounds_gate: 4"),

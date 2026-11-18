@@ -536,12 +536,17 @@ def _recorded_risk(values: Mapping[LaneTrailerKey, str]) -> str | None:
     return risk if EXPERIMENT_TAG.fullmatch(risk) else None
 
 
+def _stage_count(text: str | None) -> int | None:
+    count = _whole_number(text)
+    return count if count is not None and count <= _MAXIMUM_COUNT else None
+
+
 def _recorded_counts(values: Mapping[LaneTrailerKey, str]) -> dict[FindingStage, StageCounts]:
     return {
         stage: StageCounts(
-            _whole_number(values.get(_FIX_ROUNDS_KEYS[stage])),
-            _whole_number(values.get(_BLOCKING_KEYS[stage])),
-            _whole_number(values.get(_MISSES_KEYS[stage])),
+            _stage_count(values.get(_FIX_ROUNDS_KEYS[stage])),
+            _stage_count(values.get(_BLOCKING_KEYS[stage])),
+            _stage_count(values.get(_MISSES_KEYS[stage])),
         )
         for stage in FindingStage
     }
