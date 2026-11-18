@@ -1,6 +1,7 @@
 """`aco check <pr>`: declarations, dependency paths and parents in the real GitHub world."""
 
 from dataclasses import replace
+from typing import NoReturn
 
 import pytest
 from board_fixtures import REPOSITORY, block_body, complete_contract, slice_entries
@@ -24,7 +25,7 @@ from cli_fixtures import pull_request_listing
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
 from store_fixtures import claim_intent
 
-from aco import body, forge, protocol
+from aco import body, forge, policy, protocol
 
 WORK_ITEM_BODY = "Work-Item: #72\n\nCloses #72"
 NO_ITEM_BODY = "No-Item: docs\n\nTidy the README."
@@ -364,6 +365,13 @@ COVERED_PATHS = {
 }
 
 UNCOVERED_PATHS = {
+    "incomplete-listing": refused(
+        WORK_ITEM_BODY,
+        "lists 2 of its 1 changed files; aco judges only a complete listing",
+        5,
+        item_world(listing_of_files(2, reported=1)),
+        (12,),
+    ),
     "work-item-path-outside": item_refused(
         "docs/x.md", item_world(listing_of("README.md", "docs/x.md"))
     ),
@@ -400,6 +408,21 @@ def test_a_pull_request_changing_only_paths_its_claim_covers_is_accepted(
 ) -> None:
     """Spec: LAND-87, LAND-88, LAND-90, CHECK-01"""
     check_pull_request(case, flags)
+
+
+def test_a_listing_the_claim_scope_covers_never_reads_the_trunk_configuration(
+    check_pull_request: PullRequestCheck, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: LAND-90"""
+
+    def trunk_read(*_: object) -> NoReturn:
+        raise AssertionError("the trunk's lane_shared was read")
+
+    monkeypatch.setattr(policy, "trunk_lane_shared_reading", trunk_read)
+    covered = declares(
+        WORK_ITEM_BODY, f"Work-Item: {WORK_ITEM}", 4, item_world(listing_of("README.md"))
+    )
+    check_pull_request(covered, [])
 
 
 @pytest.mark.parametrize(("case", "flags"), rendered(UNCOVERED_PATHS))
