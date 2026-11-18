@@ -7,7 +7,7 @@
 		SEND_LABEL,
 		SUCCESS_LABEL
 	} from '../app/model/steps';
-	import type { DecisionStore } from '../app/state/decision.svelte';
+	import { locksCard, type DecisionStore } from '../app/state/decision.svelte';
 	import type { StepRead } from '../types';
 	import RefusalBanner from './RefusalBanner.svelte';
 	import UndoStrip from './UndoStrip.svelte';
@@ -17,8 +17,10 @@
 
 	const key = $derived(stepKey(repo, step.number));
 	const pending = $derived(decisions.pendingStep(key));
-	const busy = $derived(pending !== null || decisions.isSaving(key));
 	const banner = $derived(decisions.banner(key));
+	const busy = $derived(
+		pending !== null || decisions.isSaving(key) || decisions.isReading(key) || locksCard(banner)
+	);
 	const asksReport = $derived(step.answer !== null);
 
 	let report = $state('');

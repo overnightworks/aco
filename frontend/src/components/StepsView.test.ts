@@ -173,3 +173,19 @@ test('[ABRD-177] a step whose card changed offers Copy again instead of Copied',
 
 	expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
 });
+
+test('[ABRD-176] a refused answer keeps every answer button disabled until Neu laden', async () => {
+	vi.useFakeTimers();
+	const send = vi.fn(async () => ({ status: 'failed' as const, message: 'This step changed' }));
+	render(StepsView, {
+		repos: [repo({ steps: [stepRead({ fingerprint: 'fp' })] })],
+		decisions: store(send)
+	});
+
+	await fireEvent.click(screen.getByRole('button', { name: 'Erfolgreich' }));
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(screen.getByRole('alert')).toHaveTextContent('This step changed');
+	expect(screen.getByRole('button', { name: 'Erfolgreich' })).toBeDisabled();
+	expect(screen.getByRole('button', { name: 'Fehlgeschlagen' })).toBeDisabled();
+});

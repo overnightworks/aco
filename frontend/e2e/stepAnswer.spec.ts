@@ -114,6 +114,7 @@ for (const viewport of [
 				timeout: SAVED_WITHIN_MS
 			});
 			await page.screenshot({ path: testInfo.outputPath(`step-refused-${viewport.width}.png`) });
+			await expect(stepCard(page).getByRole('button', { name: 'Erfolgreich' })).toBeDisabled();
 			await stepCard(page).getByRole('button', { name: 'Neu laden' }).click();
 			await expect(stepCard(page).getByText('Something else is expected now.')).toBeVisible();
 		});
