@@ -64,7 +64,7 @@ def waiting_rows(rows_read: Iterable[rulings.Row]) -> tuple[rulings.Row, ...]:
 class Step:
     number: int
     title: str
-    step: str
+    wait_text: str
     """The text of the item's operator `wait`."""
     card: item_step.StepCard | None = None
     """The block's `step` table; `None` for a step marked without one."""
@@ -304,7 +304,7 @@ def step_json(step: Step) -> dict[str, object]:
     return {
         "number": step.number,
         "title": step.title,
-        "step": step.step,
+        "step": step.wait_text,
         item_step.PURPOSE_KEY: card and card.purpose,
         item_step.ACTIONS_KEY: card and card.actions,
         item_step.EXPECTED_KEY: card and card.expected,

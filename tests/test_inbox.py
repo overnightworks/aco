@@ -249,7 +249,7 @@ def test_a_steps_text_is_its_operator_wait_not_the_blocks_next() -> None:
 
     [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
 
-    assert found.step == "Rotate the key."
+    assert found.wait_text == "Rotate the key."
 
 
 def test_a_step_item_with_a_step_table_lists_its_card() -> None:
