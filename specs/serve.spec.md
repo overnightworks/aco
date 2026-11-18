@@ -259,7 +259,7 @@ A closed child counts however it closed, not-planned included. A container whose
 - [ ] [ABRD-173] A step with its fields shows `Erfolgreich` and `Fehlgeschlagen`; `Erfolgreich` posts `yes`. A step that names an answer shows a text field `Bericht` with `Senden` instead, which posts `report`.
 - [ ] [ABRD-174] `Fehlgeschlagen` opens a field `Notiz`; `Senden` stays disabled while it is blank and then posts `no` with the note.
 - [ ] [ABRD-175] An answer starts the 8 second window of ABRD-58 with the strip `Saves shortly: <answer> · #n` and `Undo` in the card; `Undo` posts nothing, and leaving the page posts it at once (ABRD-152).
-- [ ] [ABRD-176] A stored answer removes the card after a re-read; a refused one keeps the card and shows its sentence, with `Neu laden` when the step changed.
+- [ ] [ABRD-176] A stored answer removes the card after a re-read; a refused one keeps the card and shows its sentence, with `Neu laden`.
 - [ ] [ABRD-177] `Copied` reads `Copy` again once the step's card has changed.
 
 Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_answers.py`, `frontend/e2e/stepCard.spec.ts` and `frontend/e2e/stepAnswer.spec.ts` (390 and 1280 px).

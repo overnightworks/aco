@@ -6,7 +6,10 @@ import { inertBoard, repo, stepRead } from '../test-support/board';
 import { DecisionStore } from '../app/state/decision.svelte';
 import StepsView from './StepsView.svelte';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	vi.useRealTimers();
+});
 
 function store(
 	send: typeof postStep = vi.fn(async () => ({ status: 'answered' as const, message: null }))
@@ -117,7 +120,6 @@ test('[ABRD-173] a yes or no step offers Erfolgreich and Fehlgeschlagen, and Erf
 		fingerprint: 'fp',
 		result: 'yes'
 	});
-	vi.useRealTimers();
 });
 
 test('[ABRD-174] Fehlgeschlagen cannot send without a note', async () => {

@@ -84,12 +84,13 @@ for (const viewport of [
 				posts += 1;
 				return route.continue();
 			});
+			await page.clock.install();
 			await openSteps(page);
 
 			await stepCard(page).getByRole('button', { name: 'Erfolgreich' }).click();
 			await stepCard(page).getByRole('button', { name: 'Undo' }).click();
 			await expect(stepCard(page).getByRole('button', { name: 'Erfolgreich' })).toBeVisible();
-			await page.waitForTimeout((UNDO_SECONDS + 1) * 1000);
+			await page.clock.runFor((UNDO_SECONDS + 1) * 1000);
 
 			expect(posts).toBe(0);
 			await expect(stepCard(page)).toBeVisible();
