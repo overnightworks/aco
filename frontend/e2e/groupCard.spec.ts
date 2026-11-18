@@ -208,9 +208,9 @@ for (const viewport of [
 			await expect(pick(page, 2, 'A')).toBeEnabled();
 			await expect(otherAt(page, 2)).toBeEnabled();
 			await expect(acceptAll(page)).toBeEnabled();
-			await shoot(page, testInfo, 'one-waiting');
 			await page.clock.runFor(PAST_UNDO_WINDOW_MS - 1000);
 			expect(posts).toEqual([]);
+			await shoot(page, testInfo, 'one-waiting');
 			await page.clock.runFor(1000);
 
 			await expect
