@@ -16,7 +16,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a notification | — | MCP-05 | — |
 | `initialize` | — | MCP-06 | — |
 | `ping` | — | MCP-07 | — |
-| `tools/list` | — | MCP-08, MCP-38 | — |
+| `tools/list` | — | MCP-08, MCP-38, MCP-78 | — |
 | `server/discover` or any other method | — | MCP-09 | — |
 | an unknown tool or arguments that are no object | — | MCP-10 | — |
 | an open option line | — | — | MCP-11 |
@@ -79,7 +79,8 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-05] A message without an `id` is a notification and is never answered; an empty line is skipped.
 - [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all five tools.
 - [ ] [MCP-07] `ping` is answered with the empty result.
-- [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` (`destructiveHint` true), `answer_step` (`destructiveHint` true, `idempotentHint` false); the last four: `readOnlyHint` false, the first three of them `idempotentHint` true.
+- [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` and `answer_step` (`destructiveHint` true); the last four: `readOnlyHint` false.
+- [ ] [MCP-78] `ask`, `record_answer` and `step` are listed with `idempotentHint` true, `answer_step` with `idempotentHint` false.
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
 - [ ] [MCP-10] `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
 - [ ] [MCP-20] Standard output carries only these answers, one per line; logs go to standard error; every child process reads the null device or only data aco pipes to it, never the host's stream.
@@ -167,7 +168,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 ## Answering a step
 
-- [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (the line `read_inbox` showed), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`, and answers as `POST /api/step` does, but its `now` says the answer came `in chat` (see E-MCP-20).
+- [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
 - [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` says to act on it, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
 - [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
 - [ ] [MCP-77] The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
