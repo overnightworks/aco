@@ -1,192 +1,41 @@
-import type { Locator, Page, Response } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { decidedList, expectDecidedAnswer } from './decidedView';
 import {
-	arrange,
-	item,
-	optionEntry,
-	storedLine,
-	withdrawnEntry,
-	type CardOption,
-	type Item,
-	type OptionEntry
-} from './itemFixture';
-import { readBoardRuntime } from './runtime';
-import {
-	ALREADY_RULED_MESSAGE,
-	LINE_CHANGED_MESSAGE,
-	UNDO_SECONDS
-} from '../src/app/model/decision';
+	PAST_UNDO_WINDOW_MS,
+	BOARD_PICK_HOW,
+	CARD_NAME,
+	ANSWER,
+	NOTE,
+	FINAL_OPTIONS,
+	point,
+	withdrawn,
+	threePoints,
+	sprung,
+	arrangeCards,
+	expectRuled,
+	send,
+	logPosts,
+	visit,
+	showCard,
+	open,
+	card,
+	toggle,
+	pointPicks,
+	pick,
+	acceptAll,
+	strip,
+	undo,
+	otherAt,
+	picks,
+	decideBar,
+	shoot,
+	fits,
+	cardPost
+} from './groupCardFixture';
 
 // One shared board server backs every test in this file (see
 // global-setup.ts); each test arranges the whole board.
 test.describe.configure({ mode: 'serial' });
-
-// Just past the app's undo window; the page clock is driven, never waited.
-const PAST_UNDO_WINDOW_MS = UNDO_SECONDS * 1000 + 500;
-
-// aco rules every board pick `via board` on `board_forge.RULING_DAY`.
-const BOARD_PICK_HOW = 'Board · 03.10.2026';
-
-const CARD_NAME = 'Song-Seite · 3 points';
-const ANSWER = 'Nur am Desktop';
-const NOTE = 'Warum drei Fragen?';
-
-const OPTIONS: CardOption[] = (['A', 'B'] as const).map((letter) => ({
-	name: `Weg ${letter}`,
-	effect: `Wirkung von Weg ${letter}.`,
-	same_as_today: true,
-	notice: 'Du merkst es.',
-	cost: 'Aufwand.',
-	undo: 'reversible',
-	undo_how: 'jederzeit',
-	contract: `Vertrag ${letter}.`
-}));
-
-const FINAL_OPTIONS: CardOption[] = [
-	OPTIONS[0] as CardOption,
-	{ ...(OPTIONS[1] as CardOption), undo: 'final', undo_how: 'nicht rückholbar.' }
-];
-
-/** A point named after `index`, the block position it is arranged at. */
-function point(index: number, overrides: Partial<OptionEntry> = {}): OptionEntry {
-	return optionEntry(`Satz ${index}.`, {
-		question: `Frage ${index}?`,
-		problem: `Problem ${index}.`,
-		topic: `Thema ${index}`,
-		area: 'Song-Seite',
-		recommended: 'A',
-		option: OPTIONS,
-		...overrides
-	});
-}
-
-/** A withdrawn line the board hides, holding a block position before or between points. */
-function withdrawn(): Item['entries'][number] {
-	return withdrawnEntry('Ein zurückgezogener Punkt.', '2026-10-01');
-}
-
-function threePoints(): OptionEntry[] {
-	return [point(2), point(3), point(4)];
-}
-
-/** Item 7, its line 1 withdrawn, so its points keep the indexes from 2 on. */
-function sprung(...points: Item['entries']): Item {
-	return item(7, 'Sprung', withdrawn(), ...points);
-}
-
-async function arrangeCards(points: Item['entries'] = threePoints()): Promise<void> {
-	await arrange([sprung(...points), item(9, 'Gäste', point(1))]);
-}
-
-async function expectRuled(letters: string[]): Promise<void> {
-	for (const [position, letter] of letters.entries()) {
-		await expect
-			.poll(() => storedLine(7, position + 2))
-			.toMatchObject({ ruling: letter, via: 'board' });
-	}
-}
-
-/** Sends an answer for the card: Unclear, Other… at the point numbered `point`, or Other… on a one-point card. */
-async function send(page: Page, kind: 'other' | 'unclear', point?: number): Promise<void> {
-	if (kind === 'other') {
-		const scope = point === undefined ? '' : `Point ${point}: `;
-		await page.getByRole('button', { name: `${scope}Other…`, exact: true }).click();
-		await page.getByRole('textbox', { name: `${scope}Your answer`, exact: true }).fill(ANSWER);
-	} else {
-		await page.getByRole('button', { name: 'Unclear' }).click();
-		await page.getByRole('textbox', { name: 'What is unclear? (optional)' }).fill(NOTE);
-	}
-	await page.getByRole('button', { name: 'Send' }).click();
-}
-
-function logPosts(page: Page): Record<string, unknown>[] {
-	const bodies: Record<string, unknown>[] = [];
-	page.on('request', (request) => {
-		if (request.method() === 'POST') bodies.push(request.postDataJSON());
-	});
-	return bodies;
-}
-
-type BoardJson = { repos: { items: { lines: { index: number; fingerprint: string }[] }[] }[] };
-
-function logBoards(page: Page): Response[] {
-	const boards: Response[] = [];
-	page.on('response', (response) => {
-		if (response.url().endsWith('/api/board')) boards.push(response);
-	});
-	return boards;
-}
-
-async function fingerprintOf(
-	board: Response | undefined,
-	index: number
-): Promise<string | undefined> {
-	const read = (await board?.json()) as BoardJson | undefined;
-	return read?.repos[0]?.items
-		.flatMap((entry) => entry.lines)
-		.find((entry) => entry.index === index)?.fingerprint;
-}
-
-async function visit(page: Page): Promise<void> {
-	const { appUrl, token } = readBoardRuntime();
-	await page.clock.install();
-	await page.goto(`${appUrl}#t=${token}`);
-}
-
-async function showCard(page: Page, phone: boolean, title: string): Promise<void> {
-	if (phone) {
-		const back = page.getByRole('button', { name: '‹ Open' });
-		if (await back.isVisible()) await back.click();
-	}
-	await page.locator('.tracks').getByTitle(title, { exact: true }).click();
-	if (phone) await expect(page.locator('.question-pane')).toBeVisible();
-}
-
-async function open(page: Page, phone: boolean, title = CARD_NAME): Promise<void> {
-	await visit(page);
-	await showCard(page, phone, title);
-}
-
-const card = (page: Page): Locator => page.locator('.option-card');
-const toggle = (page: Page, number: number): Locator =>
-	card(page)
-		.locator('button.toggle')
-		.nth(number - 1);
-const pointPicks = (page: Page, number: number): Locator =>
-	page.getByRole('group', { name: `Point ${number}` });
-const pick = (page: Page, number: number, letter: string): Locator =>
-	page.getByRole('button', { name: new RegExp(`^Point ${number}: ${letter} –`) });
-const acceptAll = (page: Page): Locator =>
-	page.getByRole('button', { name: 'Accept all recommendations' });
-const strip = (page: Page): Locator => page.locator('.strip');
-const undo = (page: Page): Locator =>
-	strip(page).getByRole('button', { name: 'Undo', exact: true });
-const otherAt = (page: Page, number: number): Locator =>
-	page.getByRole('button', { name: `Point ${number}: Other…`, exact: true });
-const picks = (page: Page): Locator => page.getByRole('group', { name: 'Decide' });
-const decideBar = (page: Page): Locator => page.locator('.decide-row .bar');
-
-async function shoot(page: Page, testInfo: { outputPath(name: string): string }, name: string) {
-	const filter = (value: string) =>
-		page.evaluate((css) => {
-			document.body.style.filter = css;
-		}, value);
-	await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
-	await filter('blur(4px) grayscale(1)');
-	await page.screenshot({ path: testInfo.outputPath(`${name}-shapes.png`) });
-	await filter('');
-}
-
-async function fits(page: Page, width: number): Promise<void> {
-	expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-		width
-	);
-}
-
-function cardPost(item: number, lines: object[], answer: object = {}): object {
-	return { repo: readBoardRuntime().repository, item, lines, ...answer };
-}
 
 for (const viewport of [
 	{ width: 1280, height: 900 },
@@ -739,93 +588,5 @@ for (const viewport of [
 				}
 			});
 		}
-
-		test('[ABRD-80] a point ruled from chat meanwhile is refused as already ruled and nothing else is stored', async ({
-			page
-		}) => {
-			await arrangeCards();
-			await open(page, phone);
-			await arrangeCards([
-				point(2),
-				point(3, { ruling: 'A', ruled_on: '2026-10-26', via: 'chat' }),
-				point(4)
-			]);
-
-			await pick(page, 2, 'B').click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect(page.getByRole('alert')).toContainText(ALREADY_RULED_MESSAGE);
-			expect((await storedLine(7, 2)).ruling).toBeNull();
-			expect((await storedLine(7, 4)).ruling).toBeNull();
-		});
-
-		test('[ABRD-45] any other failure shows its banner with the point open again, and picking again posts again', async ({
-			page
-		}) => {
-			await arrangeCards();
-			const posts = logPosts(page);
-			let failFirst = true;
-			await page.route('**/api/rule', async (route) => {
-				if (failFirst) {
-					failFirst = false;
-					await route.fulfill({
-						status: 200,
-						contentType: 'application/json',
-						body: JSON.stringify({ status: 'failed', message: 'aco unavailable' })
-					});
-				} else {
-					await route.continue();
-				}
-			});
-			await open(page, phone);
-
-			await pick(page, 1, 'B').click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect(page.getByRole('alert')).toContainText('aco unavailable');
-			await expect(page.getByRole('button', { pressed: true })).toHaveCount(0);
-			await expect(pick(page, 1, 'A')).toBeEnabled();
-			await pick(page, 1, 'A').click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect.poll(() => posts.length).toBe(2);
-			await expect.poll(() => storedLine(7, 2)).toMatchObject({ ruling: 'A', via: 'board' });
-		});
-
-		test('[ABRD-91] a point changed after the page read is refused, Neu laden shows it fresh, and the next post names it', async ({
-			page
-		}) => {
-			await arrange([sprung(...threePoints())]);
-			const posts = logPosts(page);
-			const boards = logBoards(page);
-			await open(page, phone);
-
-			await pick(page, 1, 'B').click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-			await expectRuled(['B']);
-			await arrange([
-				sprung(
-					point(2, { ruling: 'B', ruled_on: '2026-10-26', via: 'board' }),
-					point(3, { problem: 'Problem 3 geändert.' }),
-					point(4)
-				)
-			]);
-			await pick(page, 1, 'A').click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect(page.getByRole('alert')).toContainText(LINE_CHANGED_MESSAGE);
-			expect((await storedLine(7, 3)).ruling).toBeNull();
-			const readsBefore = boards.length;
-			await page.getByRole('button', { name: 'Neu laden' }).click();
-			await expect.poll(() => boards.length).toBeGreaterThan(readsBefore);
-			const changed = await fingerprintOf(boards.at(-1), 3);
-			await pick(page, 1, 'A').click();
-			await page.clock.runFor(PAST_UNDO_WINDOW_MS);
-
-			await expect.poll(() => posts.length).toBe(3);
-			const posted = posts.at(-1) as { lines: { line: number; fingerprint: string }[] };
-			expect(posted.lines.find((entry) => entry.line === 3)?.fingerprint).toBe(changed);
-			await expect.poll(() => storedLine(7, 3)).toMatchObject({ ruling: 'A', via: 'board' });
-		});
 	});
 }
