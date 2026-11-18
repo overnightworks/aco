@@ -49,7 +49,7 @@ order `merge`, `squash`, `rebase`.
 | `<path>` present but untracked or ignored | PIN-01 (cited) |
 | `storage = "state-ref"` | LANDCMD-01 |
 | `--coordinator-override` without `--role coordinator` | LANDCMD-19 |
-| `--record <file>` malformed, or its last verdict not the `--head` | LANDCMD-77 (LANREC-31, LANREC-38..LANREC-40, cited) |
+| `--record <file>` malformed, or its last verdict not the `--head` or not an approval | LANDCMD-77 (LANREC-31, LANREC-38..LANREC-40, LANREC-44, cited) |
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
 | pull request not open | LANDCMD-02 |
 | pull request is a draft | LANDCMD-74 |
@@ -103,7 +103,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
-- [ ] [LANDCMD-77] `--record <file>` is checked before any read, a rerun too: LANREC-31 at the argument parse (LANREC-40), LANREC-38 and LANREC-39 after LANDCMD-19; the release writes its record (LANREC-42, LANREC-43).
+- [ ] [LANDCMD-77] `--record <file>` is checked before any merge or write, a rerun too: LANREC-31 at the argument parse, LANREC-38, LANREC-39 and LANREC-44 after LANDCMD-19; it then writes its record (LANREC-42).
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.

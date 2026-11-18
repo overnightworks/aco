@@ -27,9 +27,9 @@ def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
         defect = f"cannot be read ({error.strerror})"
     except lane_record.RecordFileError as error:
         stated = report.cut_foreign_text(error.stated, _STATED_VALUE_LENGTH_LIMIT)
-        defect = error.before + stated + error.after
+        defect = error.before + stated
     raise protocol.ClaimUnavailableError(
-        report.refusal_around_foreign_text(_INVALID, path_text, defect=defect)
+        report.refusal_around_foreign_path(_INVALID, path_text, defect=defect)
     )
 
 

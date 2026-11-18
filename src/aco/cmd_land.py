@@ -662,8 +662,9 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     `release --merged` path unchanged. A pull request `landing` already finds merged -- a resumed
     run after an earlier step failed -- skips preflight and the merge
     itself entirely: `merge_landing` never runs twice for the same pull
-    request. `--coordinator-override`'s own role and `--record`'s verdict head are validated
-    here, at entry, before that fresh/rerun split and before any read: a rerun skips
+    request. `--coordinator-override`'s own role and `--record`'s verdict are validated
+    here, at entry, once the repository root and board.toml are read and before that
+    fresh/rerun split and any forge read: a rerun skips
     `_land_preflight` entirely, so a check placed only there left a rerun free to delete the
     branch and fast-forward -- and `cmd_release.release_transition` free to close the item."""
     if parsed.head is None:
@@ -672,7 +673,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         raise protocol.ClaimUnavailableError(_LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:
         protocol.require_coordinator_override(parsed.role)
-    lane_record.require_landing_head(parsed.record, parsed.head)
+    lane_record.require_landable_record(parsed.record, parsed.head)
     client = cast(github.GitHubForge, context.forge)
     detail = _land_read_head_checked(client, parsed.pull_request, client.repository.path)
     # A rerun's own preflight never ran, so it verified no classification:

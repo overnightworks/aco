@@ -86,3 +86,23 @@ def test_a_release_refuses_a_record_it_cannot_use_before_any_write(
         f"ERROR: {sentence.format(record=record)}\n",
         tip_before,
     )
+
+
+def test_an_abandoned_release_accepts_a_record_whose_last_verdict_asks_for_revision(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: LANREC-44 -- an abandoned lane rarely ends approved."""
+    stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
+    stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
+    verdicts = [{"stage": "gate", "verdict": "revise", "sha": "c" * 40}]
+    record = write_lane_record_file(tmp_path, lane_record_object(verdicts=verdicts))
+
+    release = ["--repo", REPOSITORY, "release", "--agent", "Ada", "--abandoned", "stopped"]
+
+    result = run_cli([*release, "--record", str(record)], capsys)
+
+    assert (result.status, result.stderr) == (0, "")

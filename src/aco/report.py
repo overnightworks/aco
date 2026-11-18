@@ -16,6 +16,7 @@ from . import forge, protocol, usage, workboard
 CLI_ERROR_PREFIX = "ERROR: "
 REFUSAL_LINE_LENGTH_LIMIT = 200
 _REFUSAL_SENTENCE_LENGTH_LIMIT = REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
+_PATH_ELLIPSIS = "…/"
 
 JSON_FLAG = "--json"
 _JSON_HELP = "print the result as JSON instead of the human lines"
@@ -132,6 +133,26 @@ def refusal_around_foreign_text(template: str, foreign_text: str, **words: objec
     words around it always survive."""
     room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
     return template.format(foreign=cut_foreign_text(foreign_text, room), **words)
+
+
+def refusal_around_foreign_path(template: str, path_text: str, **words: object) -> str:
+    """`template` with `{foreign}` replaced by `path_text`, shown as `refusal_around_foreign_text`
+    shows foreign text, but a path that does not fit loses the front of its directory (`…/`),
+    so the file name and the words around it survive whole; the line passes its bound only
+    when the file name and those words do not fit together. A path that the marker would not
+    shorten is shown whole."""
+    room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
+    printable = protocol.terminal_text(path_text)
+    if len(printable) <= room:
+        return template.format(foreign=printable, **words)
+    file_name = printable.rpartition("/")[2]
+    kept = printable[len(printable) - (room - len(_PATH_ELLIPSIS)) :]
+    # `kept` starts mid-name; the first `/` ends that name, and a kept part with none holds no
+    # whole directory name, so the file name stands alone.
+    shortened = _PATH_ELLIPSIS + (kept.partition("/")[2] or file_name)
+    if len(shortened) >= len(printable):
+        shortened = printable
+    return template.format(foreign=shortened, **words)
 
 
 def cut_foreign_text(foreign_text: str, limit: int) -> str:
