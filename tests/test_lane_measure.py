@@ -19,7 +19,7 @@ from aco.lane_measure import (
     parse_group,
     remaining_work,
 )
-from aco.lane_record import LaneOutcome, LaneRecord, RecordedLane
+from aco.lane_record import FindingStage, LaneOutcome, LaneRecord, RecordedLane, StageCounts
 from aco.routing_line import RoutingLine
 
 NOVEMBER = DateRange(date(2026, 11, 1), date(2026, 11, 30))
@@ -240,3 +240,79 @@ def test_a_lane_released_without_an_issue_belongs_to_no_item() -> None:
     lane = RecordedLane(RELEASED_AT, LaneRecord(LaneOutcome.LANDED, wall_seconds=5))
 
     assert item_actuals([lane]) == {}
+
+
+def lane_of_risk(
+    risk: str | None,
+    counts: dict[FindingStage, StageCounts] | None = None,
+    outcome: LaneOutcome = LaneOutcome.LANDED,
+) -> RecordedLane:
+    record = LaneRecord(outcome, risk=risk, counts={} if counts is None else counts)
+    return RecordedLane(RELEASED_AT, record)
+
+
+def block_summaries(lanes: list[RecordedLane]) -> list[tuple[str | None, int]]:
+    return [(block.risk, block.lanes) for block in measure(NOVEMBER, lanes).risks]
+
+
+@pytest.mark.parametrize(
+    ("lanes", "expected"),
+    [
+        pytest.param([], [], id="no-lane-has-no-block"),
+        pytest.param(
+            [lane_of_risk("normal"), lane_of_risk("material"), lane_of_risk("normal")],
+            [("material", 1), ("normal", 2)],
+            id="one-block-per-risk-ordered-by-name",
+        ),
+        pytest.param(
+            [lane_of_risk(None), lane_of_risk("zeta"), lane_of_risk("alpha")],
+            [("alpha", 1), ("zeta", 1), (None, 1)],
+            id="lanes-without-a-risk-come-last",
+        ),
+        pytest.param([lane_of_risk("normal")], [("normal", 1)], id="no-none-block-without-lanes"),
+    ],
+)
+def test_a_group_has_one_block_per_risk_class_its_lanes_state(
+    lanes: list[RecordedLane], expected: list[tuple[str | None, int]]
+) -> None:
+    """Spec: STATS-23, STATS-25."""
+    assert block_summaries(lanes) == expected
+
+
+def test_a_block_counts_the_outcomes_of_its_own_lanes() -> None:
+    """Spec: STATS-23."""
+    lanes = [
+        lane_of_risk("normal"),
+        lane_of_risk("normal", outcome=LaneOutcome.ABANDONED),
+        lane_of_risk("material"),
+    ]
+
+    blocks = {block.risk: block.outcomes for block in measure(NOVEMBER, lanes).risks}
+
+    assert blocks == {
+        "normal": {LaneOutcome.LANDED: 1, LaneOutcome.ABANDONED: 1},
+        "material": {LaneOutcome.LANDED: 1, LaneOutcome.ABANDONED: 0},
+    }
+
+
+def test_a_stage_total_sums_the_known_values_and_counts_the_lanes_that_state_none() -> None:
+    """Spec: STATS-24."""
+    lanes = [
+        lane_of_risk("material", {FindingStage.REVIEW: StageCounts(2, 3, 1)}),
+        lane_of_risk("material", {FindingStage.REVIEW: StageCounts(1, None, None)}),
+        lane_of_risk("material"),
+    ]
+
+    stages = measure(NOVEMBER, lanes).risks[0].stages
+
+    review, ci = stages[FindingStage.REVIEW], stages[FindingStage.CI]
+    assert [
+        (figure.total, figure.n, figure.unknown) for figure in (review.fix_rounds, review.misses)
+    ] == [
+        (3, 2, 1),
+        (1, 1, 2),
+    ]
+    assert [(figure.total, figure.n, figure.unknown) for figure in (ci.fix_rounds, ci.misses)] == [
+        (None, 0, 3),
+        (None, 0, 3),
+    ]
