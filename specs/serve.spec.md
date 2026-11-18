@@ -135,9 +135,9 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 - [ ] [ABRD-97] A point is saving (ABRD-100) from its window's end until its answer is applied: its picks and `Other…` take no click; `Accept all` and `Unclear` take none while every open point saves.
 - [ ] [ABRD-98] A read's rows for an item apply only if the read was sent after that item's last stored answer arrived; until then the page keeps the item that answer carried.
 - [ ] [ABRD-99] From the start of its undo window until its answer is applied, a point marks its chosen letter at full strength and dims the rest, without the accent; `Other…` and `Unclear` mark none.
-- [ ] [ABRD-100] A card with a saving point shows the Saving shape on its row (a dashed ring, turning unless motion is reduced), also with its head; its meta reads `saving`; `Other…` and `Unclear` stay beside it, disabled while every open point saves (ABRD-97).
+- [ ] [ABRD-100] A card with a saving point shows the Saving shape on its row (a dashed ring, turning unless motion is reduced), also with its head; its meta reads `saving`; what stays clickable is ABRD-97.
 - [ ] [ABRD-66] The typed answer is kept per point, also on a one-point card: closing the panel, switching cards, `Undo` and a failed post keep it; `Undo` reopens the panel with it, and a stored decision drops it.
-- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Saves shortly: Other · <name>` (ABRD-82; ABRD-154 on a card of points, where the name is the point topic) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
+- [ ] [ABRD-67] `Send` closes the panel and starts the undo window with the strip `Saves shortly: Other · <name>` (ABRD-82, ABRD-154) and `Undo` (ABRD-58, ABRD-59); `Undo` posts nothing.
 - [ ] [ABRD-68] `Send` posts the point as shown when the panel opened, so a point changed since is refused (ABRD-02); the answer stays in the draft.
 - [ ] [ABRD-69] A card that is with its head (ABRD-61) offers `Other…` as any open option card does.
 - [ ] [ABRD-70] A card post's `unclear` (ABRD-78) stores no `via`; its note is trimmed, a blank one is none, and every posted line returns to its head (E-ABRD-14).
