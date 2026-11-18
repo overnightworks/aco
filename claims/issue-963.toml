@@ -1,8 +1,0 @@
-claim_id = "2453fdbbc25d42f6b202a189e9f57c08"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "75c152405bfcff1ccf5a1ce86e9bb6f0e7a8bae2"
-branch = "claude/issue-963-item-hint-base"
-scope = ["docs/ARCHITECTURE.md", "specs/item.spec.md", "specs/mcp.spec.md", "specs/storage-pin.spec.md", "src/aco/cmd_item.py", "src/aco/cmd_mcp.py", "src/aco/forge.py", "tests/support/cli_fixtures.py", "tests/test_cmd_item_base_state_ref.py", "tests/test_cmd_mcp_step.py", "tests/test_github.py", "tests/test_state_board.py"]
-opened_commit = "dcb0bea779aad51bce6cb5c424025cb3c56c3821"
-whole_reason = "three printed hints, their spec lines and one architecture sentence"
