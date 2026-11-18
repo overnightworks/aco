@@ -37,6 +37,26 @@ LANDING_BRANCH = f"codex/issue-{WORK_ITEM_ISSUE}-claims"
 # A well-formed 40-hex sha (`protocol.COMMIT_PATTERN`) for every scenario that
 # just needs one.
 MERGE_COMMIT_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+
+def api_pull_request(**overrides: object) -> dict[str, object]:
+    owner, _, name = REPOSITORY.partition("/")
+    payload: dict[str, object] = {
+        "number": 12,
+        "title": "feat: land the lane",
+        "body": "Work-Item: #72",
+        "baseRefName": "main",
+        "headRefName": LANDING_BRANCH,
+        "headRefOid": "a" * 40,
+        "headRepository": {"name": name},
+        "headRepositoryOwner": {"login": owner},
+        "author": {"login": "ada"},
+        "mergedAt": "2026-09-05T10:00:00Z",
+        "mergeCommit": {"oid": MERGE_COMMIT_SHA},
+    }
+    return payload | overrides
+
+
 Checks = tuple[forge.CheckRun, ...] | forge.ForgeError
 
 
@@ -51,6 +71,7 @@ def landing_pull_request(
     merged: bool = False,
     merge_commit: str | None = None,
     title: str = "feat: land the lane",
+    author_is_dependency_bot: bool = False,
 ) -> forge.Landing:
     """`merge_commit` defaults to a shared sha once `merged` is true and to `None` otherwise."""
     return forge.Landing(
@@ -64,6 +85,7 @@ def landing_pull_request(
         merge_commit if merge_commit is not None else (MERGE_COMMIT_SHA if merged else None),
         title,
         MERGE_COMMIT_SHA,
+        author_is_dependency_bot,
     )
 
 

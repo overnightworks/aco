@@ -16,7 +16,7 @@ from typing import Any, cast
 
 import pytest
 from board_fixtures import REPOSITORY
-from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
+from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA, api_pull_request
 from github_pages import board_issue_page_client, raw_board_issue
 from process_fixtures import UnstoppableProcess, reap
 
@@ -2323,24 +2323,6 @@ def test_bounded_command_refuses_a_process_error_type_it_does_not_classify(
 
     with pytest.raises(AssertionError, match="unhandled process failure type"):
         client.default_branch()
-
-
-def api_pull_request(**overrides: object) -> dict[str, object]:
-    owner, _, name = REPOSITORY.partition("/")
-    payload: dict[str, object] = {
-        "number": 12,
-        "title": "feat: land the lane",
-        "body": "Work-Item: #72",
-        "baseRefName": "main",
-        "headRefName": LANDING_BRANCH,
-        "headRefOid": "a" * 40,
-        "headRepository": {"name": name},
-        "headRepositoryOwner": {"login": owner},
-        "author": {"login": "ada"},
-        "mergedAt": "2026-09-05T10:00:00Z",
-        "mergeCommit": {"oid": MERGE_COMMIT_SHA},
-    }
-    return payload | overrides
 
 
 def test_github_adapter_reads_a_pull_request_and_the_default_branch() -> None:

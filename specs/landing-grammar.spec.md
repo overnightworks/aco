@@ -49,6 +49,7 @@ through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 | `No-Item: deps` PR with configured dependency paths | — | LAND-71..77 | — | — |
 | `No-Item: deps` PR without configured dependency paths | — | LAND-70 | — | — |
 | `No-Item: deps` merge commit trailer | — | LAND-48 | LAND-37, LAND-64 | — |
+| no line, dependabot-authored PR | — | LAND-91, LAND-70..77 | LAND-37 | — |
 | no classification / no trailer | — | LAND-06, LAND-58 | LAND-32, LAND-52, LAND-62, LAND-80 | — |
 | contradictory trunk trailer (both, or repeated `No-Item:`) | — (lands nothing, LAND-42) | LAND-60 | LAND-61 | — |
 | state-ref `Work-Item:` trailer number past `aco-ffffff` | — | LAND-68 | — | — |
@@ -112,7 +113,7 @@ is read (`parse_pull_request_classification`).
 
 - [ ] [LAND-04] A body carrying `Work-Item: #10` and a closing reference for #10 makes `aco check <pr>` print `PR #<n> by <author> declares Work-Item: <owner>/<repo>#10`, exit `0`, when it passes LAND-87.
 - [ ] [LAND-05] A body carrying `No-Item: docs` with an active issue-less lane claim on the pull request's head branch prints `PR #<n> by <author> declares No-Item: docs`, exit `0`, when it passes LAND-87.
-- [ ] [LAND-06] A body carrying neither `Work-Item:` nor `No-Item:` makes `check` print `REFUSED: pull request #<n> carries no \`Work-Item:\` or \`No-Item:\` line`, exit `2`.
+- [ ] [LAND-06] A body carrying neither `Work-Item:` nor `No-Item:` makes `check` print `REFUSED: pull request #<n> carries no \`Work-Item:\` or \`No-Item:\` line`, exit `2`, unless LAND-91.
 - [ ] [LAND-07] A `Work-Item:`/`No-Item:` line inside a fenced code block is documentation, not a declaration: a body carrying one only there refuses the same as LAND-06.
 - [ ] [LAND-08] A body carrying two classification lines (a `Work-Item:` and a `No-Item:`, or two `No-Item:` lines) refuses `carries <n> classification lines; exactly one is required`, exit `2`.
 - [ ] [LAND-09] A body naming two `Work-Item:` lines refuses `names two work items, #a and #b; split it`, exit `2`.
@@ -137,6 +138,7 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-88] A claim covers a path a scope entry equals or is an ancestor of, or a tracked `lane_shared` entry covers it (PIN-41); `--whole` widens nothing; a rename needs both paths covered (LAND-74).
 - [ ] [LAND-89] LAND-87 judges the listing LAND-73..76 proves, which the forge computes against the merge base: merging the default branch into the lane adds none of its paths, a merge's own resolution counts.
 - [ ] [LAND-90] LAND-87 holds for `Work-Item:` and every `No-Item:` kind, after LAND-16..19 and LAND-70/71, on the run's one listing, before any `land` write; `lane_shared` is read only if the scope leaves a path.
+- [ ] [LAND-91] A body with no live `Work-Item:` or `No-Item:` line and the forge author `app/dependabot` classifies as `No-Item: deps`; LAND-70..77 and LAND-87..90 judge it, `land` writes the trailer (LAND-48).
 
 Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-71/77, LAND-87.
 - [ ] [LAND-18] A `Work-Item:` body with no closing reference for that item refuses `carries no closing reference for its work item <item>`, exit `2`.
@@ -225,6 +227,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - LAND-71 and LAND-87 are tripwires for cooperative agents, not boundaries: push rights to the canonical remote stop outsiders, and nothing stops an agent acting under the operator's own identity, which can rescope its claim before `aco land` or merge without `aco land`; the merge commit records who merged. Neither the forge's branch protection nor its review is claimed to stop anyone.
 - A force-push back to the exact head preflight read, during the bracketed listing or before the pinned merge, is not detected (an accepted ABA residual).
 
+- A body line or a branch name never makes a pull request dependabot-authored, and a present `Work-Item:`/`No-Item:` line, valid or not, always wins over LAND-91.
 - A merge commit trailer `No-Item: deps` releases a lane as `docs`/`fix` do (LAND-37); `release --merged` never re-judges its paths: the trailer decides (LAND-64).
 
 - A trunk commit's own `No-Item:` trailer never marks any issue `code-landed`; only a `Work-Item:` trailer does.

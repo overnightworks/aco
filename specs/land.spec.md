@@ -60,7 +60,7 @@ order `merge`, `squash`, `rebase`.
 | no CI checks at all | LANDCMD-04 |
 | a check still running | LANDCMD-05 |
 | a check finished neither successful nor skipped | LANDCMD-06 |
-| pull request's own shape (classification line, cross-repository head, target branch) invalid | LANDCMD-07 (LAND-06..13, 32, cited) |
+| pull request's own shape (classification line, cross-repository head, target branch) invalid | LANDCMD-07 (LAND-06..13, 32, 91, cited) |
 | the head removes `<path>`, changes `storage` or `canonical_remote` in it, or carries an invalid one | LANDCMD-22, LANDCMD-23, LANDCMD-24 |
 | named work item not open | LANDCMD-08 |
 | classification's own claim/parent/closing defect | LANDCMD-09 (LAND-14..28, LAND-70..77, LAND-79, LAND-87..90, cited) |
@@ -119,7 +119,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
 - [ ] [LANDCMD-06] Once all checks completed, one neither successful nor skipped refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
 - [ ] [LANDCMD-56] Of several check runs with one name on the head, only the newest (highest id) counts: a red run a later green one replaced never refuses, a newer red one always does.
-- [ ] [LANDCMD-07] This pull request's own shape decides its classification, exactly as `check <pr>` reads it (LAND-06..13, 32): a shape defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
+- [ ] [LANDCMD-07] This pull request's own shape decides its classification, exactly as `check <pr>` reads it (LAND-06..13, 32, 91): a shape defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
 - [ ] [LANDCMD-22] After LANDCMD-07, a head without `<path>` refuses `pull request #<n> removes <path>; aco land cannot release its claim across that change`, exit `2` (E-LANDCMD-22).
 - [ ] [LANDCMD-23] A head changing `storage` or `canonical_remote` in `<path>` refuses `pull request #<n> changes <setting> in <path>; aco land cannot release its claim across that change`, exit `2`.
 - [ ] [LANDCMD-24] A head `<path>` the pin's own validator refuses prints `pull request #<n> carries an invalid <path>: <detail>`, exit `2`.

@@ -239,6 +239,50 @@ DEPENDENCY_ACCEPTANCES = {
     ),
 }
 
+DEPENDABOT_WORLD = replace(
+    DEPS_WORLD,
+    author="app/dependabot",
+    author_is_dependency_bot=True,
+    listing=listing_of("uv.lock"),
+)
+
+DEPENDABOT_ROWS = {
+    "dependabot-without-a-line-declares-deps": declares(
+        "Bumps ruff.", "No-Item: deps", 4, DEPENDABOT_WORLD, (12,)
+    ),
+    "dependabot-with-a-fix-line-declares-fix": declares(
+        "No-Item: fix", "No-Item: fix", 3, DEPENDABOT_WORLD
+    ),
+    "dependabot-with-a-malformed-line-is-refused": refused(
+        "No-Item: deeps",
+        "carries `No-Item: deeps`; an issue-less pull request is docs, fix, or deps",
+        2,
+        DEPENDABOT_WORLD,
+    ),
+    "dependabot-with-a-line-only-in-a-fence-declares-deps": declares(
+        "```\nNo-Item: fix\n```", "No-Item: deps", 4, DEPENDABOT_WORLD, (12,)
+    ),
+    "dependabot-changing-a-path-outside-is-refused": refused(
+        "Bumps ruff.",
+        outside("src/x.py"),
+        4,
+        replace(DEPENDABOT_WORLD, listing=listing_of("src/x.py")),
+        (12,),
+    ),
+    "dependabot-without-dependency-paths-is-refused": refused(
+        "Bumps ruff.",
+        NO_DEPENDENCY_PATHS,
+        3,
+        replace(DEPENDABOT_WORLD, dependency_paths=()),
+    ),
+    "dependabot-without-a-claim-is-refused": refused(
+        "Bumps ruff.", NO_LANE, 3, replace(DEPENDABOT_WORLD, claims=())
+    ),
+    "another-author-without-a-line-is-refused": refused(
+        "Bumps ruff.", NO_LINE, 2, replace(DEPENDABOT_WORLD, author_is_dependency_bot=False)
+    ),
+}
+
 DEPENDENCY_PATH_REFUSALS = {
     "no-dependency-paths": refused(DEPS_BODY, NO_DEPENDENCY_PATHS, 3, LANE_WORLD),
     "path-outside": listed_and_refused(outside("src/x.py"), listing_of("uv.lock", "src/x.py")),
@@ -629,4 +673,12 @@ def test_a_landing_whose_parent_cannot_be_read_or_holds_no_children_is_refused(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
     """Spec: LAND-18, LAND-26, LAND-27, CHECK-01"""
+    check_pull_request(case, flags)
+
+
+@pytest.mark.parametrize(("case", "flags"), rendered(DEPENDABOT_ROWS))
+def test_a_dependabot_pull_request_without_a_line_is_judged_as_deps(
+    case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
+) -> None:
+    """Spec: LAND-91, LAND-06, LAND-11, LAND-70, LAND-71, CHECK-01"""
     check_pull_request(case, flags)

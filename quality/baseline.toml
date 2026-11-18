@@ -5,7 +5,7 @@
 
 [ccn."src/aco/github.py"]
 "GitHubForge._board_dependency" = 18
-"GitHubForge._landing" = 28
+"GitHubForge._landing" = 25
 
 [ccn."src/aco/workboard.py"]
 "build_board" = 26
@@ -19,7 +19,7 @@
 "src/aco/cli.py" = 821
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 875
-"src/aco/github.py" = 1439
+"src/aco/github.py" = 1438
 "src/aco/protocol.py" = 1836
 "src/aco/state_board.py" = 922
 "src/aco/store.py" = 1739
@@ -34,7 +34,7 @@
 "tests/test_cmd_land_preflight_claim.py" = 851
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2759
+"tests/test_github.py" = 2741
 "tests/test_state_board.py" = 5898
 "tests/test_store.py" = 5103
 
@@ -56,9 +56,6 @@
 [function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 94
 "release_transition" = 69
-
-[function_lines."src/aco/github.py"]
-"GitHubForge._landing" = 60
 
 [function_lines."src/aco/workboard.py"]
 "_board_item" = 97
@@ -91,8 +88,7 @@
 "world" = 99
 
 [function_lines."tests/test_cmd_land_merge_message.py"]
-"world" = 110
-"world.arrange" = 67
+"world" = 102
 
 [function_lines."tests/test_cmd_land_preflight_claim.py"]
 "world" = 104

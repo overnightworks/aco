@@ -485,7 +485,12 @@ def structural_classification(
     cross_repository = cross_repository_defect(context.repository, detail)
     if cross_repository is not None:
         return cross_repository
-    classification = workboard.parse_pull_request_classification(detail.body, context.repository)
+    if detail.author_is_dependency_bot and workboard.live_classification_line(detail.body) is None:
+        classification = workboard.NoItemClassification(workboard.NoItemKind.DEPS)
+    else:
+        classification = workboard.parse_pull_request_classification(
+            detail.body, context.repository
+        )
     if isinstance(classification, workboard.ClassificationDefect):
         return classification
     target_branch = _target_branch_defect(context, detail)

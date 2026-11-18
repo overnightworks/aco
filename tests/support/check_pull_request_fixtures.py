@@ -61,6 +61,18 @@ class PullRequestWorld:
     lane_shared: tuple[str, ...] = ()
     listing: forge.PullRequestChanges | forge.ForgeError = README_LISTING
     parent: ParentWorld | None = None
+    author: str = "ada"
+    author_is_dependency_bot: bool = False
+
+    def landing(self, body: str) -> forge.Landing:
+        return landing_pull_request(
+            body=body,
+            head_ref_name=self.head_branch,
+            head_repository=self.head_repository,
+            base_ref_name=self.target_branch,
+            author=self.author,
+            author_is_dependency_bot=self.author_is_dependency_bot,
+        )
 
 
 ITEM_WORLD = PullRequestWorld()
@@ -120,7 +132,7 @@ def declares(
     return PullRequestCase(
         body=body,
         exit=0,
-        stdout=f"PR #12 by ada declares {label}\n",
+        stdout=f"PR #12 by {world.author} declares {label}\n",
         stderr="",
         envelope={"ok": True, "reason": "valid", "kind": "pull_request", "number": 12},
         forge_requests=forge_requests if already_counted else forge_requests + 1,
@@ -294,14 +306,7 @@ def check_pull_request(
         forge_world = serve_forge(
             monkeypatch,
             FakeForge(
-                landings={
-                    12: landing_pull_request(
-                        body=case.body,
-                        head_ref_name=case.world.head_branch,
-                        head_repository=case.world.head_repository,
-                        base_ref_name=case.world.target_branch,
-                    )
-                },
+                landings={12: case.world.landing(case.body)},
                 changes_by_number={12: case.world.listing},
                 default_branch_name=case.world.default_branch,
                 parents=parent_of_work_item(case.world.parent),
