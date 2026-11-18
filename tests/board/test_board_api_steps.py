@@ -41,9 +41,7 @@ def test_a_step_with_its_table_lists_purpose_actions_expected_and_no_answer(
     ]
 
 
-def test_a_step_with_an_answer_lists_it_and_an_old_step_lists_null_fields(
-    repository: BoardForge, board: BoardClient
-) -> None:
+def test_a_step_with_an_answer_lists_it(repository: BoardForge, board: BoardClient) -> None:
     """ABRD-157."""
     repository.put_item(
         7,
@@ -51,14 +49,28 @@ def test_a_step_with_an_answer_lists_it_and_an_old_step_lists_null_fields(
             "Run it.", wait=OPERATOR_WAIT, step={**STEP_TABLE, "answer": "the report"}
         ),
     )
+
+    (step,) = _repo(board)["steps"]
+
+    assert (step["number"], step["answer"]) == (7, "the report")
+
+
+def test_an_old_step_lists_null_purpose_and_actions(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """ABRD-157."""
     repository.put_item(
         8, complete_contract("Run it.", wait={"operator": "Old.", "since": date(2026, 8, 31)})
     )
 
-    old, new = _repo(board)["steps"]
+    (step,) = _repo(board)["steps"]
 
-    assert (new["number"], new["answer"]) == (7, "the report")
-    assert (old["number"], old["step"], old["purpose"], old["actions"]) == (8, "Old.", None, None)
+    assert (step["number"], step["step"], step["purpose"], step["actions"]) == (
+        8,
+        "Old.",
+        None,
+        None,
+    )
 
 
 def test_a_step_of_a_non_member_is_not_listed(repository: BoardForge, board: BoardClient) -> None:
