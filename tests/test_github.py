@@ -2335,7 +2335,6 @@ def test_github_adapter_reads_a_pull_request_and_the_default_branch() -> None:
         return "main"
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=run)
-
     expected = forge.Landing(
         12,
         "ada",

@@ -91,9 +91,8 @@ from aco.workboard import BlockerState, IssueDependency, IssueReference
 REPOSITORY_PATH = "acme/items"
 REPOSITORY = forge.RepositoryId("file", ("acme",), "items")
 DEFAULT_BRANCH = "main"
-MISSING_SECTION_HINT = (
-    "aco item edit {item} --base <body_hash> fills it (hash: aco item show {item} --json)"
-)
+ALL_MISSED = "".join(f"{{item}} misses {n}; {{hint}}\n" for n in ("Now", "Next", "Done when"))
+HINT = "aco item edit {item} --base <body_hash> fills it (hash: aco item show {item} --json)"
 
 CONTAINER_ID = "aco-000001"
 CHILD_A_ID = "aco-000002"
@@ -3368,9 +3367,7 @@ class TestCliStateRefForge:
             pytest.param(
                 piping(""),
                 (),
-                "{item} misses Now; {hint}\n"
-                "{item} misses Next; {hint}\n"
-                "{item} misses Done when; {hint}\n",
+                ALL_MISSED,
                 "```aco\n",
                 {"now": "", "next": "", "done_when": ""},
                 id="nothing_piped_writes_the_skeleton_and_names_each_gap",
@@ -3378,9 +3375,7 @@ class TestCliStateRefForge:
             pytest.param(
                 empty_harness_socket_on_stdin,
                 (),
-                "{item} misses Now; {hint}\n"
-                "{item} misses Next; {hint}\n"
-                "{item} misses Done when; {hint}\n",
+                ALL_MISSED,
                 "```aco\n",
                 {"now": "", "next": "", "done_when": ""},
                 id="a_harness_socket_is_never_read_and_the_skeleton_is_written",
@@ -3416,7 +3411,7 @@ class TestCliStateRefForge:
         printed = captured.out.strip()
         assert (status, captured.err) == (
             0,
-            err.format(item=printed, hint=MISSING_SECTION_HINT.format(item=printed)),
+            err.format(item=printed, hint=HINT.format(item=printed)),
         )
         state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
         assert state.tip is not None
