@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .. import expectation_grammar, expectations, lane_measure, progress, rulings
+from .. import expectation_grammar, expectations, inbox, lane_measure, progress, rulings
 from .board import BoardReading, RepoReading, RepoUnavailable, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
@@ -56,13 +56,20 @@ def board_json(reading: BoardReading) -> str:
 
 def _repo_json(reading: RepoReading) -> dict[str, object]:
     if isinstance(reading, RepoUnavailable):
-        return {"name": reading.name, "error": reading.reason, "items": [], "progress": None}
+        return {
+            "name": reading.name,
+            "error": reading.reason,
+            "items": [],
+            "progress": None,
+            "steps": [],
+        }
     items = (_item_json(row, reading.name) for row in reading.rows)
     return {
         "name": reading.name,
         "error": None,
         "items": [item for item in items if item is not None],
         "progress": _progress_json(reading.progress),
+        "steps": [inbox.step_json(step) for step in reading.steps],
     }
 
 

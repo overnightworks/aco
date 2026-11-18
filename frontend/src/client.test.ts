@@ -49,7 +49,9 @@ test('a refused read raises BoardApiError carrying the sentence of its body', as
 
 test('a refused read whose body holds the readings is read as the board', async () => {
 	const readings = {
-		repos: [{ name: 'owner/a', error: 'git refused the read', items: [], progress: null }]
+		repos: [
+			{ name: 'owner/a', error: 'git refused the read', items: [], progress: null, steps: [] }
+		]
 	};
 
 	expect(await fetchBoard('token', fakeFetch(502, readings))).toEqual(readings);

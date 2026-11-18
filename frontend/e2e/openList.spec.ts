@@ -205,8 +205,8 @@ for (const viewport of [
 				route.fulfill({
 					json: {
 						repos: [
-							{ name: 'quiet', error: null, items: [] },
-							{ name: 'broken', error: sentence, items: [] }
+							{ name: 'quiet', error: null, items: [], steps: [] },
+							{ name: 'broken', error: sentence, items: [], steps: [] }
 						]
 					}
 				})
