@@ -21,13 +21,13 @@ from board_fixtures import (
     write_repository_config,
 )
 from cli_fixtures import real_git, run_cli, set_git_identity, stub_board_config_tracked
+from item_base import edit_item
 from option_cards import open_option_entry
 from store_fixtures import item_record, path_without_gh, push_item_tree
 
 from aco import body, cli, decide, expectation_grammar, items, protocol, session, store
 from aco.board.aco_source import AcoSource
 from aco.board.board import LINE_CHANGED
-from aco.state_board import StateRefBoard
 
 _REAL_RUN_CONTEXT = session.run_context
 """Taken before the board conftest's seam replaces it with the test forge."""
@@ -185,27 +185,7 @@ def _card_edited(capsys: pytest.CaptureFixture[str]) -> None:
     edited = _item_file(
         {**open_option_entry(), "question": "Anders gefragt?"}, _two_open_lines()[1]
     )
-    assert run_cli(["item", "edit", _FIRST_ID], capsys, stdin=edited).status == 0
-
-
-def test_a_bare_item_edit_hands_the_board_the_snapshot_body_it_replaces(
-    checkout: _StateRefCheckout,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """The write names the stored text it replaces, as the edit read it."""
-    replaced: list[str] = []
-    write = StateRefBoard.update_item_body
-
-    def recording(board: StateRefBoard, number: int, new_body: str, *, replacing: str) -> None:
-        replaced.append(replacing)
-        write(board, number, new_body, replacing=replacing)
-
-    monkeypatch.setattr(StateRefBoard, "update_item_body", recording)
-
-    _card_edited(capsys)
-
-    assert replaced == [_item_file(*_two_open_lines()).decode()]
+    assert edit_item(_FIRST_ID, capsys, stdin=edited.decode()).status == 0
 
 
 def _line_ruled_in_chat(capsys: pytest.CaptureFixture[str]) -> None:

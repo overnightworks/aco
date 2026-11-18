@@ -19,6 +19,7 @@ from typing import cast
 from . import (
     board_read,
     body,
+    expectation_grammar,
     expectations,
     file_lock,
     forge,
@@ -38,6 +39,26 @@ class InvalidTargetError(protocol.ClaimError):
     """The target gate's own "no such writable item" refusal -- missing, a pull request,
     or a malformed body -- so a command can choose its `invalid_item` without parsing
     prose."""
+
+
+class StaleBodyError(protocol.ClaimError):
+    """A whole-body write named a base hash the item no longer has (ITEM-72)."""
+
+
+def body_hash(text: str) -> str:
+    """The hash of an item body as `item show --json` prints it (ITEM-70)."""
+    return expectation_grammar.content_hash(text.encode("utf-8"))
+
+
+def require_current(base: str, current: str, *, item_id: str, item_argument: str) -> None:
+    """Refuses a whole-body write whose `base` is not the hash of the body just read
+    under the item's lock (ITEM-72); `current` and `base` are `body_hash` values, and
+    `item_argument` is the item as the printed `item show` command takes it."""
+    if base != current:
+        raise StaleBodyError(
+            f"{item_id} changed since it was read (base {base}, now {current}); read it "
+            f"again with aco item show {item_argument} --json and apply your change to that body"
+        )
 
 
 @dataclass(frozen=True)

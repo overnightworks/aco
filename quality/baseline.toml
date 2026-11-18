@@ -16,18 +16,18 @@
 [file_lines]
 "src/aco/body.py" = 1152
 "src/aco/checkout.py" = 2019
-"src/aco/cli.py" = 822
+"src/aco/cli.py" = 821
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 875
 "src/aco/github.py" = 1438
-"src/aco/protocol.py" = 1837
+"src/aco/protocol.py" = 1836
 "src/aco/state_board.py" = 922
 "src/aco/store.py" = 1739
 "src/aco/workboard.py" = 2785
 "tests/support/cli_fixtures.py" = 888
 "tests/test_board.py" = 3582
 "tests/test_checkout.py" = 2037
-"tests/test_cli.py" = 12070
+"tests/test_cli.py" = 12059
 "tests/test_cmd_adopt.py" = 1427
 "tests/test_cmd_cut.py" = 1067
 "tests/test_cmd_land_after_merge_rerun.py" = 862
@@ -35,14 +35,14 @@
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
 "tests/test_github.py" = 2759
-"tests/test_state_board.py" = 5933
+"tests/test_state_board.py" = 5898
 "tests/test_store.py" = 5103
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 80
 
 [function_lines."src/aco/cli.py"]
-"_add_item_parser" = 84
+"_add_item_parser" = 82
 
 [function_lines."src/aco/cmd_claim.py"]
 "checked_claim" = 76

@@ -87,6 +87,10 @@ class ClaimUnavailableError(ClaimError):
     pass
 
 
+class ItemWrittenSinceReadError(ClaimUnavailableError):
+    """An item write whose pinned blob is no longer the item's (CAS-20)."""
+
+
 class ClaimConflictError(ClaimUnavailableError):
     """`apply()`'s own refusal to write a claim intent because another live
     claim, a consumed claim id, or a resource hold already occupies the
@@ -1449,7 +1453,7 @@ def _require_item_unwritten(state: ClaimState, item_id: str, read: ObjectId) -> 
     an item write's parent pin (CAS-70)."""
     current = state.items.get(item_id)
     if current != read:
-        raise ClaimUnavailableError(
+        raise ItemWrittenSinceReadError(
             f"item {item_id!r} was written since it was read "
             f"(expected {read}, found {current!r}); re-read and retry"
         )
@@ -1514,12 +1518,7 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
         raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to release")
     key, current = found
     _authorize_release(current, intent)
-    current_item_oid = state.items.get(intent.item_id)
-    if current_item_oid != intent.item_expected:
-        raise ClaimUnavailableError(
-            f"item {intent.item_id!r} was written since it was read "
-            f"(expected {intent.item_expected}, found {current_item_oid!r}); re-read and retry"
-        )
+    _require_item_unwritten(state, intent.item_id, intent.item_expected)
     new_claims = {
         existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
     }

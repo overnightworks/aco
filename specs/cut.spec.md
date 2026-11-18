@@ -353,11 +353,11 @@ Setup: bare-remote, `storage = "state-ref"` tracked, bootstrapped, item
 
 ```console
 $ aco cut <n> --title "Slice A"
-2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash
 exit 2
 $ aco cut <n> --title "Slice A" --json
-{"ok": false, "reason": "precondition_failed", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]"}
-2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
+{"ok": false, "reason": "precondition_failed", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash"}
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash
 exit 2
 ```
 
