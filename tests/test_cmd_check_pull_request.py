@@ -386,6 +386,15 @@ UNCOVERED_PATHS = {
             pull_request_listing(MERGE_COMMIT_SHA, forge.ChangedFile("README.md", "docs/old.md"))
         ),
     ),
+    "scope-below-a-changed-path-covers-no-ancestor": item_refused(
+        "a",
+        item_world(
+            pull_request_listing(
+                MERGE_COMMIT_SHA, forge.ChangedFile("a", None), forge.ChangedFile("a/b", None)
+            ),
+            scope=("a/b",),
+        ),
+    ),
     "directory-prefix-is-no-directory": item_refused(
         "docsX/a.md", item_world(listing_of("docsX/a.md"), scope=("docs",))
     ),

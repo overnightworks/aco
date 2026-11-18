@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from functools import cached_property
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 from . import (
@@ -275,6 +275,13 @@ def lane_shared_covers(reading: LaneSharedReading, path: str) -> bool:
     )
 
 
+def _scope_covers(scope: tuple[str, ...], path: str) -> bool:
+    parts = PurePosixPath(path).parts
+    return any(
+        parts[: len(PurePosixPath(entry).parts)] == PurePosixPath(entry).parts for entry in scope
+    )
+
+
 def paths_outside_claim(
     scope: tuple[str, ...], lane_shared: LaneSharedReading, paths: Iterable[str]
 ) -> tuple[str, ...]:
@@ -284,7 +291,7 @@ def paths_outside_claim(
     return tuple(
         path
         for path in paths
-        if not protocol.scopes_overlap(scope, (path,)) and not lane_shared_covers(lane_shared, path)
+        if not _scope_covers(scope, path) and not lane_shared_covers(lane_shared, path)
     )
 
 
