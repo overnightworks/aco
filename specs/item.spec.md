@@ -557,7 +557,7 @@ Setup: bare-remote, `storage = "github"`, fake `gh`, `#<n>` open with a valid `a
 
 ```console
 $ aco item show <n> --json
-{"ok": true, "reason": "shown", "item": "#<n>", "number": <n>, "state": "open", "parent": null, "origin": null, "body": "<body>", "body_hash": "sha256:<first>"}
+{"ok": true, "reason": "shown", "item": "<item-id>", "number": <n>, "state": "open", "parent": null, "origin": null, "body": "<body>", "body_hash": "sha256:<first>"}
 exit 0
 $ aco item edit <n>
 2> ERROR: item edit #<n> needs --base <hash>; aco item show <n> --json prints it
