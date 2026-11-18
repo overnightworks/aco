@@ -86,3 +86,9 @@ def test_an_answer_step_call_with_a_defective_answer_never_reaches_the_writer(
 
     assert result["isError"] is True
 
+
+def test_an_answer_step_call_with_a_text_that_is_no_string_says_so() -> None:
+    result = _answer_step(result="report", text=3)
+
+    assert result["isError"] is True
+    assert "text must be a string" in result["content"][0]["text"]
