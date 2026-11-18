@@ -50,13 +50,14 @@ def body_hash(text: str) -> str:
     return expectation_grammar.content_hash(text.encode("utf-8"))
 
 
-def require_current(base: str, current: str, *, item_id: str) -> None:
+def require_current(base: str, current: str, *, item_id: str, item_argument: str) -> None:
     """Refuses a whole-body write whose `base` is not the hash of the body just read
-    under the item's lock (ITEM-72); `current` and `base` are `body_hash` values."""
+    under the item's lock (ITEM-72); `current` and `base` are `body_hash` values, and
+    `item_argument` is the item as the printed `item show` command takes it."""
     if base != current:
         raise StaleBodyError(
             f"{item_id} changed since it was read (base {base}, now {current}); read it "
-            f"again with aco item show {item_id} --json and apply your change to that body"
+            f"again with aco item show {item_argument} --json and apply your change to that body"
         )
 
 

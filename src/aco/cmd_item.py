@@ -340,14 +340,16 @@ def _read_item_edit_body(number: int, storage: body.Storage, *, base: str | None
     socket, a terminal, `/dev/null` or a closed stdin refuses at once, naming the
     redirect, rather than hanging on a read or replacing the body with nothing."""
     item_id = workboard.item_label(number, storage)
+    item_argument = workboard.item_argument(number, storage)
     if base is None:
         raise protocol.ClaimUnavailableError(
-            f"item edit {item_id} needs --base <hash>; aco item show {item_id} --json prints it"
+            f"item edit {item_id} needs --base <hash>; "
+            f"aco item show {item_argument} --json prints it"
         )
     if not report.stdin_carries_a_body():
         raise protocol.ClaimUnavailableError(
             f"item edit {item_id} needs the new body on stdin: "
-            f"aco item edit {item_id} --base <hash> < body.md"
+            f"aco item edit {item_argument} --base <hash> < body.md"
         )
     return report.read_piped_body()
 
@@ -371,6 +373,7 @@ def _replace_whole_body(
     one written against, and its write always lands (ITEM-13)."""
     storage = context.config.storage
     item_id = workboard.item_label(number, storage)
+    item_argument = workboard.item_argument(number, storage)
     with decide.item_lock(context, number, environment=os.environ, home=Path.home()):
         if storage is body.Storage.STATE_REF:
             board = _state_ref_board(context)
@@ -378,7 +381,9 @@ def _replace_whole_body(
                 raise protocol.ClaimUnavailableError(
                     board_read.missing_item_refusal(number, board, storage)
                 )
-            decide.require_current(base, board.stored_body_hash(number), item_id=item_id)
+            decide.require_current(
+                base, board.stored_body_hash(number), item_id=item_id, item_argument=item_argument
+            )
             try:
                 board.update_item_body(number, new_body, replacing="")
             except protocol.ItemWrittenSinceReadError as error:
@@ -390,7 +395,9 @@ def _replace_whole_body(
         client = context.forge_writer
         reference = board_read.item_or_refuse(client, number, command="item edit", storage=storage)
         current = reference.body or ""
-        decide.require_current(base, decide.body_hash(current), item_id=item_id)
+        decide.require_current(
+            base, decide.body_hash(current), item_id=item_id, item_argument=item_argument
+        )
         written = decide.write_item_body(client, number, new_body, replacing=current)
         outcome = _ItemReason.EDITED if written else _ItemReason.UNCHANGED
         return _WholeBodyEdit(outcome, decide.body_hash(new_body))

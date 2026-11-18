@@ -151,7 +151,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-43] A delivered `blocked_by` refuses before any write when it names one blocker twice, `item <item-id> lists blocker <blocker-id> more than once`, or a new one naming no item, PIN-17's (see E-ITEM-11).
 - [ ] [ITEM-44] So does a new blocker naming a malformed item, PIN-14/PIN-15's then ITEM-38's, or the item itself, `item <item-id> is listed as its own blocker`; a stored list delivered unchanged is never re-judged.
 - [ ] [ITEM-52] A state-ref write whose stored body PIN-14/PIN-15 would refuse prints `<defect>; stored, that body would not read back, so nothing was written`, exit `2`, before any write (see E-ITEM-14).
-- [ ] [ITEM-63] With `--base`, a socket, terminal, `/dev/null` or closed stdin refuses `item edit <item-id> needs the new body on stdin: aco item edit <item-id> --base <hash> < body.md`, exit `2`, before any write.
+- [ ] [ITEM-63] With `--base`, a socket, terminal, `/dev/null` or closed stdin refuses `item edit <item-id> needs the new body on stdin: aco item edit <item> --base <hash> < body.md`, exit `2`, before any write.
 
   ```console
   $ aco item edit aco-00013a --base sha256:0000000000000000000000000000000000000000000000000000000000000000
@@ -161,7 +161,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-15] `item edit ITEM --base HASH --json` prints the envelope, `reason: "edited"`, then `item`, `number`, `body_hash` of the body written, and under state-ref the written blob's `oid` (see E-ITEM-03).
 - [ ] [ITEM-71] A whole-body `item edit` whose `--base` is the stored body's hash replaces the body and prints `EDITED <item-id>`, exit `0`; github stores it as piped, under both storages (see E-ITEM-19).
 - [ ] [ITEM-72] The compare runs under the item's lock (RULE-40) on a fresh read; a changed body, or under state-ref a store write meanwhile (CAS-20), refuses `stale`, exit `2`, nothing written (see E-ITEM-19).
-- [ ] [ITEM-73] No `--base` refuses `item edit <item-id> needs --base <hash>; aco item show <item-id> --json prints it`, exit `2`, before stdin is read or any write (see E-ITEM-19).
+- [ ] [ITEM-73] No `--base` refuses `item edit <item-id> needs --base <hash>; aco item show <item> --json prints it`, exit `2`, before stdin is read or any write (see E-ITEM-19); `<item>` is the argument a command takes, the bare number under github, the item id under state-ref.
 - [ ] [ITEM-74] The piped body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock is taken and the item read, and refuses `body_invalid` (ITEM-25) whatever the base is.
 - [ ] [ITEM-75] Under `storage = "github"` a body equal to the stored one prints `UNCHANGED <item-id>` (`--json`: `reason: "unchanged"`, ITEM-15's keys), exit `0`, writing nothing; state-ref always writes (ITEM-13).
 - [ ] [ITEM-76] Under `storage = "github"` a write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the body is written.
@@ -563,7 +563,7 @@ $ aco item edit <n>
 2> ERROR: item edit #<n> needs --base <hash>; aco item show <n> --json prints it
 exit 2
 $ aco item edit <n> --base sha256:<first> < body.md
-2> ERROR: #<n> changed since it was read (base sha256:<first>, now sha256:<second>); read it again with aco item show #<n> --json and apply your change to that body
+2> ERROR: #<n> changed since it was read (base sha256:<first>, now sha256:<second>); read it again with aco item show <n> --json and apply your change to that body
 exit 2
 $ aco item edit <n> --base sha256:<second> --json < body.md
 {"ok": true, "reason": "edited", "item": "#<n>", "number": <n>, "body_hash": "sha256:<third>"}
