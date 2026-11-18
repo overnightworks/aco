@@ -4,10 +4,17 @@
  * to the request path, never logged.
  */
 
-import type { BoardResponse, DecisionRequest, DecisionResult } from './types';
+import type {
+	BoardResponse,
+	DecisionRequest,
+	DecisionResult,
+	StepRequest,
+	StepResult
+} from './types';
 
 export const BOARD_PATH = '/api/board';
 export const RULE_PATH = '/api/rule';
+export const STEP_PATH = '/api/step';
 export const TOKEN_HEADER = 'X-Board-Token';
 
 export class BoardApiError extends Error {}
@@ -56,14 +63,31 @@ export async function postDecision(
 	decision: DecisionRequest,
 	fetchImpl: typeof fetch = fetch
 ): Promise<DecisionResult> {
-	const response = await fetchImpl(RULE_PATH, {
+	return (await postJson(RULE_PATH, token, decision, fetchImpl)) as DecisionResult;
+}
+
+export async function postStep(
+	token: string,
+	step: StepRequest,
+	fetchImpl: typeof fetch = fetch
+): Promise<StepResult> {
+	return (await postJson(STEP_PATH, token, step, fetchImpl)) as StepResult;
+}
+
+async function postJson(
+	path: string,
+	token: string,
+	body: unknown,
+	fetchImpl: typeof fetch
+): Promise<unknown> {
+	const response = await fetchImpl(path, {
 		method: 'POST',
 		keepalive: true,
 		headers: { [TOKEN_HEADER]: token, 'Content-Type': 'application/json' },
-		body: JSON.stringify(decision)
+		body: JSON.stringify(body)
 	});
 	if (!response.ok) {
-		throw new BoardApiError(`POST ${RULE_PATH} answered ${response.status}`);
+		throw new BoardApiError(`POST ${path} answered ${response.status}`);
 	}
-	return (await response.json()) as DecisionResult;
+	return response.json();
 }

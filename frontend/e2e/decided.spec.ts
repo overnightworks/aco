@@ -12,6 +12,7 @@ import {
 	arrange,
 	item,
 	optionEntry,
+	repoReading,
 	yesNoEntry,
 	type CardOption,
 	type OptionEntry
@@ -337,10 +338,7 @@ for (const viewport of [
 			await page.route('**/api/board', (route) =>
 				route.fulfill({
 					json: {
-						repos: [
-							{ name: 'available', error: null, items: [], steps: [] },
-							{ name: 'unavailable', error: FAILED_MESSAGE, items: [], steps: [] }
-						]
+						repos: [repoReading('available'), repoReading('unavailable', { error: FAILED_MESSAGE })]
 					}
 				})
 			);

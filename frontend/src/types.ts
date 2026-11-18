@@ -187,6 +187,8 @@ export interface StepRead {
 	actions: string | null;
 	expected: string | null;
 	answer: string | null;
+	/** The step as listed, bound to its repo, item and card (ABRD-163); an answer posts it back. */
+	fingerprint: string;
 }
 
 export interface RepoReading {
@@ -248,3 +250,20 @@ export type DecisionRequest = CardPicksRequest | CardOtherRequest | CardUnclearR
 export type DecisionResult =
 	| { status: 'ruled' | 'returned'; message: null; item: BoardItem; note?: string }
 	| { status: 'already_ruled' | 'failed'; message: string | null };
+
+/** `POST /api/step`'s body (ABRD-164): `yes` carries no `text`, `no` and `report` do. */
+export interface StepRequest {
+	repo: string;
+	item: number;
+	fingerprint: string;
+	result: 'yes' | 'no' | 'report';
+	text?: string;
+}
+
+/** `POST /api/step`'s 200 (ABRD-166..172): a stored answer carries no item, and a `note` when
+ * the label stayed (ABRD-169); a refusal only its sentence. */
+export interface StepResult {
+	status: 'answered' | 'failed';
+	message: string | null;
+	note?: string;
+}

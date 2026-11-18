@@ -5,7 +5,9 @@ import {
 	RULE_PATH,
 	TOKEN_HEADER,
 	fetchBoard,
-	postDecision
+	postDecision,
+	postStep,
+	STEP_PATH
 } from './client';
 import type { DecisionRequest } from './types';
 
@@ -115,4 +117,18 @@ test('[ABRD-152] a decision is posted keepalive, so it survives the page closing
 	await postDecision('secret-token', decision, fetchImpl);
 
 	expect(vi.mocked(fetchImpl).mock.calls.at(0)?.[1]?.keepalive).toBe(true);
+});
+
+test('[ABRD-175] a step answer is posted to /api/step, keepalive, with the token only in the header', async () => {
+	const answer = { repo: 'repo', item: 7, fingerprint: 'fp', result: 'yes' } as const;
+	const fetchImpl = fakeFetch(200, { status: 'answered', message: null });
+
+	const result = await postStep('secret-token', answer, fetchImpl);
+
+	expect(result).toEqual({ status: 'answered', message: null });
+	const [path, init] = vi.mocked(fetchImpl).mock.calls.at(0) ?? [];
+	expect(path).toBe(STEP_PATH);
+	expect(init?.keepalive).toBe(true);
+	expect((init?.headers as Record<string, string>)[TOKEN_HEADER]).toBe('secret-token');
+	expect(JSON.parse(init?.body as string)).toEqual(answer);
 });

@@ -79,6 +79,8 @@ export interface Item {
 	parent?: number;
 	/** Whether the item waits on the operator. */
 	waiting?: true;
+	/** The step table of an item that waits on the operator; it waits without `waiting`. */
+	step?: { purpose: string; actions: string; expected: string; answer?: string };
 }
 
 /** The first arranged item's open cards are asked on this day, each later one a day before. */
@@ -195,6 +197,25 @@ export function container(
 		title,
 		entries: [],
 		container: { closed: [], open: [], ...children },
+		...overrides
+	};
+}
+
+/** One repository as `GET /api/board` lists it with nothing to show: `overrides` names what the
+ * scenario changes, a failed read through `error`. */
+export function repoReading(
+	name: string,
+	overrides: Partial<{ error: string | null; steps: unknown[] }> = {}
+) {
+	return { name, error: null, items: [], progress: null, steps: [], ...overrides };
+}
+
+/** A step table the way an item stores it; `overrides` names what the scenario changes. */
+export function stepTable(overrides: Partial<NonNullable<Item['step']>> = {}) {
+	return {
+		purpose: 'Release the build.',
+		actions: 'open https://example.test/run\nclick Run',
+		expected: 'The page shows green.',
 		...overrides
 	};
 }

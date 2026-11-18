@@ -150,6 +150,7 @@ export function stepRead(overrides: Partial<StepRead> = {}): StepRead {
 		actions: 'open https://example.test/run\nclick Run',
 		expected: 'The page shows green.',
 		answer: null,
+		fingerprint: 'step-fingerprint',
 		...overrides
 	};
 }

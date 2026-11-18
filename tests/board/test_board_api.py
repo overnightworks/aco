@@ -43,6 +43,11 @@ def _card_body(**overrides: object) -> str:
     return json.dumps({**fields, **overrides})
 
 
+def _step_body(**overrides: object) -> str:
+    fields = {"repo": DEFAULT_LABEL, "item": 42, "fingerprint": "any", "result": "yes"}
+    return json.dumps({**fields, **overrides})
+
+
 def _ruled_yes_no(text: str, ruling: str, **card: str) -> dict[str, object]:
     return {"text": text, "ruling": ruling, "ruled_on": date(2026, 10, 1), **card}
 
@@ -119,6 +124,8 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
         ("POST", "/api/rule", _card_body()),
         ("POST", "/api/rule", "not json"),
         ("POST", "/api/step", "not json"),
+        ("POST", "/api/step", _step_body()),
+        ("POST", "/api/step?t={token}", _step_body()),
         ("GET", "/api/elsewhere", None),
         ("PUT", "/api/rule", _card_body()),
         ("DELETE", "/api/board", None),
@@ -131,7 +138,9 @@ def test_a_repo_whose_directory_cannot_be_entered_carries_its_error_and_the_othe
         "board-query-token",
         "rule",
         "rule-malformed",
+        "step-malformed",
         "step",
+        "step-query-token",
         "unknown-route",
         "put",
         "delete",
@@ -367,6 +376,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
         ("POST", "/api/step", "not json", True, 400, "application/json", None),
         ("GET", "/api/elsewhere", None, True, 404, "application/json", None),
         ("OPTIONS", "/api/rule", None, False, 403, "application/json", None),
+        ("OPTIONS", "/api/step", None, False, 403, "application/json", None),
+        ("OPTIONS", "/api/step", None, True, 405, "application/json", "POST"),
         ("PUT", "/api/rule", _card_body(), False, 403, "application/json", None),
         ("PUT", "/api/rule", _card_body(), True, 405, "application/json", "POST"),
         ("HEAD", "/api/board", None, False, 403, "application/json", None),
@@ -383,6 +394,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
         "api-step-bad-request",
         "api-not-found",
         "api-options-forbidden",
+        "api-step-options-forbidden",
+        "api-step-options-not-allowed",
         "api-put-forbidden",
         "api-put-not-allowed",
         "api-head-forbidden",
@@ -444,8 +457,9 @@ def test_a_head_request_answers_with_headers_only(board: BoardClient) -> None:
     assert (response.status, response.body) == (403, "")
 
 
+@pytest.mark.parametrize("path", ["/api/rule", "/api/step"])
 def test_a_cross_origin_preflight_is_granted_nothing(
-    repository: BoardForge, board: BoardClient, port: RecordedPort
+    repository: BoardForge, board: BoardClient, port: RecordedPort, path: str
 ) -> None:
     preflight = {
         **_ORIGIN_ELSEWHERE,
@@ -453,7 +467,7 @@ def test_a_cross_origin_preflight_is_granted_nothing(
         "Access-Control-Request-Headers": "x-board-token",
     }
 
-    response = board.call_api("OPTIONS", "/api/rule", presented=None, headers=preflight)
+    response = board.call_api("OPTIONS", path, presented=None, headers=preflight)
 
     assert response.status >= 400
     assert cross_origin_headers(response) == []
