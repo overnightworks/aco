@@ -2,28 +2,22 @@
 (`specs/mcp.spec.md`), driven without a process: a message in, the answer line out, the
 writer a function the test passes."""
 
-import dataclasses
 import json
 from collections.abc import Mapping
 from typing import Any
 
 import pytest
+from mcp_echoes import echoing_answer_step
 
-from aco import item_step, mcp_server
+from aco import mcp_server
 
 
 def _nothing(*_arguments: object) -> Mapping[str, object]:
     pytest.fail("a tool other than answer_step was called")
 
 
-def _echoing(
-    label: str, number: int, step: str, result: item_step.StepResult
-) -> Mapping[str, object]:
-    return {"repository": label, "item": number, "step": step, "result": dataclasses.asdict(result)}
-
-
 def _reply(method: str, params: dict[str, object] | None = None) -> dict[str, Any]:
-    tools = mcp_server.Tools(_nothing, _nothing, _nothing, _nothing, _echoing)
+    tools = mcp_server.Tools(_nothing, _nothing, _nothing, _nothing, echoing_answer_step)
     message: dict[str, object] = {"jsonrpc": "2.0", "id": 1, "method": method}
     if params is not None:
         message["params"] = params
@@ -91,3 +85,4 @@ def test_an_answer_step_call_with_a_defective_answer_never_reaches_the_writer(
     result = _answer_step(**arguments)
 
     assert result["isError"] is True
+

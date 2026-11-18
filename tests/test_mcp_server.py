@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import pytest
+from mcp_echoes import echoing_answer_step
 
 from aco import (
     __version__,
@@ -49,19 +50,13 @@ def _echoing_step(
     return {"repository": label, "step": step, "target": target, "card": dataclasses.asdict(card)}
 
 
-def _echoing_answer_step(
-    label: str, number: int, step: str, result: item_step.StepResult
-) -> Mapping[str, object]:
-    return {"repository": label, "item": number, "step": step, "result": dataclasses.asdict(result)}
-
-
 def _answer(
     message: object,
     read_inbox: mcp_server.ReadInbox = lambda: _INBOX,
     ask: mcp_server.Ask = _echoing,
     record_answer: mcp_server.RecordAnswer = _echoing_record,
     step: mcp_server.Step = _echoing_step,
-    answer_step: mcp_server.AnswerStep = _echoing_answer_step,
+    answer_step: mcp_server.AnswerStep = echoing_answer_step,
 ) -> dict[str, Any]:
     tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step)
     line = mcp_server.reply(message if isinstance(message, str) else json.dumps(message), tools)
@@ -740,7 +735,7 @@ def test_any_other_method_is_not_found(method: str) -> None:
 )
 def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
     tools = mcp_server.Tools(
-        lambda: _INBOX, _echoing, _echoing_record, _echoing_step, _echoing_answer_step
+        lambda: _INBOX, _echoing, _echoing_record, _echoing_step, echoing_answer_step
     )
 
     assert mcp_server.reply(json.dumps(message), tools) is None
