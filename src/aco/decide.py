@@ -364,7 +364,8 @@ def open_step_item(context: RunContext, title: str, step: str, card: item_step.S
         item_wait.WAIT_KEY: item_wait.operator_wait_table(step, context.today()),
         item_step.STEP_KEY: item_step.step_table(card),
         "done_when": (
-            "The operator has taken the step and the head has removed the label "
+            "The operator has taken the step and the head has cleared the wait and "
+            "removed the label "
             f"{workboard.NEEDS_OPERATOR_LABEL}."
         ),
     }

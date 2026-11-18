@@ -50,10 +50,9 @@ NEXT_PULL_DESCRIPTION = (
     "Name the one next action: pull, cut, check or close an item. Pulling is not "
     "dispatching: an item whose expectations are still unruled is named here with "
     "refining as its first step, while dispatching a builder onto it waits for the "
-    f"operator's ruling. An item labelled {workboard.NEEDS_OPERATOR_LABEL} waits on the "
-    "operator and is never pulled; set or remove the label with gh issue edit <n> "
-    f"--add-label/--remove-label {workboard.NEEDS_OPERATOR_LABEL}, or under storage = "
-    "state-ref by piping a body whose [record] labels add or drop it to aco item edit <item-id>."
+    "operator's ruling. An item whose wait.operator is set waits on the operator and is "
+    "never pulled; the step tool sets it, and the label "
+    f"{workboard.NEEDS_OPERATOR_LABEL} is its GitHub view."
 )
 CLAIM_DESCRIPTION = (
     "Refuses before the first edit unless the checkout is a linked, isolated "
