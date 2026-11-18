@@ -440,7 +440,7 @@ def answer_step(
     return StepAnswered(written_over, _unlabelled_as_a_step(context.forge_writer, fresh.number))
 
 
-def answer_step_in_turn(  # noqa: PLR0913 - the turn keywords plus the item, answer and check
+def answer_step_in_turn(  # noqa: PLR0913 - the turn keywords plus the item; the answer and the check
     context: RunContext,
     number: int,
     result: item_step.StepResult,
