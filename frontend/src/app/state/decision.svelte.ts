@@ -13,8 +13,8 @@
  */
 
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import { postDecision } from '../../client';
-import type { BoardItem, DecisionRequest, OptionLine } from '../../types';
+import { postDecision, postStep } from '../../client';
+import type { BoardItem, DecisionRequest, OptionLine, StepRead, StepRequest } from '../../types';
 import type { StripState } from '../model/boardSummary';
 import { cardName, openPoints, pickedText, recommendedPicks, type Pick } from '../model/card';
 import {
@@ -24,11 +24,16 @@ import {
 	cardPicksRequest,
 	cardUnclearRequest,
 	entryKey,
+	isStepRequest,
 	pointKey,
 	readDecisionResult,
+	readStepResult,
+	stepKey,
+	stepRequest,
 	UNDO_SECONDS,
 	type DecisionOutcome
 } from '../model/decision';
+import { stepStripText } from '../model/steps';
 import { nextOpen, pendingOtherText, type EscapeKind, type EscapePanel } from '../model/optionCard';
 
 export interface DecisionBanner {
@@ -66,7 +71,7 @@ interface PendingEntry {
 	card: string;
 	/** The line indexes the post names. */
 	indexes: readonly number[];
-	request: DecisionRequest;
+	request: DecisionRequest | StepRequest;
 	message: string;
 	state: StripState;
 	/** The name of what the post answers, for a failure strip that outlives the card being shown. */
@@ -123,15 +128,22 @@ export class DecisionStore {
 		private readonly token: string,
 		private readonly board: DecisionBoard,
 		private readonly send: typeof postDecision = postDecision,
-		private readonly undoSeconds: number = UNDO_SECONDS
+		private readonly undoSeconds: number = UNDO_SECONDS,
+		private readonly sendStep: typeof postStep = postStep
 	) {}
 
+	/** The option answers in their window; a step answer shows in its own card (`pendingStep`). */
 	get pendingEntries(): PendingDecision[] {
-		return Object.entries(this.#pending).map(([key, entry]) => ({
-			key,
-			message: entry.message,
-			state: entry.state
-		}));
+		return Object.entries(this.#pending)
+			.filter(([, entry]) => !isStepRequest(entry.request))
+			.map(([key, entry]) => ({ key, message: entry.message, state: entry.state }));
+	}
+
+	/** The step answer in its undo window under `card`, or null. */
+	pendingStep(card: string): PendingDecision | null {
+		const key = entryKey(card, []);
+		const entry = this.#pending[key];
+		return entry === undefined ? null : { key, message: entry.message, state: entry.state };
 	}
 
 	#entriesOf(card: string): PendingEntry[] {
@@ -297,6 +309,20 @@ export class DecisionStore {
 		});
 	}
 
+	/** The same window for the operator's answer to one step as listed; its post is `POST /api/step`. */
+	answerStep(repo: string, step: StepRead, result: StepRequest['result'], text: string): void {
+		this.#startUndoWindow({
+			card: stepKey(repo, step.number),
+			indexes: [],
+			request: stepRequest(repo, step, result, text),
+			message: stepStripText(result, step.number),
+			state: 'done',
+			name: step.title,
+			held: [],
+			reopens: null
+		});
+	}
+
 	#startUndoWindow(init: NewEntry): void {
 		this.#clearBanner(init.card);
 		const key = entryKey(init.card, init.indexes);
@@ -343,15 +369,25 @@ export class DecisionStore {
 		}
 	}
 
+	async #post(request: DecisionRequest | StepRequest): Promise<DecisionOutcome> {
+		return isStepRequest(request)
+			? readStepResult(await this.sendStep(this.token, request))
+			: readDecisionResult(await this.send(this.token, request));
+	}
+
 	async #commit(key: string, entry: PendingEntry): Promise<void> {
 		const { card, request, name } = entry;
 		this.#pending = withoutKey(this.#pending, key);
 		this.#saving.set(key, entry);
 		let outcome: DecisionOutcome;
 		try {
-			outcome = readDecisionResult(await this.send(this.token, request));
+			outcome = await this.#post(request);
 		} catch {
 			outcome = { kind: 'failed', message: BOARD_UNREACHABLE_MESSAGE };
+		}
+		if (outcome.kind === 'answered') {
+			// The answered step leaves with the re-read; until then its card stays saving.
+			await this.board.reload();
 		}
 		// One synchronous step: the post stops saving as its answer is applied.
 		this.#saving.delete(key);
@@ -366,9 +402,9 @@ export class DecisionStore {
 			this.#dropDraft(card, 'unclear');
 			this.board.applyItem(request.repo, outcome.item);
 			this.#justReturned = card;
-		} else {
+		} else if (outcome.kind !== 'answered') {
 			this.#banners = { ...this.#banners, [card]: outcome };
-			if (card === this.#shownKey) {
+			if (isStepRequest(request) || card === this.#shownKey) {
 				this.#unseen.delete(card);
 			} else {
 				this.#unseen.set(card, { key: card, name, message: outcome.message });

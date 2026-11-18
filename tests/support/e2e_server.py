@@ -84,6 +84,11 @@ def _dated(entry: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+def _held(raw_body: str, arranged: Mapping[str, object]) -> str:
+    step = arranged.get("step")
+    return holding_for_the_operator(raw_body, step if isinstance(step, dict) else None)
+
+
 def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     entries = arranged["entries"]
     assert isinstance(entries, list)
@@ -105,7 +110,7 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     parent = arranged.get("parent")
     return StoredItem(
         str(arranged["title"]),
-        holding_for_the_operator(raw_body) if arranged.get("waiting") else raw_body,
+        _held(raw_body, arranged) if arranged.get("waiting") else raw_body,
         kind=body.ItemKind.CONTAINER.value if container is not None else None,
         children=children,
         parent=parent if isinstance(parent, int) else None,

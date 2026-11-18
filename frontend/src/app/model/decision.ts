@@ -11,9 +11,13 @@ import type {
 	CardOtherRequest,
 	CardPicksRequest,
 	CardUnclearRequest,
+	DecisionRequest,
 	DecisionResult,
 	ExpectationLine,
-	OptionLine
+	OptionLine,
+	StepRead,
+	StepRequest,
+	StepResult
 } from '../../types';
 import type { Pick } from './card';
 
@@ -111,6 +115,7 @@ export function noteOrNull(raw: string): string | null {
 }
 
 export type DecisionOutcome =
+	| { kind: 'answered' }
 	| { kind: 'ruled'; item: BoardItem; note?: string }
 	| { kind: 'returned'; item: BoardItem }
 	| { kind: 'already-ruled'; message: string }
@@ -130,4 +135,32 @@ export function readDecisionResult(result: DecisionResult): DecisionOutcome {
 				? { kind: 'changed', message: result.message }
 				: { kind: 'failed', message: result.message ?? 'unbekannter Fehler' };
 	}
+}
+
+/** A step's answer is held under its own key, beside the card keys. */
+export function stepKey(repo: string, item: number): string {
+	return `${repo}:${item}:step`;
+}
+
+/** Whether a pending post belongs to `POST /api/step`. */
+export function isStepRequest(request: DecisionRequest | StepRequest): request is StepRequest {
+	return 'fingerprint' in request;
+}
+
+/** The answer to a step as listed; a blank text is no text, which `yes` never carries. */
+export function stepRequest(
+	repo: string,
+	step: StepRead,
+	result: StepRequest['result'],
+	text: string
+): StepRequest {
+	const base = { repo, item: step.number, fingerprint: step.fingerprint, result };
+	return result === 'yes' ? base : { ...base, text: text.trim() };
+}
+
+/** A refused step answer always asks for a re-read: the step is no longer as shown. */
+export function readStepResult(result: StepResult): DecisionOutcome {
+	return result.status === 'answered'
+		? { kind: 'answered' }
+		: { kind: 'changed', message: result.message ?? 'unbekannter Fehler' };
 }
