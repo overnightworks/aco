@@ -11,7 +11,8 @@ import {
 	lineKey,
 	noteOrNull,
 	readDecisionResult,
-	readStepResult
+	readStepResult,
+	UNKNOWN_FAILURE_MESSAGE
 } from './decision';
 
 describe('lineKey', () => {
@@ -127,25 +128,24 @@ describe('readDecisionResult', () => {
 	test('a failure with no message falls back to a German sentence', () => {
 		expect(readDecisionResult({ status: 'failed', message: null })).toEqual({
 			kind: 'failed',
-			message: 'unbekannter Fehler'
+			message: UNKNOWN_FAILURE_MESSAGE
 		});
 	});
 });
 
 describe('readStepResult', () => {
-	test('a refused step answer without a message falls back to a German sentence and asks for a re-read', () => {
-		expect(readStepResult({ status: 'failed', message: null })).toEqual({
-			kind: 'changed',
-			message: 'unbekannter Fehler'
-		});
-	});
-
-	test('a refused step answer keeps its own message', () => {
-		expect(readStepResult({ status: 'failed', message: 'step changed' })).toEqual({
-			kind: 'changed',
-			message: 'step changed'
-		});
-	});
+	test.each([
+		{ sent: null, shown: UNKNOWN_FAILURE_MESSAGE },
+		{ sent: 'step changed', shown: 'step changed' }
+	])(
+		'a refused step answer sent with $sent shows $shown and asks for a re-read',
+		({ sent, shown }) => {
+			expect(readStepResult({ status: 'failed', message: sent })).toEqual({
+				kind: 'changed',
+				message: shown
+			});
+		}
+	);
 });
 
 describe('entryKey', () => {

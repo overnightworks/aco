@@ -35,6 +35,9 @@ export const ALREADY_RULED_MESSAGE =
 /** `aco rule`'s own already-ruled sentence (RULE-04) is written for a command
  * line; this is the SPA's own operator-facing copy for the identical case. */
 
+export const UNKNOWN_FAILURE_MESSAGE = 'unbekannter Fehler';
+/** The sentence a refusal shows when the server sent none. */
+
 export const LINE_CHANGED_MESSAGE = 'Diese Zeile hat sich geändert, bitte neu laden';
 /** The exact refusal `board.py`'s `LINE_CHANGED` sends for ABRD-02: a public
  * contract sentence (`specs/serve.spec.md`), not an adapter detail, so
@@ -133,7 +136,7 @@ export function readDecisionResult(result: DecisionResult): DecisionOutcome {
 		case 'failed':
 			return result.message === LINE_CHANGED_MESSAGE
 				? { kind: 'changed', message: result.message }
-				: { kind: 'failed', message: result.message ?? 'unbekannter Fehler' };
+				: { kind: 'failed', message: result.message ?? UNKNOWN_FAILURE_MESSAGE };
 	}
 }
 
@@ -162,5 +165,5 @@ export function stepRequest(
 export function readStepResult(result: StepResult): DecisionOutcome {
 	return result.status === 'answered'
 		? { kind: 'answered' }
-		: { kind: 'changed', message: result.message ?? 'unbekannter Fehler' };
+		: { kind: 'changed', message: result.message ?? UNKNOWN_FAILURE_MESSAGE };
 }
