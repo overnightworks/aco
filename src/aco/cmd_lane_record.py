@@ -8,6 +8,9 @@ from . import lane_record, protocol, report, usage
 from .session import RunContext
 
 _INVALID = "lane record {foreign} is invalid: {defect}"
+# A value the file states is cut to this, so the refusal keeps its own words and the file's path
+# keeps room on one bounded line.
+_STATED_VALUE_LENGTH_LIMIT = 40
 
 
 def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
@@ -18,7 +21,11 @@ def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
     except OSError as error:
         defect = f"cannot be read ({error.strerror})"
     except lane_record.RecordFileError as error:
-        defect = str(error)
+        defect = (
+            error.before
+            + report.cut_foreign_text(error.stated, _STATED_VALUE_LENGTH_LIMIT)
+            + error.after
+        )
     raise protocol.ClaimUnavailableError(
         report.refusal_around_foreign_text(_INVALID, path_text, defect=defect)
     )

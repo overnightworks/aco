@@ -229,7 +229,7 @@ def test_a_refusal_cuts_a_long_unknown_key_and_stays_one_bounded_line(
 
     assert result.status == 2
     assert "is invalid: the record has an unknown key 'kkk" in result.stderr
-    assert result.stderr.endswith("…'\n")
+    assert result.stderr.endswith("…\n")
     assert len(result.stderr.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
 
 
