@@ -380,7 +380,7 @@ def test_a_refused_target_is_a_tool_error_with_its_sentence_and_writes_nothing(
 @pytest.mark.parametrize(
     ("changes", "item_reference"),
     [
-        pytest.param({}, "aco-000001", id="item"),
+        pytest.param({}, workboard.item_label(1, body.Storage.STATE_REF), id="item"),
         pytest.param({"item": None, "title": TITLE}, "<item>", id="title"),
     ],
 )
