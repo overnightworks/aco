@@ -183,7 +183,7 @@ def test_a_call_with_other_fields_rewrites_the_step_table_and_keeps_the_rest_of_
         "expected": "The vault shows a new key.",
         "answer": "Report the new key id.",
     }
-    assert stored["wait"]["operator"] == STEP
+    assert stored["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert _writes(here) == [
         ("update_item_body", 1),
         ("add_label", 1),
@@ -423,7 +423,8 @@ def test_a_body_check_that_fails_is_the_calls_error_and_a_repeat_sets_the_label(
     [repeated] = _serve(monkeypatch, _step_line(2))
 
     assert repeated["isError"] is False
-    assert body.locate_block(here.stored_body(1)).data["wait"]["operator"] == STEP
+    stored = body.locate_block(here.stored_body(1)).data
+    assert stored["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert here.stored_item(1).labels == [_LABEL]
 
 
