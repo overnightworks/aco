@@ -79,7 +79,7 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-30] `aco lane-record check <file>` reads the file alone, writes nothing, needs no checkout, and prints `lane record <file> is valid`, exit `0`.
 - [ ] [LANREC-31] A file that `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, `not valid JSON`, LANREC-32..37, LANREC-46 (E-LANREC-03).
 - [ ] [LANREC-32] The file is one JSON object of `version`, `stages`, `fix_rounds`, `blocking`, `verdicts` and the optional `risk` and `experiment`; a key beyond them, a missing one or a key stated twice refuses.
-- [ ] [LANREC-33] `version` is read first and is the whole number `1`: another whole number of at most 20 digits refuses `version <n> is unknown; this aco reads version 1`, any other value, a whole number of more digits included, `version must be the whole number 1`; a key stated twice below `version` refuses only after it.
+- [ ] [LANREC-33] `version` is judged before a repeated key: `1` passes; a whole number of up to 20 digits refuses `version <n> is unknown; this aco reads version 1`, any other `version must be the whole number 1`.
 - [ ] [LANREC-34] `stages` names `build`, `fix`, `review`, `test`, `gate` and `land`, each `<model>/<effort>` as LANREC-17 reads it, or `none` for `fix`, `test` and `gate`; `land` is the model dispatched to land.
 - [ ] [LANREC-35] `fix_rounds` and `blocking` each hold a whole number from `0` to `999` for each finding stage `review`, `gate`, `ci` and `test`; a finding a stand-in raised counts under `gate`.
 - [ ] [LANREC-36] `verdicts` lists each review and gate verdict, oldest first, as `stage` (`review` or `gate`), `verdict` (`approve` or `revise`) and the full commit `sha` it judged; the list may be empty.
@@ -91,7 +91,7 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-42] With `--record`, LANREC-11 and LANREC-12 hold the file's figures, `lane_fix_rounds` and `lane_blocking` summed over the finding stages; no routing line is read (LANREC-13..LANREC-15).
 - [ ] [LANREC-43] A file also writes `lane_risk`, then `lane_fix_rounds_<stage>` and `lane_blocking_<stage>` for `review`, `gate`, `ci` and `test`, each a whole number; an omitted `risk` has no line.
 - [ ] [LANREC-44] `aco land` also refuses a last verdict of `revise`: `the lane record's last verdict is revise at <stage>, not approve`, exit `2`; `release --abandoned` takes any last verdict (E-LANREC-08).
-- [ ] [LANREC-45] A refusal line is bounded (200 characters): a `<file>` that does not fit loses the front of its directory, shown as `…/`, and the file name and `<defect>` stay whole, so the line passes the bound only when they do not fit together (E-LANREC-10).
+- [ ] [LANREC-45] A refusal line holds 200 characters: a `<file>` that does not fit loses the front of its directory (`…/`) while the file name and `<defect>` stay whole, so only those two can pass 200 (E-LANREC-10).
 - [ ] [LANREC-46] A file that starts with a UTF-8 byte order mark refuses the defect `begins with a UTF-8 byte order mark; save it without one` (E-LANREC-09).
 
 ## Failure
