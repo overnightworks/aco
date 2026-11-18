@@ -4,7 +4,6 @@ board. The forge is the only fake. The state-ref twins live in
 `test_cmd_item_base_state_ref.py`."""
 
 import json
-import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -12,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
-from cli_fixtures import run_cli
+from cli_fixtures import devnull_on_stdin, run_cli
 from github_fixtures import serve_forge
 from item_base import edit_with_base, shown_body_hash
 from item_lock_witness import LockWitnessForge
@@ -155,13 +154,14 @@ def test_an_edit_with_a_base_and_no_body_on_stdin_names_a_redirect_that_runs(
     scenario: Scenario,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Spec: ITEM-63 -- the printed command names the item as `item edit` takes it."""
     client = serve_item()
     arguments = edit_with_base(scenario.argument, capsys)
 
-    with Path(os.devnull).open() as devnull:
-        monkeypatch.setattr(sys, "stdin", devnull)
+    with devnull_on_stdin(tmp_path) as stdin:
+        monkeypatch.setattr(sys, "stdin", stdin)
         result = run_cli(arguments, capsys)
 
     sentence = (
@@ -206,33 +206,40 @@ def test_a_body_equal_to_the_stored_one_writes_nothing(
 
 
 @pytest.mark.parametrize(
-    ("kind", "reason"),
+    ("check_answer", "reason"),
     [
-        pytest.param("overwritten", {"reason": "overwritten", "kept": False}, id="overwritten"),
-        pytest.param("not-verified", {"reason": "not_verified"}, id="not-verified"),
+        pytest.param(
+            lambda number: (
+                forge.ForgeBodyOverwrittenError(
+                    number, "2026-11-08T10:05:00Z", "ghost", kept=False
+                ),
+                f"#{number} body written, but overwritten in the meantime by ghost "
+                "at 2026-11-08T10:05:00Z",
+            ),
+            {"reason": "overwritten", "kept": False},
+            id="overwritten",
+        ),
+        pytest.param(
+            lambda number: (
+                forge.ForgeBodyNotVerifiedError(number, "timeout"),
+                f"#{number} body written, not verified (timeout)",
+            ),
+            {"reason": "not_verified"},
+            id="not-verified",
+        ),
     ],
 )
 def test_a_write_the_forges_check_answers_prints_the_check_sentence(
     serve_item: ServeItem,
     scenario: Scenario,
     capsys: pytest.CaptureFixture[str],
-    kind: str,
+    check_answer: Callable[[int], tuple[forge.ForgeBodyWrittenError, str]],
     reason: dict[str, object],
 ) -> None:
     """Spec: ITEM-76, OUT-10, OUT-11 -- the check's own sentence and `reason`, exit 2; the body
     is written."""
     number = scenario.number
-    answer, sentence = {
-        "overwritten": (
-            forge.ForgeBodyOverwrittenError(number, "2026-11-08T10:05:00Z", "ghost", kept=False),
-            f"#{number} body written, but overwritten in the meantime by ghost "
-            "at 2026-11-08T10:05:00Z",
-        ),
-        "not-verified": (
-            forge.ForgeBodyNotVerifiedError(number, "timeout"),
-            f"#{number} body written, not verified (timeout)",
-        ),
-    }[kind]
+    answer, sentence = check_answer(number)
     client = serve_item(answer=answer)
     arguments = edit_with_base(scenario.argument, capsys)
 

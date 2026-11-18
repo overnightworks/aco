@@ -186,13 +186,15 @@ an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file pe
 item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
-decision and step answer, `aco item edit` (a whole body against `--base`, or `--size/--whole`), `aco rescope` and `aco handover` (each through its claim
+decision and step answer, `aco item edit` (a whole body against `--base`, or `--size/--whole`),
+`aco rescope` and `aco handover` (each through its claim
 transition) and the `ask`, `record_answer`, `step` and `answer_step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
 `decide.write_item_body`, the one writer, which skips a body equal to the text it
 replaces and hands the port that text, except a whole-body `aco item edit` under
-`state-ref`, which calls the board's `update_item_body` directly and always writes. A writer that finds the lock held prints
+`state-ref`, which calls the board's `update_item_body` directly and always writes. A writer
+that finds the lock held prints
 one line to stderr and waits. Writers on this machine therefore never overwrite each other's
 bodies. A whole-body `aco item edit` also names the hash `aco item show --json` printed
 (`--base`) and compares it with a fresh read under the lock, so a head writing from a stale
@@ -204,7 +206,8 @@ an unread change, or cannot be verified. Every `--json` writer answers it with t
 check's sentence and `overwritten` (with `kept`) or `not_verified`, through one owner in
 `report`; `cut` wraps the sentence in its own and `adopt` states its own; the board shows `failed`. The history is read once, right after the write, so a hand
 edit saved after that read over an older copy still overwrites the write unseen. Under `state-ref` the store's
-compare-and-swap also refuses a write from a stale snapshot, which `aco item edit` reports as `stale` like a changed hash. The board keeps its own in-process turn for its shutdown drain
+compare-and-swap also refuses a write from a stale snapshot, which `aco item edit` reports as
+`stale` like a changed hash. The board keeps its own in-process turn for its shutdown drain
 (`specs/serve.spec.md`).
 
 ### The ruling signal
