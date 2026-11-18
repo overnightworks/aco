@@ -18,11 +18,9 @@ from discovery_fixtures import (
 )
 from mcp_lines import call_line, serve_mcp
 
-from aco import body, forge, protocol, workboard
+from aco import body, forge, item_step, protocol, workboard
 
 STEP = "Rotate the deploy key."
-PLAN = "S1 Prepare the vault.\nS2 Rotate the key.\nS3 Verify."
-NEXT_OF_A_STEP_ITEM = "Act on the operator's answer in now."
 TITLE = "Rotate the deploy key"
 _LABEL = workboard.NEEDS_OPERATOR_LABEL
 _WRITES = (
@@ -126,7 +124,8 @@ def _witness_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, operation: st
 def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_turn(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    here.put_item(1, complete_contract(PLAN), title="Key")
+    here.put_item(1, complete_contract("S1 Prepare the vault.\nS2 Rotate the key."), title="Key")
+    before = body.locate_block(here.stored_body(1)).data
     lock_held_at_body = _witness_lock(monkeypatch, tmp_path, "update_item_body")
     lock_held_at_label = _witness_lock(monkeypatch, tmp_path, "add_label")
 
@@ -141,7 +140,7 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
         "created": False,
     }
     stored = body.locate_block(here.stored_body(1)).data
-    assert stored["next"] == PLAN
+    assert stored["next"] == before["next"]
     assert stored["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert here.stored_item(1).labels == [_LABEL]
     assert _writes(here) == [("update_item_body", 1), ("add_label", 1)]
@@ -223,7 +222,7 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
     }
     assert (created.title, created.kind, created.labels) == (TITLE, "task", [_LABEL])
     assert (checked.status, json.loads(checked.stdout)["ok"]) == (0, True)
-    assert data["next"] == NEXT_OF_A_STEP_ITEM
+    assert data["next"] == item_step.NEXT_OF_STEP_ITEM
     assert data["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert board_forge.RULING_DAY.isoformat() in str(data["now"])
     assert _writes(here) == [("create_issue", 2), ("add_label", 2)]
@@ -247,10 +246,10 @@ def test_the_same_title_call_again_opens_no_second_item_and_calls_the_label_agai
     assert _writes(here) == [("create_issue", 2), ("add_label", 2), ("add_label", 2)]
 
 
-def _waiting_on(step: str, *, next_step: str = PLAN) -> str:
+def _waiting_on(step: str) -> str:
     """A complete body whose block waits on the operator for `step`."""
     wait = {"operator": step, "since": board_forge.RULING_DAY}
-    return complete_contract(next_step, wait=wait)
+    return complete_contract("S1 Prepare the vault.\nS2 Rotate the key.", wait=wait)
 
 
 def _standing(
