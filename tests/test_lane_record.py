@@ -37,6 +37,7 @@ from aco.lane_record import (
     ReleasedLane,
     compute_record,
     parse_record,
+    parse_record_file,
     released_issue,
 )
 from aco.routing_line import parse_routing_line
@@ -443,6 +444,26 @@ def test_an_abandoned_lane_counts_to_the_release_and_reads_its_routing_from_the_
     figures = compute_for(history, outcome, merge_commit=None)
 
     assert figures == ("lane_outcome: abandoned", "lane_wall_seconds: 90", *ROUTING_TRAILERS)
+
+
+def test_a_lane_record_file_leaves_the_reasons_routing_line_unread(
+    history: LaneHistory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: LANREC-42."""
+
+    def read_no_routing_line(message: str) -> None:
+        raise AssertionError(f"a routing line was read from {message!r}")
+
+    monkeypatch.setattr("aco.lane_record.parse_routing_line", read_no_routing_line)
+    claim = standing_active_claim(lane=True, opened_commit=history.opened_commit)
+    stated = parse_record_file(json.dumps(lane_record_object()).encode())
+    released = ReleasedLane(
+        claim, protocol.AbandonedRelease(ROUTING), None, RELEASED_AT, history.tip, None, stated
+    )
+
+    figures = compute_record(history.path, CONFIG, released).trailers()
+
+    assert figures[2:] == LANE_RECORD_TRAILERS
 
 
 def release_trailers(

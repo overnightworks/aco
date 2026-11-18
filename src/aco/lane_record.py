@@ -274,7 +274,7 @@ def _measured_record(
         return LaneRecord(
             LaneOutcome.ABANDONED,
             wall_seconds=_seconds_between(opened, released.released_at),
-            routing=parse_routing_line(outcome.explanation),
+            routing=_routing_in(outcome.explanation, released),
         )
     if merge_commit is None or protocol.COMMIT_PATTERN.fullmatch(merge_commit) is None:
         return LaneRecord(LaneOutcome.LANDED, item_size=released.item_size)
@@ -286,8 +286,12 @@ def _measured_record(
         wall_seconds=None if landed is None else _seconds_between(opened, landed.timestamp),
         size=_unknown_if_unreadable(lambda: _production_size(toplevel, config, merge)),
         item_size=released.item_size,
-        routing=None if landed is None else parse_routing_line(landed.message),
+        routing=None if landed is None else _routing_in(landed.message, released),
     )
+
+
+def _routing_in(text: str, released: ReleasedLane) -> RoutingLine | None:
+    return parse_routing_line(text) if released.record_file is None else None
 
 
 def _unknown_if_unreadable[Figure](read: Callable[[], Figure]) -> Figure | None:
