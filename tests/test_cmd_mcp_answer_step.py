@@ -124,6 +124,20 @@ def test_a_chat_answer_clears_the_wait_and_the_step_writes_now_and_keeps_the_ite
     assert _writes(here) == ["update_item_body", "remove_label"]
 
 
+def test_a_label_the_forge_refuses_to_remove_keeps_the_answer_and_names_the_repair(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _put_step(here)
+    here.fail_label_removals("the forge said no")
+
+    answered = _serve(monkeypatch, _answer_line())
+
+    assert answered["isError"] is False
+    assert answered["structuredContent"]["answered"] is True
+    assert "gh issue edit 1 --remove-label needs-operator" in answered["structuredContent"]["note"]
+    assert "wait" not in body.locate_block(here.stored_body(1)).data
+
+
 def _refusal_cases() -> list[tuple[dict[str, str], dict[str, object], str]]:
     return [
         (_YES_NO_STEP, {"step": "Another step."}, "no longer"),
