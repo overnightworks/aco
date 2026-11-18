@@ -2,18 +2,14 @@
 # ruff: noqa: T201 - the item command writes its result lines to stdout
 
 import argparse
-import os
 import sys
-from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from enum import StrEnum
-from pathlib import Path
-from typing import cast
 
 from . import (
     board_read,
     body,
     cmd_cut,
+    cmd_item_edit,
     decide,
     forge,
     inbox,
@@ -22,6 +18,13 @@ from . import (
     report,
     state_board,
     workboard,
+)
+from .cmd_item_common import (
+    ItemReason,
+    body_shape_defects,
+    refuse_an_unreadable_relative,
+    refuse_item_body_invalid,
+    state_ref_board,
 )
 from .session import RunContext
 
@@ -34,66 +37,7 @@ ITEM_NEW_PROJECTION_FLAGS = (
 )
 
 
-def _body_shape_defects(
-    raw_body: str, *, storage: body.Storage = body.Storage.GITHUB
-) -> tuple[str, ...]:
-    """`item edit`'s own accessor onto `body.body_shape_check`:
-    only the defect sentences, never the verdict `check
-    <item>` and `check -` read for their own `--json` `reason`."""
-    return body.body_shape_check(raw_body, storage=storage).defects
-
-
-def _refuse_a_body_on_stdin(command: str) -> None:
-    """Refuses, before any write, a body `command` would otherwise drop
-    unread: it reads no stdin, so a file or pipe there carrying
-    one (`report.stdin_carries_a_body`) is a mistake the person must see."""
-    if report.stdin_carries_a_body():
-        raise protocol.ClaimUnavailableError(f"{command} reads no stdin; drop the redirect")
-
-
-def _state_ref_board(context: RunContext) -> state_board.StateRefBoard:
-    """`context`'s own forge as the state-ref board, for an item command
-    that has already refused every other storage pin: under `state-ref`
-    `session._build_forge` builds exactly `session._state_ref_forge`'s board, so the cast is
-    honest, not a suppression -- the same narrowing `RunContext.forge_writer`
-    performs for the generic writing surface."""
-    return cast(state_board.StateRefBoard, context.forge)
-
-
 _ITEM_NEW_ORIGIN_ON_GITHUB_REFUSAL = '--origin needs storage = "state-ref"'
-
-
-class _ItemReason(StrEnum):
-    """`aco item`'s own `--json` `reason` vocabulary, shared across its four
-    subcommands (`specs/item.spec.md`): `created`/`edited`/
-    `closed`/`shown` name each subcommand's own success; `unchanged`, an
-    `item edit` whose value or body is already stored, which writes nothing;
-    `stale`, a whole-body `item edit` whose `--base` is no longer the item's
-    body hash. `body_invalid` covers only `item new`'s and `item edit`'s own piped-body shape check
-    (`_body_shape_defects`, the same check `check -` runs), carrying
-    `defects` the same way (`cmd_check._CheckReason`); `partial_write`
-    only a GitHub issue `item new` created but could not type or record under
-    its `--parent`, `cut`'s own shape. Every other refusal -- a
-    `storage = "github"` command, a missing item or parent, a possible twin,
-    a pull request target, or a live claim still
-    on the item -- is `precondition_failed`, this command family's single
-    generic bucket."""
-
-    CREATED = "created"
-    EDITED = "edited"
-    UNCHANGED = "unchanged"
-    CLOSED = "closed"
-    SHOWN = "shown"
-    PRECONDITION_FAILED = "precondition_failed"
-    STALE = "stale"
-    BODY_INVALID = "body_invalid"
-    PARTIAL_WRITE = "partial_write"
-
-
-def _refuse_item_body_invalid(defects: tuple[str, ...], *, as_json: bool) -> int:
-    return report.refuse(
-        _ItemReason.BODY_INVALID, defects[0], as_json=as_json, defects=list(defects)
-    )
 
 
 def _context_of_item_new(context: RunContext) -> RunContext:
@@ -119,11 +63,11 @@ def _cmd_item_new(parsed: argparse.Namespace, context: RunContext) -> int:
             return _item_new_on_github(parsed, context)
         return _item_new_on_state_ref(parsed, context)
     except _ItemBodyInvalidError as error:
-        return _refuse_item_body_invalid(error.defects, as_json=as_json)
+        return refuse_item_body_invalid(error.defects, as_json=as_json)
     except cmd_cut.PartialWriteError as error:
-        return cmd_cut.refuse_partial_write(error, _ItemReason.PARTIAL_WRITE, as_json=as_json)
+        return cmd_cut.refuse_partial_write(error, ItemReason.PARTIAL_WRITE, as_json=as_json)
     except protocol.ClaimError as error:
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
 
 
 class _ItemBodyInvalidError(protocol.ClaimError):
@@ -192,7 +136,7 @@ def _item_new_on_github(parsed: argparse.Namespace, context: RunContext) -> int:
     if parsed.origin is not None:
         raise protocol.ClaimUnavailableError(_ITEM_NEW_ORIGIN_ON_GITHUB_REFUSAL)
     new_body = _item_new_body(parsed, body.Storage.GITHUB)
-    defects = _body_shape_defects(new_body)
+    defects = body_shape_defects(new_body)
     if defects:
         raise _ItemBodyInvalidError(defects)
     client = context.forge_writer
@@ -261,12 +205,12 @@ def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> i
     forge at all. An open Task parent turns Container
     (`_retype_task_parent`) once the item is composed and before it is
     written, so an item the read would refuse retypes nothing. Narrows the
-    context's forge to the state-ref board (`_state_ref_board`), since
+    context's forge to the state-ref board (`state_ref_board`), since
     `create_item` is not part of the generic `ForgeWriter` port every other
     write command narrows to. The body is `_item_new_body`'s, the piped one
     stored as under github; one left incomplete is still written, each
     missing section named on stderr."""
-    client = _state_ref_board(context)
+    client = state_ref_board(context)
     parent = parsed.parent
     storage = context.config.storage
     new_body = _item_new_body(parsed, storage)
@@ -296,283 +240,9 @@ def _item_new_on_state_ref(parsed: argparse.Namespace, context: RunContext) -> i
 
 def _print_item_new_result(item_id: str, number: int, *, as_json: bool) -> None:
     if as_json:
-        report.emit_json(True, _ItemReason.CREATED, item=item_id, number=number)
+        report.emit_json(True, ItemReason.CREATED, item=item_id, number=number)
     else:
         print(item_id)
-
-
-def _cmd_item_edit(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM`: with `--size`, `--whole`, or `--kind`, a narrow write of
-    only that one field (both storages); with none, the item's whole body replaced
-    from stdin against `--base`, the hash `item show --json` printed. Every refusal is
-    `precondition_failed` except a malformed piped body (`body_invalid`, with `check -`'s
-    own `defects`), a stale base (`stale`) and a write the forge's check answers (ITEM-76)."""
-    for value, narrow_edit in (
-        (parsed.size, _cmd_item_edit_size),
-        (parsed.whole, _cmd_item_edit_whole),
-        (parsed.kind, _cmd_item_edit_kind),
-    ):
-        if value is not None:
-            return narrow_edit(parsed, context)
-    as_json = parsed.json
-    try:
-        number = parsed.item
-        storage = context.config.storage
-        new_body = _read_item_edit_body(number, storage, base=parsed.base)
-        defects = _body_shape_defects(new_body, storage=storage)
-        if defects:
-            return _refuse_item_body_invalid(defects, as_json=as_json)
-        replaced = _replace_whole_body(context, number, new_body, base=parsed.base)
-        item_id = workboard.item_label(number, storage)
-        _print_item_edit_result(item_id, number, replaced, as_json=as_json)
-        return 0
-    except decide.StaleBodyError as error:
-        return report.refuse(_ItemReason.STALE, error, as_json=as_json)
-    except forge.ForgeBodyWrittenError as error:
-        return report.refuse_checked_write(error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
-
-
-def _read_item_edit_body(number: int, storage: body.Storage, *, base: str | None) -> str:
-    """`item edit`'s new body: refused, unread, without a `--base` (ITEM-73), and
-    read only when stdin carries one (`report.stdin_carries_a_body`) -- an idle
-    socket, a terminal, `/dev/null` or a closed stdin refuses at once, naming the
-    redirect, rather than hanging on a read or replacing the body with nothing."""
-    item_id = workboard.item_label(number, storage)
-    item_argument = workboard.item_argument(number, storage)
-    if base is None:
-        raise protocol.ClaimUnavailableError(
-            f"item edit {item_id} needs --base <hash>; "
-            f"aco item show {item_argument} --json prints it"
-        )
-    if not report.stdin_carries_a_body():
-        raise protocol.ClaimUnavailableError(
-            f"item edit {item_id} needs the new body on stdin: "
-            f"aco item edit {item_argument} --base <hash> < body.md"
-        )
-    return report.read_piped_body()
-
-
-@dataclass(frozen=True)
-class _WholeBodyEdit:
-    """What a whole-body `item edit` left: `outcome` (`EDITED` or `UNCHANGED`), the hash
-    of the body now stored and, under state-ref, the written blob's `oid`."""
-
-    outcome: _ItemReason
-    body_hash: str
-    oid: protocol.ObjectId | None = None
-
-
-def _replace_whole_body(
-    context: RunContext, number: int, new_body: str, *, base: str
-) -> _WholeBodyEdit:
-    """Replaces item `number`'s body with `new_body` if it still has the body `base` hashes,
-    read afresh under the item's lock (ITEM-72), else refuses `StaleBodyError` and writes
-    nothing. The state-ref board is built inside the lock, so the snapshot hashed is the
-    one written against, and its write always lands (ITEM-13)."""
-    storage = context.config.storage
-    item_id = workboard.item_label(number, storage)
-    item_argument = workboard.item_argument(number, storage)
-    with decide.item_lock(context, number, environment=os.environ, home=Path.home()):
-        if storage is body.Storage.STATE_REF:
-            board = _state_ref_board(context)
-            if not board.holds(number):
-                raise protocol.ClaimUnavailableError(
-                    board_read.missing_item_refusal(number, board, storage)
-                )
-            decide.require_current(
-                base, board.stored_body_hash(number), item_id=item_id, item_argument=item_argument
-            )
-            try:
-                board.update_item_body(number, new_body, replacing="")
-            except protocol.ItemWrittenSinceReadError as error:
-                raise decide.StaleBodyError(str(error)) from error
-            stored = board.item_reference(number).body or ""
-            return _WholeBodyEdit(
-                _ItemReason.EDITED, decide.body_hash(stored), board.item_oid(number)
-            )
-        client = context.forge_writer
-        reference = board_read.item_or_refuse(client, number, command="item edit", storage=storage)
-        current = reference.body or ""
-        decide.require_current(
-            base, decide.body_hash(current), item_id=item_id, item_argument=item_argument
-        )
-        written = decide.write_item_body(client, number, new_body, replacing=current)
-        outcome = _ItemReason.EDITED if written else _ItemReason.UNCHANGED
-        return _WholeBodyEdit(outcome, decide.body_hash(new_body))
-
-
-_ITEM_EDIT_SIZE_COMMAND = "item edit --size"
-
-
-def _cmd_item_edit_size(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM --size S|M|L`: the one item-size
-    write, over the generic `ForgeWriter.update_item_body` both `github`
-    and `state-ref` already implement -- unlike the whole-body `item edit`
-    above, this works under `storage = "github"` too, since it patches only
-    the block's own top-level `size` key (never `[record]`, a
-    `state-ref`-only table BODY-15 refuses under `github`) and leaves every
-    other byte untouched. Every refusal reports through the shared envelope
-    as `precondition_failed`, except a write the forge's check answers (ITEM-66), which
-    reports `overwritten` or `not_verified`."""
-    as_json = parsed.json
-    try:
-        _refuse_a_body_on_stdin(_ITEM_EDIT_SIZE_COMMAND)
-        number = parsed.item
-        with _item_turn(context, number, _ITEM_EDIT_SIZE_COMMAND) as fresh:
-            new_data = {**fresh.located.data, "size": parsed.size}
-            outcome = _write_block_data(context.forge_writer, fresh, new_data)
-        _print_item_edit_size_result(number, parsed.size, fresh.storage, outcome, as_json=as_json)
-        return 0
-    except forge.ForgeBodyWrittenError as error:
-        return report.refuse_checked_write(error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
-
-
-def _item_turn(
-    context: RunContext, number: int, command: str
-) -> AbstractContextManager[decide.FreshItem]:
-    """The item's turn (ITEM-65) for a narrow `item edit`, refusing as `command`."""
-    return decide.turn(context, number, command=command, environment=os.environ, home=Path.home())
-
-
-def _write_block_data(
-    client: forge.ForgeWriter, fresh: decide.FreshItem, new_data: dict[str, object]
-) -> _ItemReason:
-    """Writes `new_data` as item `number`'s block, every other byte
-    untouched, or nothing at all when the block already carries it,
-    so a repeated narrow edit leaves no empty write behind."""
-    if new_data == fresh.located.data:
-        return _ItemReason.UNCHANGED
-    new_body = body.replace_block(fresh.body, fresh.located, new_data)
-    decide.write_item_body(client, fresh.number, new_body, replacing=fresh.body)
-    return _ItemReason.EDITED
-
-
-def _narrow_edit_word(outcome: _ItemReason) -> str:
-    """The first word a narrow `item edit` prints: `EDITED` or `UNCHANGED`."""
-    return outcome.value.upper()
-
-
-def _print_item_edit_size_result(
-    number: int, size: str, storage: body.Storage, outcome: _ItemReason, *, as_json: bool
-) -> None:
-    if as_json:
-        report.emit_json(True, outcome, item=number, size=size)
-    else:
-        print(f"{_narrow_edit_word(outcome)} {workboard.item_label(number, storage)} size={size}")
-
-
-_ITEM_EDIT_WHOLE_COMMAND = "item edit --whole"
-
-
-def _cmd_item_edit_whole(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM --whole REASON`: the one item-whole
-    write, mirroring `_cmd_item_edit_size` over the same generic
-    `ForgeWriter.update_item_body` -- works under `storage = "github"` too,
-    since it patches only the block's own top-level `whole` key and leaves
-    every other byte untouched. Every refusal reports through the shared
-    envelope as `precondition_failed`, except a write the forge's check answers (ITEM-66),
-    which reports `overwritten` or `not_verified`."""
-    as_json = parsed.json
-    try:
-        _refuse_a_body_on_stdin(_ITEM_EDIT_WHOLE_COMMAND)
-        number = parsed.item
-        with _item_turn(context, number, _ITEM_EDIT_WHOLE_COMMAND) as fresh:
-            reason = body.bounded_whole_reason(parsed.whole)
-            new_data = {**fresh.located.data, "whole": reason}
-            outcome = _write_block_data(context.forge_writer, fresh, new_data)
-        _print_item_edit_whole_result(number, reason, fresh.storage, outcome, as_json=as_json)
-        return 0
-    except forge.ForgeBodyWrittenError as error:
-        return report.refuse_checked_write(error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
-
-
-def _print_item_edit_whole_result(
-    number: int, reason: str, storage: body.Storage, outcome: _ItemReason, *, as_json: bool
-) -> None:
-    if as_json:
-        report.emit_json(True, outcome, item=number, whole=reason)
-    else:
-        print(
-            f"{_narrow_edit_word(outcome)} {workboard.item_label(number, storage)} whole={reason}"
-        )
-
-
-_ITEM_EDIT_KIND_COMMAND = "item edit --kind"
-
-
-def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco item edit ITEM --kind task|container`: the one
-    retype a person runs, over the `ForgeWriter.set_item_kind` both storages
-    implement -- the repair `next` names for a nested container with one
-    uncut row. Reads no stdin, and refuses a body piped or redirected there
-    before any write, so it is never silently dropped.
-    A container with an open child stays one, since a Task never has
-    children to claim through. Every refusal reports through the shared
-    envelope as `precondition_failed`."""
-    as_json = parsed.json
-    try:
-        _refuse_a_body_on_stdin(_ITEM_EDIT_KIND_COMMAND)
-        client = context.forge_writer
-        storage = context.config.storage
-        number = parsed.item
-        kind = body.ItemKind(parsed.kind)
-        # Under state-ref the retype reads its item alone (ITEM-37/38);
-        # the forge answers only through its open-issue list.
-        if isinstance(client, state_board.StateRefBoard):
-            target = client.open_issue(number)
-        else:
-            target = next(
-                (issue for issue in client.list_open_board_issues() if issue.number == number),
-                None,
-            )
-        label = workboard.item_label(number, storage)
-        if target is None:
-            raise protocol.ClaimUnavailableError(f"{label} is not an open item")
-        # The retype decides with the item and its children alone,
-        # and holds the store it read through its write, so a child
-        # written since refuses it rather than being guessed past.
-        if isinstance(client, state_board.StateRefBoard):
-            _refuse_an_unreadable_relative(client, number, with_parent=False)
-            client.hold_items()
-        if kind is body.ItemKind.TASK and target.has_open_child:
-            raise protocol.ClaimUnavailableError(
-                f"{label} has an open child; a container with open children stays a container"
-            )
-        outcome = _ItemReason.UNCHANGED if target.kind is kind else _ItemReason.EDITED
-        if outcome is _ItemReason.EDITED:
-            client.set_item_kind(number, kind)
-        _print_item_edit_kind_result(number, kind, storage, outcome, as_json=as_json)
-        return 0
-    except protocol.ClaimError as error:
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
-
-
-def _print_item_edit_kind_result(
-    number: int, kind: body.ItemKind, storage: body.Storage, outcome: _ItemReason, *, as_json: bool
-) -> None:
-    label = workboard.item_label(number, storage)
-    if as_json:
-        report.emit_json(True, outcome, item=label, number=number, kind=kind.value)
-    else:
-        print(f"{_narrow_edit_word(outcome)} {label} kind={kind.value}")
-
-
-def _print_item_edit_result(
-    item_id: str, number: int, replaced: _WholeBodyEdit, *, as_json: bool
-) -> None:
-    if as_json:
-        oid = {} if replaced.oid is None else {"oid": replaced.oid}
-        report.emit_json(
-            True, replaced.outcome, item=item_id, number=number, body_hash=replaced.body_hash, **oid
-        )
-    else:
-        print(f"{_narrow_edit_word(replaced.outcome)} {item_id}")
 
 
 _ITEM_CLOSE_GITHUB_REFUSAL = "the forge closes its issues; aco never governs them"
@@ -597,7 +267,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
     shape; `close_item` itself refuses a second close on an already-closed
     item, naming its date. An unreadable item refuses at its own read; an
     unreadable parent or child, or a parent `items/` lacks, refuses before
-    the write (`_refuse_an_unreadable_relative`); any other malformed item only goes
+    the write (`refuse_an_unreadable_relative`); any other malformed item only goes
     unfreed, and one failing the `freed:` read after the write turns that line
     into a hint. Prints one line, `CLOSED aco-xxxxxx` (`--json`:
     `{"item", "number", "closed_at", "parent_closable"}`), then `release
@@ -614,12 +284,12 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
         observed = context.observation
         protocol.require_state_ref(observed)
         protocol.require_no_live_claim(observed, protocol.IssueIdentity(number))
-        client = _state_ref_board(context)
+        client = state_ref_board(context)
         if client.item_reference(number).state is forge.ItemState.MISSING:
             raise protocol.ClaimUnavailableError(
                 board_read.missing_item_refusal(number, client, context.config.storage)
             )
-        _refuse_an_unreadable_relative(client, number, with_parent=True)
+        refuse_an_unreadable_relative(client, number, with_parent=True)
         closed_at = client.close_item(number)
         result = _ItemCloseResult(
             item_id=items.format_item_id(number),
@@ -632,25 +302,7 @@ def _cmd_item_close(parsed: argparse.Namespace, context: RunContext) -> int:
         return 0
     except protocol.ClaimError as error:
         named = workboard.named_refusal(error, body.Storage.STATE_REF)
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, named, as_json=as_json)
-
-
-def _refuse_an_unreadable_relative(
-    client: state_board.StateRefBoard, number: int, *, with_parent: bool
-) -> None:
-    """Refuses by the lowest id while one of `number`'s children -- the same
-    children the board counts, an unreadable item that may be one included
-    (ITEM-54) -- or, `with_parent`, its parent does not read
-    (ITEM-53): a single-item write decides with those alone, so
-    each is read through the one narrow `item_references` read, and an
-    unrelated malformed item never blocks the write. `parent_number` refuses
-    a parent `items/` lacks (PIN-16) here too, before the write rather than
-    after it."""
-    relatives = {child.number for child in client.list_children(number)}
-    parent = client.parent_number(number) if with_parent else None
-    if parent is not None:
-        relatives.add(parent)
-    client.item_references(sorted(relatives))
+        return report.refuse(ItemReason.PRECONDITION_FAILED, named, as_json=as_json)
 
 
 def _closable_parent_of_a_closed_item(
@@ -664,7 +316,7 @@ def _closable_parent_of_a_closed_item(
     if closable is None:
         return None
     try:
-        _refuse_an_unreadable_relative(client, closable, with_parent=True)
+        refuse_an_unreadable_relative(client, closable, with_parent=True)
     except protocol.MalformedStateTreeError:
         return None
     return closable
@@ -700,7 +352,7 @@ def _print_item_close_result(result: _ItemCloseResult, *, as_json: bool) -> None
     if as_json:
         report.emit_json(
             True,
-            _ItemReason.CLOSED,
+            ItemReason.CLOSED,
             item=result.item_id,
             number=result.number,
             closed_at=result.closed_at,
@@ -766,15 +418,15 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
         parent = client.parent_number(number)
     except items.MalformedItemError as error:
         return report.refuse(
-            _ItemReason.PRECONDITION_FAILED, error, as_json=as_json, body_hash=error.body_hash
+            ItemReason.PRECONDITION_FAILED, error, as_json=as_json, body_hash=error.body_hash
         )
     except protocol.ClaimError as error:
-        return report.refuse(_ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+        return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
     body = reference.body or ""
     if as_json:
         report.emit_json(
             True,
-            _ItemReason.SHOWN,
+            ItemReason.SHOWN,
             item=items.format_item_id(number),
             number=number,
             state=_item_state_text(reference.state),
@@ -800,7 +452,7 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     if parsed.item_command == "new":
         return _cmd_item_new(parsed, context)
     if parsed.item_command == "edit":
-        return _cmd_item_edit(parsed, context)
+        return cmd_item_edit.run(parsed, context)
     if parsed.item_command == "close":
         return _cmd_item_close(parsed, context)
     return _cmd_item_show(parsed, context)
