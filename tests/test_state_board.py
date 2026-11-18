@@ -3317,7 +3317,7 @@ class TestCliStateRefForge:
         assert locate_block(stored).data[key] == expected
 
     @pytest.mark.parametrize(
-        ("stdin_source", "flags", "err", "prefix", "block"),
+        ("stdin_source", "flags", "gaps", "prefix", "block"),
         [
             pytest.param(
                 piping("Ship the importer.\n"),
@@ -3357,8 +3357,7 @@ class TestCliStateRefForge:
                     'now = "Ready."\nnext = ""\ndone_when = ""\n```\n'
                 ),
                 ("--now", "Ready.", "--size", "S"),
-                "{item} misses Next; aco item edit {item} fills it\n"
-                "{item} misses Done when; aco item edit {item} fills it\n",
+                ("Next", "Done when"),
                 "Ship the importer.\n\n```aco\n",
                 {"now": "Ready.", "next": "", "done_when": "", "size": "S"},
                 id="a_piped_block_matching_the_flags_kept_and_its_gaps_named",
@@ -3366,9 +3365,7 @@ class TestCliStateRefForge:
             pytest.param(
                 piping(""),
                 (),
-                "{item} misses Now; aco item edit {item} fills it\n"
-                "{item} misses Next; aco item edit {item} fills it\n"
-                "{item} misses Done when; aco item edit {item} fills it\n",
+                ("Now", "Next", "Done when"),
                 "```aco\n",
                 {"now": "", "next": "", "done_when": ""},
                 id="nothing_piped_writes_the_skeleton_and_names_each_gap",
@@ -3376,9 +3373,7 @@ class TestCliStateRefForge:
             pytest.param(
                 empty_harness_socket_on_stdin,
                 (),
-                "{item} misses Now; aco item edit {item} fills it\n"
-                "{item} misses Next; aco item edit {item} fills it\n"
-                "{item} misses Done when; aco item edit {item} fills it\n",
+                ("Now", "Next", "Done when"),
                 "```aco\n",
                 {"now": "", "next": "", "done_when": ""},
                 id="a_harness_socket_is_never_read_and_the_skeleton_is_written",
@@ -3394,7 +3389,7 @@ class TestCliStateRefForge:
         worktree: Path,
         stdin_source: Callable[[Path], AbstractContextManager[TextIO]],
         flags: tuple[str, ...],
-        err: str,
+        gaps: tuple[str, ...],
         prefix: str,
         block: dict[str, object],
     ) -> None:
@@ -3412,7 +3407,12 @@ class TestCliStateRefForge:
 
         captured = capsys.readouterr()
         printed = captured.out.strip()
-        assert (status, captured.err) == (0, err.format(item=printed))
+        hint = (
+            f"aco item edit {printed} --base <body_hash> fills it "
+            f"(hash: aco item show {printed} --json)"
+        )
+        err = "".join(f"{printed} misses {gap}; {hint}\n" for gap in gaps)
+        assert (status, captured.err) == (0, err)
         state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
         assert state.tip is not None
         stored = store.read_item_files(worktree, state.tip)[f"{printed}.md"].decode()

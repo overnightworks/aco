@@ -2335,7 +2335,6 @@ def test_github_adapter_reads_a_pull_request_and_the_default_branch() -> None:
         return "main"
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=run)
-
     expected = forge.Landing(
         12,
         "ada",
@@ -2347,6 +2346,7 @@ def test_github_adapter_reads_a_pull_request_and_the_default_branch() -> None:
         MERGE_COMMIT_SHA,
         "feat: land the lane",
         head_sha,
+        False,
     )
     assert dataclasses.astuple(client.landing(12)) == dataclasses.astuple(expected)
     assert client.default_branch() == "main"

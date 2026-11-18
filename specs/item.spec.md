@@ -112,7 +112,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-58] Either storage keeps prose piped without a block byte for byte, CRLF and trailing blanks too, above a block the flags build in its line ending; a key no flag names stays `""` (see E-ITEM-16).
 - [ ] [ITEM-59] A piped body keeps its prose and fence lines byte for byte; a flag naming another value refuses `--<flag> <value> contradicts the piped block's <key> = <value>`, exit `2` (see E-ITEM-16).
 - [ ] [ITEM-60] Under either storage `item new` reads a body from a file or pipe on stdin, never dropping it; a socket, terminal, `/dev/null` or closed stdin is never read.
-- [ ] [ITEM-61] Under `storage = "state-ref"`, each section the stored body leaves empty prints `<item-id> misses <Section>; aco item edit <item-id> fills it` on stderr, one line each (see E-ITEM-01).
+- [ ] [ITEM-61] Under `storage = "state-ref"`, each section the stored body leaves empty prints one stderr line that names `item edit --base` and the `item show --json` hash source (see E-ITEM-01).
 - [ ] [ITEM-62] A piped block is stored verbatim when the flags add nothing to it under `storage = "github"`, otherwise in its canonical rendering, a comment typed inside it not kept.
 
 ## `item new` under `storage = "github"`
@@ -241,9 +241,9 @@ Setup: bare-remote, `storage = "state-ref"` tracked, bootstrapped
 ```console
 $ aco item new --title "Ship it"
 <item-id>
-2> <item-id> misses Now; aco item edit <item-id> fills it
-2> <item-id> misses Next; aco item edit <item-id> fills it
-2> <item-id> misses Done when; aco item edit <item-id> fills it
+2> <item-id> misses Now; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
+2> <item-id> misses Next; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
+2> <item-id> misses Done when; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
 exit 0
 $ aco item new --title "Docs pass" --kind container --scope docs/README.md --scope docs/PRODUCT.md --now "Cut." --next "Cut slice 1." --done-when "All slices landed." --json
 {"ok": true, "reason": "created", "item": "<item-id-2>", "number": <n2>}
@@ -413,9 +413,9 @@ $ aco item show aco-3e26d9 --json
 exit 2
 $ aco item new --title "Fresh item"
 <item-id>
-2> <item-id> misses Now; aco item edit <item-id> fills it
-2> <item-id> misses Next; aco item edit <item-id> fills it
-2> <item-id> misses Done when; aco item edit <item-id> fills it
+2> <item-id> misses Now; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
+2> <item-id> misses Next; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
+2> <item-id> misses Done when; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
 exit 0
 $ aco item edit aco-3e26d9 --base sha256:<hex> < repaired.md
 EDITED aco-3e26d9

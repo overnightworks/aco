@@ -310,9 +310,9 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked
 ````console
 $ aco item new --title "Reset export"
 <item-id>
-2> <item-id> misses Now; aco item edit <item-id> fills it
-2> <item-id> misses Next; aco item edit <item-id> fills it
-2> <item-id> misses Done when; aco item edit <item-id> fills it
+2> <item-id> misses Now; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
+2> <item-id> misses Next; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
+2> <item-id> misses Done when; aco item edit <item-id> --base <body_hash> fills it (hash: aco item show <item-id> --json)
 exit 0
 $ aco item show <item-id>
 <item-id> · #n · open · parent none · origin none

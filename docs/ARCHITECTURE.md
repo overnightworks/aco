@@ -83,9 +83,9 @@ flowchart LR
   branches on is `BoardSource.lists_pull_requests`. GitHub is the only forge
   adapter; the state-ref item store implements the same port. The seam is not
   exclusive: `cmd_land` depends on `GitHubForge` for the whole landing,
-  `cmd_item` on `StateRefBoard` and `cmd_release` on both, so another forge
-  needs its own contract for them before it can attach (the module docstring
-  of `forge.py`).
+  `cmd_item`, `cmd_item_edit` and `cmd_item_common` on `StateRefBoard` and
+  `cmd_release` on both, so another forge needs its own contract for them
+  before it can attach (the module docstring of `forge.py`).
 - The **ruling search** (`forge.RulingSearch`) is a port of its own, because it
   spans owners where the reader is bound to one repository: one query in, every
   page of the forge's hits and whether the result is complete out. Its GitHub

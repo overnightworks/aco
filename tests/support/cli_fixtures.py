@@ -652,8 +652,7 @@ ADOPTED_BRANCH = "dependabot/uv/x"
 
 
 def dependabot_pull_request(head_sha: str) -> forge.Landing:
-    """Open pull request #45 of `REPOSITORY` from the bot's own branch, aimed
-    at `main` and carrying no classification line, whose head is `head_sha`."""
+    """Open pull request #45 of `REPOSITORY` from the bot's branch, no classification line."""
     return forge.Landing(
         number=ADOPTED_PULL_REQUEST,
         author="app/dependabot",
@@ -665,6 +664,7 @@ def dependabot_pull_request(head_sha: str) -> forge.Landing:
         merge_commit=None,
         title="Bump x",
         head_sha=head_sha,
+        author_is_dependency_bot=True,
     )
 
 
