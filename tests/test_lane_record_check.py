@@ -285,28 +285,29 @@ def test_a_refusal_keeps_its_defect_and_the_file_name_however_long_the_file_path
 
 
 @pytest.mark.parametrize(
-    ("in_working_directory", "shown_prefix"),
+    ("directory", "shown_prefix"),
     [
-        pytest.param(True, "", id="a-bare-file-name"),
-        pytest.param(False, "…/", id="a-file-name-in-a-directory"),
+        pytest.param("", "", id="a-bare-file-name"),
+        pytest.param("a/", "a/", id="a-directory-the-marker-would-not-shorten"),
+        pytest.param(None, "…/", id="a-file-name-in-a-long-directory"),
     ],
 )
 def test_a_file_name_longer_than_the_line_stays_whole_and_the_line_passes_the_bound(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    in_working_directory: bool,
+    directory: str | None,
     shown_prefix: str,
 ) -> None:
     """Spec: LANREC-45."""
     file_name = "a" * 160 + ".json"
-    (tmp_path / file_name).write_text(json.dumps(lane_record_object(version=2)), encoding="utf-8")
+    folder = tmp_path / (directory or "")
+    folder.mkdir(exist_ok=True)
+    (folder / file_name).write_text(json.dumps(lane_record_object(version=2)), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
+    argument = str(folder / file_name) if directory is None else directory + file_name
 
-    result = run_cli(
-        ["lane-record", "check", file_name if in_working_directory else str(tmp_path / file_name)],
-        capsys,
-    )
+    result = run_cli(["lane-record", "check", argument], capsys)
 
     assert result.status == 2
     assert result.stderr == (
