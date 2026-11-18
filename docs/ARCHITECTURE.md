@@ -158,7 +158,8 @@ call, into an open item a member wrote, in any repository discovery finds, in
 that item's turn. Its `record_answer` tool rules one line per call in that
 turn, as `aco rule` does, so it refuses neither a closed item nor a
 non-member's: the card's hash binds the answer to what the agent read. Its
-`step` tool writes one item's `next` in that turn, refusing a closed item and a
+`step` tool writes one item's `next` and its `[step]` table (purpose,
+actions, expected, answer) in that turn, refusing a closed item and a
 non-member's, or opens one item, and sets the label `needs-operator` through the
 forge port's `add_label`; it never removes the label (`specs/mcp.spec.md`).
 Its `ask` tool also reads, through the forge's search across the owners of the

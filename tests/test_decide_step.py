@@ -11,12 +11,13 @@ from cli_fixtures import track_board_config
 from github_fixtures import FakeForge
 from option_cards import card, ruled_card
 
-from aco import body, decide, forge, item_wait, protocol, workboard
+from aco import body, decide, forge, item_step, item_wait, protocol, workboard
 from aco.session import RunContext
 
 NUMBER = 90
 STEP = "Rotate the deploy key."
 TODAY = date(2026, 11, 8)
+_CARD = item_step.StepCard("Why.", "Do this.\nThen that.", "See it.", None)
 
 
 @dataclass
@@ -51,9 +52,9 @@ def _world(
     return context, served
 
 
-def _mark(context: RunContext, step: str = STEP) -> None:
+def _mark(context: RunContext, step: str = STEP, card: item_step.StepCard = _CARD) -> None:
     fresh = decide.fresh_item(context, NUMBER, command="step")
-    decide.mark_step(context, fresh, step)
+    decide.mark_step(context, fresh, step, card)
 
 
 def test_the_step_replaces_next_and_keeps_every_other_field_and_byte(clone: Path) -> None:
@@ -64,7 +65,12 @@ def test_the_step_replaces_next_and_keeps_every_other_field_and_byte(clone: Path
 
     written = client.item_bodies[NUMBER]
     old, new = body.locate_block(before), body.locate_block(written)
-    assert new.data == {**old.data, "next": STEP, "wait": {"operator": STEP, "since": TODAY}}
+    assert new.data == {
+        **old.data,
+        "next": STEP,
+        "wait": {"operator": STEP, "since": TODAY},
+        "step": {"purpose": "Why.", "actions": "Do this.\nThen that.", "expected": "See it."},
+    }
     assert written[: new.content_start] == before[: old.content_start]
     assert written[new.content_end :] == before[old.content_end :]
     assert client.body_replacings == [before]

@@ -36,6 +36,7 @@ from aco.lane_record import LaneOutcome, LaneRecord
 from aco.routing_line import RoutingLine
 
 _CARD = card_body(card())
+_NO_CARD = dict.fromkeys(("purpose", "actions", "expected", "answer"))
 
 
 @pytest.mark.parametrize(
@@ -225,6 +226,23 @@ def test_a_labelled_member_item_is_a_step_with_its_number_title_and_next() -> No
     assert found == (inbox.Step(9, "Item 9", "Rotate the key."),)
 
 
+def test_a_step_item_with_a_step_table_lists_its_card() -> None:
+    table = {"purpose": "Why.", "actions": "Do\nthis.", "expected": "See that.", "answer": "Say."}
+    issues = (_step_issue(9, body_text=complete_contract("Rotate.", step=table)),)
+
+    [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert inbox.step_json(found) == {**table, "number": 9, "title": "Item 9", "step": "Rotate."}
+
+
+def test_a_step_item_with_a_defective_block_lists_no_card() -> None:
+    issues = (_step_issue(9, body_text="no block here"),)
+
+    [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert inbox.step_json(found) == {**_NO_CARD, "number": 9, "title": "Item 9", "step": None}
+
+
 def test_the_label_matches_in_any_case() -> None:
     issues = (_step_issue(9, labels=("Needs-Operator",)),)
 
@@ -295,7 +313,7 @@ def test_the_answer_lists_steps_always_and_gives_an_unavailable_entry_none() -> 
 
     repositories_read = cast("list[dict[str, Any]]", answer["repositories"])
     assert repositories_read[0]["steps"] == [
-        {"number": 9, "title": "Item 9", "step": "Rotate the key."}
+        {**_NO_CARD, "number": 9, "title": "Item 9", "step": "Rotate the key."}
     ]
     assert repositories_read[1]["steps"] == []
 
@@ -303,7 +321,7 @@ def test_the_answer_lists_steps_always_and_gives_an_unavailable_entry_none() -> 
 def test_a_step_with_no_text_prints_as_null() -> None:
     step = inbox.Step(9, "Item 9", None)
 
-    assert inbox.step_json(step) == {"number": 9, "title": "Item 9", "step": None}
+    assert inbox.step_json(step) == {**_NO_CARD, "number": 9, "title": "Item 9", "step": None}
 
 
 def test_one_read_of_a_checkout_lists_its_open_items_once_for_its_rows_and_its_steps(
