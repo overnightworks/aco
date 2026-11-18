@@ -185,12 +185,13 @@ export async function storedLine(number: number, index: number): Promise<Record<
 	return lines[index - 1];
 }
 
-/** A container with these sub-issues, no card of its own. */
+/** The `now` text of item `number` as aco stores it. */
 export async function storedNow(number: number): Promise<string> {
 	const response = await fetch(`${readBoardRuntime().controlUrl}/items/${number}/now`);
 	return (await response.json()) as string;
 }
 
+/** A container with these sub-issues, no card of its own. */
 export function container(
 	number: number,
 	title: string,
