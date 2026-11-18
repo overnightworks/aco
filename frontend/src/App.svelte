@@ -714,8 +714,21 @@
 			grid-row: 2;
 			border-right: 0;
 		}
+		nav {
+			gap: 2px;
+		}
 		nav button {
-			padding: 0 6px 0 12px;
+			gap: 4px;
+			padding: 0 4px 0 8px;
+			font-size: 13px;
+			letter-spacing: 0.02em;
+		}
+		nav button .n {
+			min-width: 18px;
+			height: 18px;
+			padding: 0 4px;
+			font-size: 11.5px;
+			line-height: 18px;
 		}
 		.split {
 			grid-template-columns: minmax(0, 1fr);
