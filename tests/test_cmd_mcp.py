@@ -32,6 +32,7 @@ from aco import body_fence, cli, expectations, forge, session, workboard
 from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
+_NO_CARD = dict.fromkeys(("purpose", "actions", "expected", "answer"))
 _CHILD_PROGRAM = (
     "import board_forge, sys; from aco import cli, session; "
     "session.run_context = board_forge.run_context; raise SystemExit(cli.main(['mcp']))"
@@ -292,8 +293,8 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
     }
     assert exit_code == 0
     assert entries["board-forge/here"]["steps"] == [
-        {"number": 2, "title": "Key", "step": "Rotate the key."},
-        {"number": 1, "title": "Here", "step": "X"},
+        {**_NO_CARD, "number": 2, "title": "Key", "step": "Rotate the key."},
+        {**_NO_CARD, "number": 1, "title": "Here", "step": "X"},
     ]
     assert [item["number"] for item in entries["board-forge/here"]["items"]] == [1]
     assert entries["board-forge/elsewhere"]["steps"] == []

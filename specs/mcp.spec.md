@@ -56,13 +56,16 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | the same step call again | — | — | MCP-45 |
 | a step with a title that no open item holds | — | — | MCP-47 |
 | a step with a title that an open item a member wrote already holds with that step | — | — | MCP-48 |
-| a padded `step` or `title` | — | — | MCP-49 |
+| a padded `step`, `title` or card field | — | — | MCP-49 |
+| a step with a `purpose`, `actions` and `expected`, and an `answer` or none | — | — | MCP-67, MCP-68 |
+| the same step call with other card fields | — | — | MCP-69 |
+| a step whose `purpose`, `actions` or `expected` is missing or blank | — | — | MCP-70 |
 | a step on a repository not found, or an item missing, a pull request, malformed, closed or a non-member's | — | — | MCP-50 |
 | a step in a repository under `state-ref` storage | — | — | MCP-51 |
 | a step whose body check answers `not verified` or `overwritten` | — | — | MCP-52 |
 | a step whose label fails after the body is written or the item opened | — | — | MCP-53 |
 | a new item whose issue type the forge did not set | — | — | MCP-54 |
-| an unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step` or `title` | — | — | MCP-55 |
+| an unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field | — | — | MCP-55 |
 
 ## Serving
 
@@ -128,8 +131,8 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-35] An unknown argument (`via` is none), a wrong type, not exactly one of `option` and `other`, or a blank `other` is a tool error naming each; nothing is read or written (see E-MCP-10).
 - [ ] [MCP-36] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
 - [ ] [MCP-37] `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
-- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`; `step` requires `repository`, `step`.
-- [ ] [MCP-39] An open item that carries the label `needs-operator`, in any letter case, is a step: `steps` lists its `number`, `title` and `step`, the `next` of its block (see E-MCP-11).
+- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`.
+- [ ] [MCP-39] An open item that carries the label `needs-operator`, in any letter case, is a step: `steps` lists its `number`, `title` and `step` (the block's `next`) and its card (MCP-67, see E-MCP-11).
 - [ ] [MCP-40] A step whose body has no readable block, or a malformed one, is listed with `step` null; it is never left out and its title is not given as the step.
 - [ ] [MCP-41] `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
 - [ ] [MCP-42] Only items a member of the repository wrote are steps, as for cards (MCP-14); an item the store could not read is no step.
@@ -137,22 +140,26 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 ## Marking a step
 
-`step` takes `repository`, `step` and exactly one of `item` and `title`.
+`step` takes `repository`, `step`, `purpose`, `actions`, `expected`, optionally `answer`, and exactly one of `item` and `title`.
 
 - [ ] [MCP-44] `step` with an open `item` a member wrote writes `step` as its block's `next`, then sets the label `needs-operator`; it answers `repository`, `item`, `step` and `created` false (see E-MCP-12).
 - [ ] [MCP-45] The same call again writes no body and sets the label again; it answers the same, so a repeat finishes a call whose label failed.
 - [ ] [MCP-46] The rewritten body keeps every other field of the block, every ruling and every byte outside the block; the body is written before the label, both in the item's turn.
 - [ ] [MCP-47] `step` with a `title` that no open item holds opens one item of kind task whose body names `step` as its `next`, sets the label and answers `created` true; `read_inbox` lists it (see E-MCP-13).
 - [ ] [MCP-48] A `title` that an open, readable item a member wrote holds with that exact `next` marks it (the highest number of several) and answers `created` false; a changed title or `next` opens a new item.
-- [ ] [MCP-49] `step` and `title` are stripped before use; the stored `next` and the title matched are the stripped text.
+- [ ] [MCP-49] `step`, `title`, `purpose`, `actions`, `expected` and `answer` are stripped before use; the stored text and the title matched are the stripped text.
 - [ ] [MCP-66] A step written to an item or opened as one also sets its block's `wait` to `operator = <step>` and `since` today; a repeat of the same step keeps the `since`.
 - [ ] [MCP-50] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
 - [ ] [MCP-51] A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit` as the way (see E-MCP-15).
 - [ ] [MCP-52] A body write whose check answers `not verified` or `overwritten` is a tool error with that sentence and sets no label; the same call again finishes it.
 - [ ] [MCP-53] A label that fails after the body is written or the item opened is a tool error naming the item and the forge's reason; the same call again sets it (see E-MCP-16).
 - [ ] [MCP-54] A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
-- [ ] [MCP-55] An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step` or `title` is a tool error naming each; nothing is read or written (see E-MCP-17).
+- [ ] [MCP-55] An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field is a tool error naming each; nothing is read or written (see E-MCP-17).
 - [ ] [MCP-56] A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
+- [ ] [MCP-67] `step` requires and stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `next` and `wait` stay the short `step`.
+- [ ] [MCP-68] `answer`, optional, is what the operator reports and why; without it he answers yes or no. A step without a `step` table lists all four fields as null.
+- [ ] [MCP-69] The same call with the same card fields writes no body (MCP-45); other card fields rewrite the `step` table and keep every other field of the block (MCP-46).
+- [ ] [MCP-70] A missing, non-string or blank `purpose`, `actions` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
 
 ## Never
 
@@ -275,21 +282,21 @@ Nothing is read or written; a blank `other` answers `other must not be blank`.
 
 ### E-MCP-11 -- an item that waits on a step only the operator can take
 
-Setup: `owner/a` holds item `#9` titled `Rotate the key`, labelled `needs-operator`, whose block has `next = "Rotate the deploy key in the host's settings."`
+Setup: `owner/a` holds item `#9` titled `Rotate the key`, labelled `needs-operator`, whose block has `next = "Rotate the deploy key in the host's settings."` and a `[step]` table with `purpose = "The old key leaked."`, `actions = "Open Settings, Deploy keys, click Rotate."` and `expected = "A new key shows."`
 
 ```text
 > {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_inbox"}}
-< {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[],"steps":[{"number":9,"title":"Rotate the key","step":"Rotate the deploy key in the host's settings."}]}],"unreadable":[]},"isError":false}}
+< {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[],"steps":[{"number":9,"title":"Rotate the key","step":"Rotate the deploy key in the host's settings.","purpose":"The old key leaked.","actions":"Open Settings, Deploy keys, click Rotate.","expected":"A new key shows.","answer":null}]}],"unreadable":[]},"isError":false}}
 ```
 
-An item labelled the same whose body holds no readable block is listed with `"step":null`.
+An item labelled the same whose body holds no readable block is listed with `"step":null`, and one without a `[step]` table with `purpose`, `actions`, `expected` and `answer` null.
 
 ### E-MCP-12 -- a step marked on an open item
 
 Setup: `owner/a` holds the open item `#9`, written by a member, with a complete body
 
 ```text
-> {"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"step","arguments":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings."}}}
+> {"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"step","arguments":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","purpose":"The old key leaked.","actions":"Open Settings, Deploy keys, click Rotate.","expected":"A new key shows."}}}
 < {"jsonrpc":"2.0","id":12,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","created":false},"isError":false}}
 ```
 
@@ -300,7 +307,7 @@ The block's `next` is the step and the item carries `needs-operator`, so E-MCP-1
 Setup: as E-MCP-12, with no open item titled `Rotate the key`
 
 ```text
-> {"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"step","arguments":{"repository":"owner/a","title":"Rotate the key","step":"Rotate the deploy key in the host's settings."}}}
+> {"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"step","arguments":{"repository":"owner/a","title":"Rotate the key","step":"Rotate the deploy key in the host's settings.","purpose":"The old key leaked.","actions":"Open Settings, Deploy keys, click Rotate.","expected":"A new key shows."}}}
 < {"jsonrpc":"2.0","id":13,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":10,"step":"Rotate the deploy key in the host's settings.","created":true},"isError":false}}
 ```
 
@@ -338,10 +345,10 @@ The step stands in the item's `next`. The same call, sent once the cause is gone
 
 ### E-MCP-17 -- arguments that do not fit
 
-Setup: as E-MCP-12, with both `item` and `title` given and `step` blank
+Setup: as E-MCP-12, with both `item` and `title` given, `step` blank, `purpose` missing and `actions` blank
 
 ```text
-< {"jsonrpc":"2.0","id":17,"result":{"content":[{"type":"text","text":"give exactly one of item and title; step must not be blank"}],"isError":true}}
+< {"jsonrpc":"2.0","id":17,"result":{"content":[{"type":"text","text":"give exactly one of item and title; step must not be blank; actions must not be blank; purpose is required: why the operator takes the step, in a sentence"}],"isError":true}}
 ```
 
 Nothing is read or written.

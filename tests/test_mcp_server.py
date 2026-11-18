@@ -1,6 +1,7 @@
 """The MCP server's replies (`specs/mcp.spec.md`), driven without a process: a
 message in, the answer line out, the inbox read a function the test passes."""
 
+import dataclasses
 import json
 import re
 from collections.abc import Mapping
@@ -8,7 +9,14 @@ from typing import Any, cast
 
 import pytest
 
-from aco import __version__, expectation_grammar, expectations, mcp_server, protocol
+from aco import (
+    __version__,
+    expectation_grammar,
+    expectations,
+    item_step,
+    mcp_server,
+    protocol,
+)
 
 _INBOX: dict[str, object] = {"root": "/work", "repositories": [], "unreadable": []}
 
@@ -35,8 +43,10 @@ def _echoing_record(
     }
 
 
-def _echoing_step(label: str, step: str, target: int | str) -> Mapping[str, object]:
-    return {"repository": label, "step": step, "target": target}
+def _echoing_step(
+    label: str, step: str, target: int | str, card: item_step.StepCard
+) -> Mapping[str, object]:
+    return {"repository": label, "step": step, "target": target, "card": dataclasses.asdict(card)}
 
 
 def _answer(
@@ -182,11 +192,20 @@ def test_tools_list_offers_step_as_a_repeatable_write_that_replaces_next() -> No
     assert tool["description"]
 
 
-def test_the_step_schema_requires_the_repository_and_the_step_and_closes_its_keys() -> None:
+def test_the_step_schema_requires_the_repository_the_step_and_its_card_but_the_answer() -> None:
     schema = _tools()["step"]["inputSchema"]
 
-    assert set(schema["properties"]) == {"repository", "step", "item", "title"}
-    assert set(schema["required"]) == {"repository", "step"}
+    assert set(schema["properties"]) == {
+        "repository",
+        "step",
+        "item",
+        "title",
+        "purpose",
+        "actions",
+        "expected",
+        "answer",
+    }
+    assert set(schema["required"]) == {"repository", "step", "purpose", "actions", "expected"}
     assert schema["properties"]["item"]["type"] == "integer"
     assert schema["additionalProperties"] is False
 
@@ -518,20 +537,44 @@ def test_every_record_answer_envelope_defect_is_named_in_one_error() -> None:
 
 
 def _step_arguments(**changes: object) -> dict[str, object]:
-    return {"repository": "owner/repo", "step": "Rotate the key.", "item": 7, **changes}
+    return {
+        "repository": "owner/repo",
+        "step": "Rotate the key.",
+        "item": 7,
+        "purpose": "Why.",
+        "actions": "Do this.",
+        "expected": "See that.",
+        **changes,
+    }
 
 
 def test_a_step_call_on_an_item_hands_the_stripped_step_to_the_writer_and_answers_its_json() -> (
     None
 ):
-    arguments = _step_arguments(step="  Rotate the key.\n")
+    arguments = _step_arguments(step="  Rotate the key.\n", purpose=" Why.\n", answer=" Say why ")
 
     result = _answer(_call(arguments, name="step"))["result"]
 
-    expected = {"repository": "owner/repo", "step": "Rotate the key.", "target": 7}
+    expected = {
+        "repository": "owner/repo",
+        "step": "Rotate the key.",
+        "target": 7,
+        "card": {
+            "purpose": "Why.",
+            "actions": "Do this.",
+            "expected": "See that.",
+            "answer": "Say why",
+        },
+    }
     assert result["isError"] is False
     assert result["structuredContent"] == expected
     assert json.loads(result["content"][0]["text"]) == expected
+
+
+def test_a_step_call_without_an_answer_hands_the_writer_a_card_without_one() -> None:
+    result = _answer(_call(_step_arguments(), name="step"))["result"]
+
+    assert result["structuredContent"]["card"]["answer"] is None
 
 
 def test_a_step_call_with_a_title_hands_the_stripped_title_to_the_writer() -> None:
@@ -542,7 +585,9 @@ def test_a_step_call_with_a_title_hands_the_stripped_title_to_the_writer() -> No
     assert result["structuredContent"]["target"] == "Key rotation"
 
 
-def _refusing_step(label: str, step: str, target: int | str) -> Mapping[str, object]:
+def _refusing_step(
+    label: str, step: str, target: int | str, card: item_step.StepCard
+) -> Mapping[str, object]:
     raise protocol.ClaimError("item 7 is closed")
 
 
@@ -554,7 +599,9 @@ def test_a_refused_step_is_a_tool_error_carrying_its_reason() -> None:
     assert "structuredContent" not in result
 
 
-def _step_reaches_nothing(label: str, step: str, target: int | str) -> Mapping[str, object]:
+def _step_reaches_nothing(
+    label: str, step: str, target: int | str, card: item_step.StepCard
+) -> Mapping[str, object]:
     pytest.fail("a step call with a defective envelope reached the writer")
 
 
@@ -569,6 +616,27 @@ def _step_reaches_nothing(label: str, step: str, target: int | str) -> Mapping[s
         pytest.param(_step_arguments(step=3), "step must be a string", id="step-integer"),
         pytest.param(_without(_step_arguments(), "step"), "step must be a string", id="no-step"),
         pytest.param(_step_arguments(step=" \n"), "step must not be blank", id="step-blank"),
+        pytest.param(
+            _without(_step_arguments(), "purpose"),
+            "purpose is required: why the operator takes the step",
+            id="no-purpose",
+        ),
+        pytest.param(
+            _without(_step_arguments(), "actions"),
+            "actions is required: what the operator does",
+            id="no-actions",
+        ),
+        pytest.param(
+            _without(_step_arguments(), "expected"),
+            "expected is required: what the operator sees",
+            id="no-expected",
+        ),
+        pytest.param(
+            _step_arguments(actions=" \n"), "actions must not be blank", id="blank-actions"
+        ),
+        pytest.param(_step_arguments(answer=" "), "answer must not be blank", id="blank-answer"),
+        pytest.param(_step_arguments(expected=3), "expected must be a string", id="expected-int"),
+        pytest.param(_step_arguments(answer=3), "answer must be a string", id="answer-int"),
         pytest.param(_step_arguments(item=True), "item must be an integer", id="item-boolean"),
         pytest.param(_step_arguments(item="7"), "item must be an integer", id="item-string"),
         pytest.param(_step_arguments(item=7.5), "item must be an integer", id="item-float"),

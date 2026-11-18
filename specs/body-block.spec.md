@@ -33,6 +33,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 | `[record]` under `storage = "state-ref"` | BODY-16..BODY-20 | — | — |
 | `wait` defective | BODY-21..BODY-24, BODY-112, BODY-113 | BODY-50 | BODY-52 |
 | `handover` defective | BODY-114..BODY-117 | BODY-50 | BODY-52 |
+| `step` valid or defective | BODY-122..BODY-125 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
@@ -77,7 +78,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 - [ ] [BODY-10] A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
 - [ ] [BODY-11] A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
 - [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
-- [ ] [BODY-13] Any top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `scope`, `size`, `whole`, `planned_at_first_cut`, `expectation`, `slice` is refused `unknown top-level key`, exit `2`.
+- [ ] [BODY-13] A top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `step`, `scope`, `size`, `whole`, `planned_at_first_cut`, `expectation`, `slice` is `unknown top-level key`, exit `2`.
 - [ ] [BODY-14] A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
 
 ## `[record]`, the state-ref item identity
@@ -308,6 +309,13 @@ keeps its index. Inside one entry the refusals print in this order: `text`,
 - [ ] [BODY-119] `planned_at_first_cut = <n>` is valid for an integer `n` of at least 1 (`aco cut` writes it, CUT-45): `aco check -` prints `body ok`, exit `0`.
 - [ ] [BODY-120] Any other value (`0`, a negative integer, a boolean, a string, a float, an array) prints `body malformed: planned_at_first_cut: planned_at_first_cut must be a positive integer`, exit `2`.
 - [ ] [BODY-121] A rewrite of the block (BODY-07) keeps the key, ahead of `slice = []` and every table.
+
+## `step`, the detail of a step only the operator can take
+
+- [ ] [BODY-122] A block with no `[step]` table is valid: an older step item carries none, and `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-123] `[step]` with `purpose`, `actions` and `expected`, each a non-empty string that may span lines, and optionally `answer` the same, is valid: `aco check -` prints `body ok`, exit `0`.
+- [ ] [BODY-124] A `[step]` that is no table, lacks or blanks `purpose`, `actions` or `expected`, blanks `answer` or holds another key prints `body malformed: step.<key>: ...`, exit `2` (see E-BODY-21).
+- [ ] [BODY-125] A rewrite of the block (BODY-07) keeps the table, ahead of every `[[expectation]]` and `[[slice]]` table.
 
 ## Never
 
@@ -1121,4 +1129,26 @@ done_when = "It is decided."
 BODY
 body ok
 exit 0
+````
+
+### E-BODY-21 — a step table without its purpose
+
+Setup: bare-remote, `storage = "github"`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Rotate the key."
+done_when = "It is rotated."
+
+[step]
+purpose = " "
+actions = "Open the link."
+expected = "A new key shows."
+```
+BODY
+2> body malformed: step.purpose: step.purpose must be a non-empty string
+exit 2
 ````
