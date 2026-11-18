@@ -255,7 +255,7 @@ def recorded_with_risks(recorded: Path, bare_remote: Path, monkeypatch: pytest.M
                 LaneOutcome.LANDED,
                 wall_seconds=100,
                 risk="material",
-                counts=stage_counts((2, 0, 1, 0), (3, 0, 1, 0), (1, 0, 1, 0)),
+                counts=stage_counts((2, 0, 1, 0), (3, 0, 1, 0), (0, 0, 1, 0)),
             ),
         ),
         (
@@ -288,13 +288,13 @@ def test_a_group_prints_one_block_per_risk_class_with_totals_per_stage(
         "  risk normal: lanes 1 (landed 0, abandoned 1)",
         "  risk (none): lanes 1 (landed 1, abandoned 0)",
     ]
-    assert [line for line in blocks if line.startswith("    ") and "_review:" in line] == [
-        "    fix_rounds_review: total 2, n 1, unknown 0",
-        "    misses_review: total 1, n 1, unknown 0",
-        "    fix_rounds_review: total 1, n 1, unknown 0",
-        "    misses_review: total unknown, n 0, unknown 1",
-        "    fix_rounds_review: total unknown, n 0, unknown 1",
-        "    misses_review: total unknown, n 0, unknown 1",
+    assert [line for line in blocks if line.startswith("    ") and "_ci:" in line] == [
+        "    fix_rounds_ci: total 1, n 1, unknown 0",
+        "    misses_ci: total 1, n 1, unknown 0",
+        "    fix_rounds_ci: total 0, n 1, unknown 0",
+        "    misses_ci: total unknown, n 0, unknown 1",
+        "    fix_rounds_ci: total unknown, n 0, unknown 1",
+        "    misses_ci: total unknown, n 0, unknown 1",
     ]
 
 

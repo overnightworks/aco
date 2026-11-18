@@ -72,7 +72,7 @@ def lane_record_object(**changes: object) -> dict[str, object]:
         },
         "fix_rounds": {"review": 1, "gate": 0, "ci": 2, "test": 0},
         "blocking": {"review": 3, "gate": 0, "ci": 1, "test": 0},
-        "misses": {"review": 1, "gate": 0, "ci": 1, "test": 0},
+        "misses": {"review": 0, "gate": 0, "ci": 1, "test": 0},
         "verdicts": [
             {"stage": "review", "verdict": "revise", "sha": "b" * 40},
             {"stage": "review", "verdict": "approve", "sha": JUDGED_SHA},
@@ -109,7 +109,7 @@ LANE_RECORD_TRAILERS = (
     "lane_blocking_gate: 0",
     "lane_blocking_ci: 1",
     "lane_blocking_test: 0",
-    "lane_misses_review: 1",
+    "lane_misses_review: 0",
     "lane_misses_gate: 0",
     "lane_misses_ci: 1",
     "lane_misses_test: 0",

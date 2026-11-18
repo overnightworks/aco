@@ -98,7 +98,7 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-45] A refusal line holds 200 characters: a `<file>` that does not fit loses the front of its directory (`…/`) while the file name and `<defect>` stay whole, so only those two can pass 200 (E-LANREC-10).
 - [ ] [LANREC-46] A file that starts with a UTF-8 byte order mark refuses the defect `begins with a UTF-8 byte order mark; save it without one` (E-LANREC-09).
 - [ ] [LANREC-50] A file that states `misses` also writes `lane_misses_<stage>` for `review`, `gate`, `ci` and `test` after the `lane_blocking_<stage>` lines; a file without it, and a lane with no file, has none.
-- [ ] [LANREC-51] A reader reads `lane_risk` and each `lane_fix_rounds_`, `lane_blocking_` and `lane_misses_` line back by stage; a missing, repeated or malformed line, or a risk that is no tag, is unknown alone.
+- [ ] [LANREC-51] A reader reads `lane_risk` and each `lane_fix_rounds_`, `lane_blocking_` and `lane_misses_` line back by stage; a missing, repeated or malformed line, a count above `999` or a risk that is no tag, is unknown alone.
 
 LANREC-47 and the writer's part of LANREC-48 (Misses and its exclusions) bind the lane writer: `aco` cannot check them, so their proof is `plugins/atelier/lane/record.js` in overnightworks/marketplace, and the figures stay unknown until it writes them.
 
@@ -182,7 +182,7 @@ Nothing is merged, deleted or written; the claim stands.
 
 ### E-LANREC-05 — an abandoned lane leaves the file's record
 
-Setup: bare-remote, a linked worktree on `docs/tidy-readme`, its claim live, a file `lane-record.json` with `build sonnet-5.5/high`, `fix none`, `review opus-5.5/medium`, `test sonnet-5.5/medium`, `gate none`, `land haiku-5.5/low`, fix rounds `1`, `0`, `2`, `0` and blocking counts `3`, `0`, `1`, `0` and misses `1`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`, risk `routine` and experiment `builder-sonnet`
+Setup: bare-remote, a linked worktree on `docs/tidy-readme`, its claim live, a file `lane-record.json` with `build sonnet-5.5/high`, `fix none`, `review opus-5.5/medium`, `test sonnet-5.5/medium`, `gate none`, `land haiku-5.5/low`, fix rounds `1`, `0`, `2`, `0` and blocking counts `3`, `0`, `1`, `0` and misses `0`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`, risk `routine` and experiment `builder-sonnet`
 
 ```console
 $ aco release --abandoned "stopped for the day" --record lane-record.json
@@ -209,7 +209,7 @@ lane_blocking_review: 3
 lane_blocking_gate: 0
 lane_blocking_ci: 1
 lane_blocking_test: 0
-lane_misses_review: 1
+lane_misses_review: 0
 lane_misses_gate: 0
 lane_misses_ci: 1
 lane_misses_test: 0

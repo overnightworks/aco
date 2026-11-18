@@ -213,7 +213,7 @@ exit 2
 
 ### E-STATS-06 — risk blocks
 
-Setup: recorded, three more release commits. Lane 5, dated 2026-12-01, landed, 100 s, risk `material`, fix rounds `2`, `0`, `1`, `0` and misses `1`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`. Lane 6, dated 2026-12-02, abandoned, 50 s, risk `normal`, fix rounds `1`, `0`, `0`, `0`, no misses lines. Lane 7, dated 2026-12-03, landed, 70 s, no risk line
+Setup: recorded, three more release commits. Lane 5, dated 2026-12-01, landed, 100 s, risk `material`, fix rounds `2`, `0`, `1`, `0` and misses `0`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`. Lane 6, dated 2026-12-02, abandoned, 50 s, risk `normal`, fix rounds `1`, `0`, `0`, `0`, no misses lines. Lane 7, dated 2026-12-03, landed, 70 s, no risk line
 
 ```console
 $ aco stats 2026-12-01..2026-12-31 tag:unused
@@ -233,7 +233,7 @@ A 2026-12-01..2026-12-31: lanes 3 (landed 2, abandoned 1)
   land: unknown 3
   risk material: lanes 1 (landed 1, abandoned 0)
     fix_rounds_review: total 2, n 1, unknown 0
-    misses_review: total 1, n 1, unknown 0
+    misses_review: total 0, n 1, unknown 0
     fix_rounds_gate: total 0, n 1, unknown 0
     misses_gate: total 0, n 1, unknown 0
     fix_rounds_ci: total 1, n 1, unknown 0
