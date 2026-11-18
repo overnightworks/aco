@@ -10,7 +10,8 @@ import {
 	LINE_CHANGED_MESSAGE,
 	lineKey,
 	noteOrNull,
-	readDecisionResult
+	readDecisionResult,
+	readStepResult
 } from './decision';
 
 describe('lineKey', () => {
@@ -127,6 +128,22 @@ describe('readDecisionResult', () => {
 		expect(readDecisionResult({ status: 'failed', message: null })).toEqual({
 			kind: 'failed',
 			message: 'unbekannter Fehler'
+		});
+	});
+});
+
+describe('readStepResult', () => {
+	test('a refused step answer without a message falls back to a German sentence and asks for a re-read', () => {
+		expect(readStepResult({ status: 'failed', message: null })).toEqual({
+			kind: 'changed',
+			message: 'unbekannter Fehler'
+		});
+	});
+
+	test('a refused step answer keeps its own message', () => {
+		expect(readStepResult({ status: 'failed', message: 'step changed' })).toEqual({
+			kind: 'changed',
+			message: 'step changed'
 		});
 	});
 });
