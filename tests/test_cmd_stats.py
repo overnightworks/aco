@@ -19,10 +19,24 @@ from store_fixtures import (
 )
 
 from aco import lane_measure, store, workboard
-from aco.lane_record import LaneOutcome, LaneRecord, ProductionSize
+from aco.lane_record import FindingStage, LaneOutcome, LaneRecord, ProductionSize, StageCounts
 from aco.routing_line import RoutingLine, RoutingStage
 
 UNUSED_TAG = "tag:unused"
+FINDING_STAGES = ("review", "gate", "ci", "test")
+UNKNOWN_STAGE_FIGURES = {
+    "fix_rounds": {"total": None, "n": 0, "unknown": 1},
+    "misses": {"total": None, "n": 0, "unknown": 1},
+}
+
+
+def unknown_risk_block(lanes: int) -> list[str]:
+    """The `(none)` block of `lanes` landed lanes that state no per-stage figure."""
+    lines = [f"  risk (none): lanes {lanes} (landed {lanes}, abandoned 0)"]
+    for stage in FINDING_STAGES:
+        lines.append(f"    fix_rounds_{stage}: total unknown, n 0, unknown {lanes}")
+        lines.append(f"    misses_{stage}: total unknown, n 0, unknown {lanes}")
+    return lines
 
 
 def at(moment: str) -> int:
@@ -154,6 +168,7 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  test: unknown 2",
         "  gate: unknown 2",
         "  land: haiku-5.5/low 1, unknown 1",
+        *unknown_risk_block(2),
         "B tag:builder-opus: lanes 1 (landed 1, abandoned 0)",
         "  wall_seconds: median 1200, n 1, unknown 0",
         "  fix_rounds: median 0, n 1, unknown 0",
@@ -168,6 +183,7 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  test: unknown 1",
         "  gate: unknown 1",
         "  land: unknown 1",
+        *unknown_risk_block(1),
     ]
 
 
@@ -204,7 +220,114 @@ def test_json_carries_the_same_figures_under_the_shared_envelope(
             "gate": {"choices": {}, "unknown": 1},
             "land": {"choices": {}, "unknown": 1},
         },
+        "risks": [
+            {
+                "risk": None,
+                "lanes": 1,
+                "outcomes": {"landed": 1, "abandoned": 0},
+                "stages": {stage: UNKNOWN_STAGE_FIGURES for stage in FINDING_STAGES},
+            }
+        ],
     }
+
+
+def stage_counts(
+    fix_rounds: tuple[int, int, int, int],
+    blocking: tuple[int, int, int, int],
+    misses: tuple[int, int, int, int] | None,
+) -> dict[FindingStage, StageCounts]:
+    return {
+        stage: StageCounts(
+            fix_rounds[position], blocking[position], misses[position] if misses else None
+        )
+        for position, stage in enumerate(FindingStage)
+    }
+
+
+@pytest.fixture
+def recorded_with_risks(recorded: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """`recorded` plus a material lane, a normal lane that states no misses and a lane whose
+    record states no risk, all released in December."""
+    december = (
+        (
+            at("2026-12-01T12:00:00"),
+            LaneRecord(
+                LaneOutcome.LANDED,
+                wall_seconds=100,
+                risk="material",
+                counts=stage_counts((2, 0, 1, 0), (3, 0, 1, 0), (0, 0, 1, 0)),
+            ),
+        ),
+        (
+            at("2026-12-02T12:00:00"),
+            LaneRecord(
+                LaneOutcome.ABANDONED,
+                wall_seconds=50,
+                risk="normal",
+                counts=stage_counts((1, 0, 0, 0), (1, 0, 0, 0), None),
+            ),
+        ),
+        (at("2026-12-03T12:00:00"), LaneRecord(LaneOutcome.LANDED, wall_seconds=70)),
+    )
+    for released_at, lane in december:
+        message = release_message(lane.trailers())
+        push_release_commit(monkeypatch, recorded, bare_remote, message, released_at)
+    return recorded
+
+
+def test_a_group_prints_one_block_per_risk_class_with_totals_per_stage(
+    recorded_with_risks: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-23, STATS-24, STATS-25."""
+    status, stdout, stderr = stats(capsys, "2026-12-01..2026-12-31", UNUSED_TAG)
+
+    blocks = stdout.partition("\nB ")[0].splitlines()
+    assert (status, stderr) == (0, "")
+    assert [line for line in blocks if line.startswith("  risk ")] == [
+        "  risk material: lanes 1 (landed 1, abandoned 0)",
+        "  risk normal: lanes 1 (landed 0, abandoned 1)",
+        "  risk (none): lanes 1 (landed 1, abandoned 0)",
+    ]
+    assert [line for line in blocks if line.startswith("    ") and "_ci:" in line] == [
+        "    fix_rounds_ci: total 1, n 1, unknown 0",
+        "    misses_ci: total 1, n 1, unknown 0",
+        "    fix_rounds_ci: total 0, n 1, unknown 0",
+        "    misses_ci: total unknown, n 0, unknown 1",
+        "    fix_rounds_ci: total unknown, n 0, unknown 1",
+        "    misses_ci: total unknown, n 0, unknown 1",
+    ]
+
+
+def test_json_lists_the_risk_blocks_with_their_stage_totals(
+    recorded_with_risks: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-26."""
+    _status, stdout, _stderr = stats(capsys, "2026-12-01..2026-12-31", UNUSED_TAG, "--json")
+
+    risks = json.loads(stdout)["a"]["risks"]
+    assert [(block["risk"], block["lanes"], block["outcomes"]) for block in risks] == [
+        ("material", 1, {"landed": 1, "abandoned": 0}),
+        ("normal", 1, {"landed": 0, "abandoned": 1}),
+        (None, 1, {"landed": 1, "abandoned": 0}),
+    ]
+    assert list(risks[0]["stages"]) == list(FINDING_STAGES)
+    assert risks[0]["stages"]["ci"] == {
+        "fix_rounds": {"total": 1, "n": 1, "unknown": 0},
+        "misses": {"total": 1, "n": 1, "unknown": 0},
+    }
+    assert risks[1]["stages"]["ci"]["misses"] == {"total": None, "n": 0, "unknown": 1}
+
+
+def test_a_group_no_lane_selects_prints_no_risk_block(
+    recorded: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: STATS-25, STATS-26."""
+    _status, text, _stderr = stats(capsys, "2026-11-04..2026-11-08", UNUSED_TAG)
+    _status, stdout, _stderr = stats(capsys, "2026-11-04..2026-11-08", UNUSED_TAG, "--json")
+
+    payload = json.loads(stdout)
+    assert (payload["a"]["risks"], payload["b"]["risks"]) == ([], [])
+    assert "risk " not in text
 
 
 @pytest.mark.parametrize(

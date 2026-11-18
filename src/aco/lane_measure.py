@@ -13,7 +13,7 @@ from enum import StrEnum
 
 from . import protocol
 from .body import Size
-from .lane_record import LaneOutcome, LaneRecord, RecordedLane
+from .lane_record import FindingStage, LaneOutcome, LaneRecord, RecordedLane, StageCounts
 from .routing_line import EXPERIMENT_TAG, RoutingStage
 
 TAG_PREFIX = "tag:"
@@ -102,12 +102,41 @@ class StageChoices:
 
 
 @dataclass(frozen=True)
+class StageTotal:
+    """The sum of the values of the `n` lanes that state a stage figure; `unknown` lanes do not.
+    No lane stating it has no total, never `0`."""
+
+    total: int | None
+    n: int
+    unknown: int
+
+
+@dataclass(frozen=True)
+class StageFigures:
+    """The fix rounds and misses of one finding stage."""
+
+    fix_rounds: StageTotal
+    misses: StageTotal
+
+
+@dataclass(frozen=True)
+class RiskBlock:
+    """The lanes of one risk class, `None` for the lanes that state no risk."""
+
+    risk: str | None
+    lanes: int
+    outcomes: Mapping[LaneOutcome, int]
+    stages: Mapping[FindingStage, StageFigures]
+
+
+@dataclass(frozen=True)
 class SideStats:
     group: LaneGroup
     lanes: int
     outcomes: Mapping[LaneOutcome, int]
     figures: Mapping[FigureName, Figure]
     stages: Mapping[RoutingStage, StageChoices]
+    risks: tuple[RiskBlock, ...]
 
 
 def _fix_rounds(record: LaneRecord) -> int | None:
@@ -152,13 +181,58 @@ def measure(group: LaneGroup, lanes: Iterable[RecordedLane]) -> SideStats:
         name: _figure([read(record) for record in records]) for name, read in _READ_FIGURE.items()
     }
     figures[FigureName.COST] = _figure([None] * len(records))
-    outcomes = Counter(record.outcome for record in records)
     return SideStats(
         group=group,
         lanes=len(records),
-        outcomes={outcome: outcomes[outcome] for outcome in LaneOutcome},
+        outcomes=_outcomes(records),
         figures=figures,
         stages={stage: _stage_choices(stage, records) for stage in RoutingStage},
+        risks=_risk_blocks(records),
+    )
+
+
+def _outcomes(records: Sequence[LaneRecord]) -> dict[LaneOutcome, int]:
+    outcomes = Counter(record.outcome for record in records)
+    return {outcome: outcomes[outcome] for outcome in LaneOutcome}
+
+
+def _risk_blocks(records: Sequence[LaneRecord]) -> tuple[RiskBlock, ...]:
+    """One block per risk class the lanes state, ordered by name, the lanes without one last."""
+    classes = sorted(
+        {record.risk for record in records}, key=lambda risk: (risk is None, risk or "")
+    )
+    return tuple(
+        _risk_block(risk, [record for record in records if record.risk == risk]) for risk in classes
+    )
+
+
+def _risk_block(risk: str | None, records: Sequence[LaneRecord]) -> RiskBlock:
+    return RiskBlock(
+        risk=risk,
+        lanes=len(records),
+        outcomes=_outcomes(records),
+        stages={
+            stage: StageFigures(
+                fix_rounds=_stage_total(
+                    _stage_values(records, stage, lambda counts: counts.fix_rounds)
+                ),
+                misses=_stage_total(_stage_values(records, stage, lambda counts: counts.misses)),
+            )
+            for stage in FindingStage
+        },
+    )
+
+
+def _stage_values(
+    records: Sequence[LaneRecord], stage: FindingStage, read: Callable[[StageCounts], int | None]
+) -> list[int | None]:
+    return [read(record.counts[stage]) if stage in record.counts else None for record in records]
+
+
+def _stage_total(values: Sequence[int | None]) -> StageTotal:
+    known = [value for value in values if value is not None]
+    return StageTotal(
+        total=sum(known) if known else None, n=len(known), unknown=len(values) - len(known)
     )
 
 

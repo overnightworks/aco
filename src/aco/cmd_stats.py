@@ -2,10 +2,12 @@
 # ruff: noqa: T201 - the stats command writes its result lines to stdout
 
 import argparse
+from collections.abc import Mapping
 from enum import StrEnum
 
 from . import lane_measure, lane_record, protocol, report, store, usage
-from .lane_measure import Figure, SideStats, StageChoices
+from .lane_measure import Figure, RiskBlock, SideStats, StageChoices, StageTotal
+from .lane_record import LaneOutcome
 from .session import RunContext
 
 _DESCRIPTION = (
@@ -16,6 +18,7 @@ _DESCRIPTION = (
 _REPO_MESSAGE = "aco stats reads this checkout's own state ref; --repo does not apply to it"
 _SIDE_NAMES = ("A", "B")
 _UNKNOWN = "unknown"
+_NO_RISK = "(none)"
 
 
 class _StatsReason(StrEnum):
@@ -36,13 +39,37 @@ def _stage_json(choices: StageChoices) -> dict[str, object]:
     return {"choices": dict(choices.counts), "unknown": choices.unknown}
 
 
+def _outcomes_json(outcomes: Mapping[LaneOutcome, int]) -> dict[str, int]:
+    return {outcome.value: count for outcome, count in outcomes.items()}
+
+
+def _total_json(total: StageTotal) -> dict[str, object]:
+    return {"total": total.total, "n": total.n, "unknown": total.unknown}
+
+
+def _risk_json(block: RiskBlock) -> dict[str, object]:
+    return {
+        "risk": block.risk,
+        "lanes": block.lanes,
+        "outcomes": _outcomes_json(block.outcomes),
+        "stages": {
+            stage.value: {
+                "fix_rounds": _total_json(figures.fix_rounds),
+                "misses": _total_json(figures.misses),
+            }
+            for stage, figures in block.stages.items()
+        },
+    }
+
+
 def _side_json(side: SideStats) -> dict[str, object]:
     return {
         "group": str(side.group),
         "lanes": side.lanes,
-        "outcomes": {outcome.value: count for outcome, count in side.outcomes.items()},
+        "outcomes": _outcomes_json(side.outcomes),
         "figures": {name.value: _figure_json(figure) for name, figure in side.figures.items()},
         "stages": {stage.value: _stage_json(choices) for stage, choices in side.stages.items()},
+        "risks": [_risk_json(block) for block in side.risks],
     }
 
 
@@ -57,12 +84,33 @@ def _stage_text(name: str, choices: StageChoices) -> str:
     return f"  {name}: {', '.join([*counted, f'{_UNKNOWN} {choices.unknown}'])}"
 
 
+def _lanes_text(lanes: int, outcomes: Mapping[LaneOutcome, int]) -> str:
+    counted = ", ".join(f"{outcome.value} {count}" for outcome, count in outcomes.items())
+    return f"lanes {lanes} ({counted})"
+
+
+def _total_text(name: str, total: StageTotal) -> str:
+    shown = _UNKNOWN if total.total is None else total.total
+    return f"    {name}: total {shown}, n {total.n}, unknown {total.unknown}"
+
+
+def _risk_text(block: RiskBlock) -> list[str]:
+    lines = [
+        f"  risk {_NO_RISK if block.risk is None else block.risk}: "
+        f"{_lanes_text(block.lanes, block.outcomes)}"
+    ]
+    for stage, figures in block.stages.items():
+        lines.append(_total_text(f"fix_rounds_{stage.value}", figures.fix_rounds))
+        lines.append(_total_text(f"misses_{stage.value}", figures.misses))
+    return lines
+
+
 def _side_text(name: str, side: SideStats) -> list[str]:
-    outcomes = ", ".join(f"{outcome.value} {count}" for outcome, count in side.outcomes.items())
     return [
-        f"{name} {side.group}: lanes {side.lanes} ({outcomes})",
+        f"{name} {side.group}: {_lanes_text(side.lanes, side.outcomes)}",
         *(_figure_text(figure.value, side.figures[figure]) for figure in side.figures),
         *(_stage_text(stage.value, choices) for stage, choices in side.stages.items()),
+        *(line for block in side.risks for line in _risk_text(block)),
     ]
 
 

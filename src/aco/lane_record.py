@@ -56,6 +56,10 @@ class LaneTrailerKey(StrEnum):
     BLOCKING_GATE = "lane_blocking_gate"
     BLOCKING_CI = "lane_blocking_ci"
     BLOCKING_TEST = "lane_blocking_test"
+    MISSES_REVIEW = "lane_misses_review"
+    MISSES_GATE = "lane_misses_gate"
+    MISSES_CI = "lane_misses_ci"
+    MISSES_TEST = "lane_misses_test"
 
 
 class FindingStage(StrEnum):
@@ -97,14 +101,23 @@ _BLOCKING_KEYS = MappingProxyType(
         FindingStage.TEST: LaneTrailerKey.BLOCKING_TEST,
     }
 )
+_MISSES_KEYS = MappingProxyType(
+    {
+        FindingStage.REVIEW: LaneTrailerKey.MISSES_REVIEW,
+        FindingStage.GATE: LaneTrailerKey.MISSES_GATE,
+        FindingStage.CI: LaneTrailerKey.MISSES_CI,
+        FindingStage.TEST: LaneTrailerKey.MISSES_TEST,
+    }
+)
 
 
 @dataclass(frozen=True)
 class StageCounts:
-    """The fix rounds and the blocking findings of one finding stage."""
+    """The fix rounds, blocking findings and misses of one finding stage; `None` is unknown."""
 
-    fix_rounds: int
-    blocking: int
+    fix_rounds: int | None
+    blocking: int | None
+    misses: int | None = None
 
 
 @dataclass(frozen=True)
@@ -116,11 +129,13 @@ class JudgedVerdict:
 
 @dataclass(frozen=True)
 class LaneRecordFile:
-    """What a lane record file states (`specs/lane-record.spec.md`, LANREC-30..LANREC-37),
-    read once: the file is never stored."""
+    """What a lane record file states (`specs/lane-record.spec.md`, LANREC-30..LANREC-37 and
+    LANREC-48, LANREC-49), read once: the file is never stored."""
 
     stages: Mapping[RoutingStage, str]
-    counts: Mapping[FindingStage, StageCounts]
+    fix_rounds: Mapping[FindingStage, int]
+    blocking: Mapping[FindingStage, int]
+    misses: Mapping[FindingStage, int] | None
     verdicts: tuple[JudgedVerdict, ...]
     risk: str | None
     experiment: str | None
@@ -129,10 +144,21 @@ class LaneRecordFile:
         """The routing figures the file states, as a routing line states them."""
         return RoutingLine(
             stages=self.stages,
-            fix_rounds=sum(counts.fix_rounds for counts in self.counts.values()),
-            blocking=sum(counts.blocking for counts in self.counts.values()),
+            fix_rounds=sum(self.fix_rounds.values()),
+            blocking=sum(self.blocking.values()),
             experiment=self.experiment,
         )
+
+    def stage_counts(self) -> Mapping[FindingStage, StageCounts]:
+        """The counts the file states for each finding stage; misses only when it states them."""
+        return {
+            stage: StageCounts(
+                self.fix_rounds[stage],
+                self.blocking[stage],
+                None if self.misses is None else self.misses[stage],
+            )
+            for stage in FindingStage
+        }
 
 
 @dataclass(frozen=True)
@@ -187,6 +213,7 @@ class LaneRecord:
         figures += [
             (_BLOCKING_KEYS[stage], counts.blocking) for stage, counts in self.counts.items()
         ]
+        figures += [(_MISSES_KEYS[stage], counts.misses) for stage, counts in self.counts.items()]
         return tuple(f"{key}: {value}" for key, value in figures if value is not None)
 
 
@@ -269,7 +296,7 @@ def compute_record(
         item_size=measured.item_size,
         routing=stated.routing_line(),
         risk=stated.risk,
-        counts=stated.counts,
+        counts=stated.stage_counts(),
     )
 
 
@@ -454,6 +481,8 @@ def parse_record(message: str) -> LaneRecord | None:
         size=_recorded_size(values),
         item_size=body.Size(item_size) if item_size in body.Size else None,
         routing=_recorded_routing(values),
+        risk=_recorded_risk(values),
+        counts=_recorded_counts(values),
     )
 
 
@@ -502,10 +531,31 @@ def _recorded_routing(values: Mapping[LaneTrailerKey, str]) -> RoutingLine:
     )
 
 
+def _recorded_risk(values: Mapping[LaneTrailerKey, str]) -> str | None:
+    risk = values.get(LaneTrailerKey.RISK, "")
+    return risk if EXPERIMENT_TAG.fullmatch(risk) else None
+
+
+def _stage_count(text: str | None) -> int | None:
+    count = _whole_number(text)
+    return count if count is not None and count <= _MAXIMUM_COUNT else None
+
+
+def _recorded_counts(values: Mapping[LaneTrailerKey, str]) -> dict[FindingStage, StageCounts]:
+    return {
+        stage: StageCounts(
+            _stage_count(values.get(_FIX_ROUNDS_KEYS[stage])),
+            _stage_count(values.get(_BLOCKING_KEYS[stage])),
+            _stage_count(values.get(_MISSES_KEYS[stage])),
+        )
+        for stage in FindingStage
+    }
+
+
 RECORD_FILE_VERSION = 1
 _MAXIMUM_COUNT = 999
 _RECORD_FIELDS = ("version", "stages", "fix_rounds", "blocking", "verdicts")
-_OPTIONAL_RECORD_FIELDS = ("risk", "experiment")
+_OPTIONAL_RECORD_FIELDS = ("risk", "misses", "experiment")
 _VERDICT_FIELDS = ("stage", "verdict", "sha")
 
 
@@ -564,9 +614,12 @@ def _record_file(raw: object) -> LaneRecordFile:
     fields = _members(raw, "the record", _RECORD_FIELDS, _OPTIONAL_RECORD_FIELDS)
     fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
     blocking = _counts_by_stage(fields["blocking"], "blocking")
+    misses = _misses(fields, blocking)
     return LaneRecordFile(
         stages=_stage_choices(fields["stages"]),
-        counts={stage: StageCounts(fix_rounds[stage], blocking[stage]) for stage in FindingStage},
+        fix_rounds=fix_rounds,
+        blocking=blocking,
+        misses=misses,
         verdicts=_verdicts(fields["verdicts"]),
         risk=_optional_tag(fields, "risk"),
         experiment=_optional_tag(fields, "experiment"),
@@ -624,6 +677,18 @@ def _counts_by_stage(value: object, where: str) -> dict[FindingStage, int]:
             )
         counts[stage] = count
     return counts
+
+
+def _misses(
+    fields: Mapping[str, object], blocking: Mapping[FindingStage, int]
+) -> dict[FindingStage, int] | None:
+    if "misses" not in fields:
+        return None
+    misses = _counts_by_stage(fields["misses"], "misses")
+    for stage in FindingStage:
+        if misses[stage] > blocking[stage]:
+            raise RecordFileError(f"misses.{stage} exceeds blocking.{stage}")
+    return misses
 
 
 def _verdicts(value: object) -> tuple[JudgedVerdict, ...]:

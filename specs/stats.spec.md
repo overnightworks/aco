@@ -21,6 +21,7 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 | a stage's choices | STATS-10 | STATS-21 |
 | a group with a control character | STATS-22 | STATS-22 |
 | no state ref, or none with a record | STATS-15 | STATS-15 |
+| a risk class and its stage figures | STATS-23..STATS-25 | STATS-26 |
 
 ## Reading the lanes
 
@@ -37,11 +38,15 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 - [ ] [STATS-07] Each group then prints the lines `  <figure>: median <m>, n <n>, unknown <u>` for `wall_seconds`, `fix_rounds`, `blocking`, `files`, `added`, `deleted` and `cost`, in that order (see E-STATS-01).
 - [ ] [STATS-08] `n` counts the lanes that state the figure, `unknown` those that do not; a missing, repeated or malformed line is unknown (LANREC-04), and `files`, `added`, `deleted` are known only together.
 - [ ] [STATS-09] `<m>` is the median of the known values, the mean of the middle two for an even `n` (so it can end in `.5`), `unknown` with none. `cost` is always `median unknown, n 0` (see E-STATS-01).
-- [ ] [STATS-10] Each group ends with `  <stage>: <choice> <count>, ..., unknown <u>` for `build`, `fix`, `review`, `test`, `gate`, `land`; choices by count descending, ties by name (see E-STATS-01).
+- [ ] [STATS-10] Each group then prints `  <stage>: <choice> <count>, ..., unknown <u>` for `build`, `fix`, `review`, `test`, `gate`, `land`; choices by count descending, ties by name (see E-STATS-01).
+- [ ] [STATS-23] Each group then prints a block per risk class its lanes state, by name, then `(none)` for lanes with no risk; a block starts `  risk <class>: lanes <n> (landed <n>, abandoned <n>)` (see E-STATS-06).
+- [ ] [STATS-24] Each block then has, for `review`, `gate`, `ci`, `test`: `    fix_rounds_<stage>: total <t>, n <n>, unknown <u>`, then `    misses_<stage>: ...`; `<t>` sums the known values, `unknown` if `n` is 0.
+- [ ] [STATS-25] A risk class none of a group's lanes states has no block, so an empty group has none (see E-STATS-02); `(none)` is for a lane with no valid `lane_risk` (LANREC-51), never a tag (LANREC-20).
 
 ## `--json`
 
-- [ ] [STATS-11] Success is `{"ok": true, "reason": "compared", "a": <group>, "b": <group>}`; a group has `group`, `lanes`, `outcomes`, `figures` (`median` `null` if unknown, `n`, `unknown`) and `stages`.
+- [ ] [STATS-11] Success is `{"ok": true, "reason": "compared", "a": <group>, "b": <group>}`; a group has `group`, `lanes`, `outcomes`, `figures` (`median` `null` if unknown, `n`, `unknown`), `stages` and `risks`.
+- [ ] [STATS-26] `risks` lists the blocks as `{risk, lanes, outcomes, stages}`, `risk` `null` for `(none)`; `stages` maps a stage to `fix_rounds` and `misses`, each `{total, n, unknown}`, `total` `null` if unknown.
 
 ## Refusals
 
@@ -67,7 +72,7 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 ## Never
 
 - `aco stats` never writes: no ref, file, claim, comment or trailer, and it asks no forge.
-- It never guesses a figure: a lane that does not state one is counted `unknown`, never `0`, and no figure is read from another source than the lane's own record.
+- It never guesses a figure: a lane that does not state one is counted `unknown`, never `0` (a stage total no lane states is `unknown`), and no figure is read from another source than the lane's own record.
 - It never prints a cost or token figure: the record holds none (`specs/lane-record.spec.md`), so `cost` is unknown for every lane.
 - It reads the `lane_*` lines of the commit messages itself, by key: they are underscore keys, which git's trailer tooling does not read (`specs/ref-store-cas.spec.md`, CAS-06).
 - It never compares repositories: one run reads one checkout's state ref.
@@ -99,6 +104,15 @@ A 2026-11-01..2026-11-07: lanes 2 (landed 2, abandoned 0)
   test: unknown 2
   gate: unknown 2
   land: haiku-5.5/low 1, unknown 1
+  risk (none): lanes 2 (landed 2, abandoned 0)
+    fix_rounds_review: total unknown, n 0, unknown 2
+    misses_review: total unknown, n 0, unknown 2
+    fix_rounds_gate: total unknown, n 0, unknown 2
+    misses_gate: total unknown, n 0, unknown 2
+    fix_rounds_ci: total unknown, n 0, unknown 2
+    misses_ci: total unknown, n 0, unknown 2
+    fix_rounds_test: total unknown, n 0, unknown 2
+    misses_test: total unknown, n 0, unknown 2
 B tag:builder-opus: lanes 1 (landed 1, abandoned 0)
   wall_seconds: median 1200, n 1, unknown 0
   fix_rounds: median 0, n 1, unknown 0
@@ -113,9 +127,18 @@ B tag:builder-opus: lanes 1 (landed 1, abandoned 0)
   test: unknown 1
   gate: unknown 1
   land: unknown 1
+  risk (none): lanes 1 (landed 1, abandoned 0)
+    fix_rounds_review: total unknown, n 0, unknown 1
+    misses_review: total unknown, n 0, unknown 1
+    fix_rounds_gate: total unknown, n 0, unknown 1
+    misses_gate: total unknown, n 0, unknown 1
+    fix_rounds_ci: total unknown, n 0, unknown 1
+    misses_ci: total unknown, n 0, unknown 1
+    fix_rounds_test: total unknown, n 0, unknown 1
+    misses_test: total unknown, n 0, unknown 1
 exit 0
 $ aco stats 2026-11-01..2026-11-07 tag:builder-opus --json
-{"ok": true, "reason": "compared", "a": {"group": "2026-11-01..2026-11-07", "lanes": 2, "outcomes": {"landed": 2, "abandoned": 0}, "figures": {"wall_seconds": {"median": 2400, "n": 2, "unknown": 0}, "fix_rounds": {"median": 1.5, "n": 2, "unknown": 0}, "blocking": {"median": 2, "n": 1, "unknown": 1}, "files": {"median": 3, "n": 2, "unknown": 0}, "added": {"median": 70, "n": 2, "unknown": 0}, "deleted": {"median": 12.5, "n": 2, "unknown": 0}, "cost": {"median": null, "n": 0, "unknown": 2}}, "stages": {"build": {"choices": {"sonnet-5.5/high": 2}, "unknown": 0}, "fix": {"choices": {"none": 1}, "unknown": 1}, "review": {"choices": {"opus-5.5/medium": 2}, "unknown": 0}, "test": {"choices": {}, "unknown": 2}, "gate": {"choices": {}, "unknown": 2}, "land": {"choices": {"haiku-5.5/low": 1}, "unknown": 1}}}, "b": {"group": "tag:builder-opus", "lanes": 1, "outcomes": {"landed": 1, "abandoned": 0}, "figures": {"wall_seconds": {"median": 1200, "n": 1, "unknown": 0}, "fix_rounds": {"median": 0, "n": 1, "unknown": 0}, "blocking": {"median": 0, "n": 1, "unknown": 0}, "files": {"median": null, "n": 0, "unknown": 1}, "added": {"median": null, "n": 0, "unknown": 1}, "deleted": {"median": null, "n": 0, "unknown": 1}, "cost": {"median": null, "n": 0, "unknown": 1}}, "stages": {"build": {"choices": {"opus-5.5/high": 1}, "unknown": 0}, "fix": {"choices": {}, "unknown": 1}, "review": {"choices": {}, "unknown": 1}, "test": {"choices": {}, "unknown": 1}, "gate": {"choices": {}, "unknown": 1}, "land": {"choices": {}, "unknown": 1}}}}
+{"ok": true, "reason": "compared", "a": {"group": "2026-11-01..2026-11-07", "lanes": 2, "outcomes": {"landed": 2, "abandoned": 0}, "figures": {"wall_seconds": {"median": 2400, "n": 2, "unknown": 0}, "fix_rounds": {"median": 1.5, "n": 2, "unknown": 0}, "blocking": {"median": 2, "n": 1, "unknown": 1}, "files": {"median": 3, "n": 2, "unknown": 0}, "added": {"median": 70, "n": 2, "unknown": 0}, "deleted": {"median": 12.5, "n": 2, "unknown": 0}, "cost": {"median": null, "n": 0, "unknown": 2}}, "stages": {"build": {"choices": {"sonnet-5.5/high": 2}, "unknown": 0}, "fix": {"choices": {"none": 1}, "unknown": 1}, "review": {"choices": {"opus-5.5/medium": 2}, "unknown": 0}, "test": {"choices": {}, "unknown": 2}, "gate": {"choices": {}, "unknown": 2}, "land": {"choices": {"haiku-5.5/low": 1}, "unknown": 1}}, "risks": [{"risk": null, "lanes": 2, "outcomes": {"landed": 2, "abandoned": 0}, "stages": {"review": {"fix_rounds": {"total": null, "n": 0, "unknown": 2}, "misses": {"total": null, "n": 0, "unknown": 2}}, "gate": {"fix_rounds": {"total": null, "n": 0, "unknown": 2}, "misses": {"total": null, "n": 0, "unknown": 2}}, "ci": {"fix_rounds": {"total": null, "n": 0, "unknown": 2}, "misses": {"total": null, "n": 0, "unknown": 2}}, "test": {"fix_rounds": {"total": null, "n": 0, "unknown": 2}, "misses": {"total": null, "n": 0, "unknown": 2}}}}]}, "b": {"group": "tag:builder-opus", "lanes": 1, "outcomes": {"landed": 1, "abandoned": 0}, "figures": {"wall_seconds": {"median": 1200, "n": 1, "unknown": 0}, "fix_rounds": {"median": 0, "n": 1, "unknown": 0}, "blocking": {"median": 0, "n": 1, "unknown": 0}, "files": {"median": null, "n": 0, "unknown": 1}, "added": {"median": null, "n": 0, "unknown": 1}, "deleted": {"median": null, "n": 0, "unknown": 1}, "cost": {"median": null, "n": 0, "unknown": 1}}, "stages": {"build": {"choices": {"opus-5.5/high": 1}, "unknown": 0}, "fix": {"choices": {}, "unknown": 1}, "review": {"choices": {}, "unknown": 1}, "test": {"choices": {}, "unknown": 1}, "gate": {"choices": {}, "unknown": 1}, "land": {"choices": {}, "unknown": 1}}, "risks": [{"risk": null, "lanes": 1, "outcomes": {"landed": 1, "abandoned": 0}, "stages": {"review": {"fix_rounds": {"total": null, "n": 0, "unknown": 1}, "misses": {"total": null, "n": 0, "unknown": 1}}, "gate": {"fix_rounds": {"total": null, "n": 0, "unknown": 1}, "misses": {"total": null, "n": 0, "unknown": 1}}, "ci": {"fix_rounds": {"total": null, "n": 0, "unknown": 1}, "misses": {"total": null, "n": 0, "unknown": 1}}, "test": {"fix_rounds": {"total": null, "n": 0, "unknown": 1}, "misses": {"total": null, "n": 0, "unknown": 1}}}}]}}
 exit 0
 ```
 
@@ -186,4 +209,68 @@ Setup: recorded, `git remote remove origin`
 $ aco stats 2026-11-01..2026-11-07 tag:builder-opus
 2> ERROR: cannot determine the trunk: canonical remote 'origin' is not configured
 exit 2
+```
+
+### E-STATS-06 — risk blocks
+
+Setup: recorded, three more release commits. Lane 5, dated 2026-12-01, landed, 100 s, risk `material`, fix rounds `2`, `0`, `1`, `0` and misses `0`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`. Lane 6, dated 2026-12-02, abandoned, 50 s, risk `normal`, fix rounds `1`, `0`, `0`, `0`, no misses lines. Lane 7, dated 2026-12-03, landed, 70 s, no risk line
+
+```console
+$ aco stats 2026-12-01..2026-12-31 tag:unused
+A 2026-12-01..2026-12-31: lanes 3 (landed 2, abandoned 1)
+  wall_seconds: median 70, n 3, unknown 0
+  fix_rounds: median unknown, n 0, unknown 3
+  blocking: median unknown, n 0, unknown 3
+  files: median unknown, n 0, unknown 3
+  added: median unknown, n 0, unknown 3
+  deleted: median unknown, n 0, unknown 3
+  cost: median unknown, n 0, unknown 3
+  build: unknown 3
+  fix: unknown 3
+  review: unknown 3
+  test: unknown 3
+  gate: unknown 3
+  land: unknown 3
+  risk material: lanes 1 (landed 1, abandoned 0)
+    fix_rounds_review: total 2, n 1, unknown 0
+    misses_review: total 0, n 1, unknown 0
+    fix_rounds_gate: total 0, n 1, unknown 0
+    misses_gate: total 0, n 1, unknown 0
+    fix_rounds_ci: total 1, n 1, unknown 0
+    misses_ci: total 1, n 1, unknown 0
+    fix_rounds_test: total 0, n 1, unknown 0
+    misses_test: total 0, n 1, unknown 0
+  risk normal: lanes 1 (landed 0, abandoned 1)
+    fix_rounds_review: total 1, n 1, unknown 0
+    misses_review: total unknown, n 0, unknown 1
+    fix_rounds_gate: total 0, n 1, unknown 0
+    misses_gate: total unknown, n 0, unknown 1
+    fix_rounds_ci: total 0, n 1, unknown 0
+    misses_ci: total unknown, n 0, unknown 1
+    fix_rounds_test: total 0, n 1, unknown 0
+    misses_test: total unknown, n 0, unknown 1
+  risk (none): lanes 1 (landed 1, abandoned 0)
+    fix_rounds_review: total unknown, n 0, unknown 1
+    misses_review: total unknown, n 0, unknown 1
+    fix_rounds_gate: total unknown, n 0, unknown 1
+    misses_gate: total unknown, n 0, unknown 1
+    fix_rounds_ci: total unknown, n 0, unknown 1
+    misses_ci: total unknown, n 0, unknown 1
+    fix_rounds_test: total unknown, n 0, unknown 1
+    misses_test: total unknown, n 0, unknown 1
+B tag:unused: lanes 0 (landed 0, abandoned 0)
+  wall_seconds: median unknown, n 0, unknown 0
+  fix_rounds: median unknown, n 0, unknown 0
+  blocking: median unknown, n 0, unknown 0
+  files: median unknown, n 0, unknown 0
+  added: median unknown, n 0, unknown 0
+  deleted: median unknown, n 0, unknown 0
+  cost: median unknown, n 0, unknown 0
+  build: unknown 0
+  fix: unknown 0
+  review: unknown 0
+  test: unknown 0
+  gate: unknown 0
+  land: unknown 0
+exit 0
 ```

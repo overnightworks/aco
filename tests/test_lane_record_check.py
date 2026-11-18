@@ -34,6 +34,16 @@ VALID_RECORDS = [
     pytest.param(json.dumps(lane_record_object()), id="every-field"),
     pytest.param(record_text_without("risk"), id="no-risk"),
     pytest.param(record_text_without("experiment"), id="no-experiment"),
+    pytest.param(record_text_without("misses"), id="no-misses"),
+    pytest.param(
+        json.dumps(
+            lane_record_object(
+                blocking={"review": 3, "gate": 0, "ci": 3, "test": 0},
+                misses={"review": 0, "gate": 0, "ci": 3, "test": 0},
+            )
+        ),
+        id="misses-equal-to-blocking",
+    ),
     pytest.param(json.dumps(lane_record_object(verdicts=[])), id="no-verdict"),
     pytest.param(record_text_with("stages", "fix", "grok-4.6/high"), id="a-fix-stage-that-ran"),
     pytest.param(record_text_with("blocking", "ci", 999), id="the-largest-count"),
@@ -152,6 +162,36 @@ MALFORMED_RECORDS = [
         id="a-finding-stage-not-counted",
     ),
     pytest.param(
+        record_text_with("misses", "ci", 2),
+        "misses.ci exceeds blocking.ci",
+        id="misses-above-blocking",
+    ),
+    pytest.param(
+        record_text_with("misses", "test", 1),
+        "misses.test exceeds blocking.test",
+        id="a-miss-where-no-finding-blocked",
+    ),
+    pytest.param(
+        record_text_with("misses", "gate", -1),
+        "misses.gate must be a whole number from 0 to 999",
+        id="a-negative-miss-count",
+    ),
+    pytest.param(
+        record_text_with("misses", "review", MISSING),
+        "misses lacks 'review'",
+        id="a-finding-stage-without-misses",
+    ),
+    pytest.param(
+        record_text_with("misses", "deploy", 0),
+        "misses has an unknown key 'deploy'",
+        id="an-unknown-stage-of-misses",
+    ),
+    pytest.param(
+        json.dumps(lane_record_object(misses=[])),
+        "misses must be an object",
+        id="misses-not-an-object",
+    ),
+    pytest.param(
         json.dumps(lane_record_object(verdicts={})),
         "verdicts must be a list",
         id="verdicts-not-a-list",
@@ -194,7 +234,7 @@ MALFORMED_RECORDS = [
 def test_a_valid_record_file_is_accepted_and_left_as_it_is(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str
 ) -> None:
-    """Spec: LANREC-30, LANREC-32..LANREC-37."""
+    """Spec: LANREC-30, LANREC-32..LANREC-37, LANREC-48."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
@@ -212,7 +252,7 @@ def test_a_valid_record_file_is_accepted_and_left_as_it_is(
 def test_a_malformed_record_file_is_refused_with_its_defect(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str, defect: str
 ) -> None:
-    """Spec: LANREC-31..LANREC-37."""
+    """Spec: LANREC-31..LANREC-37, LANREC-48, LANREC-49."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
