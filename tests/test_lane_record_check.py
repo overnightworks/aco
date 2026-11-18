@@ -229,5 +229,19 @@ def test_a_refusal_cuts_a_long_unknown_key_and_stays_one_bounded_line(
 
     assert result.status == 2
     assert "is invalid: the record has an unknown key 'kkk" in result.stderr
-    assert result.stderr.endswith("…\n")
+    assert result.stderr.endswith("…'\n")
+    assert len(result.stderr.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
+
+
+def test_a_refusal_cuts_a_long_version_and_keeps_its_wording(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-31, LANREC-33."""
+    path = tmp_path / "lane-record.json"
+    path.write_text(json.dumps(lane_record_object(version="v" * 70)), encoding="utf-8")
+
+    result = run_cli(["lane-record", "check", str(path)], capsys)
+
+    assert result.status == 2
+    assert result.stderr.endswith("… is unknown; this aco reads version 1\n")
     assert len(result.stderr.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT

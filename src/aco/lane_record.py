@@ -13,7 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from . import body, checkout, forge, protocol, store, workboard
+from . import body, checkout, forge, protocol, report, store, workboard
 from .routing_line import (
     EXPERIMENT_TAG,
     RoutingLine,
@@ -505,6 +505,15 @@ class RecordFileError(Exception):
     """The first thing wrong with a lane record file, as a phrase that follows its name."""
 
 
+# A value the file states (a key, the version) is cut to this, so the refusal keeps its own words
+# and the file's path keeps room on one bounded line.
+_STATED_VALUE_LENGTH_LIMIT = 40
+
+
+def _stated(text: str) -> str:
+    return report.cut_foreign_text(text, _STATED_VALUE_LENGTH_LIMIT)
+
+
 def parse_record_file(content: bytes) -> LaneRecordFile:
     """The lane record file whose bytes are `content`, validated whole: one that is not exactly
     what the spec states raises `RecordFileError`."""
@@ -527,7 +536,7 @@ def _record_file(raw: object) -> LaneRecordFile:
     version = fields["version"]
     if type(version) is not int or version != RECORD_FILE_VERSION:
         raise RecordFileError(
-            f"version {json.dumps(version)} is unknown; "
+            f"version {_stated(json.dumps(version))} is unknown; "
             f"this aco reads version {RECORD_FILE_VERSION}"
         )
     fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
@@ -549,7 +558,7 @@ def _members(
     members = cast(dict[str, object], value)
     for name in members:
         if name not in required and name not in optional:
-            raise RecordFileError(f"{where} has an unknown key {name!r}")
+            raise RecordFileError(f"{where} has an unknown key {_stated(name)!r}")
     for name in map(str, required):
         if name not in members:
             raise RecordFileError(f"{where} lacks {name!r}")
