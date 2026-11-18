@@ -14,8 +14,9 @@ NUMBER = 301
 STEP = "Rotate the deploy key."
 
 
-def _item(wait: Mapping[str, object], today: date, labels: tuple[str, ...] = ()):
-    contract = complete_contract("Claim it.", scope=["src/widget.py"], wait=wait)
+def _item(wait: Mapping[str, object] | None, today: date, labels: tuple[str, ...] = ()):
+    entries = {} if wait is None else {"wait": wait}
+    contract = complete_contract("Claim it.", scope=["src/widget.py"], **entries)
     issue = board_issue(NUMBER, "Held", contract, labels=labels)
     board = projected_board((issue,), (), (), (), BoardConfig(), today=today)
     return board, board.items[0]
@@ -24,12 +25,6 @@ def _item(wait: Mapping[str, object], today: date, labels: tuple[str, ...] = ())
 @pytest.mark.parametrize(
     ("wait", "labels", "reason"),
     [
-        pytest.param(
-            {"operator": STEP, "since": date(2026, 11, 1)},
-            (),
-            f"waiting: {STEP}",
-            id="operator-wait-without-the-label",
-        ),
         pytest.param(
             {"trigger": "A second machine exists.", "since": date(2026, 11, 1)},
             (),
@@ -55,16 +50,20 @@ def test_a_waiting_item_is_never_ready_and_never_named_first(
     assert workboard.highest_scored_actionable(board) is None
 
 
-def test_the_label_alone_decides_that_a_wait_beside_it_still_waits_on_the_operator() -> None:
-    board, item = _item(
-        {"operator": STEP, "since": date(2026, 11, 1)},
-        date(2026, 11, 15),
-        (workboard.NEEDS_OPERATOR_LABEL,),
-    )
+def test_an_operator_wait_without_the_label_waits_on_the_operator() -> None:
+    board, item = _item({"operator": STEP, "since": date(2026, 11, 1)}, date(2026, 11, 15))
 
     assert item.waits_on_operator
     assert item.actionable_reason == workboard.WAITING_ON_OPERATOR
     assert item not in board.ready_now
+
+
+def test_the_label_without_an_operator_wait_holds_nothing() -> None:
+    board, item = _item(None, date(2026, 11, 15), (workboard.NEEDS_OPERATOR_LABEL,))
+
+    assert not item.waits_on_operator
+    assert item.actionable_reason is None
+    assert item in board.ready_now
 
 
 @pytest.mark.parametrize(

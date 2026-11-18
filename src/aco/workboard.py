@@ -39,7 +39,7 @@ from .body import (
     unprintable_slice_line_key,
 )
 from .body_fence import walk_fences
-from .item_wait import active_wait_text
+from .item_wait import active_wait_text, waits_on_operator
 
 DEFAULT_PRIORITY_LABELS = ("security", "data", "ci", "product", "ux", "cleanup")
 DEFAULT_CANONICAL_REMOTE = "origin"
@@ -1632,7 +1632,7 @@ def _board_item(
         contract=contract,
         contract_complete=parsed.contract_complete,
         idea=idea,
-        labelled_needs_operator=has_label(issue.labels, NEEDS_OPERATOR_LABEL),
+        operator_wait=waits_on_operator(parsed.wait),
         read_state=parsed.read_state,
         malformed_defect=(
             contract.defects[0] if parsed.read_state is BodyReadState.MALFORMED else None
@@ -2388,7 +2388,7 @@ class _ActionabilityFacts:
     contract: Contract
     contract_complete: bool
     idea: bool
-    labelled_needs_operator: bool
+    operator_wait: bool
     read_state: BodyReadState = BodyReadState.VALID
     malformed_defect: ContractDefect | None = None
     childless_container_reason: str | None = None
@@ -2609,17 +2609,16 @@ def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
 
 
 def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
-    """Whether only the operator's ruling frees this item: the label
-    `NEEDS_OPERATOR_LABEL` alone decides, on a readable container, which `next`
-    then never cuts or checks, or on any other readable item while unclaimed --
-    a claimed one names that reason instead. A `wait` beside the label changes
-    nothing; without the label it only keeps the item out of ready. An idea
-    waits on no ruling: `next` lists it apart."""
+    """Whether only the operator's ruling frees this item: its `wait` names the
+    operator, on a readable container, which `next` then never cuts or checks, or
+    on any other readable item while unclaimed -- a claimed one names the step as
+    its `waiting:` reason instead. The label `NEEDS_OPERATOR_LABEL` is a view of
+    that wait and decides nothing. An idea waits on no ruling: `next` lists it apart."""
     if facts.idea or facts.read_state is BodyReadState.MALFORMED:
         return False
     if facts.kind is ItemKind.CONTAINER:
-        return facts.labelled_needs_operator
-    return facts.labelled_needs_operator and facts.active_claim is None
+        return facts.operator_wait
+    return facts.operator_wait and facts.active_claim is None
 
 
 def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
