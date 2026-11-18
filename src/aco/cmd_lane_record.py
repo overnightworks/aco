@@ -2,9 +2,25 @@
 # ruff: noqa: T201 - the lane-record command writes its result line to stdout
 
 import argparse
+from pathlib import Path
 
-from . import lane_record, protocol, usage
+from . import lane_record, protocol, report, usage
 from .session import RunContext
+
+
+def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
+    """The lane record file at `path_text`, read once and validated whole; one that is not
+    exactly what the spec states refuses, naming the first thing wrong with it."""
+    shown = protocol.terminal_text(path_text)
+    try:
+        return lane_record.parse_record_file(Path(path_text).read_bytes())
+    except OSError as error:
+        defect = f"cannot be read ({error.strerror})"
+    except lane_record.RecordFileError as error:
+        defect = str(error)
+    raise protocol.ClaimUnavailableError(
+        report.bounded_refusal(f"lane record {shown} is invalid: {defect}")
+    )
 
 
 def add_record_argument(command: argparse.ArgumentParser, *, writes: str) -> None:
@@ -13,7 +29,7 @@ def add_record_argument(command: argparse.ArgumentParser, *, writes: str) -> Non
     command.add_argument(
         "--record",
         metavar="FILE",
-        type=lane_record.read_record_file,
+        type=read_record_file,
         help=f"the lane record file whose figures {writes}; a malformed file refuses",
     )
 
@@ -28,6 +44,6 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def run(parsed: argparse.Namespace, _context: RunContext) -> int:
-    lane_record.read_record_file(parsed.file)
+    read_record_file(parsed.file)
     print(f"lane record {protocol.terminal_text(parsed.file)} is valid")
     return 0

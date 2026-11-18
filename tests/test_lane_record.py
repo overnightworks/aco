@@ -661,7 +661,7 @@ def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_th
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: LANREC-38, LANREC-41 -- the reason's routing line is not read."""
+    """Spec: LANREC-41, LANREC-42, LANREC-43 -- the reason's routing line is not read."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
     record = write_lane_record_file(tmp_path, lane_record_object())
@@ -688,7 +688,7 @@ def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_th
         pytest.param(
             json.dumps(lane_record_object()),
             ("--merged", "12"),
-            "--record applies to --abandoned; aco land takes the record of a landing",
+            "--record applies to --abandoned only",
             id="a-record-for-a-landing",
         ),
     ],
@@ -703,7 +703,7 @@ def test_a_release_refuses_a_record_it_cannot_use_before_any_write(
     extra: tuple[str, ...],
     sentence: str,
 ) -> None:
-    """Spec: LANREC-30, LANREC-40."""
+    """Spec: LANREC-31, LANREC-41."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
     record = tmp_path / "record.json"

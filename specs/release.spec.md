@@ -59,6 +59,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 | no landing to report | — | — | REL-21 |
 | any refusal past the parser, with `--json` | REL-24 | REL-24 | REL-24 |
 | the lane record on the release commit | REL-64 | REL-64 | REL-64 |
+| `--record <file>` | REL-67 | REL-67 | REL-67 |
 | a successful outcome's own worktree/branch cleanup | — | REL-25..REL-32, REL-34, REL-42..REL-46, REL-52, REL-55, REL-59, REL-61..REL-63 | REL-33 |
 
 ## Flags and outcome
@@ -150,6 +151,7 @@ instead.
 - [ ] [REL-22] A `--merged` release whose post-commit board read fails prints LAND-38's `hint:` line, on stdout in text or stderr with `--json`; `freed`/`next` omitted (LAND-50) (see E-REL-06).
 - [ ] [REL-24] A release refusal past the parser (every ID but REL-01) prints `specs/output.spec.md`'s envelope, `reason` `precondition_failed`, exit `2`; REL-06..08 through OUT-05 (see E-REL-07).
 - [ ] [REL-64] A release that releases a claim writes `specs/lane-record.spec.md`'s record on its own release commit; a figure it cannot compute is left out and changes neither output nor exit status (LANREC-21).
+- [ ] [REL-67] `--abandoned REASON --record <file>` writes the file's record, not REASON's routing figures; `--record` with `--merged` refuses before any write (LANREC-41).
 
 ## `--merged`'s own worktree/branch cleanup
 

@@ -111,7 +111,7 @@ MALFORMED_RECORDS = [
     ),
     pytest.param(
         json.dumps(
-            lane_record_object(verdicts=[{"stage": "ci", "verdict": "pass", "sha": "a" * 40}])
+            lane_record_object(verdicts=[{"stage": "ci", "verdict": "approve", "sha": "a" * 40}])
         ),
         "verdicts[0].stage must be one of review, gate",
         id="a-verdict-of-another-stage",
@@ -120,12 +120,12 @@ MALFORMED_RECORDS = [
         json.dumps(
             lane_record_object(verdicts=[{"stage": "gate", "verdict": "ok", "sha": "a" * 40}])
         ),
-        "verdicts[0].verdict must be one of pass, revise",
+        "verdicts[0].verdict must be one of approve, revise",
         id="an-unknown-verdict",
     ),
     pytest.param(
         json.dumps(
-            lane_record_object(verdicts=[{"stage": "gate", "verdict": "pass", "sha": "abc1234"}])
+            lane_record_object(verdicts=[{"stage": "gate", "verdict": "approve", "sha": "abc1234"}])
         ),
         "verdicts[0].sha must be a full 40-digit commit sha",
         id="a-short-sha",
@@ -147,7 +147,7 @@ MALFORMED_RECORDS = [
 def test_a_valid_record_file_is_accepted_and_left_as_it_is(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str
 ) -> None:
-    """Spec: LANREC-30, LANREC-33, LANREC-34, LANREC-35, LANREC-36."""
+    """Spec: LANREC-30, LANREC-32..LANREC-37."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
@@ -165,8 +165,7 @@ def test_a_valid_record_file_is_accepted_and_left_as_it_is(
 def test_a_malformed_record_file_is_refused_with_its_defect(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str, defect: str
 ) -> None:
-    """Spec: LANREC-30, LANREC-31, LANREC-32, LANREC-33, LANREC-34, LANREC-35, LANREC-36,
-    LANREC-37."""
+    """Spec: LANREC-31..LANREC-37."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
@@ -182,7 +181,7 @@ def test_a_malformed_record_file_is_refused_with_its_defect(
 def test_a_record_file_that_does_not_exist_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-30."""
+    """Spec: LANREC-31."""
     path = tmp_path / "missing.json"
 
     result = run_cli(["lane-record", "check", str(path)], capsys)

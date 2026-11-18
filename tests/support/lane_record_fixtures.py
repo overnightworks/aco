@@ -67,7 +67,7 @@ def lane_record_object(**changes: object) -> dict[str, object]:
         "blocking": {"review": 3, "gate": 0, "ci": 1, "test": 0},
         "verdicts": [
             {"stage": "review", "verdict": "revise", "sha": "b" * 40},
-            {"stage": "review", "verdict": "pass", "sha": JUDGED_SHA},
+            {"stage": "review", "verdict": "approve", "sha": JUDGED_SHA},
         ],
         "risk": "routine",
         "experiment": "builder-sonnet",

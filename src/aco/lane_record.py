@@ -13,7 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from . import body, checkout, forge, protocol, report, store, workboard
+from . import body, checkout, forge, protocol, store, workboard
 from .routing_line import (
     EXPERIMENT_TAG,
     RoutingLine,
@@ -72,7 +72,7 @@ class VerdictStage(StrEnum):
 
 
 class Verdict(StrEnum):
-    PASS = "pass"
+    APPROVE = "approve"
     REVISE = "revise"
 
 
@@ -80,8 +80,22 @@ def _stage_key(stage: RoutingStage) -> LaneTrailerKey:
     return LaneTrailerKey(f"lane_{stage}")
 
 
-def _count_key(name: str, stage: FindingStage) -> LaneTrailerKey:
-    return LaneTrailerKey(f"lane_{name}_{stage}")
+_FIX_ROUNDS_KEYS = MappingProxyType(
+    {
+        FindingStage.REVIEW: LaneTrailerKey.FIX_ROUNDS_REVIEW,
+        FindingStage.GATE: LaneTrailerKey.FIX_ROUNDS_GATE,
+        FindingStage.CI: LaneTrailerKey.FIX_ROUNDS_CI,
+        FindingStage.TEST: LaneTrailerKey.FIX_ROUNDS_TEST,
+    }
+)
+_BLOCKING_KEYS = MappingProxyType(
+    {
+        FindingStage.REVIEW: LaneTrailerKey.BLOCKING_REVIEW,
+        FindingStage.GATE: LaneTrailerKey.BLOCKING_GATE,
+        FindingStage.CI: LaneTrailerKey.BLOCKING_CI,
+        FindingStage.TEST: LaneTrailerKey.BLOCKING_TEST,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -167,12 +181,10 @@ class LaneRecord:
             ]
         figures.append((LaneTrailerKey.RISK, self.risk))
         figures += [
-            (_count_key("fix_rounds", stage), counts.fix_rounds)
-            for stage, counts in self.counts.items()
+            (_FIX_ROUNDS_KEYS[stage], counts.fix_rounds) for stage, counts in self.counts.items()
         ]
         figures += [
-            (_count_key("blocking", stage), counts.blocking)
-            for stage, counts in self.counts.items()
+            (_BLOCKING_KEYS[stage], counts.blocking) for stage, counts in self.counts.items()
         ]
         return tuple(f"{key}: {value}" for key, value in figures if value is not None)
 
@@ -485,30 +497,18 @@ _OPTIONAL_RECORD_FIELDS = ("risk", "experiment")
 _VERDICT_FIELDS = ("stage", "verdict", "sha")
 
 
-class _RecordFileError(Exception):
-    """One thing wrong with a lane record file, worded for the refusal that names the file."""
+class RecordFileError(Exception):
+    """The first thing wrong with a lane record file, as a phrase that follows its name."""
 
 
-def read_record_file(path_text: str) -> LaneRecordFile:
-    """The lane record file at `path_text`, read once and validated whole; a file that is not
-    exactly what the spec states refuses before any command acts on it."""
-    shown = protocol.terminal_text(path_text)
+def parse_record_file(content: bytes) -> LaneRecordFile:
+    """The lane record file whose bytes are `content`, validated whole: one that is not exactly
+    what the spec states raises `RecordFileError`."""
     try:
-        raw = json.loads(Path(path_text).read_bytes(), object_pairs_hook=_keys_once)
-    except OSError as error:
-        raise _record_file_refusal(shown, f"cannot be read ({error.strerror})") from error
+        raw = json.loads(content, object_pairs_hook=_keys_once)
     except ValueError as error:
-        raise _record_file_refusal(shown, "not valid JSON") from error
-    try:
-        return _record_file(raw)
-    except _RecordFileError as defect:
-        raise _record_file_refusal(shown, str(defect)) from defect
-
-
-def _record_file_refusal(shown: str, defect: str) -> protocol.ClaimUnavailableError:
-    return protocol.ClaimUnavailableError(
-        report.bounded_refusal(f"lane record {shown} is invalid: {defect}")
-    )
+        raise RecordFileError("not valid JSON") from error
+    return _record_file(raw)
 
 
 def _keys_once(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -522,7 +522,7 @@ def _record_file(raw: object) -> LaneRecordFile:
     fields = _members(raw, "the record", _RECORD_FIELDS, _OPTIONAL_RECORD_FIELDS)
     version = fields["version"]
     if type(version) is not int or version != RECORD_FILE_VERSION:
-        raise _RecordFileError(
+        raise RecordFileError(
             f"version {version!r} is unknown; this aco reads version {RECORD_FILE_VERSION}"
         )
     fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
@@ -540,14 +540,14 @@ def _members(
     value: object, where: str, required: Collection[str], optional: Collection[str] = ()
 ) -> dict[str, object]:
     if not isinstance(value, dict):
-        raise _RecordFileError(f"{where} must be an object")
+        raise RecordFileError(f"{where} must be an object")
     members = cast(dict[str, object], value)
     for name in members:
         if name not in required and name not in optional:
-            raise _RecordFileError(f"{where} has an unknown key {name!r}")
+            raise RecordFileError(f"{where} has an unknown key {name!r}")
     for name in map(str, required):
         if name not in members:
-            raise _RecordFileError(f"{where} lacks {name!r}")
+            raise RecordFileError(f"{where} lacks {name!r}")
     return members
 
 
@@ -557,7 +557,7 @@ def _stage_choices(value: object) -> dict[RoutingStage, str]:
     for stage in RoutingStage:
         choice = members[stage]
         if not isinstance(choice, str) or not stage_choice_fits(stage, choice):
-            raise _RecordFileError(f"stage {stage} must be <model>/<effort> or none")
+            raise RecordFileError(f"stage {stage} must be <model>/<effort> or none")
         choices[stage] = choice
     return choices
 
@@ -568,7 +568,7 @@ def _counts_by_stage(value: object, where: str) -> dict[FindingStage, int]:
     for stage in FindingStage:
         count = members[stage]
         if type(count) is not int or not 0 <= count <= _MAXIMUM_COUNT:
-            raise _RecordFileError(
+            raise RecordFileError(
                 f"{where}.{stage} must be a whole number from 0 to {_MAXIMUM_COUNT}"
             )
         counts[stage] = count
@@ -577,7 +577,7 @@ def _counts_by_stage(value: object, where: str) -> dict[FindingStage, int]:
 
 def _verdicts(value: object) -> tuple[JudgedVerdict, ...]:
     if not isinstance(value, list):
-        raise _RecordFileError("verdicts must be a list")
+        raise RecordFileError("verdicts must be a list")
     return tuple(
         _verdict(item, f"verdicts[{position}]")
         for position, item in enumerate(cast(list[object], value))
@@ -588,11 +588,11 @@ def _verdict(value: object, where: str) -> JudgedVerdict:
     members = _members(value, where, _VERDICT_FIELDS)
     stage, verdict, sha = (members[name] for name in _VERDICT_FIELDS)
     if not isinstance(stage, str) or stage not in VerdictStage:
-        raise _RecordFileError(f"{where}.stage must be one of {', '.join(VerdictStage)}")
+        raise RecordFileError(f"{where}.stage must be one of {', '.join(VerdictStage)}")
     if not isinstance(verdict, str) or verdict not in Verdict:
-        raise _RecordFileError(f"{where}.verdict must be one of {', '.join(Verdict)}")
+        raise RecordFileError(f"{where}.verdict must be one of {', '.join(Verdict)}")
     if not isinstance(sha, str) or protocol.COMMIT_PATTERN.fullmatch(sha) is None:
-        raise _RecordFileError(f"{where}.sha must be a full 40-digit commit sha")
+        raise RecordFileError(f"{where}.sha must be a full 40-digit commit sha")
     return JudgedVerdict(VerdictStage(stage), Verdict(verdict), sha)
 
 
@@ -601,16 +601,14 @@ def _optional_tag(fields: Mapping[str, object], name: str) -> str | None:
         return None
     tag = fields[name]
     if not isinstance(tag, str) or EXPERIMENT_TAG.fullmatch(tag) is None:
-        raise _RecordFileError(f"{name} must be 1 to 40 lowercase letters, digits and `-`")
+        raise RecordFileError(f"{name} must be 1 to 40 lowercase letters, digits and `-`")
     return tag
 
 
 def require_abandoned_release(record: LaneRecordFile | None, abandoned: str | None) -> None:
     """Refuse a `release` given a lane record file for a landing: `aco land` takes it there."""
     if record is not None and abandoned is None:
-        raise protocol.ClaimUnavailableError(
-            "--record applies to --abandoned; aco land takes the record of a landing"
-        )
+        raise protocol.ClaimUnavailableError("--record applies to --abandoned only")
 
 
 def require_landing_head(record: LaneRecordFile | None, reviewed: str) -> None:
@@ -626,6 +624,5 @@ def require_landing_head(record: LaneRecordFile | None, reviewed: str) -> None:
     judged = record.verdicts[-1].sha
     if not judged.startswith(reviewed):
         raise protocol.ClaimUnavailableError(
-            f"the lane record's last verdict judged {judged}, not the reviewed {reviewed}; "
-            "write the record again for the head to land"
+            f"the lane record's last verdict judged {judged}, not the reviewed {reviewed}"
         )

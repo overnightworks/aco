@@ -24,7 +24,7 @@ def lane(
 
 
 def verdict_on(sha: str) -> list[dict[str, str]]:
-    return [{"stage": "gate", "verdict": "pass", "sha": sha}]
+    return [{"stage": "gate", "verdict": "approve", "sha": sha}]
 
 
 def lane_trailers(world: LaneLandingWorld) -> tuple[str, ...]:
@@ -35,7 +35,7 @@ def lane_trailers(world: LaneLandingWorld) -> tuple[str, ...]:
 def test_a_landing_with_a_record_writes_the_record_s_trailers(
     lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-38, LANREC-41."""
+    """Spec: LANREC-42, LANREC-43."""
     record = write_lane_record_file(tmp_path, lane_record_object(verdicts=verdict_on(lane.head)))
 
     result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
@@ -64,7 +64,7 @@ def test_a_landing_whose_record_judged_another_head_refuses_before_any_write(
     capsys: pytest.CaptureFixture[str],
     merged: bool,
 ) -> None:
-    """Spec: LANREC-38, LANREC-39 -- nothing is merged, deleted or written."""
+    """Spec: LANREC-38, LANREC-40 -- nothing is merged, deleted or written."""
     other = "d" * 40
     record = write_lane_record_file(tmp_path, lane_record_object(verdicts=verdict_on(other)))
     if merged:
@@ -74,10 +74,7 @@ def test_a_landing_whose_record_judged_another_head_refuses_before_any_write(
 
     result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
 
-    sentence = (
-        f"the lane record's last verdict judged {other}, not the reviewed {lane.head}; "
-        "write the record again for the head to land"
-    )
+    sentence = f"the lane record's last verdict judged {other}, not the reviewed {lane.head}"
     observed, expected = refusal_observations(lane, result, sentence)
     assert observed == expected
 
@@ -85,7 +82,7 @@ def test_a_landing_whose_record_judged_another_head_refuses_before_any_write(
 def test_a_landing_whose_record_holds_no_verdict_refuses_before_any_write(
     lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-38."""
+    """Spec: LANREC-39, LANREC-40."""
     record = write_lane_record_file(tmp_path, lane_record_object(verdicts=[]))
 
     result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
@@ -98,7 +95,7 @@ def test_a_landing_whose_record_holds_no_verdict_refuses_before_any_write(
 def test_a_landing_whose_record_is_malformed_refuses_before_any_write(
     lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-30, LANREC-39."""
+    """Spec: LANREC-31, LANREC-40."""
     record = write_lane_record_file(tmp_path, lane_record_object(version=2))
 
     result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
