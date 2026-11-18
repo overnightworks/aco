@@ -260,8 +260,15 @@ def compute_record(
     stated = released.record_file
     if stated is None:
         return measured
-    return dataclasses.replace(
-        measured, routing=stated.routing_line(), risk=stated.risk, counts=stated.counts
+    return LaneRecord(
+        measured.outcome,
+        merge_commit=measured.merge_commit,
+        wall_seconds=measured.wall_seconds,
+        size=measured.size,
+        item_size=measured.item_size,
+        routing=stated.routing_line(),
+        risk=stated.risk,
+        counts=stated.counts,
     )
 
 
