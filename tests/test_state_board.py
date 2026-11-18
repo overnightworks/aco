@@ -4520,6 +4520,8 @@ class TestCliStateRefForge:
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, _item_files())
         result = run_cli(
             ["item", "edit", "aco-abcdef", "--base", "sha256:" + "0" * 64],
+            capsys,
+            stdin=_github_body(_CHILD_A_PROJECTION),
         )
 
         assert result.status == 2
