@@ -1,13 +1,13 @@
 # `aco mcp`
 
 `aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions and the steps waiting on the operator across every
-repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask`, `record_answer` and `step`: the CLI stays complete without it.
+repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take; its tool `answer_step` records the operator's chat answer to such a step. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask`, `record_answer`, `step` and `answer_step`: the CLI stays complete without it.
 It speaks the protocol of the `initialize` era, revisions `2025-11-25` and `2025-06-18`. The items and lines it returns are the ones `specs/rulings.spec.md` owns (RUL-10),
 so an agent holds the line index and the `card_hash` that `aco rule` takes. Which repositories exist and how the root is found is `specs/serve.spec.md`'s (ABRD-14, ABRD-108..ABRD-111).
 
 ## Behavior table
 
-| state \ trigger | start | a message arrives | the `read_inbox`, `ask`, `record_answer` or `step` call |
+| state \ trigger | start | a message arrives | the `read_inbox`, `ask`, `record_answer`, `step` or `answer_step` call |
 |---|---|---|---|
 | the global `aco --repo OWNER/REPO` before `mcp` | MCP-01 | — | — |
 | stdin ends | MCP-02 | — | — |
@@ -62,6 +62,9 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a step whose `purpose`, `actions` or `expected` is missing or blank | — | — | MCP-70 |
 | a step on a repository not found, or an item missing, a pull request, malformed, closed or a non-member's | — | — | MCP-50 |
 | a step in a repository under `state-ref` storage | — | — | MCP-51 |
+| an `answer_step` of Erfolgreich, of Fehlgeschlagen with a note or of a report | — | — | MCP-72, MCP-73, MCP-76, MCP-77 |
+| an `answer_step` on a step that changed, an item without a step or an answer the step does not ask for | — | — | MCP-74 |
+| an `answer_step` with arguments that do not fit | — | — | MCP-75 |
 | a step whose body check answers `not verified` or `overwritten` | — | — | MCP-52 |
 | a step whose label fails after the body is written or the item opened | — | — | MCP-53 |
 | a new item whose issue type the forge did not set | — | — | MCP-54 |
@@ -162,10 +165,19 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - [ ] [MCP-70] A missing, non-string or blank `purpose`, `actions` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
 - [ ] [MCP-71] An item labelled `needs-operator` whose block has no operator `wait` is no step: `steps` omits it.
 
+## Answering a step
+
+- [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (the line `read_inbox` showed), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`, and answers as `POST /api/step` does (see E-MCP-20).
+- [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` says to act on it, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
+- [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
+- [ ] [MCP-77] The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
+- [ ] [MCP-74] A `step` that is no longer the item's current step, an item with no step for the operator, or a `result` the step does not ask for is a tool error with a sentence; nothing is written.
+- [ ] [MCP-75] An unknown argument, a wrong type, a `result` outside the three, a blank `step`, or a `text` missing, blank or given with `Erfolgreich` is a tool error; nothing is read or written.
+
 ## Never
 
-- `aco mcp` writes only through `ask`, `record_answer` and `step`: `ask` and `record_answer` one line per call, `step` one item's `next` in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
-- `step` never clears `wait.operator` and never removes the label `needs-operator`: the board's step answer does both (ABRD-168, ABRD-169), and the head does both for an answer given in chat.
+- `aco mcp` writes only through `ask`, `record_answer`, `step` and `answer_step`: `ask` and `record_answer` one line per call, `answer_step` one item's step answer, `step` one item's `next` in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
+- `step` never clears `wait.operator` and never removes the label `needs-operator`: the board's step answer and `answer_step` do both (ABRD-168, ABRD-169, MCP-72).
 - `record_answer` never checks that the operator spoke: it records what the agent says he answered, and the forge's edit history is the record after the fact.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
 - It never prints anything but protocol messages on standard output (MCP-20).
@@ -373,3 +385,14 @@ Setup: as E-MCP-04; the forge fails the search with `HTTP 502`
 ```
 
 `earlier` and `earlier_more` are absent; the card stands, and the same card sent again searches again.
+
+### E-MCP-20 -- the operator's answer to a step, given in chat
+
+Setup: `owner/a` holds the open item `#9` of E-MCP-12, waiting on its step, which asks for no report
+
+```text
+> {"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"answer_step","arguments":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","result":"Fehlgeschlagen","text":"The page shows an error."}}}
+< {"jsonrpc":"2.0","id":20,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":9,"answered":true},"isError":false}}
+```
+
+The block's `wait` and `step` are gone, `now` ends with `Fehlgeschlagen: The page shows an error.`, the item is open without the label `needs-operator`, and E-MCP-11's `read_inbox` no longer lists it. The same call again answers a tool error that the item no longer waits on that step.

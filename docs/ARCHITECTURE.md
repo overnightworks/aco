@@ -187,7 +187,7 @@ item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
 decision and step answer, `aco item edit --size/--whole`, `aco rescope` and `aco handover` (each through its claim
-transition) and the `ask`, `record_answer` and `step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
+transition) and the `ask`, `record_answer`, `step` and `answer_step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
 `decide.write_item_body`, the one writer, which skips a body equal to the text it
