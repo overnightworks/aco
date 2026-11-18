@@ -169,6 +169,11 @@ and keeps only those on items a member of a found repository wrote. It shows
 them and applies none; a line from a private repository can reach a head
 working in a public one, as the inbox already allows.
 
+The board's step answer, `POST /api/step`, is a write boundary beside its card decision: behind the
+board token and the same body limits, in the item's turn, it clears the item's operator wait and `[step]`,
+writes the outcome into `now` and removes the label `needs-operator` through the forge port's
+`remove_label` (`specs/serve.spec.md`).
+
 `aco fleet-plans` reads that same listing for the open items of members labelled `fleet-plan`, across every repository discovery finds, and keeps no state of its own (`specs/fleet-plans.spec.md`).
 
 `aco stats` compares two groups of lanes by the records on the state ref's release commits: `lane_record.py` owns the trailer keys and reads them back, the pure `lane_measure.py` computes the figures, and the command writes nothing and asks no forge (`specs/stats.spec.md`).
@@ -181,7 +186,7 @@ an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file pe
 item under aco's state directory (`repositories.state_directory`), named by a
 digest of the forge repository id and the item number. `decide.turn` is that lock
 plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
-decision, `aco item edit --size/--whole`, `aco rescope` and `aco handover` (each through its claim
+decision and step answer, `aco item edit --size/--whole`, `aco rescope` and `aco handover` (each through its claim
 transition) and the `ask`, `record_answer` and `step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
