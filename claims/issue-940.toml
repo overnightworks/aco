@@ -1,0 +1,8 @@
+claim_id = "7c25ae5e9f11487d8d88309693bace79"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "091433c66b4899dfbcd922554bb8711a02cb422d"
+branch = "claude/issue-940-lane-record-check"
+scope = ["specs/landing-grammar.spec.md", "specs/lane-record.spec.md", "specs/release.spec.md", "src/aco/cli.py", "src/aco/cmd_land.py", "src/aco/cmd_land_merge.py", "src/aco/cmd_release.py", "src/aco/lane_record.py", "src/aco/routing_line.py", "tests/support/lane_record_fixtures.py", "tests/test_cli.py", "tests/test_cli_help.py", "tests/test_cmd_land_merge_message.py", "tests/test_cmd_land_preflight.py", "tests/test_cmd_release_lane_mode.py", "tests/test_cmd_release_merged_verification.py", "tests/test_lane_record.py", "tests/test_lane_record_check.py", "tests/test_routing_line.py"]
+opened_commit = "28ec070d350f86e9643c57fd4e830737c0467e2b"
+whole_reason = "The record check spans its parser, the land and release commands that reuse it, the CLI, three specs and their tests"
