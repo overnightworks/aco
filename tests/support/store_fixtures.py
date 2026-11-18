@@ -100,6 +100,17 @@ def state_ref_tip(remote: Path) -> str | None:
     return result.stdout.split("\t", 1)[0]
 
 
+def release_commit_message(remote: Path) -> str:
+    return real_git(remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
+
+
+def lane_trailers(remote: Path) -> tuple[str, ...]:
+    """The lane record trailers of the release commit at the tip of `remote`'s state ref."""
+    return tuple(
+        line for line in release_commit_message(remote).splitlines() if line.startswith("lane_")
+    )
+
+
 def state_ref_listing(remote: Path) -> dict[bytes, bytes]:
     """`git ls-tree -r -z` of the state ref in `remote`, raw path -> raw
     `mode kind oid`."""

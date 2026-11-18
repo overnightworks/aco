@@ -20,9 +20,15 @@ from cli_fixtures import (
     track_board_config,
 )
 from github_fixtures import FakeForge
-from lane_record_fixtures import release_trailers_of
+from lane_record_fixtures import (
+    LANE_BRANCH,
+    LANE_RECORD_TRAILERS,
+    ROUTING,
+    lane_record_object,
+    release_trailers_of,
+)
 from merged_release import arrange_merged_pull_request
-from store_fixtures import claim_intent
+from store_fixtures import claim_intent, lane_trailers, release_commit_message
 
 from aco import body, protocol, store, workboard
 from aco.lane_record import (
@@ -32,16 +38,11 @@ from aco.lane_record import (
     ReleasedLane,
     compute_record,
     parse_record,
+    parse_record_file,
     released_issue,
 )
 from aco.routing_line import parse_routing_line
 
-LANE_BRANCH = "docs/tidy-readme"
-ROUTING = (
-    "Routing: build sonnet-5.5/high; fix none; review opus-5.5/medium; test sonnet-5.5/medium; "
-    "gate none; land haiku-5.5/low. Fix rounds: 1. Experiment: builder-sonnet. "
-    "Blocking: a red check → ci"
-)
 ROUTING_TRAILERS = (
     "lane_build: sonnet-5.5/high",
     "lane_fix: none",
@@ -58,14 +59,6 @@ CLAIMED_AT = 1_700_000_000
 IDLE_SECONDS = 3600
 MERGED_AT = CLAIMED_AT + 600
 RELEASED_AT = CLAIMED_AT + 90
-
-
-def lane_trailers(message: str) -> tuple[str, ...]:
-    return tuple(line for line in message.splitlines() if line.startswith("lane_"))
-
-
-def release_commit_message(remote: Path) -> str:
-    return real_git(remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
 
 
 def test_a_record_renders_its_known_figures_in_order_and_leaves_unknown_ones_out() -> None:
@@ -440,6 +433,26 @@ def test_an_abandoned_lane_counts_to_the_release_and_reads_its_routing_from_the_
     assert figures == ("lane_outcome: abandoned", "lane_wall_seconds: 90", *ROUTING_TRAILERS)
 
 
+def test_a_lane_record_file_leaves_the_reasons_routing_line_unread(
+    history: LaneHistory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: LANREC-42."""
+
+    def read_no_routing_line(message: str) -> None:
+        raise AssertionError(f"a routing line was read from {message!r}")
+
+    monkeypatch.setattr("aco.lane_record.parse_routing_line", read_no_routing_line)
+    claim = standing_active_claim(lane=True, opened_commit=history.opened_commit)
+    stated = parse_record_file(json.dumps(lane_record_object()).encode())
+    released = ReleasedLane(
+        claim, protocol.AbandonedRelease(ROUTING), None, RELEASED_AT, history.tip, None, stated
+    )
+
+    figures = compute_record(history.path, CONFIG, released).trailers()
+
+    assert figures[2:] == LANE_RECORD_TRAILERS
+
+
 def release_trailers(
     history: LaneHistory, outcome: protocol.ReleaseOutcome, verified_merge: str | None = None
 ) -> tuple[str, ...]:
@@ -570,7 +583,7 @@ def test_a_merged_release_leaves_its_record_on_the_release_commit(
     )
 
     merge = real_git(bare_remote, "rev-parse", "main").stdout.strip()
-    assert lane_trailers(message) == (
+    assert lane_trailers(bare_remote) == (
         "lane_outcome: landed",
         f"lane_merge: {merge}",
         "lane_wall_seconds: 0",
@@ -603,12 +616,12 @@ def test_a_merged_release_whose_merge_lost_the_routing_line_still_releases_with_
     bare_remote: Path,
 ) -> None:
     """Spec: LANREC-14, LANREC-21, REL-64."""
-    message, _forge = land_and_release(
+    _message, _forge = land_and_release(
         monkeypatch, capsys, pinned_clone, bare_remote, message_lines=("No-Item: docs",)
     )
 
     merge = real_git(bare_remote, "rev-parse", "main").stdout.strip()
-    assert lane_trailers(message) == (
+    assert lane_trailers(bare_remote) == (
         "lane_outcome: landed",
         f"lane_merge: {merge}",
         "lane_wall_seconds: 0",
@@ -640,7 +653,7 @@ def test_an_abandoned_release_leaves_a_record_from_its_reason(
             bare_remote, "log", "-2", "--first-parent", "--format=%ct", store.STATE_REF
         ).stdout.split()
     )
-    lines = lane_trailers(release_commit_message(bare_remote))
+    lines = lane_trailers(bare_remote)
     assert (result.status, result.stderr) == (0, "")
     assert lines[:2] == (
         "lane_outcome: abandoned",
@@ -698,7 +711,7 @@ def test_a_record_survives_a_push_that_loses_its_race(bare_remote: Path, worktre
         transport=transport,
     )
 
-    assert lane_trailers(release_commit_message(bare_remote)) == ("lane_outcome: abandoned",)
+    assert lane_trailers(bare_remote) == ("lane_outcome: abandoned",)
 
 
 class RejectsOnce:
