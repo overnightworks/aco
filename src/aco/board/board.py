@@ -28,9 +28,11 @@ from .ports import (
     DecisionSourceUnavailableError,
     DecisionStatus,
     PostedCard,
+    StepPost,
 )
 
 LINE_CHANGED = "Diese Zeile hat sich geändert, bitte neu laden"
+STEP_CHANGED = "This step changed; reload."
 SHUTTING_DOWN = "board is shutting down"
 
 
@@ -42,6 +44,27 @@ def wire_fingerprint(repo: str, item: int, line: expectations.OptionLine) -> str
     card identical in two configured repos never satisfies the other repo's
     check, even with the two labels swapped."""
     shown = json.dumps([repo, item, line.index, line.card_hash], ensure_ascii=False)
+    return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def step_fingerprint(repo: str, item: int, step: inbox.Step) -> str:
+    """The fingerprint a step carries across the wire (ABRD-163): it follows the
+    item, the step's text and every field its card shows, and binds the `repo`
+    label it was read under, as `wire_fingerprint` does for a line. The JSON API
+    and `checked_step` share this one function."""
+    card = step.card
+    shown = json.dumps(
+        [
+            repo,
+            item,
+            step.wait_text,
+            card and card.purpose,
+            card and card.actions,
+            card and card.expected,
+            card and card.answer,
+        ],
+        ensure_ascii=False,
+    )
     return hashlib.sha256(shown.encode("utf-8", "surrogatepass")).hexdigest()
 
 
@@ -104,6 +127,17 @@ class Board:
             return DecisionResult(DecisionStatus.FAILED, LINE_CHANGED)
         return written
 
+    def answer_step(self, posted: StepPost, repo: str) -> DecisionResult:
+        """Write the answer `posted` carries unless the step no longer reads as
+        shown: the source reads the item once and runs `checked_step` on that read
+        before it writes. Callers serialize writes as for `decide_card`."""
+        answered = self._decisions.answer_step(
+            posted.item, posted.result, partial(checked_step, posted, repo)
+        )
+        if isinstance(answered, CardChanged):
+            return DecisionResult(DecisionStatus.FAILED, STEP_CHANGED)
+        return answered
+
 
 def checked_card(
     posted: PostedCard, repo: str, lines: Sequence[expectations.ExpectationLine]
@@ -124,6 +158,11 @@ def checked_card(
             return None
         checked.append(CardLine(posted_line.index, shown.card_hash, posted_line.letter))
     return CardDecision(posted.item, tuple(checked), posted.answer)
+
+
+def checked_step(posted: StepPost, repo: str, step: inbox.Step) -> bool:
+    """Whether the step just read is the one shown: its fingerprint is the posted one."""
+    return step_fingerprint(repo, posted.item, step) == posted.fingerprint
 
 
 @dataclass(frozen=True)
@@ -176,13 +215,21 @@ class Boards:
         """Write a whole card through `repo`'s board in the one write turn;
         `repo` must be one of the repos this turn's scan finds, else
         `RepositoriesUnavailableError`."""
+        return self._written(repo, lambda board: board.decide_card(posted, repo))
+
+    def answer_step(self, repo: str, posted: StepPost) -> DecisionResult:
+        """Write the answer to a step through `repo`'s board in the one write turn,
+        as `decide_card` does a card."""
+        return self._written(repo, lambda board: board.answer_step(posted, repo))
+
+    def _written(self, repo: str, write: Callable[[Board], DecisionResult]) -> DecisionResult:
         if not self._take_turn():
             return DecisionResult(DecisionStatus.FAILED, SHUTTING_DOWN)
         try:
             boards = self._discover().boards
             if repo not in boards:
                 raise RepositoriesUnavailableError(f"{repo} is not among the repositories found")
-            return boards[repo].decide_card(posted, repo)
+            return write(boards[repo])
         finally:
             self._end_turn()
 

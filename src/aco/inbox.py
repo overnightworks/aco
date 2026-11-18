@@ -70,12 +70,15 @@ class Step:
     """The block's `step` table; `None` for a step marked without one."""
 
 
-def _step_of(issue: workboard.Issue, storage: body.Storage) -> Step | None:
-    wait = body.parse_body(issue.body, storage=storage).wait
+def step_in(number: int, title: str, item_body: str, *, storage: body.Storage) -> Step | None:
+    """The step an item's body asks the operator for: `None` unless its `wait` names
+    the operator. The one reader of a step, for the listing and for the board's
+    answer to it, whose fingerprints must match."""
+    wait = body.parse_body(item_body, storage=storage).wait
     if not item_wait.waits_on_operator(wait):
         return None
-    card = item_step.parse_step(body.locate_block(issue.body).data)
-    return Step(issue.number, issue.title, wait.step, card)
+    card = item_step.parse_step(body.locate_block(item_body).data)
+    return Step(number, title, wait.step, card)
 
 
 def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[Step, ...]:
@@ -85,7 +88,7 @@ def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[
         step
         for issue in issues
         if issue.author_is_member and issue.unreadable is None
-        if (step := _step_of(issue, storage)) is not None
+        if (step := step_in(issue.number, issue.title, issue.body, storage=storage)) is not None
     ]
     return tuple(sorted(found, key=lambda step: -step.number))
 

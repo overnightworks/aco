@@ -1,19 +1,27 @@
 """The board's JSON wire form, free of any socket.
 
 Turns each repo's rows into the answer of `GET /api/board`, a request
-body into a `CardRequest` for a whole option card, and a decision's result or a
-refusal into its JSON answer. Every line is `aco rulings --json`'s own
-rendering of it; this module only adds an option line's fingerprint and
-leaves withdrawn lines out. The transport decides when to answer; this
-module owns what the answer and the request look like.
+body into a `CardRequest` for a whole option card or a `StepRequest` for the
+answer to a step, and a decision's result or a refusal into its JSON answer.
+Every line is `aco rulings --json`'s own rendering of it; this module only adds
+an option line's and a step's fingerprint and leaves withdrawn lines out. The transport
+decides when to answer; this module owns what the answer and the request look like.
 """
 
 import json
 from dataclasses import dataclass
 from typing import TypeGuard, cast
 
-from .. import expectation_grammar, expectations, inbox, lane_measure, progress, rulings
-from .board import BoardReading, RepoReading, RepoUnavailable, wire_fingerprint
+from .. import (
+    expectation_grammar,
+    expectations,
+    inbox,
+    item_step,
+    lane_measure,
+    progress,
+    rulings,
+)
+from .board import BoardReading, RepoReading, RepoUnavailable, step_fingerprint, wire_fingerprint
 from .ports import (
     NOTE_MAX_LENGTH,
     CardAnswer,
@@ -22,6 +30,7 @@ from .ports import (
     OtherCardAnswer,
     PostedCard,
     PostedLine,
+    StepPost,
     UnclearCardAnswer,
 )
 
@@ -43,6 +52,18 @@ class CardRequest:
     card: PostedCard
 
 
+@dataclass(frozen=True)
+class StepRequest:
+    repo: str
+    """The label of the configured repo the step belongs to."""
+    step: StepPost
+
+
+_STEP_RESULT_YES = "yes"
+_STEP_RESULT_NO = "no"
+_STEP_RESULT_REPORT = "report"
+_TEXT = "text"
+_STEP_POST_KEYS = frozenset({"repo", "item", "fingerprint", "result", _TEXT})
 _CARD_ENTRY_KEYS = frozenset({"line", "fingerprint", "option"})
 _KEYS_OF_ONE_LINE = ("line", "fingerprint", "option", "outcome")
 """Keys a card post never carries beside `lines`, even as `null`."""
@@ -69,8 +90,13 @@ def _repo_json(reading: RepoReading) -> dict[str, object]:
         "error": None,
         "items": [item for item in items if item is not None],
         "progress": _progress_json(reading.progress),
-        "steps": [inbox.step_json(step) for step in reading.steps],
+        "steps": [_step_json(step, reading.name) for step in reading.steps],
     }
+
+
+def _step_json(step: inbox.Step, repo: str) -> dict[str, object]:
+    """`inbox.step_json`'s step; it adds its fingerprint last (ABRD-163)."""
+    return {**inbox.step_json(step), "fingerprint": step_fingerprint(repo, step.number, step)}
 
 
 def _progress_json(
@@ -183,6 +209,40 @@ def parse_rule_request(raw: bytes) -> CardRequest | None:
     if fields is None or "lines" not in fields:
         return None
     return _card_request(fields)
+
+
+def parse_step_request(raw: bytes) -> StepRequest | None:
+    """The answer to a step a request body names, or None unless every field is
+    well-formed (ABRD-164, ABRD-165). `repo` is checked only for its shape, as for a
+    card."""
+    fields = _json_object(raw)
+    if fields is None or not fields.keys() <= _STEP_POST_KEYS:
+        return None
+    repo, item, fingerprint = fields.get("repo"), fields.get("item"), fields.get("fingerprint")
+    result = _step_result(fields)
+    if (
+        isinstance(repo, str)
+        and repo != ""
+        and _is_position(item)
+        and isinstance(fingerprint, str)
+        and result is not None
+    ):
+        return StepRequest(repo, StepPost(item, fingerprint, result))
+    return None
+
+
+def _step_result(fields: dict[str, object]) -> item_step.StepResult | None:
+    """Erfolgreich names no text; a failure and a report each name one non-blank text."""
+    kind = fields.get("result")
+    if kind == _STEP_RESULT_YES:
+        return item_step.StepSucceeded() if _TEXT not in fields else None
+    text = fields.get(_TEXT)
+    stripped = text.strip() if _is_note_text(text) else ""
+    if not stripped:
+        return None
+    if kind == _STEP_RESULT_NO:
+        return item_step.StepFailed(stripped)
+    return item_step.StepReported(stripped) if kind == _STEP_RESULT_REPORT else None
 
 
 def _card_request(fields: dict[str, object]) -> CardRequest | None:

@@ -10,11 +10,16 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from aco_board_fixtures import BoardClient, Lister, serving
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body, write_repository_config
+from board_fixtures import (
+    MINIMAL_BLOCK_TOML,
+    OPERATOR_WAIT,
+    block_body,
+    write_repository_config,
+)
 from cli_fixtures import real_git, run_cli, set_git_identity, stub_board_config_tracked
 from option_cards import open_option_entry
 from store_fixtures import item_record, path_without_gh, push_item_tree
@@ -35,10 +40,12 @@ def _two_open_lines() -> tuple[dict[str, object], ...]:
     return (open_option_entry(), open_option_entry(_QUESTION))
 
 
-def _item_file(*entries: dict[str, object], title: str = "Karte") -> bytes:
-    """A state-ref item body: `entries` as its lines and its `[record]` table."""
+def _item_file(*entries: dict[str, object], title: str = "Karte", **block_entries: object) -> bytes:
+    """A state-ref item body: `entries` as its lines, `block_entries` beside them and its
+    `[record]` table."""
     data = {
         **tomllib.loads(MINIMAL_BLOCK_TOML),
+        **block_entries,
         "expectation": list(entries),
         "record": item_record(title=title, state="open", kind="task"),
     }
@@ -62,11 +69,15 @@ class _StateRefCheckout:
         count = real_git(self.remote, "rev-list", "--count", store.STATE_REF).stdout
         return int(count)
 
-    def entries(self, item_id: str) -> list[dict[str, object]]:
+    def block(self, item_id: str) -> dict[str, object]:
+        """The `aco` block of item `item_id` as the state ref holds it."""
         tip = self.tip()
         assert tip is not None
         stored = store.read_item_files(self.worktree, tip)[f"{item_id}.md"].decode()
-        return body.block_expectation_dicts(body.locate_block(stored).data)
+        return body.locate_block(stored).data
+
+    def entries(self, item_id: str) -> list[dict[str, object]]:
+        return body.block_expectation_dicts(self.block(item_id))
 
 
 @pytest.fixture(autouse=True)
@@ -345,3 +356,23 @@ def test_two_decisions_on_one_item_at_once_store_it_once(
 
     assert statuses == ["already_ruled", "ruled"]
     assert checkout.commits() == commits + 1
+
+
+def test_a_step_answer_on_a_state_ref_item_clears_the_step_and_writes_now_without_a_label(
+    checkout: _StateRefCheckout, state_ref_board: BoardClient
+) -> None:
+    """ABRD-168, ABRD-169: one state-ref commit, no forge label to remove, the item open."""
+    step = {"purpose": "Why.", "actions": "Do this.", "expected": "See it."}
+    checkout.seed({f"{_FIRST_ID}.md": _item_file(wait=OPERATOR_WAIT, step=step)})
+    commits = checkout.commits()
+
+    answered = state_ref_board.answer_step_through_api(_FIRST, "no", "Stayed red.")
+
+    block = checkout.block(_FIRST_ID)
+    assert answered.json() == {"status": "answered", "message": None}
+    assert not {"wait", "step"} & block.keys()
+    assert str(block["now"]).endswith(": Fehlgeschlagen: Stayed red.")
+    assert (checkout.commits(), cast(dict[str, object], block["record"])["state"]) == (
+        commits + 1,
+        "open",
+    )

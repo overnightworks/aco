@@ -6,10 +6,10 @@ loopback interface, carrying no decision data, so they need no token; the
 JSON API under `/api/` takes the board token in exactly one
 `X-Board-Token` header and checks it before any other work, whatever the
 method: `GET /api/board` answers every line from a fresh read of the
-decision source, `POST /api/rule` submits one decision or one whole option card, and every other
-method is refused. A malformed or stalled request gets a fixed 4xx answer,
-never a traceback; every answer, the HTTP layer's own refusals included,
-carries the same guard headers, and none carries a cross-origin header, so a
+decision source, `POST /api/rule` submits one decision or one whole option card,
+`POST /api/step` the answer to one step, and every other method is refused. A malformed or
+stalled request gets a fixed 4xx answer, never a traceback; every answer, the HTTP layer's own
+refusals included, carries the same guard headers, and none carries a cross-origin header, so a
 page from another origin can never read one.
 """
 
@@ -19,6 +19,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BufferedIOBase
@@ -27,6 +28,7 @@ from urllib.parse import urlsplit
 
 from . import api, static
 from .board import Boards, RepositoriesUnavailableError, all_repos_unavailable
+from .ports import DecisionResult
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"  # noqa: S105 - names the query field that carries the token and holds no secret
@@ -35,10 +37,12 @@ PAGE_PATH = "/"
 API_PREFIX = "/api/"
 API_BOARD_PATH = "/api/board"
 API_RULE_PATH = "/api/rule"
+API_STEP_PATH = "/api/step"
 _FORBIDDEN = "forbidden: missing or wrong token"
 _NOT_FOUND = "not found"
 _BAD_CONTENT_LENGTH = "bad request: Content-Length"
 _BAD_DECISION = "bad request: decision"
+_BAD_STEP = "bad request: step"
 _BODY_INCOMPLETE = "request timeout: body incomplete"
 _METHOD_NOT_ALLOWED = "method not allowed"
 _SERVED_METHODS = frozenset({"GET", "POST"})
@@ -47,6 +51,7 @@ _ALLOWED_METHODS_BY_PATH = {
     PAGE_PATH: "GET",
     API_BOARD_PATH: "GET",
     API_RULE_PATH: "POST",
+    API_STEP_PATH: "POST",
 }
 """The one method each known fixed route serves, for a 405's `Allow` header;
 an asset path (every filename under `static.ASSETS_PREFIX`) is handled
@@ -288,7 +293,8 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
         if path.startswith(API_PREFIX):
-            self._answer_api(self._post_rule if path == API_RULE_PATH else None)
+            routes = {API_RULE_PATH: self._post_rule, API_STEP_PATH: self._post_step}
+            self._answer_api(routes.get(path))
             return
         if path == PAGE_PATH or path.startswith(static.ASSETS_PREFIX):
             self._refuse_as_text(
@@ -334,7 +340,23 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         if request is None:
             self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
             return
-        self._decide(request)
+        boards = self._server().boards
+        self._answer_write(
+            request.repo, partial(boards.decide_card, request.repo, request.card), _BAD_DECISION
+        )
+
+    def _post_step(self) -> None:
+        raw = self._read_body(self._refuse_as_json)
+        if raw is None:
+            return
+        request = api.parse_step_request(raw)
+        if request is None:
+            self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_STEP)
+            return
+        boards = self._server().boards
+        self._answer_write(
+            request.repo, partial(boards.answer_step, request.repo, request.step), _BAD_STEP
+        )
 
     def _read_body(self, refuse: _Refusal) -> bytes | None:
         """The whole declared body, or None once `refuse` has answered why not."""
@@ -356,16 +378,16 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return None
         return body
 
-    def _decide(self, request: api.CardRequest) -> None:
+    def _answer_write(self, repo: str, write: Callable[[], DecisionResult], refusal: str) -> None:
         try:
-            result = self._server().boards.decide_card(request.repo, request.card)
+            result = write()
         except RepositoriesUnavailableError:
             # A repo outside the scan's findings never reaches aco.
-            self._refuse_as_json(HTTPStatus.BAD_REQUEST, _BAD_DECISION)
+            self._refuse_as_json(HTTPStatus.BAD_REQUEST, refusal)
             return
         self._respond(
             HTTPStatus.OK,
-            api.decision_result_json(result, request.repo).encode("utf-8"),
+            api.decision_result_json(result, repo).encode("utf-8"),
             api.JSON_CONTENT_TYPE,
         )
 

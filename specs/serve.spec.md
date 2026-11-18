@@ -17,47 +17,51 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 
 ## Behavior table
 
-| state \ trigger | load the page | decide a shown card |
-|---|---|---|
-| an item a non-member wrote, or whose author is unknown | ABRD-06 | — (not shown) |
-| an item under `storage = "state-ref"` | ABRD-06, ABRD-112 | as its lines |
-| an open line | ABRD-06 | ABRD-58, ABRD-59, ABRD-152, ABRD-153 |
-| the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 |
-| a ruled option line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 |
-| a ruled yes/no line | ABRD-30, ABRD-37, ABRD-54 | — (read-only) |
-| an item whose block is malformed or unreadable | ABRD-07 | ABRD-41 |
-| an item with open option lines | ABRD-82 | ABRD-77 |
-| an item with two or more open option lines | ABRD-83, ABRD-84, ABRD-85 | ABRD-86, ABRD-87, ABRD-88, ABRD-89, ABRD-90, ABRD-91, ABRD-92, ABRD-154, ABRD-155, ABRD-156 |
-| an option line, open or ruled | ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-99, ABRD-100, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-78 |
-| a withdrawn line | ABRD-60 | ABRD-41 |
-| a post without `lines` | — | ABRD-40 |
-| its card changed, withdrawn, gone or closed since the page read it | — | ABRD-41 |
-| a card post answering `other` | — | ABRD-64 |
-| a card post answering `unclear` | — | ABRD-70, ABRD-71 |
-| a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 |
-| a read sent before an item's stored answer arrived | ABRD-98 | — |
-| a read while a card waits | ABRD-105 | — |
-| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161 | — |
-| a card post naming one or more open option lines of its item | — | ABRD-77, ABRD-78, ABRD-80 |
-| a card post naming a changed or non-option line | — | ABRD-79 |
-| a card post naming a line already ruled | — | ABRD-80 |
-| a malformed card post | — | ABRD-81 |
-| a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17, ABRD-113 |
-| a decision written | — | ABRD-122 |
-| a decision written over a change aco had not read, which the body check keeps | — | ABRD-129, ABRD-130 |
-| the board is stopping | — | ABRD-04, ABRD-18 |
-| a note or an answer on the decision | — | ABRD-05 |
-| one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 |
-| every found repo's read fails or times out | ABRD-20, ABRD-102, ABRD-128 | ABRD-20 |
-| an `/api/` request without the right token | ABRD-10 | ABRD-10 |
-| a decision naming a repo the scan does not find | — | ABRD-16 |
-| a card's fingerprint submitted against a different configured repo | — | ABRD-21 |
-| `aco serve --json` | ABRD-26 | — |
-| the global `aco --repo OWNER/REPO` before `serve` | ABRD-27 | — |
-| no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — |
-| no repository found, at start or on a later read | ABRD-109 | — |
-| a directory under the root that cannot be read | ABRD-110 | — |
-| a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139, ABRD-147, ABRD-148, ABRD-149, ABRD-150, ABRD-151 | — |
+| state \ trigger | load the page | decide a shown card | answer a step |
+|---|---|---|---|
+| an item a non-member wrote, or whose author is unknown | ABRD-06 | — (not shown) | — |
+| an item under `storage = "state-ref"` | ABRD-06, ABRD-112 | as its lines | — |
+| an open line | ABRD-06 | ABRD-58, ABRD-59, ABRD-152, ABRD-153 | — |
+| the line's shown fields changed since the page was built | ABRD-06 | ABRD-02 | — |
+| a ruled option line | ABRD-06, ABRD-37, ABRD-54, ABRD-57 | RULE-04 | — |
+| a ruled yes/no line | ABRD-30, ABRD-37, ABRD-54 | — (read-only) | — |
+| an item whose block is malformed or unreadable | ABRD-07 | ABRD-41 | — |
+| an item with open option lines | ABRD-82 | ABRD-77 | — |
+| an item with two or more open option lines | ABRD-83, ABRD-84, ABRD-85 | ABRD-86, ABRD-87, ABRD-88, ABRD-89, ABRD-90, ABRD-91, ABRD-92, ABRD-154, ABRD-155, ABRD-156 | — |
+| an option line, open or ruled | ABRD-34, ABRD-53, ABRD-56, ABRD-61, ABRD-62, ABRD-36, ABRD-37, ABRD-38, ABRD-43, ABRD-44, ABRD-45, ABRD-46, ABRD-47, ABRD-63, ABRD-65, ABRD-99, ABRD-100, ABRD-66, ABRD-67, ABRD-68, ABRD-69, ABRD-72, ABRD-73, ABRD-74, ABRD-75, ABRD-76 | ABRD-78 | — |
+| a withdrawn line | ABRD-60 | ABRD-41 | — |
+| a post without `lines` | — | ABRD-40 | — |
+| its card changed, withdrawn, gone or closed since the page read it | — | ABRD-41 | — |
+| a card post answering `other` | — | ABRD-64 | — |
+| a card post answering `unclear` | — | ABRD-70, ABRD-71 | — |
+| a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 | — |
+| a read sent before an item's stored answer arrived | ABRD-98 | — | — |
+| a read while a card waits | ABRD-105 | — | — |
+| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172 |
+| a malformed step answer | — | — | ABRD-164, ABRD-165 |
+| a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
+| an answer that does not fit its step | — | — | ABRD-167 |
+| a step answer written over a change aco had not read, lost or not verified | — | — | ABRD-170 |
+| a card post naming one or more open option lines of its item | — | ABRD-77, ABRD-78, ABRD-80 | — |
+| a card post naming a changed or non-option line | — | ABRD-79 | — |
+| a card post naming a line already ruled | — | ABRD-80 | — |
+| a malformed card post | — | ABRD-81 | — |
+| a second decision while one is being written, in any configured repo | — | ABRD-03, ABRD-17, ABRD-113 | ABRD-03, ABRD-17, ABRD-113 |
+| a decision written | — | ABRD-122 | — |
+| a decision written over a change aco had not read, which the body check keeps | — | ABRD-129, ABRD-130 | — |
+| the board is stopping | — | ABRD-04, ABRD-18 | ABRD-04, ABRD-18 |
+| a note or an answer on the decision | — | ABRD-05 | — |
+| one found repo's read fails or times out | ABRD-15, ABRD-101 | ABRD-15 | — |
+| every found repo's read fails or times out | ABRD-20, ABRD-102, ABRD-128 | ABRD-20 | — |
+| an `/api/` request without the right token | ABRD-10 | ABRD-10 | ABRD-10 |
+| a decision naming a repo the scan does not find | — | ABRD-16 | ABRD-16 |
+| a card's fingerprint submitted against a different configured repo | — | ABRD-21 | — |
+| `aco serve --json` | ABRD-26 | — | — |
+| the global `aco --repo OWNER/REPO` before `serve` | ABRD-27 | — | — |
+| no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — | — |
+| no repository found, at start or on a later read | ABRD-109 | — | — |
+| a directory under the root that cannot be read | ABRD-110 | — | — |
+| a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139, ABRD-147, ABRD-148, ABRD-149, ABRD-150, ABRD-151 | — | — |
 
 ## Writing a decision
 
@@ -172,7 +176,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 
 - [ ] [ABRD-14] `aco serve` serves each checkout under the config file's `root` tracking `.aco/board.toml`, labelled `owner/repo`, one per forge repository (first sorted path); it takes no `--repo`.
 - [ ] [ABRD-15] `GET /api/board` answers once any repo's read succeeded; a repo whose read fails or times out carries its own sentence and no items (E-ABRD-06); the page shows it per ABRD-101.
-- [ ] [ABRD-16] A decision naming a `repo` that the scan made for that decision does not find is refused `bad request: decision` before any forge request (see E-ABRD-07).
+- [ ] [ABRD-16] A decision or step answer naming a `repo` the scan does not find is refused `bad request: decision` (`bad request: step` for a step) before any forge request (see E-ABRD-07).
 - [ ] [ABRD-17] The one write turn (ABRD-03) spans every configured repo: a decision for one repo never writes while another repo's decision is being written (see E-ABRD-07).
 - [ ] [ABRD-18] Stopping the board (ABRD-04) drains every repo: it waits for a running write in any one, and refuses a waiting decision in any repo once stopping begins, without waiting for the running one.
 - [ ] [ABRD-19] Every read and every decision scans the root afresh, so a checkout added or removed since the last shows or goes at once; `GET /api/board` names the `root` it scanned (E-ABRD-03).
@@ -191,7 +195,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
 - [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
-- [ ] [ABRD-11] A body not complete 10 seconds after its headers, however it trickles, or that ends before its declared Content-Length is received, answers 408 `{"error": "request timeout: body incomplete"}`.
+- [ ] [ABRD-11] On `/api/rule` and `/api/step`, a body not complete 10 seconds after its headers or ending before its declared Content-Length answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every found repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-128.
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
 - [ ] [ABRD-13] With the token, an `/api/` method other than `GET` or `POST` answers 405 `{"error": "method not allowed"}` with `Allow` naming the route; elsewhere it answers 405 as text with the same header.
@@ -241,8 +245,18 @@ A closed child counts however it closed, not-planned included. A container whose
 - [ ] [ABRD-160] `Copy` beside the block puts exactly the block's text on the clipboard and then reads `Copied`; a refused copy reads `Copy failed, try again`.
 - [ ] [ABRD-161] A step without its fields (`null`) shows its number, title and one-line `step` only, with no button.
 - [ ] [ABRD-162] With no step the tab says `No step is waiting for you.`; a repo that could not be read shows `Not read` and its sentence instead, never an empty list.
+- [ ] [ABRD-163] Each `steps` entry also carries `fingerprint`, which follows its repo, item, `step` and the four fields of its card, so it changes when any of them does.
+- [ ] [ABRD-164] `POST /api/step` takes `repo`, `item`, `fingerprint` and `result`: `yes` with no `text`, or `no` or `report` with a `text`; any other key or shape is refused `bad request: step` (see E-ABRD-22).
+- [ ] [ABRD-165] A step answer's `text` follows ABRD-05's rules and is not blank; a refused one reaches no forge.
+- [ ] [ABRD-166] A step no longer as shown on the item's fresh read (ABRD-113), because it changed, was answered, closed or removed, answers `failed` `This step changed; reload.`, nothing written (see E-ABRD-23).
+- [ ] [ABRD-167] A `yes` on a step that asks for a report, or a `report` on one that does not, answers `failed` with a sentence, nothing written; `no` fits every step (see E-ABRD-24).
+- [ ] [ABRD-168] A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" on the board on <date>: ` and `Erfolgreich`, `Fehlgeschlagen: <note>` or the report (see E-ABRD-25).
+- [ ] [ABRD-169] Under `storage = "github"` the label `needs-operator` goes after the body write; a refused removal keeps the answer and adds a `note` naming `gh issue edit <n> --remove-label needs-operator`.
+- [ ] [ABRD-170] A write the forge's body check keeps answers `answered` with ABRD-129's note and removes the label; a lost or unverified write answers `failed` with the forge's sentence and leaves the label.
+- [ ] [ABRD-171] The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.
+- [ ] [ABRD-172] A stored answer writes `next` as `Act on the operator's answer in now.`, in one body write, and answers `answered` with no `item`.
 
-Proofs: `tests/board/test_board_api_steps.py` and `frontend/e2e/stepCard.spec.ts` (390 and 1280 px).
+Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_answers.py` and `frontend/e2e/stepCard.spec.ts` (390 and 1280 px). The card's answer buttons are not yet built.
 
 ## The SPA shell
 
@@ -262,6 +276,7 @@ Proofs: `tests/board/test_board_api_steps.py` and `frontend/e2e/stepCard.spec.ts
 - The board never writes `via chat` or `via default`. Its `via board` is the cooperative record of `specs/rule.spec.md`'s Never, not proof that a person clicked.
 - The board never runs two writes at once across any configured repo, and never starts one after stopping began (ABRD-03, ABRD-04, ABRD-17, ABRD-18).
 - The board never writes an item through a second path: every ruling goes through the writer `aco rule` uses.
+- The board answers a step only on the item's fresh read of that step (ABRD-166) and removes its label only after a write that stands (ABRD-170); it never closes the item (ABRD-171).
 - No answer carries an `Access-Control-*` header, so a page from another origin can neither read an answer nor send the token header (ABRD-10).
 - The board never resolves a repo label from a request into a path: a label is only ever a lookup key among the repos a fresh scan found (ABRD-16).
 - A card's fingerprint never satisfies another found repo's check, even with identical line content: it binds the repo label it was read under (ABRD-21).
@@ -543,4 +558,50 @@ Setup: test-forge, open container `#10` with 3 children closed of 4, whose paren
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
 answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [], "progress": {"error": "GitHub is down"}, "steps": []}]}
+```
+
+### E-ABRD-22 -- a step answer without its note is refused
+
+Setup: test-forge, item `#7` waiting on the operator with a `step` table, as listed by `GET /api/board`
+
+```text
+request: POST /api/step, header X-Board-Token: <board token>
+body: {"repo": "<repo>", "item": 7, "fingerprint": "<as listed>", "result": "no"}
+forge requests: none
+answer 400: {"error": "bad request: step"}
+```
+
+### E-ABRD-23 -- a step changed since the page read it
+
+Setup: test-forge, item `#7` waiting on the operator, then its `expected` text changed before the operator answers `yes`
+
+```text
+request: POST /api/step, header X-Board-Token: <board token>
+body: {"repo": "<repo>", "item": 7, "fingerprint": "<as first listed>", "result": "yes"}
+forge requests: read #7, no write
+answer 200: {"status": "failed", "message": "This step changed; reload."}
+```
+
+### E-ABRD-24 -- an Erfolgreich answer to a step that asks for a report
+
+Setup: test-forge, item `#7` waiting on the operator whose `step` table names `answer = "the run report"`
+
+```text
+request: POST /api/step, header X-Board-Token: <board token>
+body: {"repo": "<repo>", "item": 7, "fingerprint": "<as listed>", "result": "yes"}
+forge requests: read #7, no write
+answer 200: {"status": "failed", "message": "#7 asks for a report; the answer does not fit"}
+```
+
+### E-ABRD-25 -- Fehlgeschlagen with a note
+
+Setup: test-forge, open item `#7` labelled `needs-operator`, waiting on `Decide.` with a `step` table, the board's day 2026-10-03
+
+```text
+request: POST /api/step, header X-Board-Token: <board token>
+body: {"repo": "<repo>", "item": 7, "fingerprint": "<as listed>", "result": "no", "text": "Stayed red."}
+forge requests: read #7, write #7's body, remove the label needs-operator from #7
+answer 200: {"status": "answered", "message": null}
+stored block: no `wait`, no `[step]`, now = The operator answered "Decide." on the board on 2026-10-03: Fehlgeschlagen: Stayed red.
+              next = Act on the operator's answer in now.
 ```

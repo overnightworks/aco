@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .. import decide, expectations, forge, inbox, protocol, session
+from .. import decide, expectations, forge, inbox, item_step, protocol, session
 from .ports import (
     CardAnswer,
     CardChanged,
@@ -25,6 +25,7 @@ from .ports import (
     DecisionSourceUnavailableError,
     DecisionStatus,
     OtherCardAnswer,
+    StepCheck,
     UnclearCardAnswer,
 )
 
@@ -66,6 +67,17 @@ class AcoSource:
         except protocol.ClaimError as error:
             return DecisionResult(DecisionStatus.FAILED, str(error))
 
+    def answer_step(
+        self, item: int, result: item_step.StepResult, check: StepCheck
+    ) -> DecisionResult | CardChanged:
+        context = self._context()
+        try:
+            return _checked_and_answered(context, item, result, check)
+        except decide.InvalidTargetError:
+            return CardChanged()
+        except protocol.ClaimError as error:
+            return DecisionResult(DecisionStatus.FAILED, str(error))
+
     def _context(self) -> session.RunContext:
         # Looked up on the module at every call, so a replaced `run_context`
         # (the board's test forge) reaches every read and write.
@@ -80,6 +92,22 @@ def _checked_and_written(
         context, item, command="rule", environment=os.environ, home=Path.home()
     ) as fresh:
         return _checked_and_written_in_turn(context, fresh, check)
+
+
+def _checked_and_answered(
+    context: session.RunContext, item: int, result: item_step.StepResult, check: StepCheck
+) -> DecisionResult | CardChanged:
+    """One read of `item`, `check` on the step that read shows, then one write of
+    the answer."""
+    with decide.turn(
+        context, item, command="step", environment=os.environ, home=Path.home()
+    ) as fresh:
+        step = decide.step_of(fresh)
+        if step is None or not check(step):
+            return CardChanged()
+        answered = decide.answer_step(context, fresh, step, result)
+    notes = (WRITTEN_OVER_NOTE if answered.written_over else None, answered.label_note)
+    return DecisionResult(DecisionStatus.ANSWERED, note=" ".join(filter(None, notes)) or None)
 
 
 def _checked_and_written_in_turn(

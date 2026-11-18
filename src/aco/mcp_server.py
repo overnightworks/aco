@@ -243,8 +243,9 @@ _TOOLS: Final = (
             "required and answer is optional, each stored on the item and shown in "
             "read_inbox. Give an open item's number as item, or a title to open a new item "
             "for the step; a title that an open item of the operator's already holds with "
-            "this step marks that item instead. The head removes the label once the operator "
-            "says the step is done; there is no tool for that. A refusal that says the step "
+            "this step marks that item instead. An answer on the board clears the wait, "
+            "the step and the label; an answer in chat is the head's own edit. A refusal "
+            "that says the step "
             "was written or the item was opened is finished by repeating the same call."
         ),
         "inputSchema": _step_schema(),

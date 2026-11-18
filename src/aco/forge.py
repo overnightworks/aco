@@ -534,6 +534,11 @@ class ForgeWriter(ForgeReader, Protocol):
         it; raises when the forge's answer does not show it set."""
         ...
 
+    def remove_label(self, number: int, label: str) -> None:
+        """Takes `label` off item `number`; a label the item does not hold is
+        already removed."""
+        ...
+
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
         """Writes `body` as item `number`'s body; `replacing` is the text the write
         replaces, as the caller read it."""

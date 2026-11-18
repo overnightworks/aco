@@ -16,7 +16,8 @@ from cli_fixtures import (
     run_cli,
     track_board_config,
 )
-from github_fixtures import ReaderOnlyForge, assert_github_world, serve_forge
+from github_fixtures import assert_github_world, serve_forge
+from reader_only_forge import ReaderOnlyForge
 from store_fixtures import claim_intent, publish_claims_from_a_second_clone, state_ref_tip
 
 from aco import forge, github, protocol, workboard

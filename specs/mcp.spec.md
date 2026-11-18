@@ -165,7 +165,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 ## Never
 
 - `aco mcp` writes only through `ask`, `record_answer` and `step`: `ask` and `record_answer` one line per call, `step` one item's `next` in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
-- `step` never clears `wait.operator` and never removes the label `needs-operator`: the head does both, once the operator says the step is done.
+- `step` never clears `wait.operator` and never removes the label `needs-operator`: the board's step answer does both (ABRD-168, ABRD-169), and the head does both for an answer given in chat.
 - `record_answer` never checks that the operator spoke: it records what the agent says he answered, and the forge's edit history is the record after the fact.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
 - It never prints anything but protocol messages on standard output (MCP-20).
