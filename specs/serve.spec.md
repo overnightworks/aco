@@ -37,7 +37,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 | — |
 | a read sent before an item's stored answer arrived | ABRD-98 | — | — |
 | a read while a card waits | ABRD-105 | — | — |
-| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177 |
+| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
 | a malformed step answer | — | — | ABRD-164, ABRD-165 |
 | a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
 | an answer that does not fit its step | — | — | ABRD-167 |
@@ -250,7 +250,8 @@ A closed child counts however it closed, not-planned included. A container whose
 - [ ] [ABRD-165] A step answer's `text` follows ABRD-05's rules and is not blank; a refused one reaches no forge.
 - [ ] [ABRD-166] A step no longer as shown on the item's fresh read (ABRD-113), because it changed, was answered, closed or removed, answers `failed` `This step changed; reload.`, nothing written (see E-ABRD-23).
 - [ ] [ABRD-167] A `yes` on a step that asks for a report, or a `report` on one that does not, answers `failed` with a sentence, nothing written; `no` fits every step (see E-ABRD-24).
-- [ ] [ABRD-168] A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" on the board on <date>: ` and `Erfolgreich`, `Fehlgeschlagen: <note>` or the report (see E-ABRD-25).
+- [ ] [ABRD-168] A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" <channel> on <date>: ` and `Erfolgreich`, `Fehlgeschlagen: <note>` or the report (see E-ABRD-25).
+- [ ] [ABRD-178] The `<channel>` of ABRD-168 is `on the board` for `POST /api/step` and `in chat` for the MCP tool `answer_step` (MCP-72).
 - [ ] [ABRD-169] Under `storage = "github"` the label `needs-operator` goes after the body write; a refused removal keeps the answer and adds a `note` naming `gh issue edit <n> --remove-label needs-operator`.
 - [ ] [ABRD-170] A write the forge's body check keeps answers `answered` with ABRD-129's note and removes the label; a lost or unverified write answers `failed` with the forge's sentence and leaves the label.
 - [ ] [ABRD-171] The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.

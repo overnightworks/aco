@@ -1,9 +1,10 @@
 """The MCP server's replies (`specs/mcp.spec.md`): one decoded JSON-RPC message
 in, the line to answer with out. Free of I/O: the inbox read, the card write, the
-answer write and the step write are passed in.
+answer write, the step write and the step answer write are passed in.
 
 Speaks the `initialize` era of the protocol: `initialize`, `ping`, `tools/list`
-and `tools/call`, with the tools `read_inbox`, `ask`, `record_answer` and `step`.
+and `tools/call`, with the tools `read_inbox`, `ask`, `record_answer`, `step` and
+`answer_step`.
 """
 
 import json
@@ -20,6 +21,7 @@ READ_INBOX: Final = "read_inbox"
 ASK: Final = "ask"
 RECORD_ANSWER: Final = "record_answer"
 STEP: Final = "step"
+ANSWER_STEP: Final = "answer_step"
 
 type ReadInbox = Callable[[], Mapping[str, object]]
 """The inbox as JSON; raises `protocol.ClaimError` when it cannot be read."""
@@ -41,6 +43,12 @@ a repository named as `read_inbox` lists it: on the item whose number is the thi
 argument, or, when that is a title, on the open item holding it or on a new one;
 answers as JSON; raises `protocol.ClaimError` when it refuses."""
 
+type AnswerStep = Callable[[str, int, str, item_step.StepResult], Mapping[str, object]]
+"""Records the operator's chat answer to the step of an item of a repository, named as
+`read_inbox` lists it, given the step line `read_inbox` showed; answers as JSON; raises
+`protocol.ClaimError` when the step changed, the item holds none or the answer does not
+fit it."""
+
 
 @dataclass(frozen=True)
 class Tools:
@@ -50,6 +58,7 @@ class Tools:
     ask: Ask
     record_answer: RecordAnswer
     step: Step
+    answer_step: AnswerStep
 
 
 _PARSE_ERROR: Final = -32700
@@ -61,7 +70,8 @@ _INSTRUCTIONS: Final = (
     "Read the decisions and the steps waiting on the operator across every repository on "
     f"this machine with {READ_INBOX}, put a decision card of your own on an item with {ASK}, "
     f"record the answer the operator gave in this chat with {RECORD_ANSWER}, and mark a step "
-    f"only the operator can take with {STEP}."
+    f"only the operator can take with {STEP}; record the operator's chat answer to such a step "
+    f"with {ANSWER_STEP}."
 )
 _REPOSITORY: Final = "repository"
 _REPOSITORY_DESCRIPTION: Final = "the repository as read_inbox lists it, owner/repo"
@@ -81,6 +91,13 @@ _STEP_CARD_PURPOSES: Final = {
 _STEP_KEYS: Final = (_REPOSITORY, STEP, _ITEM, _TITLE, *_STEP_CARD_PURPOSES)
 _OPTION: Final = "option"
 _OTHER: Final = "other"
+_RESULT: Final = "result"
+_TEXT: Final = "text"
+_SUCCEEDED: Final = "Erfolgreich"
+_FAILED: Final = "Fehlgeschlagen"
+_REPORT: Final = "report"
+_RESULT_KINDS: Final = (_SUCCEEDED, _FAILED, _REPORT)
+_ANSWER_STEP_KEYS: Final = (*_ENVELOPE_KEYS, STEP, _RESULT, _TEXT)
 _RECORD_KEYS: Final = (*_ENVELOPE_KEYS, "line", "card_hash", _OPTION, _OTHER)
 
 
@@ -178,6 +195,28 @@ def _step_schema() -> dict[str, object]:
     }
 
 
+def _answer_step_schema() -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": {
+            _REPOSITORY: _string(_REPOSITORY_DESCRIPTION),
+            _ITEM: {"type": "integer", "description": "the number of the item"},
+            STEP: _string("the step line read_inbox showed for that item"),
+            _RESULT: {
+                "type": "string",
+                "enum": list(_RESULT_KINDS),
+                "description": (
+                    f"{_SUCCEEDED}: it worked; {_FAILED}: it failed, with text saying how; "
+                    f"{_REPORT}: the report the step asks for, as text"
+                ),
+            },
+            _TEXT: _string(f"the note of {_FAILED} or the {_REPORT}; give it for those only"),
+        },
+        "required": [*_ENVELOPE_KEYS, STEP, _RESULT],
+        "additionalProperties": False,
+    }
+
+
 _TOOLS: Final = (
     {
         "name": READ_INBOX,
@@ -244,12 +283,27 @@ _TOOLS: Final = (
             "read_inbox. Give an open item's number as item, or a title to open a new item "
             "for the step; a title that an open item of the operator's already holds with "
             "this step marks that item instead. An answer on the board clears the wait, "
-            "the step and the label; an answer in chat is the head's own edit. A refusal "
+            "the step and the label; an answer in chat goes through answer_step. A refusal "
             "that says the step "
             "was written or the item was opened is finished by repeating the same call."
         ),
         "inputSchema": _step_schema(),
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True},
+    },
+    {
+        "name": ANSWER_STEP,
+        "title": "Record the operator's answer to a step",
+        "description": (
+            "Records the answer the operator gave in this chat to the step an item waits "
+            "on, as the board records it: Erfolgreich, Fehlgeschlagen with the note that says "
+            "how, or the report a step that asks for one wants. Use it only for an answer he "
+            "gave, never for your own. Give the step line exactly as read_inbox shows it; a "
+            "step that changed since, an item without a step or an answer the step does not "
+            "ask for is refused and nothing is written. The item's wait, step and label "
+            "needs-operator go and the answer is written into now; the item stays open."
+        ),
+        "inputSchema": _answer_step_schema(),
+        "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False},
     },
 )
 
@@ -329,6 +383,9 @@ def _handlers(tools: Tools) -> dict[str, _Handler]:
             _record_answer_defects, lambda arguments: _record_answer(tools.record_answer, arguments)
         ),
         STEP: _Handler(_step_defects, lambda arguments: _step(tools.step, arguments)),
+        ANSWER_STEP: _Handler(
+            _answer_step_defects, lambda arguments: _answer_step(tools.answer_step, arguments)
+        ),
     }
 
 
@@ -378,6 +435,26 @@ def _step(step: Step, arguments: Mapping[str, object]) -> Mapping[str, object]:
         cast(str, arguments[STEP]).strip(),
         cast(int | str, target),
         _step_card(arguments),
+    )
+
+
+def _answer_step(answer_step: AnswerStep, arguments: Mapping[str, object]) -> Mapping[str, object]:
+    """The call of the step answer writer with arguments whose defects were already
+    refused."""
+    text = cast(str, arguments[_TEXT]).strip() if _TEXT in arguments else ""
+    result: item_step.StepResult
+    match arguments[_RESULT]:
+        case "Fehlgeschlagen":
+            result = item_step.StepFailed(text)
+        case "report":
+            result = item_step.StepReported(text)
+        case _:
+            result = item_step.StepSucceeded()
+    return answer_step(
+        cast(str, arguments[_REPOSITORY]),
+        cast(int, arguments[_ITEM]),
+        cast(str, arguments[STEP]).strip(),
+        result,
     )
 
 
@@ -460,6 +537,27 @@ def _step_defects(arguments: Mapping[str, object]) -> list[str]:
         if _is_blank(arguments, key)
     )
     defects.extend(_step_card_defects(arguments))
+    return defects
+
+
+def _answer_step_defects(arguments: Mapping[str, object]) -> list[str]:
+    """Every defect of `answer_step`'s arguments: the envelope's, a `step` that is no
+    string or blank, a `result` that is none of the three, a `text` that is no string,
+    blank where `result` needs one, or given with Erfolgreich. Whether the step and the
+    answer fit the item is the writer's to judge."""
+    defects = _envelope_defects(arguments, _ANSWER_STEP_KEYS)
+    if not isinstance(arguments.get(STEP), str) or _is_blank(arguments, STEP):
+        defects.append(f"{STEP} must be the non-blank step line read_inbox showed")
+    kind = arguments.get(_RESULT)
+    if kind not in _RESULT_KINDS:
+        defects.append(f"{_RESULT} must be one of {', '.join(_RESULT_KINDS)}")
+    text = arguments.get(_TEXT)
+    if _TEXT in arguments and not isinstance(text, str):
+        defects.append(f"{_TEXT} must be a string")
+    elif kind == _SUCCEEDED and _TEXT in arguments:
+        defects.append(f"{_TEXT} must not be given with {_SUCCEEDED}")
+    elif kind in (_FAILED, _REPORT) and (text is None or _is_blank(arguments, _TEXT)):
+        defects.append(f"{_TEXT} is required with {kind} and must not be blank")
     return defects
 
 

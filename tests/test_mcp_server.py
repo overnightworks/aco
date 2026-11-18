@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import pytest
+from mcp_echoes import echoing_answer_step
 
 from aco import (
     __version__,
@@ -55,8 +56,9 @@ def _answer(
     ask: mcp_server.Ask = _echoing,
     record_answer: mcp_server.RecordAnswer = _echoing_record,
     step: mcp_server.Step = _echoing_step,
+    answer_step: mcp_server.AnswerStep = echoing_answer_step,
 ) -> dict[str, Any]:
-    tools = mcp_server.Tools(read_inbox, ask, record_answer, step)
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step)
     line = mcp_server.reply(message if isinstance(message, str) else json.dumps(message), tools)
     assert line is not None
     assert "\n" not in line
@@ -134,7 +136,7 @@ def test_tools_list_offers_the_read_only_inbox_tool_without_arguments() -> None:
 def test_tools_list_offers_ask_as_a_repeatable_write_that_destroys_nothing() -> None:
     tool = _tools()["ask"]
 
-    assert list(_tools()) == ["read_inbox", "ask", "record_answer", "step"]
+    assert list(_tools()) == ["read_inbox", "ask", "record_answer", "step", "answer_step"]
     assert tool["annotations"] == {
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -682,7 +684,7 @@ def test_every_step_envelope_defect_is_named_in_one_error() -> None:
     ] == [True] * 6
 
 
-@pytest.mark.parametrize("name", ["read_inbox", "ask", "record_answer", "step"])
+@pytest.mark.parametrize("name", ["read_inbox", "ask", "record_answer", "step", "answer_step"])
 @pytest.mark.parametrize("arguments", [[], "card", 3, None], ids=["list", "string", "int", "null"])
 def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool(
     name: str, arguments: object
@@ -732,7 +734,9 @@ def test_any_other_method_is_not_found(method: str) -> None:
     ],
 )
 def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
-    tools = mcp_server.Tools(lambda: _INBOX, _echoing, _echoing_record, _echoing_step)
+    tools = mcp_server.Tools(
+        lambda: _INBOX, _echoing, _echoing_record, _echoing_step, echoing_answer_step
+    )
 
     assert mcp_server.reply(json.dumps(message), tools) is None
 

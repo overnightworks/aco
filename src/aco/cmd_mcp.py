@@ -114,6 +114,32 @@ def record_answer(
     }
 
 
+def answer_step(
+    label: str, number: int, step_text: str, result: item_step.StepResult
+) -> dict[str, object]:
+    """Records the operator's chat `result` to the step of item `number` of the
+    discovered repository `label` through `decide.answer_step_in_turn`, the turn
+    `POST /api/step` takes; refused when no repository found has that label, when the
+    item's step is not `step_text` or the item holds none, and when `result` does not
+    fit the step. Answers the sentences the answer is owed, when there are any."""
+    context = _context_of(label)
+    answered = decide.answer_step_in_turn(
+        context,
+        number,
+        result,
+        lambda step: step.wait_text == step_text,
+        item_step.AnswerChannel.CHAT,
+        environment=os.environ,
+        home=Path.home(),
+    )
+    if answered is None:
+        raise protocol.ClaimError(
+            f"#{number} no longer waits on the step {step_text!r}; read_inbox shows the current one"
+        )
+    note = {} if answered.note is None else {"note": answered.note}
+    return {"repository": label, "item": number, "answered": True, **note}
+
+
 def _holds_step(title: str, step: object, *, wanted_title: str, wanted_step: str) -> bool:
     """Whether an item with `title` and `next` value `step` is the one a call
     for `wanted_title` and `wanted_step` marks, padding of `next` ignored."""
@@ -195,7 +221,8 @@ def serve(requests: Iterable[bytes], replies: TextIO) -> None:
             continue
         try:
             answer = mcp_server.reply(
-                request.decode("utf-8"), mcp_server.Tools(read_inbox, ask, record_answer, step)
+                request.decode("utf-8"),
+                mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step),
             )
         except UnicodeDecodeError:
             answer = mcp_server.unparsable_reply()
@@ -209,8 +236,8 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
     commands.add_parser(
         name,
         help=(
-            "serve the operator's inbox, a card writer, an answer writer and a step writer "
-            "to an agent host over MCP on stdio"
+            "serve the operator's inbox, a card writer, an answer writer, a step writer and "
+            "a step answer writer to an agent host over MCP on stdio"
         ),
     )
 

@@ -146,6 +146,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         "ask",
         "record_answer",
         "step",
+        "answer_step",
     ]
     assert inbox["isError"] is False
     structured = inbox["structuredContent"]

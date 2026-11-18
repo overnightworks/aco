@@ -99,14 +99,17 @@ output is committed under `src/aco/board/static/`.
 ## MCP
 
 `aco mcp` is a stdio MCP server an agent host starts for one session; its tool
-`read_inbox` returns the option lines and the steps (items whose
-block's `wait` names the operator, with that wait's step) that wait on the operator across the
+`read_inbox` returns the option lines and the steps (items whose block's `wait`
+names the operator, with that wait's step) that wait on the operator across the
 same repositories `aco serve` finds, rescanned on every call, and its tool
 `ask` puts one decision card on an open item there, writing it once even when
 asked again, and its tool `record_answer` records the answer the operator gave
-in the chat on a card's option line, and its tool `step` marks a step only the
-operator can take: it writes the step into an item's `next` and `wait.operator` and sets
-the label `needs-operator` as its GitHub view, or opens such an item (`specs/mcp.spec.md`). For one session, `claude --strict-mcp-config
+in the chat on a card's option line, and its tool `answer_step` records the
+operator's chat answer to a step through the board's writer, and its tool
+`step` marks a step only the operator can take: it writes the step into an
+item's `next` and `wait.operator` and sets the label `needs-operator` as its
+GitHub view, or opens such an item (`specs/mcp.spec.md`).
+For one session, `claude --strict-mcp-config
 --mcp-config '{"mcpServers":{"aco":{"command":"aco","args":["mcp"]}}}'` or
 `codex exec -c 'mcp_servers.aco.command="aco"' -c 'mcp_servers.aco.args=["mcp"]'`
 registers it.

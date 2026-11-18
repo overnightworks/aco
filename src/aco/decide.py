@@ -1,6 +1,6 @@
 """The one read-modify-write of an item's block (`specs/rule.spec.md`,
 `specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
-decision board and the MCP `ask`, `record_answer` and `step` read an item through the
+decision board and the MCP `ask`, `record_answer`, `step` and `answer_step` read an item through the
 target gate and write its folded body once, here, so every ruling, withdrawal, card and
 step takes the same path, and a ruling or withdrawal touches the item's signal
 (`specs/wait.spec.md`). `item_lock` serializes the writers of one item on this
@@ -9,7 +9,7 @@ another read (`aco cut`) holds `item_lock` alone."""
 
 import hashlib
 import sys
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, fields
 from datetime import date
@@ -358,6 +358,12 @@ def mark_step(context: RunContext, fresh: FreshItem, step: str, card: item_step.
     _label_as_a_step(context.forge_writer, fresh.number, standing=f"#{fresh.number} holds the step")
 
 
+WRITTEN_OVER_NOTE = (
+    "Written over a change aco had not read; that change is only in the item's edit history."
+)
+"""The note of a write the forge's body check kept over a change aco had not read."""
+
+
 @dataclass(frozen=True)
 class StepAnswered:
     """How an answer to a step stands: whether the forge kept the written body over a
@@ -366,6 +372,12 @@ class StepAnswered:
 
     written_over: bool
     label_note: str | None
+
+    @property
+    def note(self) -> str | None:
+        """The sentences a reader of the answer is owed, `None` when there are none."""
+        notes = (WRITTEN_OVER_NOTE if self.written_over else None, self.label_note)
+        return " ".join(filter(None, notes)) or None
 
 
 def step_of(fresh: FreshItem) -> inbox.Step | None:
@@ -389,7 +401,11 @@ def _unlabelled_as_a_step(client: forge.ForgeWriter, number: int) -> str | None:
 
 
 def answer_step(
-    context: RunContext, fresh: FreshItem, step: inbox.Step, result: item_step.StepResult
+    context: RunContext,
+    fresh: FreshItem,
+    step: inbox.Step,
+    result: item_step.StepResult,
+    channel: item_step.AnswerChannel,
 ) -> StepAnswered:
     """Writes the operator's `result` to `step`, the one `step_of` read from the fresh
     item: the `wait` and the `step` table go, `now` tells the outcome and `next` says to
@@ -408,7 +424,7 @@ def answer_step(
         if key not in (item_wait.WAIT_KEY, item_step.STEP_KEY)
     }
     answered = {
-        "now": item_step.answered_now(step.wait_text, result, context.today()),
+        "now": item_step.answered_now(step.wait_text, result, context.today(), channel),
         "next": item_step.NEXT_AFTER_ANSWER,
     }
     new_body = body.replace_block(fresh.body, fresh.located, {**kept, **answered})
@@ -422,6 +438,27 @@ def answer_step(
     if fresh.storage is not body.Storage.GITHUB:
         return StepAnswered(written_over, None)
     return StepAnswered(written_over, _unlabelled_as_a_step(context.forge_writer, fresh.number))
+
+
+def answer_step_in_turn(  # noqa: PLR0913 - the turn keywords plus the item; the answer and the check
+    context: RunContext,
+    number: int,
+    result: item_step.StepResult,
+    check: Callable[[inbox.Step], bool],
+    channel: item_step.AnswerChannel,
+    *,
+    environment: Mapping[str, str],
+    home: Path,
+) -> StepAnswered | None:
+    """The one turn that answers a step: reads item `number` fresh, runs `check` on the
+    step that read shows and, when it passes, writes `result` with `answer_step`, told as
+    given through `channel`. `None` writes nothing: the item holds no step for the
+    operator or `check` refused the one it holds. Raises what `turn` and `answer_step` raise."""
+    with turn(context, number, command="step", environment=environment, home=home) as fresh:
+        step = step_of(fresh)
+        if step is None or not check(step):
+            return None
+        return answer_step(context, fresh, step, result, channel)
 
 
 def open_step_item(context: RunContext, title: str, step: str, card: item_step.StepCard) -> int:
