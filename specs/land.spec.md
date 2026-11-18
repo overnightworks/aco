@@ -49,6 +49,7 @@ order `merge`, `squash`, `rebase`.
 | `<path>` present but untracked or ignored | PIN-01 (cited) |
 | `storage = "state-ref"` | LANDCMD-01 |
 | `--coordinator-override` without `--role coordinator` | LANDCMD-19 |
+| `--record <file>` malformed, or its last verdict not the `--head` | LANDCMD-77 (LANREC-31, LANREC-38..LANREC-40, cited) |
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
 | pull request not open | LANDCMD-02 |
 | pull request is a draft | LANDCMD-74 |
@@ -102,6 +103,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
+- [ ] [LANDCMD-77] `--record <file>` is checked before any read, a rerun too: LANREC-31 at the argument parse (LANREC-40), LANREC-38 and LANREC-39 after LANDCMD-19; the release writes its record (LANREC-42, LANREC-43).
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
@@ -193,7 +195,7 @@ pull request's head (REL-61); a rerun with no live claim has no `base` (REL-47).
 - `aco land` never runs `release`'s own close, store transition, `freed`/`next` report, or worktree cleanup a second time; it delegates to the one existing `release --merged` path (`specs/release.spec.md`).
 - A step after the merge never re-merges: recovery always resumes from the pull request's own already-merged state, read fresh on every rerun.
 - Once merged, the delegated release never reads the pull request's own mutable body for routing: a fixer editing it away afterward changes nothing this pull request already landed (LAND-64).
-- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-50..53, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
+- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-50..53, LANDCMD-77, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
 - `aco land` never takes its storage, canonical remote, forge, or claim store from a head's `<path>`: this checkout's own tracked copy governs, and the head's copy is only checked (LANDCMD-22..24).
 
 ## Examples

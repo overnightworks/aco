@@ -23,6 +23,7 @@ from . import (
     cmd_handover,
     cmd_item,
     cmd_land,
+    cmd_lane_record,
     cmd_mcp,
     cmd_next,
     cmd_release,
@@ -277,6 +278,7 @@ def _add_release_parser(commands: usage.Subcommands, name: str) -> None:
         metavar="REASON",
         help="why this claim ends without a landing",
     )
+    cmd_lane_record.add_record_argument(release, writes="record an --abandoned lane")
     release.add_argument("--claim-id", help=EXPECTED_CLAIM_ID_HELP)
     release.add_argument(
         "--coordinator-override",
@@ -310,6 +312,7 @@ def _add_land_parser(commands: usage.Subcommands, name: str) -> None:
             "land refuses before any write when the pull request's head is another commit"
         ),
     )
+    cmd_lane_record.add_record_argument(land, writes="record the landed lane")
     land.add_argument("--agent", help=AGENT_HELP)
     land.add_argument("--role", help=ROLE_ON_LIVE_CLAIM_HELP)
     land.add_argument(
@@ -362,8 +365,7 @@ REVIEWED_HEAD_PATTERN = re.compile(r"[0-9a-fA-F]{7,40}")
 
 
 def _reviewed_head(value: str) -> str:
-    """`land --head`'s argparse `type=`: the sha its reviewers
-    saw, lowercased as git prints it, refused before anything is read."""
+    """`land --head`'s argparse `type=`: the reviewed sha, lowercased, refused before any read."""
     if REVIEWED_HEAD_PATTERN.fullmatch(value) is None:
         raise protocol.ClaimUnavailableError("--head must be 7 to 40 hex digits")
     return value.lower()
@@ -612,11 +614,10 @@ class PreDispatchReason(StrEnum):
 
 
 def _refuse_usage(error: usage.UsageError, *, as_json: bool) -> int:
-    """The argument parser's own refusal, in the shape this invocation asked
-    for: without `--json` argparse's own usage block and
-    sentence, printed by the implementation `usage.UsageErrorParser` overrode, so
-    the bytes stay exactly what they were; with `--json` the shared envelope
-    instead, `invalid_usage`, argparse's own sentence as `message`."""
+    """The argument parser's own refusal, in the shape this invocation asked for: without `--json`
+    argparse's own usage block and sentence, printed by the implementation
+    `usage.UsageErrorParser` overrode, so the bytes stay exactly what they were; with `--json`
+    the shared envelope, `invalid_usage`, argparse's own sentence as `message`."""
     if not as_json:
         argparse.ArgumentParser.error(error.parser, str(error))
     return report.refuse(PreDispatchReason.INVALID_USAGE, error, as_json=True)
@@ -648,6 +649,7 @@ _COMMANDS: dict[str, _RepositoryCommand] = {
     "claim": _RepositoryCommand(_add_claim_parser, cmd_claim.run, resolves_agent=True),
     "release": _RepositoryCommand(_add_release_parser, cmd_release.run, resolves_agent=True),
     "land": _RepositoryCommand(_add_land_parser, cmd_land.run, resolves_agent=True),
+    "lane-record": _RepositoryCommand(cmd_lane_record.add_parser, cmd_lane_record.run),
     "adopt": _RepositoryCommand(_add_adopt_parser, cmd_adopt.run, resolves_agent=True),
     "rescope": _RepositoryCommand(_add_rescope_parser, cmd_rescope.run, resolves_agent=True),
     "handover": _RepositoryCommand(cmd_handover.add_parser, cmd_handover.run, resolves_agent=True),
@@ -709,8 +711,7 @@ def _asked_for_json(root: usage.UsageErrorParser, given: list[str]) -> bool:
 def _reached_levels(
     root: usage.UsageErrorParser, given: list[str]
 ) -> Iterator[tuple[usage.UsageErrorParser, tuple[str, ...]]]:
-    """Each parser this invocation's parse reached, root first, with the
-    tokens argparse handed that level."""
+    """Each parser this invocation's parse reached, root first, with its tokens."""
     parser, tokens = root, tuple(given)
     while True:
         yield parser, tokens
@@ -790,20 +791,19 @@ def _run_repository_command(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    # Every refusal the parse itself raises -- argparse's own usage errors, and
-    # `workboard.parse_item_reference`, an argparse `type=` whose refusal is a `ClaimError` --
-    # fires before any namespace carries `--json`, so the mode is read back off the parsers this
-    # parse reached. Both report `invalid_usage` through the one envelope. Past the parse the
-    # plain sentence alone still stands: a refusal a command raises outside its own reported
-    # vocabulary must not be dressed as one.
+    # Every refusal the parse itself raises -- argparse's own usage errors, and an argparse
+    # `type=` whose refusal is a `ClaimError` (`workboard.parse_item_reference`, a lane record
+    # file) -- fires before any namespace carries `--json`, so the mode is read back off the
+    # parsers this parse reached. Both report `invalid_usage` through the one envelope. Past the
+    # parse the plain sentence alone still stands: a refusal a command raises outside its own
+    # reported vocabulary must not be dressed as one.
     given = sys.argv[1:] if arguments is None else arguments
     parser = _parser()
     try:
         parsed = parser.parse_args(given)
-        # Judged after the parse, not as an argparse `type=`: `--repo`
-        # precedes the subcommand, so a refusal raised while argparse reads
-        # it would fire before the parse reached the command that decides
-        # whether this run asked for JSON.
+        # Judged after the parse, not as an argparse `type=`: `--repo` precedes the subcommand,
+        # so a refusal raised while argparse reads it would fire before the parse reached the
+        # command that decides whether this run asked for JSON.
         parsed.repo = None if parsed.repo is None else github.repository_id(parsed.repo)
     except usage.UsageError as error:
         return _refuse_usage(error, as_json=_asked_for_json(parser, given))

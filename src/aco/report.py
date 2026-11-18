@@ -131,8 +131,12 @@ def refusal_around_foreign_text(template: str, foreign_text: str, **words: objec
     shown as `bounded_refusal` shows foreign text, and cut alone so that the
     words around it always survive."""
     room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
-    shown = _cut_to(protocol.terminal_text(foreign_text), room)
-    return template.format(foreign=shown, **words)
+    return template.format(foreign=cut_foreign_text(foreign_text, room), **words)
+
+
+def cut_foreign_text(foreign_text: str, limit: int) -> str:
+    """`foreign_text` shown as `bounded_refusal` shows foreign text, cut to `limit` characters."""
+    return _cut_to(protocol.terminal_text(foreign_text), limit)
 
 
 def _cut_to(printable: str, limit: int) -> str:

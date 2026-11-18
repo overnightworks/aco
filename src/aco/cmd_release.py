@@ -372,13 +372,11 @@ def authorize_releaser(
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`release`'s own `--json` envelope: every refusal this
-    function or `_cmd_release_landed` raises -- REL-01's own usage errors
-    excepted, which the parser reports as `invalid_usage` before either ever
-    runs -- is caught here and reported as
-    `precondition_failed`, rather than escaping the envelope entirely."""
+    """`release`'s own `--json` envelope: every refusal past the parser (REL-01's usage errors
+    are `invalid_usage`) is caught here and reported as `precondition_failed`."""
     as_json = parsed.json
     try:
+        lane_record.require_abandoned_release(parsed.record, parsed.abandoned)
         release_transition(parsed, context, _release_branch_for(parsed))
     except protocol.ClaimError as error:
         return report.refuse(_ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
@@ -437,23 +435,19 @@ def release_transition(
         coordinator_override=parsed.coordinator_override,
     )
     merge_commit, item = (None, None) if lane is None else (lane.merge_commit, lane.item)
+    evidence = lane_record.ReleaseEvidence(merge_commit, item, parsed.record)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, merge_commit, item),
-        intent,
+        lane_record.release_subject(context, resolved.selected, outcome, evidence), intent
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
-    landing = (
-        None
-        if lane is None
-        else _landing_report(
+    landing = worktree_cleanup = None
+    if lane is not None:
+        landing = _landing_report(
             context, identity, new_state, storage, context.fetched_default_branch_ref()
         )
-    )
-    worktree_cleanup = (
-        None
-        if lane is None
-        else _cleanup_landed_worktree(parsed, lane, context, context.fetched_default_branch_ref)
-    )
+        worktree_cleanup = _cleanup_landed_worktree(
+            parsed, lane, context, context.fetched_default_branch_ref
+        )
     _print_release_result(
         _ReleaseReport(
             resolved.selected,
@@ -706,17 +700,13 @@ def _cmd_release_landed(
     storage: body.Storage,
     release_branch: str | None,
 ) -> ReleaseEnding:
-    """`release --merged <sha|empty>` under `storage = "state-ref"` (
-    LAND-47/LAND-52): the trunk walk (`checkout.trunk_landings`)
-    names, or verifies, the landing commit; one
-    `protocol.LandingIntent` then closes the item and releases the claim in
-    one commit, one CAS -- `run`'s own `ReleaseIntent` path never
-    runs for this storage pin's `--merged`. With no live claim left to
-    release (REL-47) it writes nothing and only cleans up, and a claim the
-    landing did not land refuses (REL-48, REL-53), both before the item
-    write is prepared: that write refuses an item the landing already
-    closed.
-    """
+    """`release --merged <sha|empty>` under `storage = "state-ref"` (LAND-47/LAND-52): the trunk
+    walk (`checkout.trunk_landings`) names, or verifies, the landing commit; one
+    `protocol.LandingIntent` then closes the item and releases the claim in one commit, one CAS
+    -- `run`'s own `ReleaseIntent` path never runs for this storage pin's `--merged`. With no
+    live claim left to release (REL-47) it writes nothing and only cleans up, and a claim the
+    landing did not land refuses (REL-48, REL-53), both before the item write is prepared: that
+    write refuses an item the landing already closed."""
     if not isinstance(identity, protocol.IssueIdentity):
         raise protocol.ClaimUnavailableError(
             "--merged under storage = state-ref requires an issue number; "
@@ -772,9 +762,9 @@ def _cmd_release_landed(
         operation_id=uuid.uuid4().hex,
         coordinator_override=parsed.coordinator_override,
     )
+    evidence = lane_record.ReleaseEvidence(item=item)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, item=item),
-        intent,
+        lane_record.release_subject(context, resolved.selected, outcome, evidence), intent
     )
     client.mark_landed(write, new_oid)
     landing = _landing_report(context, identity, new_state, storage, trunk_ref)

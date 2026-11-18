@@ -17,6 +17,7 @@ from . import (
     cmd_release,
     forge,
     github,
+    lane_record,
     policy,
     protocol,
     report,
@@ -568,19 +569,16 @@ def _land_release(
     issue: int | None,
     branch: str,
 ) -> cmd_release.ReleaseEnding:
-    """`aco land`'s own delegated call into the existing `release --merged`
-    path: never a second copy of its close/release/report/
-    cleanup -- `--branch` selects the lane by name without requiring this
-    checkout to be on it: the release may run from the coordinator's primary
-    checkout, exactly where `land` runs from. Calls `cmd_release.release_transition` directly, never
-    `cmd_release.run`: `land` needs a raised `ClaimError` here so
-    `_land_step` can convert it into its own ruled `MERGED ... follow-up
-    incomplete: release` line, not `cmd_release.run`'s own caught-and-printed
-    `--json` refusal, which `land` never uses (`json=False` above) and
-    would otherwise print its sentence a second time. The release reads
-    through a fresh `context`: the fast-forward just
-    wrote the landed trunk into this very checkout, so the configuration
-    and forge read before it no longer answer for it."""
+    """`aco land`'s own delegated call into the existing `release --merged` path: never a second
+    copy of its close/release/report/cleanup -- `--branch` selects the lane by name without
+    requiring this checkout to be on it: the release may run from the coordinator's primary
+    checkout, exactly where `land` runs from. Calls `cmd_release.release_transition` directly,
+    never `cmd_release.run`: `land` needs a raised `ClaimError` here so `_land_step` can convert
+    it into its own ruled `MERGED ... follow-up incomplete: release` line, not `cmd_release.run`'s
+    own caught-and-printed `--json` refusal, which `land` never uses and which would print the
+    sentence twice. The release reads through a fresh `context`: the fast-forward just wrote
+    the landed trunk into this very checkout, so the configuration and forge read before it no
+    longer answer for it."""
     release_parsed = argparse.Namespace(
         issue=issue,
         agent=parsed.agent,
@@ -588,6 +586,7 @@ def _land_release(
         branch=branch,
         merged=str(parsed.pull_request),
         abandoned=None,
+        record=parsed.record,
         claim_id=None,
         coordinator_override=parsed.coordinator_override,
         keep_worktree=parsed.keep_worktree,
@@ -663,18 +662,17 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     `release --merged` path unchanged. A pull request `landing` already finds merged -- a resumed
     run after an earlier step failed -- skips preflight and the merge
     itself entirely: `merge_landing` never runs twice for the same pull
-    request. `--coordinator-override`'s own role is validated here, at
-    entry, before that fresh/rerun split and before any read: a rerun skips `_land_preflight`
-    entirely, so a
-    check placed only there left a rerun free to delete the branch and
-    fast-forward -- and `cmd_release.release_transition` free to close the item -- on a bare
-    `--coordinator-override` with no coordinator role behind it."""
+    request. `--coordinator-override`'s own role and `--record`'s verdict head are validated
+    here, at entry, before that fresh/rerun split and before any read: a rerun skips
+    `_land_preflight` entirely, so a check placed only there left a rerun free to delete the
+    branch and fast-forward -- and `cmd_release.release_transition` free to close the item."""
     if parsed.head is None:
         raise protocol.ClaimUnavailableError(_LAND_HEAD_REQUIRED_REFUSAL)
     if context.config.storage is not body.Storage.GITHUB:
         raise protocol.ClaimUnavailableError(_LAND_GITHUB_ONLY_REFUSAL)
     if parsed.coordinator_override:
         protocol.require_coordinator_override(parsed.role)
+    lane_record.require_landing_head(parsed.record, parsed.head)
     client = cast(github.GitHubForge, context.forge)
     detail = _land_read_head_checked(client, parsed.pull_request, client.repository.path)
     # A rerun's own preflight never ran, so it verified no classification:
