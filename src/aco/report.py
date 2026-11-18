@@ -138,15 +138,19 @@ def refusal_around_foreign_text(template: str, foreign_text: str, **words: objec
 def refusal_around_foreign_path(template: str, path_text: str, **words: object) -> str:
     """`template` with `{foreign}` replaced by `path_text`, shown as `refusal_around_foreign_text`
     shows foreign text, but a path that does not fit loses the front of its directory (`…/`),
-    so the file name and the words around it survive."""
+    so the file name and the words around it survive whole; the line passes its bound only
+    when the file name and those words do not fit together."""
     room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
     printable = protocol.terminal_text(path_text)
     if len(printable) <= room:
         return template.format(foreign=printable, **words)
+    file_name = printable.rpartition("/")[2]
     kept = printable[len(printable) - (room - len(_PATH_ELLIPSIS)) :]
-    # `kept` starts mid-name; the first `/` ends that name, and a name with none is the file name.
-    whole_names = kept.partition("/")[2] or kept
-    return template.format(foreign=_PATH_ELLIPSIS + whole_names, **words)
+    # `kept` starts mid-name; the first `/` ends that name, and a kept part with none holds no
+    # whole directory name, so the file name stands alone.
+    whole_names = kept.partition("/")[2] or file_name
+    shortened = _PATH_ELLIPSIS + whole_names if "/" in printable else file_name
+    return template.format(foreign=shortened, **words)
 
 
 def cut_foreign_text(foreign_text: str, limit: int) -> str:

@@ -91,7 +91,7 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-42] With `--record`, LANREC-11 and LANREC-12 hold the file's figures, `lane_fix_rounds` and `lane_blocking` summed over the finding stages; no routing line is read (LANREC-13..LANREC-15).
 - [ ] [LANREC-43] A file also writes `lane_risk`, then `lane_fix_rounds_<stage>` and `lane_blocking_<stage>` for `review`, `gate`, `ci` and `test`, each a whole number; an omitted `risk` has no line.
 - [ ] [LANREC-44] `aco land` also refuses a last verdict of `revise`: `the lane record's last verdict is revise at <stage>, not approve`, exit `2`; `release --abandoned` takes any last verdict (E-LANREC-08).
-- [ ] [LANREC-45] A refusal line is bounded (200 characters): a `<file>` that does not fit loses the front of its directory, shown as `…/`, and the file name and `<defect>` stay whole (E-LANREC-10).
+- [ ] [LANREC-45] A refusal line is bounded (200 characters): a `<file>` that does not fit loses the front of its directory, shown as `…/`, and the file name and `<defect>` stay whole, so the line passes the bound only when they do not fit together (E-LANREC-10).
 - [ ] [LANREC-46] A file that starts with a UTF-8 byte order mark refuses the defect `begins with a UTF-8 byte order mark; save it without one` (E-LANREC-09).
 
 ## Failure

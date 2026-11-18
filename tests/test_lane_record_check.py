@@ -274,6 +274,37 @@ def test_a_refusal_keeps_its_defect_and_the_file_name_however_long_the_file_path
     assert len(result.stderr.rstrip("\n")) <= report.REFUSAL_LINE_LENGTH_LIMIT
 
 
+@pytest.mark.parametrize(
+    ("in_working_directory", "shown_prefix"),
+    [
+        pytest.param(True, "", id="a-bare-file-name"),
+        pytest.param(False, "…/", id="a-file-name-in-a-directory"),
+    ],
+)
+def test_a_file_name_longer_than_the_line_stays_whole_and_the_line_passes_the_bound(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    in_working_directory: bool,  # noqa: FBT001
+    shown_prefix: str,
+) -> None:
+    """Spec: LANREC-45."""
+    file_name = "a" * 160 + ".json"
+    (tmp_path / file_name).write_text(json.dumps(lane_record_object(version=2)), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = run_cli(
+        ["lane-record", "check", file_name if in_working_directory else str(tmp_path / file_name)],
+        capsys,
+    )
+
+    assert result.status == 2
+    assert result.stderr == (
+        f"ERROR: lane record {shown_prefix}{file_name} is invalid: "
+        "version 2 is unknown; this aco reads version 1\n"
+    )
+
+
 def test_a_refusal_cuts_a_long_unknown_key_and_stays_one_bounded_line(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
