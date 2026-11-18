@@ -180,7 +180,7 @@ exit 0
 
 ### E-WAIT-05 — an idle head waits on the board and a card is ruled
 
-Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open, labelled `needs-operator`, with the three lines above and no other open item
+Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `<item-id>` open, carrying a `wait` naming `operator`, with the three lines above and no other open item
 
 Started in one shell, then `aco rule <item-id> --line 3 --option A --via chat` run in another:
 

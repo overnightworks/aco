@@ -513,7 +513,7 @@ answer 200: {"root": "<root>", "repos": [
 
 ### E-ABRD-20 -- progress per top-level container
 
-Setup: test-forge, open container `#10` titled `Song jump` whose sub-issue list holds 3 closed children, two of them named by a trunk commit's `Work-Item:` trailer, and the open child `#20` labelled `needs-operator`, with 2 uncut `[[slice]]` rows, and container `#11` with a parent `#10`
+Setup: test-forge, open container `#10` titled `Song jump` whose sub-issue list holds 3 closed children, two of them named by a trunk commit's `Work-Item:` trailer, and the open child `#20` carrying a `wait` naming `operator`, with 2 uncut `[[slice]]` rows, and container `#11` with a parent `#10`
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
