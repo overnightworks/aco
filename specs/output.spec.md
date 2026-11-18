@@ -83,8 +83,8 @@ Setup: bare-remote, bootstrapped, `storage = "state-ref"` tracked, `items/aco-00
 
 ```console
 $ aco rule aco-000001 --line 1 --option A --via chat --card-hash sha256:0 --json
-2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]
-{"ok": false, "reason": "invalid_item", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 and a body whose aco block carries a valid [record]"}
+2> ERROR: item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash
+{"ok": false, "reason": "invalid_item", "message": "item aco-000001 has a malformed aco block (body malformed: aco: no aco block); repair it with aco item edit aco-000001 --base <body_hash> and a body whose aco block carries a valid [record]; aco item show aco-000001 --json prints the body_hash"}
 exit 2
 ```
 

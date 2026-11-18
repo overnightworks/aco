@@ -44,6 +44,7 @@ from .body import (
     readable_record_title,
     replace_block,
 )
+from .expectation_grammar import content_hash
 from .protocol import (
     ClaimUnavailableError,
     ItemPin,
@@ -130,22 +131,21 @@ class _DecodedItem:
 
 @dataclass(frozen=True)
 class _MalformedItem:
-    """An item file whose bytes decode to no valid `aco` block with
-    a `[record]` table: kept aside rather than refusing the
-    store at decode, so a read of any other item still answers while this
-    item's own read refuses, and `board`/`next` list it by `defect` rather
-    than refusing the whole store. `problem` completes the
-    sentence `item <id> ...`; `oid` is the CAS `expected` a repairing
-    `update_item_body` writes over; `text` is whatever of the file still
-    decodes; `title` is the record's title when it alone still reads, for
-    the twin search and the board's row; `parent` is the record's parent
-    when it alone still reads, so that container counts this item as an
-    open child, `None` for a top-level record, and `UnreadParent.UNREAD`
-    when the record or its parent does not read."""
+    """An item file whose bytes decode to no valid `aco` block with a `[record]` table: kept
+    aside rather than refusing the store at decode, so a read of any other item still answers
+    while this item's own read refuses, and `board`/`next` list it by `defect` rather than
+    refusing the whole store. `problem` completes the sentence `item <id> ...`; `oid` is the
+    CAS `expected` a repairing `update_item_body` writes over; `body_hash` hashes the stored
+    bytes, the base that repair names; `text` is whatever of the file still decodes; `title`
+    is the record's title when it alone still reads, for the twin search and the board's row;
+    `parent` is the record's parent when it alone still reads, so that container counts this
+    item as an open child, `None` for a top-level record, and `UnreadParent.UNREAD` when the
+    record or its parent does not read."""
 
     problem: str
     defect: ContractDefect
     oid: ObjectId
+    body_hash: str
     text: str = ""
     title: str | None = None
     parent: str | UnreadParent | None = UnreadParent.UNREAD
@@ -236,7 +236,9 @@ def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | 
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
-        return _MalformedItem(problem="is not valid UTF-8", defect=_NOT_UTF8, oid=oid)
+        return _MalformedItem(
+            problem="is not valid UTF-8", defect=_NOT_UTF8, oid=oid, body_hash=content_hash(content)
+        )
     parsed = parse_body(text, storage=Storage.STATE_REF)
     if parsed.read_state is not BodyReadState.VALID or parsed.record is None:
         defect = (parsed.contract.defects or (_NO_RECORD,))[0]
@@ -244,6 +246,7 @@ def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | 
             problem=f"has a malformed {BLOCK_FENCE_INFO} block ({body_defect_text(defect)})",
             defect=defect,
             oid=oid,
+            body_hash=content_hash(content),
             text=text,
             title=readable_record_title(text),
             parent=readable_record_parent(text),
@@ -251,10 +254,12 @@ def _decode_item(item_id: str, content: bytes, oid: ObjectId) -> _DecodedItem | 
     return _DecodedItem(record=items.parse_item_record(item_id, parsed.record), body=text, oid=oid)
 
 
-def _malformed_item_refusal(item_id: str, malformed: _MalformedItem) -> MalformedStateTreeError:
-    return MalformedStateTreeError(
+def _malformed_item_refusal(item_id: str, malformed: _MalformedItem) -> items.MalformedItemError:
+    return items.MalformedItemError(
         f"item {item_id} {malformed.problem}; repair it with aco item edit {item_id} "
-        f"and a body whose {BLOCK_FENCE_INFO} block carries a valid [record]"
+        f"--base <body_hash> and a body whose {BLOCK_FENCE_INFO} block carries a valid "
+        f"[record]; aco item show {item_id} --json prints the body_hash",
+        body_hash=malformed.body_hash,
     )
 
 
@@ -276,17 +281,11 @@ def _item_kind(kind: str | None) -> ItemKind | None:
 def _delivered_content_fields(
     body: str, stored: items.ItemRecord
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
-    """`update_item_body`'s own owner split for `title`, `labels`,
-    `blocked_by` (`aco item edit`'s ruled record merge): taken from `body`'s
-    own `[record]` table when the delivered body carries one valid -- read off
-    the table's raw TOML presence, never `items.parse_item_record`'s own
-    `.get(key, [])` default, which would turn an omitted `labels`/`blocked_by`
-    into an emptied one rather than `stored`'s own value. A body with no
-    `[record]` at all -- every `rule`/`ask`/`cut` write already composes one --
-    changes nothing here. Every other record field (`parent`, `state`,
-    `origin`, `kind`, the three timestamps) stays `stored`'s own regardless of
-    what a delivered record names for it -- `update_item_body` itself, never
-    this helper, owns that half of the split."""
+    """`update_item_body`'s owner split for `title`, `labels`, `blocked_by`: taken from
+    `body`'s own `[record]` when it carries one valid -- read off the table's raw TOML
+    presence, never `items.parse_item_record`'s `.get(key, [])` default, which would empty
+    an omitted `labels`/`blocked_by` instead of keeping `stored`'s. A body with no `[record]`
+    changes nothing here, and every other record field stays `stored`'s own."""
     parsed = parse_body(body, storage=Storage.STATE_REF)
     delivered = parsed.record
     if parsed.read_state is not BodyReadState.VALID or delivered is None:
@@ -352,6 +351,15 @@ class StateRefBoard:
         one existence check `aco item edit` needs, since it is also the
         repair path for a malformed item every other read refuses."""
         return number in self._by_number
+
+    def stored_body_hash(self, number: int) -> str:
+        """The hash of `number`'s stored bytes, malformed or not, the base a
+        whole-body `item edit` compares (ITEM-72). `number` is one `holds` named."""
+        item_id = self._by_number[number]
+        malformed = self._malformed.get(item_id)
+        if malformed is not None:
+            return malformed.body_hash
+        return content_hash(self._items[item_id].body.encode("utf-8"))
 
     def _refuse_a_foreign_entry(self) -> None:
         """PIN-13's refusal by the lowest name while `items/` holds an entry
@@ -755,23 +763,15 @@ class StateRefBoard:
         return items.item_number(item_id)
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:  # NOSONAR(S1172)
-        """`body`, written back to `number`'s item file:
-        `title`, `labels`, `blocked_by` come from `body`'s own `[record]`
-        table when it carries one (`_delivered_content_fields`'s own owner
-        split -- `aco item edit`'s ruled record merge); every other record
-        field stays this item's own already-read `current.record`, and
-        `updated_at` always moves to now. The CAS write's `expected` is
-        `current.oid`, this instance's own already-read snapshot -- never a
-        re-read -- so a second writer holding the same stale oid refuses with
-        the CAS-20 refusal; that stronger check leaves `replacing` unread.
-        Every blocker the write adds must resolve to another readable item,
-        and none may repeat, before the write: a missing one
-        would stop every later `board`/`next` (PIN-17), a repeated one trip
-        `board_read.validated_dependencies`' malformed blocked-by list refusal; a
-        write that carries the stored record through never re-judges it.
-        A malformed item has no stored record to merge into:
-        `body`'s own complete `[record]` repairs it once its relations
-        resolve (`_refuse_unresolved_repair`), else it refuses by name."""
+        """`body`, written back to `number`'s item file: `title`, `labels`, `blocked_by` come
+        from `body`'s own `[record]` when it carries one (`_delivered_content_fields`), every
+        other record field stays the stored one, and `updated_at` moves to now. The CAS write
+        expects `current.oid`, this instance's own snapshot, so a second writer from the same
+        snapshot refuses with CAS-20's sentence; that check leaves `replacing` unread. A
+        blocker the write adds must resolve to another readable item and none may repeat
+        (PIN-17, ITEM-43). A malformed item has no stored record to merge into: `body`'s
+        complete `[record]` repairs it once its relations resolve
+        (`_refuse_unresolved_repair`), else it refuses by name."""
         item_id = self._by_number[number]
         now = items.format_record_timestamp(datetime.now(UTC))
         malformed = self._malformed.get(item_id)

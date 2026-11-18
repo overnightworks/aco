@@ -9,6 +9,7 @@ import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
 from cli_fixtures import run_cli
 from github_fixtures import serve_forge
+from item_base import edit_with_base
 from item_lock_witness import LockWitnessForge, run_second_writer_beside_the_first
 
 from aco import body, cli, forge
@@ -141,3 +142,20 @@ def test_an_unwritable_lock_directory_refuses_precondition_failed_and_writes_not
     )
     assert json.loads(result.stdout)["reason"] == "precondition_failed"
     assert client.body_writes == []
+
+
+def test_a_whole_body_edit_reads_and_writes_while_the_lock_is_held(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], lock_directory: Path
+) -> None:
+    """Spec: ITEM-72 -- the whole-body edit compares and writes under the item's lock, the read
+    `item show` made for its base excepted."""
+    client = served_witness(monkeypatch, lock_directory)
+    arguments = edit_with_base(str(ITEM), capsys)
+    shown_reads = len(client.lock_held_at_reads)
+
+    result = run_cli(arguments, capsys, stdin=block_body(MINIMAL_BLOCK_TOML, before="New.\n\n"))
+
+    assert result.status == 0
+    assert result.stderr == ""
+    assert client.lock_held_at_reads[shown_reads:] == [True]
+    assert client.lock_held_at_writes == [True]

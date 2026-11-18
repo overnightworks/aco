@@ -45,6 +45,15 @@ _MAX_MINT_ATTEMPTS = 3
 type _OptionalStr = str | None
 
 
+class MalformedItemError(MalformedStateTreeError):
+    """The refusal of one malformed item (ITEM-38), carrying `body_hash`, the base its
+    repairing `item edit` names (ITEM-73)."""
+
+    def __init__(self, message: str, *, body_hash: str) -> None:
+        super().__init__(message)
+        self.body_hash = body_hash
+
+
 class RecordState(StrEnum):
     """An item's own `[record].state`: `body.py`'s schema
     already restricts the raw value to these two; this is the typed read of
