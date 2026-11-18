@@ -3,7 +3,6 @@ board's test forge: marking an item, opening one, finding the one a failed call
 left, and what each refusal and each failure after a write leaves behind."""
 
 import json
-import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -379,18 +378,24 @@ def test_a_refused_target_is_a_tool_error_with_its_sentence_and_writes_nothing(
 
 
 @pytest.mark.parametrize(
-    "changes",
-    [pytest.param({}, id="item"), pytest.param({"item": None, "title": TITLE}, id="title")],
+    ("changes", "item_reference"),
+    [
+        pytest.param({}, workboard.item_label(1, body.Storage.STATE_REF), id="item"),
+        pytest.param({"item": None, "title": TITLE}, "<item>", id="title"),
+    ],
 )
 def test_a_state_ref_repository_refuses_before_any_lookup_or_write(
-    changes: dict[str, object], here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+    changes: dict[str, object],
+    item_reference: str,
+    here: board_forge.BoardForge,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     write_repository_config(here.directory, 'storage = "state-ref"\n')
 
     [result] = _serve(monkeypatch, _step_line(1, **changes))
 
     assert result["isError"] is True
-    assert re.search(r"aco item edit (?!--)\S+ --base <body_hash>", _text(result))
+    assert f"aco item edit {item_reference} --base <body_hash>" in _text(result)
     assert here.request_log() == ()
 
 
