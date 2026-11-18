@@ -17,18 +17,42 @@ from lane_record_fixtures import (
 )
 from store_fixtures import lane_trailers, state_ref_tip
 
+LANE_RECORD_TRAILERS_WITHOUT_MISSES = tuple(
+    line for line in LANE_RECORD_TRAILERS if not line.startswith("lane_misses_")
+)
 
+
+def record_without_misses() -> dict[str, object]:
+    record = lane_record_object()
+    del record["misses"]
+    return record
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_trailers"),
+    [
+        pytest.param(lane_record_object(), LANE_RECORD_TRAILERS, id="a-file-that-states-misses"),
+        pytest.param(
+            record_without_misses(),
+            LANE_RECORD_TRAILERS_WITHOUT_MISSES,
+            id="a-file-without-misses-writes-no-misses-line",
+        ),
+    ],
+)
 def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_the_reasons(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     github_clone: Path,
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
+    content: dict[str, object],
+    expected_trailers: tuple[str, ...],
 ) -> None:
-    """Spec: LANREC-41, LANREC-42, LANREC-43 -- the reason's routing line is not read."""
+    """Spec: LANREC-41, LANREC-42, LANREC-43, LANREC-50 -- the reason's routing line is not
+    read."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
-    record = write_lane_record_file(tmp_path, lane_record_object())
+    record = write_lane_record_file(tmp_path, content)
 
     release = ["--repo", REPOSITORY, "release", "--agent", "Ada", "--abandoned", ROUTING]
 
@@ -37,7 +61,7 @@ def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_th
     lines = lane_trailers(bare_remote)
     assert (result.status, result.stderr) == (0, "")
     assert lines[0] == "lane_outcome: abandoned"
-    assert lines[2:] == LANE_RECORD_TRAILERS
+    assert lines[2:] == expected_trailers
 
 
 @pytest.mark.parametrize(

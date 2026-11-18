@@ -25,8 +25,9 @@ last verdict judged and `<reviewed>` the `--head` value of `aco land`.
 | item size class | LANREC-28 | — |
 | the routing line, without `--record` | LANREC-13..LANREC-15 | LANREC-13, LANREC-14 |
 | the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 |
-| `aco lane-record check <file>` | LANREC-30..LANREC-37, LANREC-45, LANREC-46 | LANREC-30..LANREC-37, LANREC-45, LANREC-46 |
-| `--record <file>` | LANREC-31, LANREC-38..LANREC-40, LANREC-42..LANREC-46 | LANREC-31, LANREC-41..LANREC-43, LANREC-45, LANREC-46 |
+| `aco lane-record check <file>` | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49 | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49 |
+| `--record <file>` | LANREC-31, LANREC-38..LANREC-40, LANREC-42..LANREC-46, LANREC-49, LANREC-50 | LANREC-31, LANREC-41..LANREC-43, LANREC-45, LANREC-46, LANREC-49, LANREC-50 |
+| a figure read back from a release commit | LANREC-51 | LANREC-51 |
 | a figure that cannot be computed | LANREC-21 | LANREC-21 |
 | a malformed `production_paths` | LANREC-22 | LANREC-22 |
 
@@ -77,13 +78,16 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 `--record`: counts, model names, tags and shas, never a finding's text (LANREC-05). A file larger than 1048576 bytes `cannot be read` (LANREC-31).
 
 - [ ] [LANREC-30] `aco lane-record check <file>` reads the file alone, writes nothing, needs no checkout, and prints `lane record <file> is valid`, exit `0`.
-- [ ] [LANREC-31] A file that `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, `not valid JSON`, LANREC-32..37, LANREC-46 (E-LANREC-03).
-- [ ] [LANREC-32] The file is one JSON object of `version`, `stages`, `fix_rounds`, `blocking`, `verdicts` and the optional `risk` and `experiment`; a key beyond them, a missing one or a key stated twice refuses.
+- [ ] [LANREC-31] A file that `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, `not valid JSON`, LANREC-32..37, 46, 48, 49 (E-LANREC-03).
+- [ ] [LANREC-32] The file is one JSON object of `version`, `stages`, `fix_rounds`, `blocking`, `verdicts` and the optional `risk`, `misses` and `experiment`; an extra key, a missing one or a key stated twice refuses.
 - [ ] [LANREC-33] `version` is judged first: `1` passes; a whole number of up to 20 digits refuses `version <n> is unknown; this aco reads version 1`, any other `version must be the whole number 1`.
 - [ ] [LANREC-34] `stages` names `build`, `fix`, `review`, `test`, `gate` and `land`, each `<model>/<effort>` as LANREC-17 reads it, or `none` for `fix`, `test` and `gate`; `land` is the model dispatched to land.
 - [ ] [LANREC-35] `fix_rounds` and `blocking` each hold a whole number from `0` to `999` for each finding stage `review`, `gate`, `ci` and `test`; a finding a stand-in raised counts under `gate`.
+- [ ] [LANREC-47] A fix round counts under the stage whose report raised the blocking findings it fixes; one fixing only folded follow-ups, under the stage that raised them, the first of `review`, `gate`, `ci`, `test`.
 - [ ] [LANREC-36] `verdicts` lists each review and gate verdict, oldest first, as `stage` (`review` or `gate`), `verdict` (`approve` or `revise`) and the full commit `sha` it judged; the list may be empty.
 - [ ] [LANREC-37] `risk` and `experiment`, each optional, are tags as LANREC-20 reads one; no value in the file holds whitespace, so a count, a sha or a tag is one word.
+- [ ] [LANREC-48] `misses`, optional, holds a whole number from `0` to `999` for each finding stage: how many of its blocking findings the head contract's Misses rule counts, its exclusions applied by the writer.
+- [ ] [LANREC-49] A stage's misses above its blocking refuses `misses.<stage> exceeds blocking.<stage>`, through LANREC-31 (E-LANREC-11).
 - [ ] [LANREC-38] `aco land <n> --head <reviewed> --record <file>` refuses `the lane record's last verdict judged <full>, not the reviewed <reviewed>`, exit `2`, unless `<full>` starts with `<reviewed>`.
 - [ ] [LANREC-39] A record that states no verdict refuses `the lane record states no review or gate verdict, so it judged no head to land`, exit `2`.
 - [ ] [LANREC-40] LANREC-31 refuses at the argument parse; LANREC-38, LANREC-39 and LANREC-44 after the repository root and board.toml are read; all before any merge or write, on a rerun too (E-LANREC-04).
@@ -93,6 +97,10 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-44] `aco land` also refuses a last verdict of `revise`: `the lane record's last verdict is revise at <stage>, not approve`, exit `2`; `release --abandoned` takes any last verdict (E-LANREC-08).
 - [ ] [LANREC-45] A refusal line holds 200 characters: a `<file>` that does not fit loses the front of its directory (`…/`) while the file name and `<defect>` stay whole, so only those two can pass 200 (E-LANREC-10).
 - [ ] [LANREC-46] A file that starts with a UTF-8 byte order mark refuses the defect `begins with a UTF-8 byte order mark; save it without one` (E-LANREC-09).
+- [ ] [LANREC-50] A file that states `misses` also writes `lane_misses_<stage>` for `review`, `gate`, `ci` and `test` after the `lane_blocking_<stage>` lines; a file without it, and a lane with no file, has none.
+- [ ] [LANREC-51] A reader reads `lane_risk` and each `lane_fix_rounds_`, `lane_blocking_` and `lane_misses_` line back by stage; a missing, repeated or malformed line, or a risk that is no tag, is unknown alone.
+
+LANREC-47 and the writer's part of LANREC-48 (Misses and its exclusions) bind the lane writer: `aco` cannot check them, so their proof is `plugins/atelier/lane/record.js` in overnightworks/marketplace, and the figures stay unknown until it writes them.
 
 ## Failure
 
@@ -174,7 +182,7 @@ Nothing is merged, deleted or written; the claim stands.
 
 ### E-LANREC-05 — an abandoned lane leaves the file's record
 
-Setup: bare-remote, a linked worktree on `docs/tidy-readme`, its claim live, a file `lane-record.json` with `build sonnet-5.5/high`, `fix none`, `review opus-5.5/medium`, `test sonnet-5.5/medium`, `gate none`, `land haiku-5.5/low`, fix rounds `1`, `0`, `2`, `0` and blocking counts `3`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`, risk `routine` and experiment `builder-sonnet`
+Setup: bare-remote, a linked worktree on `docs/tidy-readme`, its claim live, a file `lane-record.json` with `build sonnet-5.5/high`, `fix none`, `review opus-5.5/medium`, `test sonnet-5.5/medium`, `gate none`, `land haiku-5.5/low`, fix rounds `1`, `0`, `2`, `0` and blocking counts `3`, `0`, `1`, `0` and misses `1`, `0`, `1`, `0` for `review`, `gate`, `ci`, `test`, risk `routine` and experiment `builder-sonnet`
 
 ```console
 $ aco release --abandoned "stopped for the day" --record lane-record.json
@@ -201,6 +209,10 @@ lane_blocking_review: 3
 lane_blocking_gate: 0
 lane_blocking_ci: 1
 lane_blocking_test: 0
+lane_misses_review: 1
+lane_misses_gate: 0
+lane_misses_ci: 1
+lane_misses_test: 0
 ```
 
 ### E-LANREC-06 — a record for a landing is not taken by release
@@ -252,5 +264,15 @@ Setup: a file `lane-record.json` stating `"version": 2`, in a directory path lon
 ```console
 $ aco lane-record check /long/…/directory/lane-record.json
 ERROR: lane record …/directory/lane-record.json is invalid: version 2 is unknown; this aco reads version 1
+exit 2
+```
+
+### E-LANREC-11 — a record whose misses exceed its blocking findings
+
+Setup: a file `lane-record.json` stating `"blocking": {"review": 3, "gate": 0, "ci": 1, "test": 0}` and `"misses": {"review": 1, "gate": 0, "ci": 2, "test": 0}`, no checkout
+
+```console
+$ aco lane-record check lane-record.json
+ERROR: lane record lane-record.json is invalid: misses.ci exceeds blocking.ci
 exit 2
 ```
