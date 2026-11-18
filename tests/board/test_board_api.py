@@ -289,6 +289,7 @@ def test_a_forge_that_cannot_list_answers_502_with_acos_reason(
                 "error": "no forge adapter for host",
                 "items": [],
                 "progress": None,
+                "steps": [],
             }
         ],
     }
@@ -319,6 +320,7 @@ def test_the_board_lists_every_configured_repo_in_order_200_on_partial_failure(
         "error": "no forge adapter for host",
         "items": [],
         "progress": None,
+        "steps": [],
     }
 
 
@@ -336,8 +338,8 @@ def test_the_board_answers_502_only_once_every_configured_repo_has_failed(
     assert response.json() == {
         "root": "/",
         "repos": [
-            {"name": "a", "error": "a is down", "items": [], "progress": None},
-            {"name": "b", "error": "b is down", "items": [], "progress": None},
+            {"name": "a", "error": "a is down", "items": [], "progress": None, "steps": []},
+            {"name": "b", "error": "b is down", "items": [], "progress": None, "steps": []},
         ],
     }
 
@@ -458,7 +460,7 @@ def test_a_repo_lists_only_its_name_error_items_and_progress(
     [repo] = cast(list[dict[str, Any]], board.get_board_json().json()["repos"])
 
     assert (set(repo), [item["number"] for item in repo["items"]]) == (
-        {"name", "error", "items", "progress"},
+        {"name", "error", "items", "progress", "steps"},
         [42],
     )
 

@@ -52,6 +52,8 @@ class RepoSnapshot:
     """This repo's open items with expectation lines, in RUL-03's order."""
     progress: Progress | ProgressUnavailable | None = None
     """This repo's progress view; `None` when the source gave none."""
+    steps: tuple[inbox.Step, ...] = ()
+    """The members' steps waiting on the operator, by descending number."""
 
 
 @dataclass(frozen=True)
@@ -215,6 +217,6 @@ class Boards:
 def _reading(label: str, future: Future[inbox.Reading]) -> RepoReading:
     try:
         reading = future.result()
-        return RepoSnapshot(label, reading.rows, reading.progress)
+        return RepoSnapshot(label, reading.rows, reading.progress, reading.steps)
     except DecisionSourceUnavailableError as error:
         return RepoUnavailable(label, str(error))
