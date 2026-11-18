@@ -98,7 +98,7 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-45] A refusal line holds 200 characters: a `<file>` that does not fit loses the front of its directory (`…/`) while the file name and `<defect>` stay whole, so only those two can pass 200 (E-LANREC-10).
 - [ ] [LANREC-46] A file that starts with a UTF-8 byte order mark refuses the defect `begins with a UTF-8 byte order mark; save it without one` (E-LANREC-09).
 - [ ] [LANREC-50] A file that states `misses` also writes `lane_misses_<stage>` for `review`, `gate`, `ci` and `test` after the `lane_blocking_<stage>` lines; a file without it, and a lane with no file, has none.
-- [ ] [LANREC-51] A reader reads `lane_risk` and each `lane_fix_rounds_`, `lane_blocking_` and `lane_misses_` line back by stage; a missing, repeated or malformed line, a count above `999` or a risk that is no tag, is unknown alone.
+- [ ] [LANREC-51] A reader reads `lane_risk` and each `lane_fix_rounds_`, `lane_blocking_`, `lane_misses_` line by stage; a missing, repeated or malformed line, a count above `999` or a non-tag risk is unknown alone.
 
 LANREC-47 and the writer's part of LANREC-48 (Misses and its exclusions) bind the lane writer: `aco` cannot check them, so their proof is `plugins/atelier/lane/record.js` in overnightworks/marketplace, and the figures stay unknown until it writes them.
 
