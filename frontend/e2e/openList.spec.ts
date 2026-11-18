@@ -1,6 +1,13 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { arrange, item, optionEntry, yesNoEntry, type CardOption } from './itemFixture';
+import {
+	arrange,
+	item,
+	optionEntry,
+	repoReading,
+	yesNoEntry,
+	type CardOption
+} from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 const SONG_QUESTION = 'Soll der Song beim Sprung offen bleiben?';
@@ -204,10 +211,7 @@ for (const viewport of [
 			await page.route('**/api/board', (route) =>
 				route.fulfill({
 					json: {
-						repos: [
-							{ name: 'quiet', error: null, items: [], steps: [] },
-							{ name: 'broken', error: sentence, items: [], steps: [] }
-						]
+						repos: [repoReading('quiet'), repoReading('broken', { error: sentence })]
 					}
 				})
 			);

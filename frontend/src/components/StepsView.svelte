@@ -10,10 +10,13 @@
 		STEPS_REGION_LABEL
 	} from '../app/model/steps';
 	import type { RepoReading } from '../types';
+	import type { DecisionStore } from '../app/state/decision.svelte';
+	import StepAnswer from './StepAnswer.svelte';
 	import WarnMark from './WarnMark.svelte';
 
-	let { repos }: { repos: RepoReading[] } = $props();
+	let { repos, decisions }: { repos: RepoReading[]; decisions: DecisionStore } = $props();
 
+	// A copy is told per step as listed: a changed card starts at Copy again.
 	let copies: Record<string, string> = $state({});
 
 	async function copy(key: string, text: string) {
@@ -45,6 +48,7 @@
 			<h2>{repo.name}</h2>
 			{#each repo.steps as step (step.number)}
 				{@const key = `${repo.name}#${step.number}`}
+				{@const copyKey = `${key}:${step.fingerprint}`}
 				<article aria-labelledby="step-{key}">
 					<h3 id="step-{key}"><span class="number">#{step.number}</span> {step.title}</h3>
 					{#if step.purpose === null}
@@ -52,11 +56,12 @@
 					{:else}
 						<p>{step.purpose}</p>
 						<pre>{step.actions}</pre>
-						<button type="button" class="copy" onclick={() => copy(key, step.actions ?? '')}
-							>{copies[key] ?? COPY_LABEL}</button
+						<button type="button" class="copy" onclick={() => copy(copyKey, step.actions ?? '')}
+							>{copies[copyKey] ?? COPY_LABEL}</button
 						>
 						<p><b>Expected</b> {step.expected}</p>
 						<p class="answer">{answerText(step)}</p>
+						<StepAnswer repo={repo.name} {step} {decisions} />
 					{/if}
 				</article>
 			{/each}

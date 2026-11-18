@@ -320,7 +320,7 @@
 			</div>
 		</div>
 		{#if view === 'steps'}
-			<StepsView repos={board.repos} />
+			<StepsView repos={board.repos} {decisions} />
 		{/if}
 		{#if view === 'progress'}
 			<ProgressView repos={board.repos} />

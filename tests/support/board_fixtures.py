@@ -396,10 +396,12 @@ TRIGGER_WAIT = {"trigger": WAIT_TRIGGER, "since": date(2026, 8, 31)}
 OPERATOR_WAIT = {"operator": "Decide.", "since": date(2026, 8, 31)}
 
 
-def holding_for_the_operator(raw_body: str) -> str:
-    """`raw_body` with an operator `wait` in its block, written by the production writer."""
+def holding_for_the_operator(raw_body: str, step: Mapping[str, str] | None = None) -> str:
+    """`raw_body` with an operator `wait` in its block, and `step` as its `[step]` table when
+    given, written by the production writer."""
     located = locate_block(raw_body)
-    return replace_block(raw_body, located, {**located.data, "wait": OPERATOR_WAIT})
+    held = {**located.data, "wait": OPERATOR_WAIT}
+    return replace_block(raw_body, located, held if step is None else {**held, "step": dict(step)})
 
 
 def ruled_expectation(

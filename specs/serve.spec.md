@@ -37,7 +37,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 | — |
 | a read sent before an item's stored answer arrived | ABRD-98 | — | — |
 | a read while a card waits | ABRD-105 | — | — |
-| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172 |
+| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177 |
 | a malformed step answer | — | — | ABRD-164, ABRD-165 |
 | a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
 | an answer that does not fit its step | — | — | ABRD-167 |
@@ -256,7 +256,13 @@ A closed child counts however it closed, not-planned included. A container whose
 - [ ] [ABRD-171] The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.
 - [ ] [ABRD-172] A stored answer writes `next` as `Act on the operator's answer in now.`, in one body write, and answers `answered` with no `item`.
 
-Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_answers.py` and `frontend/e2e/stepCard.spec.ts` (390 and 1280 px). The card's answer buttons are not yet built.
+- [ ] [ABRD-173] A step with its fields shows `Erfolgreich` and `Fehlgeschlagen`; `Erfolgreich` posts `yes`. A step that names an answer shows a text field `Bericht` with `Senden` instead, which posts `report`.
+- [ ] [ABRD-174] `Fehlgeschlagen` opens a field `Notiz`; `Senden` stays disabled while it is blank and then posts `no` with the note.
+- [ ] [ABRD-175] An answer starts the 8 second window of ABRD-58 with the strip `Saves shortly: <answer> · #n` and `Undo` in the card; `Undo` posts nothing, and leaving the page posts it at once (ABRD-152).
+- [ ] [ABRD-176] A stored answer removes the card after a re-read; a refused one keeps the card and shows its sentence, with `Neu laden`; the answer buttons stay disabled until `Neu laden`.
+- [ ] [ABRD-177] `Copied` reads `Copy` again once the step's card has changed.
+
+Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_answers.py`, `frontend/e2e/stepCard.spec.ts` and `frontend/e2e/stepAnswer.spec.ts` (390 and 1280 px).
 
 ## The SPA shell
 
