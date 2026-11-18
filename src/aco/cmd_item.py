@@ -379,7 +379,10 @@ def _replace_whole_body(
                     board_read.missing_item_refusal(number, board, storage)
                 )
             decide.require_current(base, board.stored_body_hash(number), item_id=item_id)
-            board.update_item_body(number, new_body, replacing="")
+            try:
+                board.update_item_body(number, new_body, replacing="")
+            except protocol.ItemWrittenSinceReadError as error:
+                raise decide.StaleBodyError(str(error)) from error
             stored = board.item_reference(number).body or ""
             return _WholeBodyEdit(
                 _ItemReason.EDITED, decide.body_hash(stored), board.item_oid(number)
