@@ -13,6 +13,7 @@ import type { DecisionResult } from '../../types';
 import {
 	ALREADY_RULED_MESSAGE,
 	cardKey,
+	entryKey,
 	LINE_CHANGED_MESSAGE,
 	UNDO_SECONDS
 } from '../model/decision';
@@ -65,11 +66,11 @@ test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is 
 	const store = new DecisionStore('token', wiring, send);
 
 	store.choose('repo', 42, points, { shown: card, option: optionA });
-	expect(store.isPending(key)).toBe(true);
-	store.undo(key);
+	expect(store.held(key)).not.toBeNull();
+	store.undo(entryKey(key, [3]));
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
-	expect(store.isPending(key)).toBe(false);
+	expect(store.held(key)).toBeNull();
 	expect(send).not.toHaveBeenCalled();
 	expect(reads()).toBe(0);
 });
@@ -109,5 +110,7 @@ test('[ABRD-44] a pending pick names its letter, option and topic for the strip'
 
 	store.choose('repo', 42, points, { shown: card, option: optionB });
 
-	expect(store.pendingEntries).toEqual([{ key, message: 'B — As today · Jump', state: 'done' }]);
+	expect(store.pendingEntries).toEqual([
+		{ key: entryKey(key, [3]), message: 'B — As today · Jump', state: 'done' }
+	]);
 });

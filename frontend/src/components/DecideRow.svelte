@@ -4,13 +4,13 @@
 		acceptAllConfirmation,
 		confirmationFor,
 		pickedLetter,
+		recommendedPicks,
 		type Confirmation,
 		type Pick
 	} from '../app/model/card';
 	import { STATE_LABEL } from '../app/model/boardSummary';
 	import {
 		CONFIRM_LABEL,
-		chosenText,
 		GROUP_LABEL,
 		isStuck,
 		pickLabel,
@@ -25,9 +25,8 @@
 
 	let {
 		points,
-		picks,
-		pending,
-		waiting,
+		held,
+		blocked,
 		saving,
 		banner,
 		onPick,
@@ -37,20 +36,26 @@
 	}: {
 		/** The card's points as shown now. */
 		points: readonly OptionLine[];
-		/** The picks shown: the held ones while the answer waits, else the live ones. */
-		picks: readonly Pick[];
-		pending: boolean;
-		/** The answer waits in its undo window or is being saved: the picks are held. */
-		waiting: boolean;
-		/** The answer is being saved (ABRD-100). */
+		/** The picks of the answers waiting in their undo window or being saved. */
+		held: readonly Pick[];
+		/** The points whose controls are disabled: waiting, or the card is reading again. */
+		blocked: ReadonlySet<number>;
+		/** A point of the card is being saved (ABRD-100). */
 		saving: boolean;
 		banner: DecisionBanner | null;
 		onPick: (shown: readonly OptionLine[], pick: Pick) => void;
 		onAcceptAll: (shown: readonly OptionLine[]) => void;
 		onReload: () => void;
-		/** The escapes (Other…, Unclear) and their panel; absent where the card offers none. */
-		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'points' | 'pending'>;
+		/** The escapes the row offers (Unclear on a card of points, Other… and Unclear on a
+		 * one-point card) and their panel; absent where the card offers none. */
+		escapes?: Omit<ComponentProps<typeof EscapeRow>, 'points' | 'pending' | 'number'>;
 	} = $props();
+
+	/** The points a post of the whole row covers: those not waiting. */
+	const open = $derived(points.filter((point) => !blocked.has(point.index)));
+	const allWaiting = $derived(open.length === 0);
+	/** Accept all needs a point with a recommendation that names an option. */
+	const nothingToAccept = $derived(recommendedPicks(open).length === 0);
 
 	const titleId = $props.id();
 	let dialog: HTMLDialogElement | undefined = $state();
@@ -116,7 +121,7 @@
 
 	async function acceptAll() {
 		const shown = points;
-		const confirmation = acceptAllConfirmation(shown);
+		const confirmation = acceptAllConfirmation(shown, open);
 		if (confirmation === null) {
 			onAcceptAll(shown);
 			return;
@@ -142,25 +147,25 @@
 					<button
 						type="button"
 						class="pick recommended wide"
-						disabled={pending}
+						disabled={nothingToAccept}
 						aria-label={GROUP_LABEL.acceptAllName}
 						onclick={acceptAll}
 					>
 						{GROUP_LABEL.acceptAll}
 					</button>
-					<span class="count">{chosenText(picks.length, points.length)}</span>
 				{:else}
 					{#each points as line (line.index)}
-						{@const held = pickedLetter(picks, line)}
+						{@const picked = pickedLetter(held, line)}
+						{@const waits = blocked.has(line.index)}
 						<div class="picks" role="group" aria-label={ROW_LABEL.decide}>
 							{#each line.options as option (option.letter)}
 								<button
 									type="button"
 									class="pick"
-									class:recommended={!waiting && option.letter === line.recommended}
-									class:chosen={waiting && option.letter === held}
-									disabled={pending}
-									aria-pressed={waiting ? option.letter === held : undefined}
+									class:recommended={!waits && option.letter === line.recommended}
+									class:chosen={option.letter === picked}
+									disabled={waits}
+									aria-pressed={waits ? option.letter === picked : undefined}
 									aria-label={pickLabel(option)}
 									onclick={() => choose({ shown: line, option })}
 								>
@@ -175,8 +180,9 @@
 						<span aria-hidden="true"><StateShape state="saving" /></span>
 						{STATE_LABEL.saving}
 					</span>
-				{:else if escapes !== undefined}
-					<EscapeRow {points} {pending} {...escapes} />
+				{/if}
+				{#if escapes !== undefined}
+					<EscapeRow {points} pending={allWaiting} {...escapes} />
 				{/if}
 			</div>
 		{/if}
@@ -298,12 +304,6 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 	}
-	.count {
-		align-self: center;
-		font-size: 13px;
-		line-height: 18px;
-		color: var(--fg-3);
-	}
 	dialog {
 		max-width: min(420px, calc(100vw - 32px));
 		padding: 26px 26px 22px;
@@ -354,9 +354,6 @@
 		color: var(--fg);
 	}
 	@media (max-width: 760px) {
-		.count {
-			display: none;
-		}
 		.decide-row {
 			grid-template-columns: minmax(0, 1fr);
 			padding-top: 12px;

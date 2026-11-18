@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { findSelection, NO_SELECTION_MESSAGE, selectionHeading } from '../app/model/boardSummary';
-	import { cardKey, lineKey } from '../app/model/decision';
+	import { cardKey, lineKey, pointKey } from '../app/model/decision';
+	import { escapeKinds, type EscapeKind, type EscapePanel } from '../app/model/optionCard';
 	import { locksCard, type DecisionStore } from '../app/state/decision.svelte';
-	import type { RepoReading } from '../types';
+	import type { OptionLine, RepoReading } from '../types';
 	import DecideRow from './DecideRow.svelte';
 	import DecidedCard from './DecidedCard.svelte';
 	import GroupCard from './GroupCard.svelte';
@@ -21,6 +22,48 @@
 	let decideRow: DecideRow | undefined = $state();
 
 	const selected = $derived(findSelection(repos, selectedKey));
+
+	/** The points whose controls are disabled: those waiting, all while the card reads again. */
+	function blockedPoints(card: string, points: readonly OptionLine[]): ReadonlySet<number> {
+		return decisions.isReading(card)
+			? new Set(points.map((point) => point.index))
+			: decisions.waitingIndexes(card);
+	}
+
+	/** The escapes of `shown` points: Other has its panel and draft under its point,
+	 * Unclear under the card; one panel is open at a time per row. */
+	function escapesFor(
+		repo: string,
+		item: number,
+		shown: readonly OptionLine[],
+		kinds: readonly EscapeKind[]
+	) {
+		const card = cardKey(repo, item);
+		const [answered] = shown;
+		const keyOf = (kind: EscapeKind) =>
+			kind === 'other' && answered !== undefined ? pointKey(repo, item, answered.index) : card;
+		const panel = kinds.map((kind) => decisions.panel(keyOf(kind))).find((open) => open !== null);
+		return {
+			kinds,
+			panel: panel ?? null,
+			draft: panel === undefined ? '' : decisions.draft(keyOf(panel.kind), panel.kind),
+			onOpen: (kind: EscapeKind, snapshot: readonly OptionLine[]) => {
+				for (const other of kinds) decisions.closePanel(keyOf(other));
+				decisions.openPanel(keyOf(kind), { kind, shown: snapshot });
+			},
+			onClose: () => {
+				for (const kind of kinds) decisions.closePanel(keyOf(kind));
+			},
+			onDraft: (text: string) => {
+				if (panel !== undefined) decisions.setDraft(keyOf(panel.kind), panel.kind, text);
+			},
+			onSend: ({ kind, shown: snapshot }: EscapePanel, text: string) => {
+				const [point] = snapshot;
+				if (kind === 'unclear') decisions.decideUnclear(repo, item, snapshot, text);
+				else if (point !== undefined) decisions.decideOther(repo, item, point, text);
+			}
+		};
+	}
 </script>
 
 <section
@@ -47,35 +90,21 @@
 		{@const itemNumber = selected.item.number}
 		{@const optionKey = cardKey(repoName, itemNumber)}
 		{@const banner = decisions.banner(optionKey)}
-		{@const held = decisions.held(optionKey)}
-		{@const picks = held ?? decisions.picks(optionKey, points)}
+		{@const held = decisions.held(optionKey) ?? []}
+		{@const blocked = blockedPoints(optionKey, points)}
 		{@const saving = decisions.isSaving(optionKey)}
-		{@const openPanel = decisions.panel(optionKey)}
 		{#snippet decide()}
 			<DecideRow
 				bind:this={decideRow}
 				{points}
-				{picks}
-				pending={decisions.isPending(optionKey)}
-				waiting={held !== null}
+				{held}
+				{blocked}
 				{saving}
 				{banner}
 				onPick={(shown, pick) => decisions.choose(repoName, itemNumber, shown, pick)}
 				onAcceptAll={(shown) => decisions.acceptAll(repoName, itemNumber, shown)}
 				onReload={() => decisions.reloadAfterBanner(optionKey)}
-				escapes={{
-					panel: openPanel,
-					draft: openPanel === null ? '' : decisions.draft(optionKey, openPanel.kind),
-					onOpen: (kind, shown) => decisions.openPanel(optionKey, { kind, shown }),
-					onClose: () => decisions.closePanel(optionKey),
-					onDraft: (text) => {
-						if (openPanel !== null) decisions.setDraft(optionKey, openPanel.kind, text);
-					},
-					onSend: ({ kind, shown }, text) =>
-						kind === 'other'
-							? decisions.decideOther(repoName, itemNumber, shown, text)
-							: decisions.decideUnclear(repoName, itemNumber, shown, text)
-				}}
+				escapes={escapesFor(repoName, itemNumber, points, escapeKinds(points, points.length === 1))}
 			/>
 		{/snippet}
 		{#key optionKey}
@@ -85,11 +114,11 @@
 					item={itemNumber}
 					{points}
 					open={decisions.openPoint(optionKey)}
-					{picks}
+					{held}
 					locked={locksCard(banner)}
-					pending={decisions.isPending(optionKey)}
-					waiting={held !== null}
+					{blocked}
 					{saving}
+					escapes={(point) => escapesFor(repoName, itemNumber, [point], ['other'])}
 					onToggle={(index) => decisions.togglePoint(optionKey, index)}
 					onPick={(shown, option) => decideRow?.choose({ shown, option })}
 				>

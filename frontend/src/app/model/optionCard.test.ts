@@ -6,6 +6,7 @@ import {
 	chosenOption,
 	GROUP_LABEL,
 	hasFinalOption,
+	escapeKinds,
 	hasHead,
 	CONTRACT_SUMMARY,
 	askedText,
@@ -175,8 +176,8 @@ describe('the chosen option', () => {
 	});
 });
 
-test('[ABRD-67] the strip text of an Other answer names Other and the card’s name', () => {
-	expect(pendingOtherText('Song-Seite · 3 points')).toBe('Other · Song-Seite · 3 points');
+test('[ABRD-67] the strip text of an Other answer names Other and the point’s topic', () => {
+	expect(pendingOtherText('Song-Seite')).toBe('Other · Song-Seite');
 });
 
 describe('the words of a card of points', () => {
@@ -287,5 +288,20 @@ describe('isStuck', () => {
 		['the card ends above the view', 90, false]
 	])('[ABRD-52] %s', (_name, containerBottom, expected) => {
 		expect(isStuck(containerBottom, 100)).toBe(expected);
+	});
+});
+
+describe('escapeKinds', () => {
+	const open = optionLine();
+	const back = optionLine({ returned_on: '2026-10-27' });
+
+	test('[ABRD-154] a point offers Other, and Unclear unless it is with its head', () => {
+		expect(escapeKinds([open], true)).toEqual(['other', 'unclear']);
+		expect(escapeKinds([back], true)).toEqual(['other']);
+	});
+
+	test('[ABRD-92] the card row of points offers Unclear alone, and nothing while with its head', () => {
+		expect(escapeKinds([open, open], false)).toEqual(['unclear']);
+		expect(escapeKinds([open, back], false)).toEqual([]);
 	});
 });

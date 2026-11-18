@@ -206,9 +206,18 @@ export function sendsBlank(kind: EscapeKind): boolean {
 	return kind === 'unclear';
 }
 
+/** The escapes a row offers: Other when it answers one point, Unclear unless
+ * the points are with their head (ABRD-61). */
+export function escapeKinds(points: readonly OptionLine[], other: boolean): EscapeKind[] {
+	return [
+		...(other ? (['other'] as const) : []),
+		...(hasHead(points) ? [] : (['unclear'] as const))
+	];
+}
+
 /** The strip text of an Other answer waiting out the undo window. */
-export function pendingOtherText(cardName: string): string {
-	return `Other · ${cardName}`;
+export function pendingOtherText(topic: string): string {
+	return `Other · ${topic}`;
 }
 
 /** The words only a card of points has: its rows, its count and Accept all. */
@@ -219,11 +228,6 @@ export const GROUP_LABEL = {
 	acceptAllName: 'Accept all recommendations',
 	acceptAllTitle: 'Accept all recommendations?'
 } as const;
-
-/** `1 of 3 chosen`. */
-export function chosenText(chosen: number, total: number): string {
-	return `${chosen} of ${total} chosen`;
-}
 
 /** The start of a point's line in a confirm: `Point 2: `. */
 export function pointPrefix(number: number): string {

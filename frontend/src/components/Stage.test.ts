@@ -5,7 +5,7 @@ import { STATE_LABEL } from '../app/model/boardSummary';
 import { DecisionStore } from '../app/state/decision.svelte';
 import { cardKey, LINE_CHANGED_MESSAGE, UNDO_SECONDS, lineKey } from '../app/model/decision';
 import { inertBoard, item, line, optionLine, repo, storedAnswer } from '../test-support/board';
-import type { DecisionResult } from '../types';
+import type { DecisionResult, OptionLine } from '../types';
 import Stage from './Stage.svelte';
 
 beforeEach(() => {
@@ -272,7 +272,7 @@ function renderGroup(decisions: DecisionStore, points = groupPoints()) {
 	});
 }
 
-test('[ABRD-83] a card of points is titled by its name and offers Accept all, its count and the escapes, no pick of its own', () => {
+test('[ABRD-83] a card of points is titled by its name and offers Accept all, Unclear and an Other… at every point, no pick row of its own', () => {
 	renderGroup(storeAnswering(storedAnswer(item())));
 
 	expect(screen.getByRole('heading', { name: 'Song-Seite · 3 points' })).toBeInTheDocument();
@@ -280,8 +280,8 @@ test('[ABRD-83] a card of points is titled by its name and offers Accept all, it
 	expect(screen.getByRole('button', { name: 'Accept all recommendations' })).toHaveTextContent(
 		'Accept all'
 	);
-	expect(screen.getByText('0 of 3 chosen')).toBeInTheDocument();
-	expect(screen.getByRole('button', { name: 'Other…' })).toBeInTheDocument();
+	expect(screen.queryByText(/chosen/)).not.toBeInTheDocument();
+	expect(screen.getAllByRole('button', { name: /^Point \d: Other…$/ })).toHaveLength(3);
 	expect(screen.getByRole('button', { name: 'Unclear' })).toBeInTheDocument();
 });
 
@@ -299,9 +299,10 @@ test('[ABRD-85] activating a point opens it, and another point closes the first'
 	expect(second).toHaveAttribute('aria-expanded', 'true');
 });
 
-test('[ABRD-86] a pick marks its point and counts it, and posts nothing', async () => {
+test('[ABRD-86] a pick answers its point alone: it waits, the other points stay open, and one post names only its line', async () => {
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
-	renderGroup(new DecisionStore('token', inertBoard(), send as never));
+	const decisions = new DecisionStore('token', inertBoard(), send as never);
+	renderGroup(decisions);
 
 	screen.getByRole('button', { name: 'Point 1: B – As today' }).click();
 	await tick();
@@ -310,39 +311,37 @@ test('[ABRD-86] a pick marks its point and counts it, and posts nothing', async 
 		'aria-pressed',
 		'true'
 	);
-	expect(screen.getByText('1 of 3 chosen')).toBeInTheDocument();
-	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 2000);
-	expect(send).not.toHaveBeenCalled();
-});
-
-test('[ABRD-87] the last pick waits out one window, then posts the whole card once', async () => {
-	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
-	const decisions = new DecisionStore('token', inertBoard(), send as never);
-	renderGroup(decisions);
-
-	for (const name of [
-		'Point 1: B – As today',
-		'Point 2: A – Keep the song open',
-		'Point 3: B – As today'
-	]) {
-		screen.getByRole('button', { name }).click();
-		await tick();
-	}
-
+	expect(screen.getByRole('button', { name: 'Point 1: A – Keep the song open' })).toBeDisabled();
+	expect(screen.getByRole('button', { name: 'Point 2: A – Keep the song open' })).toBeEnabled();
+	expect(screen.getByRole('button', { name: 'Point 2: Other…' })).toBeEnabled();
 	expect(decisions.pendingEntries.map((entry) => entry.message)).toEqual([
-		'1B 2A 3B · Song-Seite · 3 points'
+		'1B · Song-Seite · 3 points'
 	]);
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 	expect(send).toHaveBeenCalledTimes(1);
 	expect(send).toHaveBeenCalledWith('token', {
 		repo: 'repo',
 		item: 7,
-		lines: [
-			{ line: 2, fingerprint: 'fp-2', option: 'B' },
-			{ line: 3, fingerprint: 'fp-3', option: 'A' },
-			{ line: 5, fingerprint: 'fp-5', option: 'B' }
-		]
+		lines: [{ line: 2, fingerprint: 'fp-2', option: 'B' }]
 	});
+});
+
+test('[ABRD-87] picks on two points are two windows and two posts', async () => {
+	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
+	const decisions = new DecisionStore('token', inertBoard(), send as never);
+	renderGroup(decisions);
+
+	for (const name of ['Point 1: B – As today', 'Point 3: B – As today']) {
+		screen.getByRole('button', { name }).click();
+		await tick();
+	}
+
+	expect(decisions.pendingEntries.map((entry) => entry.message)).toEqual([
+		'1B · Song-Seite · 3 points',
+		'3B · Song-Seite · 3 points'
+	]);
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+	expect(send).toHaveBeenCalledTimes(2);
 });
 
 test('[ABRD-89] Accept all picks each recommended letter and posts the card after the window', async () => {
@@ -382,13 +381,13 @@ test('[ABRD-45] a changed card hides its picks and Accept all until Neu laden', 
 	expect(screen.getByRole('button', { name: 'Neu laden' })).toBeInTheDocument();
 });
 
-test('[ABRD-92] Other… answers the whole card', async () => {
+test('[ABRD-154] Other… at a point answers that point alone with its own text', async () => {
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
 	renderGroup(new DecisionStore('token', inertBoard(), send as never));
 
-	screen.getByRole('button', { name: 'Other…' }).click();
+	screen.getByRole('button', { name: 'Point 2: Other…' }).click();
 	await tick();
-	const field = screen.getByRole('textbox', { name: 'Your answer' });
+	const field = screen.getByRole('textbox', { name: 'Point 2: Your answer' });
 	field.focus();
 	await fireEvent.input(field, { target: { value: 'Only on desktop' } });
 	screen.getByRole('button', { name: 'Send' }).click();
@@ -397,12 +396,51 @@ test('[ABRD-92] Other… answers the whole card', async () => {
 	expect(send).toHaveBeenCalledWith('token', {
 		repo: 'repo',
 		item: 7,
+		lines: [{ line: 3, fingerprint: 'fp-3' }],
+		other: 'Only on desktop'
+	});
+});
+
+test('[ABRD-66] the open Other panel of a point and its draft survive the card turning into a one-point card', async () => {
+	const decisions = storeAnswering(storedAnswer(item()));
+	const points = groupPoints();
+	const { rerender } = renderGroup(decisions, points);
+	screen.getByRole('button', { name: 'Point 3: Other…' }).click();
+	await tick();
+	await fireEvent.input(screen.getByRole('textbox', { name: 'Point 3: Your answer' }), {
+		target: { value: 'Only on desktop' }
+	});
+
+	await rerender({
+		repos: [repo({ items: [item({ number: 7, lines: [points[2] as OptionLine] })] })],
+		selectedKey: cardKey('repo', 7),
+		decisions
+	});
+
+	expect(screen.getByRole('textbox', { name: 'Your answer' })).toHaveValue('Only on desktop');
+});
+
+test('[ABRD-92] Unclear covers the points not waiting', async () => {
+	const send = vi.fn(async () => storedAnswer(item(), 'returned') as DecisionResult);
+	const decisions = new DecisionStore('token', inertBoard(), send as never);
+	renderGroup(decisions);
+	screen.getByRole('button', { name: 'Point 1: B – As today' }).click();
+	await tick();
+
+	screen.getByRole('button', { name: 'Unclear' }).click();
+	await tick();
+	screen.getByRole('button', { name: 'Send' }).click();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(send).toHaveBeenCalledWith('token', {
+		repo: 'repo',
+		item: 7,
 		lines: [
-			{ line: 2, fingerprint: 'fp-2' },
 			{ line: 3, fingerprint: 'fp-3' },
 			{ line: 5, fingerprint: 'fp-5' }
 		],
-		other: 'Only on desktop'
+		unclear: true,
+		note: null
 	});
 });
 
@@ -412,7 +450,7 @@ test('[ABRD-61] a card of points with one point with its head offers no Unclear 
 	renderGroup(storeAnswering(storedAnswer(item())), points);
 
 	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
-	expect(screen.getByRole('button', { name: 'Other…' })).toBeInTheDocument();
+	expect(screen.getAllByRole('button', { name: /^Point \d: Other…$/ })).toHaveLength(3);
 	expect(screen.getByRole('button', { name: 'Accept all recommendations' })).toBeInTheDocument();
 });
 

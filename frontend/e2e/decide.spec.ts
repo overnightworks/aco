@@ -260,7 +260,7 @@ for (const viewport of [
 				await expect(
 					page.locator('.decide-row').getByText('Saving', { exact: true })
 				).toBeVisible();
-				await expect(page.getByRole('button', { name: 'Other…' })).toHaveCount(0);
+				await expect(page.getByRole('button', { name: 'Other…' })).toBeDisabled();
 
 				if (viewport.width === 390) await page.getByRole('button', { name: '‹ Open' }).click();
 				await listRow(page, 'Second?').click();

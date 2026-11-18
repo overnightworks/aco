@@ -149,7 +149,7 @@ for (const viewport of [
 				await expect(
 					page.locator('.decide-row').getByText('Saving', { exact: true })
 				).toBeVisible();
-				await expect(page.getByRole('button', { name: 'Other…' })).toHaveCount(0);
+				await expect(page.getByRole('button', { name: 'Other…' })).toBeDisabled();
 
 				if (phone) await page.getByRole('button', { name: '‹ Open' }).click();
 				const turning = listRow(page, 'Langsam?')
@@ -189,8 +189,9 @@ for (const viewport of [
 				await expect(
 					page.locator('.decide-row').getByText('Saving', { exact: true })
 				).toBeVisible();
-				await expect(page.getByRole('button', { name: 'Other…' })).toHaveCount(0);
-				await expect(page.getByRole('button', { name: 'Unclear' })).toHaveCount(0);
+				for (const other of await page.getByRole('button', { name: /^Point \d: Other…$/ }).all())
+					await expect(other).toBeDisabled();
+				await expect(page.getByRole('button', { name: 'Unclear' })).toBeDisabled();
 				const toggle = page.locator('button.toggle').first();
 				await toggle.click();
 				await expect(toggle).toHaveAttribute('aria-expanded', 'true');

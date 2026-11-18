@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { item, line, optionLine, repo } from '../../test-support/board';
 import {
 	cardHeading,
+	clockTime,
 	decidedKeyOf,
 	decidedList,
 	findSelection,
@@ -9,14 +10,8 @@ import {
 	firstDecidedKey,
 	firstOpenKey,
 	nextOpenAfter,
-	clockTime,
-	isStale,
-	lastReadAt,
-	READING_LABEL,
-	REFRESH_LABEL,
-	refreshName,
-	STALE_AFTER_SECONDS,
 	stageAfterReturned,
+	stageAfterRuled,
 	openList,
 	outcomeLabel,
 	pictureDataUri,
@@ -691,6 +686,56 @@ describe('tabCounts', () => {
 	});
 });
 
+describe('stageAfterRuled', () => {
+	const twoOpen = [
+		repo({
+			items: [
+				item({ number: 7, lines: [optionLine({ index: 1 }), optionLine({ index: 2 })] }),
+				item({ number: 8, lines: [optionLine({ index: 1 })] })
+			]
+		})
+	];
+	const lastLeft = [
+		repo({
+			items: [
+				item({
+					number: 7,
+					lines: [
+						optionLine({ index: 1, ruling: 'A', ruled_on: '2026-10-01', via: 'board' }),
+						optionLine({ index: 2, ruling: 'B', ruled_on: '2026-10-01', via: 'board' })
+					]
+				}),
+				item({ number: 8, lines: [optionLine({ index: 1 })] })
+			]
+		})
+	];
+
+	test('[ABRD-155] the stage stays while the card still has an open point, noted or not', () => {
+		expect(stageAfterRuled(twoOpen, 'repo:7:card', false)).toEqual({ kind: 'keep' });
+		expect(stageAfterRuled(twoOpen, 'repo:7:card', true)).toEqual({ kind: 'keep' });
+	});
+
+	test('[ABRD-155] once its last point is stored the stage moves to the next open card', () => {
+		expect(stageAfterRuled(lastLeft, 'repo:7:card', false)).toEqual({
+			kind: 'select',
+			key: 'repo:8:card'
+		});
+	});
+
+	test('[ABRD-155] a noted last point shows its decided card, in the Decided view when nothing else is open', () => {
+		const alone = [repo({ items: [lastLeft[0]?.items[0] as ReturnType<typeof item>] })];
+
+		expect(stageAfterRuled(lastLeft, 'repo:7:card', true)).toEqual({
+			kind: 'select',
+			key: 'repo:7:1'
+		});
+		expect(stageAfterRuled(alone, 'repo:7:card', true)).toEqual({
+			kind: 'decided',
+			key: 'repo:7:1'
+		});
+	});
+});
+
 describe('stageAfterReturned', () => {
 	const cards = (...members: ReturnType<typeof optionLine | typeof line>[]) => [
 		repo({ items: members.map((member, number) => item({ number: number + 1, lines: [member] })) })
@@ -737,56 +782,4 @@ describe('clockTime', () => {
 			expect(clockTime(moment)).toBe(expected);
 		}
 	);
-});
-
-const readAt = new Date(2026, 9, 31, 9, 41, 0);
-
-function readRepo(name: string, moment: Date | null, error: string | null = null) {
-	return { ...repo({ name, error }), readAt: moment };
-}
-
-describe('lastReadAt', () => {
-	test('[ABRD-104] is the latest read time, a failed repository keeping its older one', () => {
-		const later = new Date(2026, 9, 31, 9, 55);
-		const repos = [
-			readRepo('a', readAt),
-			readRepo('b', later),
-			readRepo('c', new Date(2026, 9, 31, 9, 10), 'forge down')
-		];
-
-		expect(lastReadAt(repos)).toEqual(later);
-	});
-
-	test('[ABRD-104] is null while no repository has been read', () => {
-		expect(lastReadAt([readRepo('a', null)])).toBeNull();
-	});
-});
-
-describe('isStale', () => {
-	const repos = [readRepo('a', readAt)];
-	const after = (seconds: number) => new Date(readAt.getTime() + seconds * 1000);
-
-	test.each([
-		{ seconds: STALE_AFTER_SECONDS - 1, stale: false },
-		{ seconds: STALE_AFTER_SECONDS + 1, stale: true }
-	])('[ABRD-103] a read $seconds s ago is stale: $stale', ({ seconds, stale }) => {
-		expect(isStale(repos, after(seconds))).toBe(stale);
-	});
-
-	test('[ABRD-103] with no read yet the board is stale', () => {
-		expect(isStale([readRepo('a', null)], readAt)).toBe(true);
-	});
-});
-
-describe('refreshName', () => {
-	test.each([
-		{ reading: false, label: REFRESH_LABEL },
-		{ reading: true, label: READING_LABEL }
-	])('[ABRD-104] reads "$label · read HH:MM" when reading is $reading', ({ reading, label }) => {
-		expect(refreshName(reading, readAt)).toBe(`${label} · read ${clockTime(readAt)}`);
-	});
-
-	test('[ABRD-104] is the bare label before any read', () => {
-		expect(refreshName(false, null)).toBe(REFRESH_LABEL);
-	});
 });

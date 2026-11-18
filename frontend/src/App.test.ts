@@ -258,3 +258,43 @@ test('[ABRD-153] a refused post on a card left behind keeps a strip naming it un
 
 	expect(screen.queryByText('Not saved: Jump')).not.toBeInTheDocument();
 });
+
+test('[ABRD-155] the stage stays on a card while one of its points is open and leaves when its last point is stored', async () => {
+	vi.useFakeTimers();
+	const first = optionLine({ index: 1, question: 'First?', fingerprint: 'fp-1' });
+	const second = optionLine({ index: 2, question: 'Second?', fingerprint: 'fp-2' });
+	const another = optionLine({ index: 1, question: 'Share the page?', fingerprint: 'fp-other' });
+	const ruled = (open: typeof first) => ({
+		...open,
+		ruling: 'A' as const,
+		ruled_on: '2026-10-01',
+		via: 'board' as const
+	});
+	const repos = [
+		repo({
+			items: [item({ number: 42, lines: [first, second] }), item({ number: 43, lines: [another] })]
+		})
+	];
+	const stored = [
+		storedAnswer(item({ number: 42, lines: [ruled(first), second] })),
+		storedAnswer(item({ number: 42, lines: [ruled(first), ruled(second)] }))
+	];
+	const fetchMock = vi.fn(async (path: string) => ({
+		ok: true,
+		status: 200,
+		json: async () => (path === '/api/rule' ? stored.shift() : { repos })
+	}));
+	vi.stubGlobal('fetch', fetchMock);
+
+	render(App, { token: 'a-token' });
+	await vi.advanceTimersByTimeAsync(0);
+	screen.getByRole('button', { name: /^Point 1: A/ }).click();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(screen.getByRole('heading', { name: 'Second?' })).toBeInTheDocument();
+	expect(screen.queryByRole('heading', { name: 'Share the page?' })).not.toBeInTheDocument();
+	screen.getByRole('button', { name: /^Decide A:/ }).click();
+	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
+
+	expect(screen.getByRole('heading', { name: 'Share the page?' })).toBeInTheDocument();
+});

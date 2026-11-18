@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { postDecision } from '../../client';
 import { item, optionLine, readyBoard, repo, storedAnswer } from '../../test-support/board';
 import type { DecisionResult } from '../../types';
-import { cardKey, UNDO_SECONDS } from '../model/decision';
+import { cardKey, entryKey, UNDO_SECONDS } from '../model/decision';
 import { DecisionStore } from './decision.svelte';
 
 const card = optionLine({ index: 4, fingerprint: 'fp-shown', topic: 'Jump' });
@@ -32,7 +32,9 @@ test('[ABRD-74] sending waits out the window as a With head strip named by the t
 	const { send, store } = unclearStore();
 
 	store.decideUnclear('repo', 42, points, '  Why two? ');
-	expect(store.pendingEntries).toEqual([{ key, message: 'Jump', state: 'back' }]);
+	expect(store.pendingEntries).toEqual([
+		{ key: entryKey(key, [4]), message: 'Jump', state: 'back' }
+	]);
 	expect(send).not.toHaveBeenCalled();
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
@@ -53,7 +55,7 @@ test('[ABRD-74] undo posts nothing and reopens the Unclear panel with the note',
 
 	store.decideUnclear('repo', 42, points, store.draft(key, 'unclear'));
 	expect(store.panel(key)).toBeNull();
-	store.undo(key);
+	store.undo(entryKey(key, [4]));
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 
 	expect(send).not.toHaveBeenCalled();
@@ -79,7 +81,7 @@ test('[ABRD-75] the card is pending while its answer waits, so no pick can join 
 
 	store.decideUnclear('repo', 42, points, '');
 
-	expect(store.isPending(key)).toBe(true);
+	expect(store.held(key)).not.toBeNull();
 });
 
 test('[ABRD-76] a returned answer shows its item in place, drops the Unclear draft only and is reported once, never as a ruling', async () => {
