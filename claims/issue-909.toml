@@ -1,8 +1,0 @@
-claim_id = "ccf5f43553af481ea7e872abc43c93d1"
-agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
-role = "builder"
-base = "cbfe6bfd7a92cb09d33f9bbd7cbc181cbba2cfc6"
-branch = "claude/issue-909-card-points-save-alone"
-scope = ["frontend/e2e", "frontend/src", "quality/baseline.toml", "specs/serve.spec.md", "src/aco/board/board.py", "src/aco/board/static", "tests/board", "tests/support"]
-opened_commit = "fdb5a5207d99316f97cc4678a6c5370e20dba0d9"
-whole_reason = "one board slice: card model, decide row, stage and their tests move together"
