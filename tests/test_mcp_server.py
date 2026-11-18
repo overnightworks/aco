@@ -182,7 +182,7 @@ def test_the_record_answer_schema_takes_its_letters_from_the_grammar_and_offers_
     assert schema["additionalProperties"] is False
 
 
-def test_tools_list_offers_step_as_a_repeatable_write_that_replaces_next() -> None:
+def test_tools_list_offers_step_as_a_repeatable_write_that_keeps_next() -> None:
     tool = _tools()["step"]
 
     assert tool["annotations"] == {

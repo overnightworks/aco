@@ -1,5 +1,6 @@
 """The per-item turn's step writer (`specs/mcp.spec.md`) on a fake forge: the
-`next` it folds in, the order of the body and the label, and what it refuses."""
+`wait` and `step` it writes around the untouched `next`, the order of the body and the
+label, and what it refuses."""
 
 from dataclasses import dataclass, field
 from datetime import date
