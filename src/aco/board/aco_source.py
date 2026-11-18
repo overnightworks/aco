@@ -29,9 +29,7 @@ from .ports import (
     UnclearCardAnswer,
 )
 
-WRITTEN_OVER_NOTE = (
-    "Written over a change aco had not read; that change is only in the item's edit history."
-)
+WRITTEN_OVER_NOTE = decide.WRITTEN_OVER_NOTE
 """The note of a decision the forge's body check kept (ABRD-129)."""
 
 
@@ -97,17 +95,19 @@ def _checked_and_written(
 def _checked_and_answered(
     context: session.RunContext, item: int, result: item_step.StepResult, check: StepCheck
 ) -> DecisionResult | CardChanged:
-    """One read of `item`, `check` on the step that read shows, then one write of
-    the answer."""
-    with decide.turn(
-        context, item, command="step", environment=os.environ, home=Path.home()
-    ) as fresh:
-        step = decide.step_of(fresh)
-        if step is None or not check(step):
-            return CardChanged()
-        answered = decide.answer_step(context, fresh, step, result)
-    notes = (WRITTEN_OVER_NOTE if answered.written_over else None, answered.label_note)
-    return DecisionResult(DecisionStatus.ANSWERED, note=" ".join(filter(None, notes)) or None)
+    """The answer of the one turn `decide.answer_step_in_turn` runs, as the board shows it."""
+    answered = decide.answer_step_in_turn(
+        context,
+        item,
+        result,
+        check,
+        item_step.AnswerChannel.BOARD,
+        environment=os.environ,
+        home=Path.home(),
+    )
+    if answered is None:
+        return CardChanged()
+    return DecisionResult(DecisionStatus.ANSWERED, note=answered.note)
 
 
 def _checked_and_written_in_turn(

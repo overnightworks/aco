@@ -1,9 +1,6 @@
 """`aco mcp`'s ask answer shows the earlier rulings of the card's area
 (`specs/mcp.spec.md`) through `cli.main(["mcp"])` over the board's test forge."""
 
-import io
-import json
-import sys
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -13,10 +10,10 @@ import board_forge
 import pytest
 from aco_board_fixtures import board_checkout
 from discovery_fixtures import configure_root, isolate_config_file, repository_with_card
-from mcp_lines import Script, call_line
+from mcp_lines import call_line, serve_mcp
 from option_cards import ask_card, open_option_entry
 
-from aco import cli, forge, session
+from aco import forge
 
 
 @pytest.fixture(autouse=True)
@@ -44,17 +41,6 @@ def _ask_line(request_id: int) -> str:
     return call_line(request_id, "ask", {"repository": "board-forge/here", "item": 1, **card})
 
 
-def _serve(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
-    """Every answer line `aco mcp` writes."""
-    replies = io.StringIO()
-    with monkeypatch.context() as served:
-        served.setattr(session, "run_context", board_forge.run_context)
-        served.setattr(sys, "stdin", Script(*lines))
-        served.setattr(sys, "stdout", replies)
-        assert cli.main(["mcp"]) == 0
-    return [json.loads(line) for line in replies.getvalue().splitlines()]
-
-
 def _ruled_entry(**changes: object) -> dict[str, object]:
     ruled = {"ruling": "A", "ruled_on": date(2026, 10, 28), "via": "board"}
     return {**open_option_entry(), **ruled, **changes}
@@ -79,7 +65,7 @@ def test_a_ruled_line_of_the_same_area_from_another_repository_and_a_closed_item
     index = board_forge.search_index()
     index.include(here, elsewhere)
 
-    [answer] = _serve(monkeypatch, _ask_line(1))
+    [answer] = serve_mcp(monkeypatch, _ask_line(1))
 
     structured = answer["result"]["structuredContent"]
     assert (answer["result"]["isError"], structured["written"]) == (False, True)
@@ -100,7 +86,7 @@ def test_an_area_without_a_ruling_shows_no_earlier_line(
     here.put_item(4, board_forge.item_body(_ruled_entry(area="Andere")), title="Anders")
     board_forge.search_index().include(here)
 
-    [answer] = _serve(monkeypatch, _ask_line(1))
+    [answer] = serve_mcp(monkeypatch, _ask_line(1))
 
     structured = answer["result"]["structuredContent"]
     assert (structured["earlier"], structured["earlier_more"]) == ([], 0)
@@ -135,7 +121,7 @@ def test_a_ruled_line_of_a_non_member_or_of_an_untracked_repository_is_left_out(
     """Spec: MCP-60."""
     board_forge.search_index().include(arrange(root, tmp_path / "outside"))
 
-    [answer] = _serve(monkeypatch, _ask_line(1))
+    [answer] = serve_mcp(monkeypatch, _ask_line(1))
 
     assert _earlier(answer) == []
 
@@ -149,7 +135,7 @@ def test_the_asked_line_itself_is_left_out_when_the_same_card_stands_ruled(
     board_forge.search_index().include(here)
     same_card = call_line(1, "ask", {"repository": "board-forge/here", "item": 1, **ask_card()})
 
-    [answer] = _serve(monkeypatch, same_card)
+    [answer] = serve_mcp(monkeypatch, same_card)
 
     structured = answer["result"]["structuredContent"]
     assert (structured["written"], structured["line"]["ruling"], _earlier(answer)) == (
@@ -167,7 +153,7 @@ def test_the_same_card_asked_again_shows_the_same_earlier_lines(
     elsewhere.put_item(3, board_forge.item_body(_ruled_entry()), title="Dort")
     board_forge.search_index().include(elsewhere)
 
-    [asked, again] = _serve(monkeypatch, _ask_line(1), _ask_line(2))
+    [asked, again] = serve_mcp(monkeypatch, _ask_line(1), _ask_line(2))
 
     assert asked["result"]["structuredContent"]["written"] is True
     assert again["result"]["structuredContent"]["written"] is False
@@ -208,7 +194,7 @@ def test_a_search_that_cannot_answer_leaves_the_card_written_and_says_why(
     card = ask_card(area=area, question="Soll der Take danach markiert bleiben?")
     asked = call_line(1, "ask", {"repository": "board-forge/here", "item": 1, **card})
 
-    [answer] = _serve(monkeypatch, asked)
+    [answer] = serve_mcp(monkeypatch, asked)
 
     result = answer["result"]
     structured = result["structuredContent"]
@@ -232,6 +218,6 @@ def test_the_search_runs_after_the_items_lock_is_released(
 
     monkeypatch.setattr(board_forge.SearchIndex, "search", witnessed)
 
-    _serve(monkeypatch, _ask_line(1))
+    serve_mcp(monkeypatch, _ask_line(1))
 
     assert lock_held_at_searches == [False]
