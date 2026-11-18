@@ -191,7 +191,8 @@ transition) and the `ask`, `record_answer`, `step` and `answer_step` tools of `a
 forge use through its container write, because it judges from the open-board
 listing, not the item read. Every one of these writes the body through
 `decide.write_item_body`, the one writer, which skips a body equal to the text it
-replaces and hands the port that text. A writer that finds the lock held prints
+replaces and hands the port that text, except a whole-body `aco item edit` under
+`state-ref`, which calls the board's `update_item_body` directly and always writes. A writer that finds the lock held prints
 one line to stderr and waits. Writers on this machine therefore never overwrite each other's
 bodies. A whole-body `aco item edit` also names the hash `aco item show --json` printed
 (`--base`) and compares it with a fresh read under the lock, so a head writing from a stale
