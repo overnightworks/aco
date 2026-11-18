@@ -1,0 +1,8 @@
+claim_id = "5969124b92964d3a838f4e3c95f5b92f"
+agent = "Claude b0d83a6c-8981-4aa2-882d-83160145e49e"
+role = "builder"
+base = "67ad2e836e67d367f21684371071a7783aeeca7b"
+branch = "claude/issue-913-board-step-answers"
+scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/mcp.spec.md", "specs/serve.spec.md", "specs/wait.spec.md", "src/aco/board", "src/aco/decide.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_issue_payload.py", "src/aco/item_step.py", "src/aco/mcp_server.py", "src/aco/state_board.py", "tests/board", "tests/support", "tests/test_cli.py", "tests/test_cmd_check.py", "tests/test_cmd_mcp_step.py", "tests/test_decide_step.py", "tests/test_github_labels.py", "tests/test_item_step.py", "tests/test_mcp_server.py", "tests/test_state_board_labels.py"]
+opened_commit = "54154f7e85e5a9fb27807176dd0c2264d4eec47e"
+whole_reason = "one write path: route, writer, label port, specs, offsets"
