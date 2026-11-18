@@ -519,6 +519,12 @@ class RecordFileError(Exception):
         self.after = after
 
 
+# A valid file is a few hundred bytes of counts and tags plus one short entry per verdict; a file
+# past this is never one, and a reader that holds it whole would run out of memory on a special
+# file such as /dev/zero.
+RECORD_FILE_BYTES_LIMIT = 1024 * 1024
+
+
 def parse_record_file(content: bytes) -> LaneRecordFile:
     """The lane record file whose bytes are `content`, validated whole: one that is not exactly
     what the spec states raises `RecordFileError`."""

@@ -17,7 +17,12 @@ def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
     """The lane record file at `path_text`, read once and validated whole; one that is not
     exactly what the spec states refuses, naming the first thing wrong with it."""
     try:
-        return lane_record.parse_record_file(Path(path_text).read_bytes())
+        with Path(path_text).open("rb") as record_file:
+            content = record_file.read(lane_record.RECORD_FILE_BYTES_LIMIT + 1)
+        if len(content) > lane_record.RECORD_FILE_BYTES_LIMIT:
+            defect = f"cannot be read (larger than {lane_record.RECORD_FILE_BYTES_LIMIT} bytes)"
+        else:
+            return lane_record.parse_record_file(content)
     except OSError as error:
         defect = f"cannot be read ({error.strerror})"
     except lane_record.RecordFileError as error:

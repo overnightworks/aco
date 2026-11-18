@@ -8,7 +8,7 @@ import pytest
 from cli_fixtures import run_cli
 from lane_record_fixtures import lane_record_object
 
-from aco import report
+from aco import lane_record, report
 
 MISSING = object()
 
@@ -194,6 +194,23 @@ def test_a_record_file_that_does_not_exist_is_refused(
         2,
         "",
         f"ERROR: lane record {path} is invalid: cannot be read (No such file or directory)\n",
+    )
+
+
+def test_a_record_file_larger_than_the_limit_is_refused_unread(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-31."""
+    path = tmp_path / "lane-record.json"
+    path.write_bytes(b" " * (lane_record.RECORD_FILE_BYTES_LIMIT + 1))
+
+    result = run_cli(["lane-record", "check", str(path)], capsys)
+
+    assert (result.status, result.stdout, result.stderr) == (
+        2,
+        "",
+        f"ERROR: lane record {path} is invalid: cannot be read "
+        f"(larger than {lane_record.RECORD_FILE_BYTES_LIMIT} bytes)\n",
     )
 
 
