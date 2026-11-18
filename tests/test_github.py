@@ -2274,19 +2274,22 @@ def test_bounded_command_rejects_non_utf8_output() -> None:
             "GitHub issue coordination exceeded its output limit",
             id="output-too-large",
         ),
+        pytest.param(
+            process.ExecutableMissingError("gh"),
+            ClaimError,
+            "gh is required for issue claims",
+            id="gh-missing",
+        ),
     ],
 )
 def test_bounded_command_classifies_every_forge_failure_signal(
     monkeypatch: pytest.MonkeyPatch,
     outcome: process.BoundedResult | process.ProcessError,
-    expected_type: type[forge.ForgeError],
+    expected_type: type[Exception],
     expected_message: str,
 ) -> None:
-    """Adapter-boundary proof, driven through `GitHubForge.default_branch`
-    (the real caller of `_gh` -> `bounded_command`) with `process.run_bounded`
-    faked: every nonzero-exit signal and every process failure that
-    reaches no forge response becomes the exact typed `ForgeError`
-    subclass with the exact message -- not just some `ClaimError`."""
+    """Driven through `GitHubForge.default_branch` with `process.run_bounded`
+    faked: every failure signal becomes the exact typed error and message."""
 
     def fake_run_bounded(*args, **kwargs):
         if isinstance(outcome, process.ProcessError):
@@ -2306,12 +2309,8 @@ def test_bounded_command_classifies_every_forge_failure_signal(
 def test_bounded_command_refuses_a_process_error_type_it_does_not_classify(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The isinstance chain the GitHub adapter's failure classifier walks names
-    every concrete `process.ProcessError` subclass; a hypothetical new one added
-    there without updating this dispatch must fail loud as a defect, not
-    silently fall through as some generic `ForgeError` -- proven through
-    `GitHubForge.default_branch`, the real caller, with `process.run_bounded`
-    faked to raise the unclassified type."""
+    """A `process.ProcessError` subclass the failure classifier does not name
+    fails loud as a defect instead of becoming a generic `ForgeError`."""
 
     class _UnknownProcessError(process.ProcessError):
         pass
