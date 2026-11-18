@@ -98,7 +98,7 @@ def test_the_request_is_conditional_on_the_token_it_is_given(
         ),
     ],
 )
-def test_any_other_answer_fails(
+def test_an_answer_that_is_not_a_usable_200_or_304_fails(
     exit_status: int, text: str, token: str | None, failure: type[forge.ForgeError]
 ) -> None:
     """Spec: WAIT-20 -- a status that is neither 200 nor 304, or a 200 without an ETag, fails."""

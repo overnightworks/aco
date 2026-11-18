@@ -28,13 +28,10 @@ GitHubForge = github.GitHubForge
 
 
 def test_only_the_github_adapters_speak_gh_argv() -> None:
-    """Only the GitHub adapters construct a `gh` argv.
-
-    Import-linter's module contract cannot see an argv string, so this is a
-    source check, not a runtime guarantee: it greps every other module of the
-    package for the literal command name. The modules are enumerated, so a new
-    one is covered the day it is added.
-    """
+    """Source check, not a runtime guarantee: import-linter's module contract
+    cannot see an argv string, so "only the adapters speak `gh`" is proven by
+    grepping every other module of the package, enumerated so that a new module
+    is covered the day it is added, for the literal command name instead."""
     package = Path(__file__).parent.parent / "src" / "aco"
     adapters = {"github", "github_search", "github_probe"}
     others = sorted(p for p in package.glob("*.py") if p.stem not in adapters)
@@ -2277,6 +2274,12 @@ def test_bounded_command_rejects_non_utf8_output() -> None:
             "GitHub issue coordination exceeded its output limit",
             id="output-too-large",
         ),
+        pytest.param(
+            process.ExecutableMissingError("gh"),
+            ClaimError,
+            "gh is required for issue claims",
+            id="gh-missing",
+        ),
     ],
 )
 def test_bounded_command_classifies_every_forge_failure_signal(
@@ -2285,11 +2288,8 @@ def test_bounded_command_classifies_every_forge_failure_signal(
     expected_type: type[forge.ForgeError],
     expected_message: str,
 ) -> None:
-    """Adapter-boundary proof, driven through `GitHubForge.default_branch`
-    (the real caller of `_gh` -> `bounded_command`) with `process.run_bounded`
-    faked: every nonzero-exit signal and every process failure that
-    reaches no forge response becomes the exact typed `ForgeError`
-    subclass with the exact message -- not just some `ClaimError`."""
+    """Driven through `GitHubForge.default_branch` with `process.run_bounded`
+    faked: every failure signal becomes the exact typed error and message."""
 
     def fake_run_bounded(*args, **kwargs):
         if isinstance(outcome, process.ProcessError):
@@ -2309,12 +2309,8 @@ def test_bounded_command_classifies_every_forge_failure_signal(
 def test_bounded_command_refuses_a_process_error_type_it_does_not_classify(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The isinstance chain the GitHub adapter's failure classifier walks names
-    every concrete `process.ProcessError` subclass; a hypothetical new one added
-    there without updating this dispatch must fail loud as a defect, not
-    silently fall through as some generic `ForgeError` -- proven through
-    `GitHubForge.default_branch`, the real caller, with `process.run_bounded`
-    faked to raise the unclassified type."""
+    """A `process.ProcessError` subclass the failure classifier does not name
+    fails loud as a defect instead of becoming a generic `ForgeError`."""
 
     class _UnknownProcessError(process.ProcessError):
         pass
