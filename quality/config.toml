@@ -26,11 +26,3 @@ reason = "the command specs that own each command's behaviour and printed litera
 path = "tests/test_network_guard.py"
 rule = "test-layout"
 reason = "tests the suite's own network guard plugin (tests/support/network_guard.py), which no src/aco module owns"
-
-[[advisories.allow]]
-id = "GHSA-fc5q-39xc-vjpf"
-lock = "frontend/pnpm-lock.yaml"
-until = 2027-01-31
-date = 2026-11-17
-item = "overnightworks/quality#879"
-reason = "picomatch 4.0.7 has no fixed release; it reaches the board frontend only as dev tooling (svelte-check, typescript-eslint and knip through fdir and tinyglobby), never the built assets"
