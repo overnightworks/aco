@@ -333,9 +333,9 @@ def _label_as_a_step(client: forge.ForgeWriter, number: int, *, standing: str) -
 
 
 def mark_step(context: RunContext, fresh: FreshItem, step: str, card: item_step.StepCard) -> None:
-    """Writes `step` as the `next` and `card` as the `step` table of the fresh item,
-    every other field and byte kept, then sets the label of an operator-only step.
-    A body equal to the
+    """Writes `step` as the `next` and as the operator wait (`wait.operator`), and `card`
+    as the `step` table, of the fresh item, every other field and byte kept, then sets
+    the label of an operator-only step. A body equal to the
     fresh one writes nothing and the label is set all the same, so a repeat
     finishes a call whose label failed. Raises `protocol.ClaimError` by name for
     a closed item and one a non-member wrote, before the write."""
@@ -364,7 +364,8 @@ def open_step_item(context: RunContext, title: str, step: str, card: item_step.S
         item_wait.WAIT_KEY: item_wait.operator_wait_table(step, context.today()),
         item_step.STEP_KEY: item_step.step_table(card),
         "done_when": (
-            "The operator has taken the step and the head has removed the label "
+            "The operator has taken the step and the head has cleared the wait and "
+            "removed the label "
             f"{workboard.NEEDS_OPERATOR_LABEL}."
         ),
     }

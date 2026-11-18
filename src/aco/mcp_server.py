@@ -185,7 +185,7 @@ _TOOLS: Final = (
         "description": (
             "The option lines and the steps that wait on the operator, across every repository "
             "found under the configured root: each item with its waiting lines, each item "
-            "labelled needs-operator with its step, the repositories that could not be read, "
+            "whose wait names the operator with its step, the repositories that could not be read, "
             "and the checkouts that could not be scanned."
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
@@ -237,7 +237,8 @@ _TOOLS: Final = (
         "description": (
             "Marks a step that only the operator can take, such as a secret to set or an "
             "approval to give: it becomes the item's next, replacing the one that stood, "
-            "and the item gets the label needs-operator, so the step shows in read_inbox "
+            "and the item gets that wait and the label needs-operator, so the step shows "
+            "in read_inbox "
             "under steps. The step is a short line; purpose, actions and expected are "
             "required and answer is optional, each stored on the item and shown in "
             "read_inbox. Give an open item's number as item, or a title to open a new item "

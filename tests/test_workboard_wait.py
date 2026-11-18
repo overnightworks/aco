@@ -4,7 +4,14 @@ from collections.abc import Mapping
 from datetime import date
 
 import pytest
-from board_fixtures import board_issue, complete_contract, projected_board, slice_entries
+from board_fixtures import (
+    board_issue,
+    complete_contract,
+    projected_board,
+    request,
+    slice_entries,
+    store_claim_from_request,
+)
 
 from aco import workboard
 from aco.body import ItemKind
@@ -14,40 +21,43 @@ NUMBER = 301
 STEP = "Rotate the deploy key."
 
 
-def _item(wait: Mapping[str, object], today: date, labels: tuple[str, ...] = ()):
-    contract = complete_contract("Claim it.", scope=["src/widget.py"], wait=wait)
+def _item(
+    wait: Mapping[str, object] | None,
+    today: date,
+    labels: tuple[str, ...] = (),
+    claimed: bool = False,
+):
+    scope = ["src/widget.py"]
+    contract = (
+        complete_contract("Claim it.", scope=scope)
+        if wait is None
+        else complete_contract("Claim it.", scope=scope, wait=wait)
+    )
     issue = board_issue(NUMBER, "Held", contract, labels=labels)
-    board = projected_board((issue,), (), (), (), BoardConfig(), today=today)
+    claims = (store_claim_from_request(request(issue=NUMBER)),) if claimed else ()
+    board = projected_board((issue,), (), (), claims, BoardConfig(), today=today)
     return board, board.items[0]
 
 
 @pytest.mark.parametrize(
-    ("wait", "labels", "reason"),
+    ("wait", "reason"),
     [
         pytest.param(
-            {"operator": STEP, "since": date(2026, 11, 1)},
-            (),
-            f"waiting: {STEP}",
-            id="operator-wait-without-the-label",
-        ),
-        pytest.param(
             {"trigger": "A second machine exists.", "since": date(2026, 11, 1)},
-            (),
             "waiting: A second machine exists.",
             id="trigger",
         ),
         pytest.param(
             {"until": date(2026, 12, 1), "since": date(2026, 11, 1)},
-            (),
             "waiting: until 2026-12-01",
             id="until-in-the-future",
         ),
     ],
 )
 def test_a_waiting_item_is_never_ready_and_never_named_first(
-    wait: Mapping[str, object], labels: tuple[str, ...], reason: str
+    wait: Mapping[str, object], reason: str
 ) -> None:
-    board, item = _item(wait, date(2026, 11, 15), labels)
+    board, item = _item(wait, date(2026, 11, 15))
 
     assert item.actionable_reason == reason
     assert item.wait == reason.removeprefix("waiting: ")
@@ -55,16 +65,29 @@ def test_a_waiting_item_is_never_ready_and_never_named_first(
     assert workboard.highest_scored_actionable(board) is None
 
 
-def test_the_label_alone_decides_that_a_wait_beside_it_still_waits_on_the_operator() -> None:
-    board, item = _item(
-        {"operator": STEP, "since": date(2026, 11, 1)},
-        date(2026, 11, 15),
-        (workboard.NEEDS_OPERATOR_LABEL,),
-    )
+def test_an_operator_wait_without_the_label_waits_on_the_operator() -> None:
+    board, item = _item({"operator": STEP, "since": date(2026, 11, 1)}, date(2026, 11, 15))
 
     assert item.waits_on_operator
     assert item.actionable_reason == workboard.WAITING_ON_OPERATOR
     assert item not in board.ready_now
+
+
+def test_a_claimed_item_with_an_operator_wait_names_the_step_as_its_waiting_reason() -> None:
+    _, item = _item(
+        {"operator": STEP, "since": date(2026, 11, 1)}, date(2026, 11, 15), claimed=True
+    )
+
+    assert not item.waits_on_operator
+    assert item.actionable_reason == f"waiting: {STEP}"
+
+
+def test_the_label_without_an_operator_wait_holds_nothing() -> None:
+    board, item = _item(None, date(2026, 11, 15), (workboard.NEEDS_OPERATOR_LABEL,))
+
+    assert not item.waits_on_operator
+    assert item.actionable_reason is None
+    assert item in board.ready_now
 
 
 @pytest.mark.parametrize(

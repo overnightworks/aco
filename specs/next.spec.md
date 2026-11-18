@@ -55,10 +55,11 @@ other printable space are text.
 | that container has an open blocker | NEXT-47 | NEXT-14 |
 | a landed-but-open item exists | LAND-53 (cited) | NEXT-14 |
 | an unworkable item exists beside the top action | NEXT-08 | NEXT-14 |
-| an item carries the label `needs-operator` | NEXT-39, NEXT-40 | NEXT-14 |
-| a container is labelled `needs-operator` | NEXT-39, NEXT-28 | NEXT-14 |
+| an item carries an operator `wait` | NEXT-39, NEXT-40 | NEXT-14 |
+| an item carries the label `needs-operator` and no operator `wait` | NEXT-61 | NEXT-14 |
+| a container carries an operator `wait` | NEXT-39, NEXT-28 | NEXT-14 |
 | an item carries a `wait` that still holds | NEXT-59 | NEXT-14 |
-| a childless container carries a `wait` that still holds, with no label | NEXT-59, NEXT-39 | NEXT-14 |
+| a childless container carries a trigger or `until` `wait` that still holds | NEXT-59 | NEXT-14 |
 | an item carries the idea label | NEXT-43, NEXT-28 | NEXT-44 |
 | further free items exist | NEXT-09, NEXT-21, NEXT-22 | NEXT-15 |
 | a placed item meets a live claim, the first action or an earlier candidate | NEXT-56, NEXT-57 | NEXT-58 |
@@ -112,10 +113,11 @@ other printable space are text.
 - [ ] [NEXT-47] An open blocker beats NEXT-06 and NEXT-26: such a container is never `check_container`; `SKIPPED` reads `blocked by <blockers>`, in text and `--json`, as for a work item (see E-NEXT-04).
 - [ ] [NEXT-34] A NEXT-05 container not the first action reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` in `<title>` escaped in text and `--json`; never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
-- [ ] [NEXT-39] A `needs-operator` item or container, whether or not it carries a `wait`, is never pulled, cut or checked; `waiting on operator: <labels>` names it (E-NEXT-13, E-NEXT-15).
-- [ ] [NEXT-59] A `wait` that holds (`operator` step, `trigger`, or `until <date>` up to that date) keeps an item unpulled and a container uncut and unchecked; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
+- [ ] [NEXT-39] An item whose `wait` names `operator` is never pulled, cut or checked; `waiting on operator: <labels>` names it; a claimed task reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
+- [ ] [NEXT-59] A `wait` that holds (`trigger`, or `until <date>` up to that date) keeps an item unpulled and a container uncut and unchecked; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
+- [ ] [NEXT-61] The label `needs-operator` on an item without an operator `wait` holds nothing: the item is pulled, cut or checked like any other.
 - [ ] [NEXT-60] A container whose open children all live in other repositories reads `container; waiting on <owner>/<repo>#<n>, ...` under `SKIPPED`, never `container; claim a child` (NEXT-38 appends it).
-- [ ] [NEXT-40] `aco next --help` names that label and how to set or remove it: `gh issue edit <n> --add-label/--remove-label`, or `aco item edit <item-id>` under `storage = "state-ref"`.
+- [ ] [NEXT-40] `aco next --help` names `wait.operator` as what holds an item for the operator, the `step` tool as the way to set it, and the label `needs-operator` as its GitHub view.
 - [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut, checked or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
 - [ ] [NEXT-45] `with head: <label> line <k>, …` follows `ideas:` and names each open item's option lines sent back by `rule --unclear` (RULE-22); absent when none; an unreadable body names none (E-NEXT-16).
 
@@ -412,7 +414,7 @@ exit 2
 
 ### E-NEXT-13 — the top item waits on the operator
 
-Setup: bare-remote, fake `gh`; `#230` is labelled `security` and `needs-operator`, `#11` is a scopeless open item
+Setup: bare-remote, fake `gh`; `#230` is labelled `security` and carries a `wait` naming `operator`, `#11` is a scopeless open item
 
 ```console
 $ aco next
@@ -450,7 +452,7 @@ The same item with `scope` naming five paths and no `whole` prints `Run: aco sta
 
 ### E-NEXT-15 — containers the operator holds
 
-Setup: bare-remote, fake `gh`, each container with no open child; `#441` labelled `needs-operator` with one `[[slice]]` row, `#442` labelled `needs-operator` and also carrying a `wait` with `Next` naming work, `#443` labelled `needs-operator` with `Next` line `keiner`, `#444` unlabelled and carrying a `trigger` wait with `Next` naming work; `#11` a scopeless open item
+Setup: bare-remote, fake `gh`, each container with no open child; `#441` carrying an `operator` wait with one `[[slice]]` row, `#442` carrying an `operator` wait with `Next` naming work, `#443` carrying an `operator` wait with `Next` line `keiner`, `#444` carrying a `trigger` wait with `Next` naming work; `#11` a scopeless open item
 
 ```console
 $ aco next
@@ -467,7 +469,7 @@ SKIPPED
 exit 0
 ```
 
-`#441` gets no `cut` and `#442` no `check_container`, nor a `SKIPPED` line; `#444`, unlabelled, is no operator wait: it gets no `cut` or `check_container` either, and `SKIPPED` names its wait (NEXT-59); `#443`, closable, stays under `close:` alone (NEXT-28).
+`#441` gets no `cut` and `#442` no `check_container`, nor a `SKIPPED` line; `#444`, a trigger wait, is no operator wait: it gets no `cut` or `check_container` either, and `SKIPPED` names its wait (NEXT-59); `#443`, closable, stays under `close:` alone (NEXT-28).
 
 ### E-NEXT-16 — a line sent back to its head
 

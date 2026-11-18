@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import cast
+from typing import TypeIs, cast
 
 from .expectation_grammar import NOT_A_LOCAL_DATE
 from .toml_text import toml_string
@@ -97,6 +97,11 @@ def parse_wait(data: Mapping[str, object]) -> ItemWait | None:
 def is_over(wait: ItemWait, today: date) -> bool:
     """Whether `today` frees the item: only an `until` wait ends by itself."""
     return isinstance(wait, UntilWait) and today >= wait.until
+
+
+def waits_on_operator(wait: ItemWait | None) -> TypeIs[OperatorWait]:
+    """Whether `wait` holds the item for the operator: the one decider of an operator wait."""
+    return isinstance(wait, OperatorWait)
 
 
 def wait_text(wait: ItemWait) -> str:

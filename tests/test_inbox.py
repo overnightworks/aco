@@ -207,72 +207,78 @@ def test_the_read_of_a_root_holding_only_unreadable_directories_lists_no_reposit
 def _step_issue(
     number: int,
     *,
-    labels: tuple[str, ...] = (workboard.NEEDS_OPERATOR_LABEL,),
+    labels: tuple[str, ...] = (),
     body_text: str | None = None,
-    next_step: str = "Do the thing.",
+    wait: dict[str, object] | None = None,
     author_is_member: bool = True,
 ) -> workboard.Issue:
-    text = complete_contract(next_step) if body_text is None else body_text
+    operator_wait = (
+        {"operator": "Do the thing.", "since": date(2026, 11, 1)} if wait is None else wait
+    )
+    text = complete_contract("Work.", wait=operator_wait) if body_text is None else body_text
     return board_issue(
         number, f"Item {number}", text, labels=labels, author_is_member=author_is_member
     )
 
 
-def test_a_labelled_member_item_is_a_step_with_its_number_title_and_next() -> None:
-    issues = (_step_issue(9, next_step="Rotate the key."),)
+def test_a_members_item_with_an_operator_wait_is_a_step_without_the_label() -> None:
+    issues = (_step_issue(9, wait={"operator": "Rotate the key.", "since": date(2026, 11, 1)}),)
 
     found = inbox.steps(issues, storage=body.Storage.GITHUB)
 
     assert found == (inbox.Step(9, "Item 9", "Rotate the key."),)
 
 
+def test_a_labelled_item_without_an_operator_wait_is_no_step() -> None:
+    labelled = (workboard.NEEDS_OPERATOR_LABEL,)
+    trigger = {"trigger": "A second machine.", "since": date(2026, 11, 1)}
+    issues = (
+        _step_issue(5, labels=labelled, body_text=complete_contract("Work.")),
+        _step_issue(6, labels=labelled, wait=trigger),
+        _step_issue(7, labels=labelled, body_text="Prose only, no block."),
+    )
+
+    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert found == ()
+
+
+def test_a_steps_text_is_its_operator_wait_not_the_blocks_next() -> None:
+    wait = {"operator": "Rotate the key.", "since": date(2026, 11, 1)}
+    issues = (_step_issue(9, body_text=complete_contract("Cut the slice.", wait=wait)),)
+
+    [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
+
+    assert found.wait_text == "Rotate the key."
+
+
 def test_a_step_item_with_a_step_table_lists_its_card() -> None:
     table = {"purpose": "Why.", "actions": "Do\nthis.", "expected": "See that.", "answer": "Say."}
-    issues = (_step_issue(9, body_text=complete_contract("Rotate.", step=table)),)
+    wait = {"operator": "Rotate.", "since": date(2026, 11, 1)}
+    issues = (_step_issue(9, body_text=complete_contract("Work.", wait=wait, step=table)),)
 
     [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
 
     assert inbox.step_json(found) == {**table, "number": 9, "title": "Item 9", "step": "Rotate."}
 
 
-def test_a_step_item_with_a_defective_block_lists_no_card() -> None:
-    issues = (_step_issue(9, body_text="no block here"),)
+def test_a_step_item_without_a_step_table_lists_no_card() -> None:
+    [found] = inbox.steps((_step_issue(9),), storage=body.Storage.GITHUB)
 
-    [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
-
-    assert inbox.step_json(found) == {**_NO_CARD, "number": 9, "title": "Item 9", "step": None}
-
-
-def test_the_label_matches_in_any_case() -> None:
-    issues = (_step_issue(9, labels=("Needs-Operator",)),)
-
-    found = inbox.steps(issues, storage=body.Storage.GITHUB)
-
-    assert [step.number for step in found] == [9]
+    assert inbox.step_json(found) == {
+        **_NO_CARD,
+        "number": 9,
+        "title": "Item 9",
+        "step": "Do the thing.",
+    }
 
 
-@pytest.mark.parametrize(
-    "body_text",
-    [
-        pytest.param("Prose only, no block.", id="no-block"),
-        pytest.param("```aco\nversion = \n```\n", id="malformed-block"),
-    ],
-)
-def test_a_labelled_item_without_a_readable_block_is_a_step_with_no_text(body_text: str) -> None:
-    issues = (_step_issue(9, body_text=body_text), _step_issue(8, next_step="Fine."))
-
-    found = inbox.steps(issues, storage=body.Storage.GITHUB)
-
-    assert [(step.number, step.next_step) for step in found] == [(9, None), (8, "Fine.")]
-
-
-def test_only_a_labelled_item_a_member_wrote_and_the_store_could_read_is_a_step() -> None:
+def test_only_an_item_a_member_wrote_and_the_store_could_read_is_a_step() -> None:
     unreadable = replace(_step_issue(6), unreadable=body.ContractDefect("body", "unreadable"))
     issues = (
         _step_issue(3, author_is_member=False),
         unreadable,
-        _step_issue(4, labels=()),
-        _step_issue(5, labels=("bug",)),
+        _step_issue(4, body_text=complete_contract("Work.")),
         _step_issue(7),
     )
 
@@ -289,8 +295,11 @@ def test_steps_come_by_descending_number() -> None:
     assert [step.number for step in found] == [11, 5, 2]
 
 
-def test_a_labelled_item_with_a_waiting_line_is_in_both_lists() -> None:
-    carded = _step_issue(5, body_text=item_body(open_option_entry()))
+def test_an_item_with_an_operator_wait_and_a_waiting_line_is_in_both_lists() -> None:
+    wait = {"operator": "Rotate.", "since": date(2026, 11, 1)}
+    carded = _step_issue(
+        5, body_text=complete_contract("Work.", wait=wait, expectation=[open_option_entry()])
+    )
 
     reading = inbox.read_issues((carded,), storage=body.Storage.GITHUB)
 
@@ -318,18 +327,14 @@ def test_the_answer_lists_steps_always_and_gives_an_unavailable_entry_none() -> 
     assert repositories_read[1]["steps"] == []
 
 
-def test_a_step_with_no_text_prints_as_null() -> None:
-    step = inbox.Step(9, "Item 9", None)
-
-    assert inbox.step_json(step) == {**_NO_CARD, "number": 9, "title": "Item 9", "step": None}
-
-
 def test_one_read_of_a_checkout_lists_its_open_items_once_for_its_rows_and_its_steps(
     tmp_path: Path, isolated_global_git_config: Path
 ) -> None:
     del isolated_global_git_config
     repository = board_checkout(tmp_path / "repository")
-    repository.put_item(5, item_body(open_option_entry()), labels=[workboard.NEEDS_OPERATOR_LABEL])
+    wait = {"operator": "Rotate.", "since": date(2026, 11, 1)}
+    waiting_body = complete_contract("Work.", wait=wait, expectation=[open_option_entry()])
+    repository.put_item(5, waiting_body)
     context = run_context(None).for_directory(repository.directory)
 
     reading = inbox.read_context(context)

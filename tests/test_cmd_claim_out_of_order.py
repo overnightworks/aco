@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import (
+    OPERATOR_WAIT,
     TRIGGER_WAIT,
     block_dependency,
     blocked_issue,
@@ -284,8 +285,10 @@ def test_claim_does_not_require_out_of_order_past_a_higher_ranked_labelled_idea(
             board_issue(
                 11,
                 "Highest scored",
-                complete_contract("wait for session with the operator", scope=TOP_SCOPE),
-                labels=("security", workboard.NEEDS_OPERATOR_LABEL),
+                complete_contract(
+                    "wait for session with the operator", scope=TOP_SCOPE, wait=OPERATOR_WAIT
+                ),
+                labels=("security",),
             ),
             id="waiting_on_the_operator",
         ),

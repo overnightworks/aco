@@ -152,16 +152,16 @@ state-ref item counts as a member's, since only a writer of the state ref can
 create one): in a public repository a stranger can open an issue carrying a
 card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
 stay unfiltered. `aco mcp` lists only the lines of those items that wait on the
-operator and, from the same listing, the items of the same members labelled
-`needs-operator` with their `next`. Its `ask` tool is a write boundary of its own: one option line per
+operator and, from the same listing, the items of the same members whose block's
+`wait` names the operator, with that wait's step. Its `ask` tool is a write boundary of its own: one option line per
 call, into an open item a member wrote, in any repository discovery finds, in
 that item's turn. Its `record_answer` tool rules one line per call in that
 turn, as `aco rule` does, so it refuses neither a closed item nor a
 non-member's: the card's hash binds the answer to what the agent read. Its
-`step` tool writes one item's `next` and its `[step]` table (purpose,
+`step` tool writes one item's `next`, its `wait.operator` and its `[step]` table (purpose,
 actions, expected, answer) in that turn, refusing a closed item and a
-non-member's, or opens one item, and sets the label `needs-operator` through the
-forge port's `add_label`; it never removes the label (`specs/mcp.spec.md`).
+non-member's, or opens one item, and sets the label `needs-operator`, the GitHub view of that wait, through the
+forge port's `add_label`; it never clears the wait or removes the label (`specs/mcp.spec.md`).
 Its `ask` tool also reads, through the forge's search across the owners of the
 repositories discovery finds, the lines the operator ruled in the card's area,
 and keeps only those on items a member of a found repository wrote. It shows

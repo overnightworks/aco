@@ -24,6 +24,7 @@ from board_fixtures import (
     BASE,
     BIDI_AND_ZERO_WIDTH_CONTROLS,
     MINIMAL_BLOCK_TOML,
+    OPERATOR_WAIT,
     REPOSITORY,
     TRIGGER_WAIT,
     WAIT_TRIGGER,
@@ -134,7 +135,6 @@ from aco.protocol import (
 )
 from aco.session import RunContext
 from aco.workboard import (
-    NEEDS_OPERATOR_LABEL,
     BlockerState,
     ChildItem,
     ChildState,
@@ -822,8 +822,8 @@ _WAITING_AND_PULLABLE = (
     board_issue(
         230,
         "Operator ruling",
-        complete_contract("wait for session with the operator"),
-        labels=("security", NEEDS_OPERATOR_LABEL),
+        complete_contract("wait for session with the operator", wait=OPERATOR_WAIT),
+        labels=("security",),
     ),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
@@ -843,16 +843,15 @@ def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...]
     )
 
 
-# Containers the operator holds -- one labelled with an uncut row, one labelled with a `wait`, one
-# labelled but closable -- beside one unlabelled with a `wait` and one pullable item.
+# Containers the operator holds -- one with an uncut row, one with a check, one closable, each
+# with an operator `wait` -- beside one with a trigger `wait` and one pullable item.
 _CHECK_WHILE_WAITING = complete_contract("Check it.", wait=TRIGGER_WAIT)
-_HELD_LABELS = (NEEDS_OPERATOR_LABEL,)
 _OPERATOR_HELD_CONTAINERS = (
     _childless_container(
-        441, complete_contract("Cut it.", slice=slice_entries("Scheibe A")), labels=_HELD_LABELS
+        441, complete_contract("Cut it.", slice=slice_entries("Scheibe A"), wait=OPERATOR_WAIT)
     ),
-    _childless_container(442, _CHECK_WHILE_WAITING, labels=_HELD_LABELS),
-    _childless_container(443, complete_contract("keiner"), labels=_HELD_LABELS),
+    _childless_container(442, complete_contract("Check it.", wait=OPERATOR_WAIT)),
+    _childless_container(443, complete_contract("keiner", wait=OPERATOR_WAIT)),
     _childless_container(444, _CHECK_WHILE_WAITING),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
@@ -3704,11 +3703,11 @@ def test_readme_and_help_texts_carry_no_stale_state_ref_read_only_sentence() -> 
         pytest.param(
             "next",
             (
-                "labelled needs-operator waits on the operator",
-                "gh issue edit <n> --add-label/--remove-label needs-operator",
-                "aco item edit <item-id>",
+                "wait.operator is set waits on the operator",
+                "the step tool sets it",
+                f"label {workboard.NEEDS_OPERATOR_LABEL} is its GitHub view",
             ),
-            id="next-names-the-label-that-holds-an-item-for-the-operator",
+            id="next-names-the-wait-that-holds-an-item-for-the-operator",
         ),
     ],
 )
@@ -5436,7 +5435,7 @@ def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item
 def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_does_not_warn(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """The record's `needs-operator` label keeps the
+    """The item's operator `wait` keeps the
     top-ranked item out of `next`'s pull and `claim`'s precedence check;
     `next` names it on its own line, and the pullable item claims as
     printed, without `--out-of-order`."""
@@ -5446,7 +5445,8 @@ def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_doe
         {
             10: _state_ref_item_body(
                 "Operator ruling",
-                labels=("security", NEEDS_OPERATOR_LABEL),
+                labels=("security",),
+                wait=OPERATOR_WAIT,
                 scope=["docs/ruling.md"],
             ),
             11: _state_ref_item_body("Pullable work", scope=["docs/work.md"]),
@@ -5771,7 +5771,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
     both still appear under `close:` -- unconditionally, never gated by
     which row `next` happens to recommend -- and, named there, never again
     under `SKIPPED`, nor under `waiting on operator:`
-    when the landed item still carries `needs-operator`."""
+    when the landed item still waits on the operator."""
     top_ranked = board_issue(
         70,
         "Top ranked work",
@@ -5792,8 +5792,7 @@ def test_next_close_names_every_zero_cost_action_regardless_of_rank(
     landed_but_open = board_issue(
         72,
         "Landed but open",
-        complete_contract("Close it."),
-        labels=(NEEDS_OPERATOR_LABEL,),
+        complete_contract("Close it.", wait=OPERATOR_WAIT),
     )
     client = _configured_board_client(
         monkeypatch, tmp_path, open_issues=(top_ranked, closable_container, landed_but_open)

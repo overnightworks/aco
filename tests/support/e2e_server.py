@@ -48,9 +48,10 @@ from aco_board_fixtures import (
     land_item,
     rulings_lines,
 )
+from board_fixtures import holding_for_the_operator
 from board_forge import BoardForge, ReleasedItem, StoredItem, child_list, seed_lane_records
 
-from aco import body, expectation_grammar, session, workboard
+from aco import body, expectation_grammar, session
 from aco.board.board import Boards
 from aco.board.cli import discovered_boards
 from aco.board.server import start_board
@@ -104,8 +105,7 @@ def _stored_item(arranged: Mapping[str, object]) -> StoredItem:
     parent = arranged.get("parent")
     return StoredItem(
         str(arranged["title"]),
-        raw_body,
-        labels=[workboard.NEEDS_OPERATOR_LABEL] if arranged.get("waiting") else [],
+        holding_for_the_operator(raw_body) if arranged.get("waiting") else raw_body,
         kind=body.ItemKind.CONTAINER.value if container is not None else None,
         children=children,
         parent=parent if isinstance(parent, int) else None,

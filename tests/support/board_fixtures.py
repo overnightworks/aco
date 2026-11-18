@@ -19,8 +19,10 @@ from aco import forge, github_probe, protocol, workboard
 from aco.body import (
     BLOCK_FENCE_INFO,
     ItemKind,
+    locate_block,
     prose_above_fresh_block,
     render_block,
+    replace_block,
 )
 from aco.protocol import ClaimRequest
 from aco.session import RunContext
@@ -391,6 +393,13 @@ def unfilled_block_body(prose: str = "") -> str:
 
 WAIT_TRIGGER = "eine zweite Maschine bekommt einen Grund"
 TRIGGER_WAIT = {"trigger": WAIT_TRIGGER, "since": date(2026, 8, 31)}
+OPERATOR_WAIT = {"operator": "Decide.", "since": date(2026, 8, 31)}
+
+
+def holding_for_the_operator(raw_body: str) -> str:
+    """`raw_body` with an operator `wait` in its block, written by the production writer."""
+    located = locate_block(raw_body)
+    return replace_block(raw_body, located, {**located.data, "wait": OPERATOR_WAIT})
 
 
 def ruled_expectation(

@@ -6,7 +6,7 @@ open an item that carries a card, and a card reaches the operator's decision
 surface only from a writer of the repository.
 
 The steps only the operator can take come from the same items: those a member
-wrote that carry the `needs-operator` label, each with its block's `next`. The
+wrote whose block's `wait` names the operator, each with that wait's text. The
 fleet-wide plans are those a member wrote that carry the `fleet-plan` label.
 
 The read across repositories: of those rows, the option lines still waiting on
@@ -26,6 +26,7 @@ from . import (
     expectations,
     forge,
     item_step,
+    item_wait,
     lane_measure,
     lane_record,
     progress,
@@ -63,31 +64,28 @@ def waiting_rows(rows_read: Iterable[rulings.Row]) -> tuple[rulings.Row, ...]:
 class Step:
     number: int
     title: str
-    next_step: str | None
-    """The block's `next`; `None` when the body has no readable block."""
+    wait_text: str
+    """The text of the item's operator `wait`."""
     card: item_step.StepCard | None = None
     """The block's `step` table; `None` for a step marked without one."""
 
 
-def _step_of(issue: workboard.Issue, storage: body.Storage) -> Step:
-    parsed = body.parse_body(issue.body, storage=storage)
-    card = (
-        item_step.parse_step(body.locate_block(issue.body).data)
-        if parsed.read_state is body.BodyReadState.VALID
-        else None
-    )
-    return Step(issue.number, issue.title, parsed.contract.next, card)
+def _step_of(issue: workboard.Issue, storage: body.Storage) -> Step | None:
+    wait = body.parse_body(issue.body, storage=storage).wait
+    if not item_wait.waits_on_operator(wait):
+        return None
+    card = item_step.parse_step(body.locate_block(issue.body).data)
+    return Step(issue.number, issue.title, wait.step, card)
 
 
 def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[Step, ...]:
-    """The members' readable items among `issues` that carry the
-    `needs-operator` label, by descending number."""
+    """The members' readable items among `issues` whose `wait` names the
+    operator, by descending number."""
     found = [
-        _step_of(issue, storage)
+        step
         for issue in issues
-        if issue.author_is_member
-        and issue.unreadable is None
-        and workboard.has_label(issue.labels, workboard.NEEDS_OPERATOR_LABEL)
+        if issue.author_is_member and issue.unreadable is None
+        if (step := _step_of(issue, storage)) is not None
     ]
     return tuple(sorted(found, key=lambda step: -step.number))
 
@@ -306,7 +304,7 @@ def step_json(step: Step) -> dict[str, object]:
     return {
         "number": step.number,
         "title": step.title,
-        "step": step.next_step,
+        "step": step.wait_text,
         item_step.PURPOSE_KEY: card and card.purpose,
         item_step.ACTIONS_KEY: card and card.actions,
         item_step.EXPECTED_KEY: card and card.expected,

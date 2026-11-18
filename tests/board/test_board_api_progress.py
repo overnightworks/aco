@@ -4,7 +4,7 @@ and a fake forge (specs/serve.spec.md, ABRD-131 to ABRD-137)."""
 from typing import Any, cast
 
 from aco_board_fixtures import BoardClient
-from board_fixtures import complete_contract, slice_entries
+from board_fixtures import OPERATOR_WAIT, complete_contract, slice_entries
 from board_forge import (
     BoardForge,
     ForgeOperation,
@@ -15,7 +15,6 @@ from board_forge import (
     seed_lane_records,
 )
 
-from aco import workboard
 from aco.body import ItemKind
 from aco.lane_record import LaneOutcome, LaneRecord
 from aco.routing_line import RoutingLine
@@ -88,7 +87,7 @@ def test_a_repo_counts_the_items_that_wait_on_the_operator(
     repository: BoardForge, board: BoardClient
 ) -> None:
     """ABRD-133."""
-    repository.put_item(7, complete_contract("Decide."), labels=[workboard.NEEDS_OPERATOR_LABEL])
+    repository.put_item(7, complete_contract("Decide.", wait=OPERATOR_WAIT))
 
     progress = _repo(board)["progress"]
 
@@ -130,8 +129,8 @@ def test_a_container_lists_the_open_children_that_wait_on_the_operator(
     repository.put_item(
         10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(open=[7, 8])
     )
-    repository.put_item(7, complete_contract("Decide."), labels=[workboard.NEEDS_OPERATOR_LABEL])
-    repository.put_item(9, complete_contract("Decide."), labels=[workboard.NEEDS_OPERATOR_LABEL])
+    repository.put_item(7, complete_contract("Decide.", wait=OPERATOR_WAIT))
+    repository.put_item(9, complete_contract("Decide.", wait=OPERATOR_WAIT))
 
     progress = _repo(board)["progress"]
 
@@ -191,7 +190,7 @@ def test_a_container_shows_its_lanes_left_and_the_range_in_seconds_with_its_samp
         kind=ItemKind.CONTAINER,
         children=child_list(closed=[1], open=[2, 3]),
     )
-    repository.put_item(3, complete_contract("Decide."), labels=[workboard.NEEDS_OPERATOR_LABEL])
+    repository.put_item(3, complete_contract("Decide.", wait=OPERATOR_WAIT))
     seed_lane_records(repository, [_finished(n, 100 * n) for n in range(1, 7)])
 
     [container] = _repo(board)["progress"]["containers"]
