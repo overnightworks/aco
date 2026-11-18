@@ -4,15 +4,23 @@ The record is computed once, before the release commit is pushed. A figure that 
 is unknown and has no trailer: no failure here refuses or delays a release."""
 
 import dataclasses
+import json
 import re
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
+from typing import cast
 
-from . import body, checkout, forge, protocol, store, workboard
-from .routing_line import RoutingLine, RoutingStage, parse_routing_line, stage_choice_fits
+from . import body, checkout, forge, protocol, report, store, workboard
+from .routing_line import (
+    EXPERIMENT_TAG,
+    RoutingLine,
+    RoutingStage,
+    parse_routing_line,
+    stage_choice_fits,
+)
 from .session import RunContext
 
 
@@ -38,10 +46,78 @@ class LaneTrailerKey(StrEnum):
     FIX_ROUNDS = "lane_fix_rounds"
     BLOCKING = "lane_blocking"
     EXPERIMENT = "lane_experiment"
+    RISK = "lane_risk"
+    FIX_ROUNDS_REVIEW = "lane_fix_rounds_review"
+    FIX_ROUNDS_GATE = "lane_fix_rounds_gate"
+    FIX_ROUNDS_CI = "lane_fix_rounds_ci"
+    FIX_ROUNDS_TEST = "lane_fix_rounds_test"
+    BLOCKING_REVIEW = "lane_blocking_review"
+    BLOCKING_GATE = "lane_blocking_gate"
+    BLOCKING_CI = "lane_blocking_ci"
+    BLOCKING_TEST = "lane_blocking_test"
+
+
+class FindingStage(StrEnum):
+    """The stages a blocking finding is counted under; a stand-in for the gate counts as `gate`."""
+
+    REVIEW = "review"
+    GATE = "gate"
+    CI = "ci"
+    TEST = "test"
+
+
+class VerdictStage(StrEnum):
+    REVIEW = "review"
+    GATE = "gate"
+
+
+class Verdict(StrEnum):
+    PASS = "pass"
+    REVISE = "revise"
 
 
 def _stage_key(stage: RoutingStage) -> LaneTrailerKey:
     return LaneTrailerKey(f"lane_{stage}")
+
+
+def _count_key(name: str, stage: FindingStage) -> LaneTrailerKey:
+    return LaneTrailerKey(f"lane_{name}_{stage}")
+
+
+@dataclass(frozen=True)
+class StageCounts:
+    """The fix rounds and the blocking findings of one finding stage."""
+
+    fix_rounds: int
+    blocking: int
+
+
+@dataclass(frozen=True)
+class JudgedVerdict:
+    stage: VerdictStage
+    verdict: Verdict
+    sha: str
+
+
+@dataclass(frozen=True)
+class LaneRecordFile:
+    """What a lane record file states (`specs/lane-record.spec.md`, LANREC-30..LANREC-37),
+    read once: the file is never stored."""
+
+    stages: Mapping[RoutingStage, str]
+    counts: Mapping[FindingStage, StageCounts]
+    verdicts: tuple[JudgedVerdict, ...]
+    risk: str | None
+    experiment: str | None
+
+    def routing_line(self) -> RoutingLine:
+        """The routing figures the file states, as a routing line states them."""
+        return RoutingLine(
+            stages=self.stages,
+            fix_rounds=sum(counts.fix_rounds for counts in self.counts.values()),
+            blocking=sum(counts.blocking for counts in self.counts.values()),
+            experiment=self.experiment,
+        )
 
 
 @dataclass(frozen=True)
@@ -61,6 +137,8 @@ class LaneRecord:
     size: ProductionSize | None = None
     item_size: body.Size | None = None
     routing: RoutingLine | None = None
+    risk: str | None = None
+    counts: Mapping[FindingStage, StageCounts] = MappingProxyType({})
 
     def trailers(self) -> tuple[str, ...]:
         """The `key: value` lines of every known figure, in the spec's order."""
@@ -87,6 +165,15 @@ class LaneRecord:
                 (LaneTrailerKey.BLOCKING, self.routing.blocking),
                 (LaneTrailerKey.EXPERIMENT, self.routing.experiment),
             ]
+        figures.append((LaneTrailerKey.RISK, self.risk))
+        figures += [
+            (_count_key("fix_rounds", stage), counts.fix_rounds)
+            for stage, counts in self.counts.items()
+        ]
+        figures += [
+            (_count_key("blocking", stage), counts.blocking)
+            for stage, counts in self.counts.items()
+        ]
         return tuple(f"{key}: {value}" for key, value in figures if value is not None)
 
 
@@ -94,7 +181,9 @@ class LaneRecord:
 class ReleasedLane:
     """The release being recorded: `released_at` is Unix seconds, `merge_commit` the sha the
     forge or the trunk walk named for a landed lane, `state_tip` the state-ref tip the claim
-    was read from, `item_size` the size class its work item declares."""
+    was read from, `item_size` the size class its work item declares, `record_file` the lane
+    record file the release was given, which states the routing figures instead of a routing
+    line."""
 
     claim: protocol.ActiveClaim
     outcome: protocol.ReleaseOutcome
@@ -102,26 +191,36 @@ class ReleasedLane:
     released_at: int
     state_tip: str | None
     item_size: body.Size | None = None
+    record_file: LaneRecordFile | None = None
+
+
+@dataclass(frozen=True)
+class ReleaseEvidence:
+    """What a release holds beyond its claim and outcome: `verified_merge` is the merge commit
+    the forge's landing was verified to have (a github `--merged` release reads it nowhere
+    else), `item` the work item the landing release already read, whose body declares the size,
+    `record_file` the lane record file the release was given."""
+
+    verified_merge: str | None = None
+    item: forge.ItemReference | None = None
+    record_file: LaneRecordFile | None = None
 
 
 def release_subject(
     context: RunContext,
     claim: protocol.ActiveClaim,
     outcome: protocol.ReleaseOutcome,
-    verified_merge: str | None = None,
-    item: forge.ItemReference | None = None,
+    evidence: ReleaseEvidence,
 ) -> store.TransitionSubject:
-    """The release transition's subject for `claim`, carrying its lane record. `verified_merge`
-    is the merge commit the forge's landing was verified to have: a github `--merged` release
-    reads it nowhere else. `item` is the work item the landing release already read, whose body
-    declares the size."""
+    """The release transition's subject for `claim`, carrying its lane record."""
     released = ReleasedLane(
         claim,
         outcome,
-        _merge_commit(outcome, verified_merge),
+        _merge_commit(outcome, evidence.verified_merge),
         int(context.now().timestamp()),
         context.observation.tip,
-        _declared_size(item, context.config.storage),
+        _declared_size(evidence.item, context.config.storage),
+        evidence.record_file,
     )
     record = compute_record(context.toplevel, context.config, released)
     subject = store.transition_subject("release", claim.identity, claim.branch)
@@ -143,7 +242,20 @@ def _declared_size(item: forge.ItemReference | None, storage: body.Storage) -> b
 def compute_record(
     toplevel: Path, config: workboard.BoardConfig, released: ReleasedLane
 ) -> LaneRecord:
-    """The record of `released`, every figure read from the repository at `toplevel`."""
+    """The record of `released`, every figure read from the repository at `toplevel`; the routing
+    figures come from its lane record file when it has one, and from a routing line otherwise."""
+    measured = _measured_record(toplevel, config, released)
+    stated = released.record_file
+    if stated is None:
+        return measured
+    return dataclasses.replace(
+        measured, routing=stated.routing_line(), risk=stated.risk, counts=stated.counts
+    )
+
+
+def _measured_record(
+    toplevel: Path, config: workboard.BoardConfig, released: ReleasedLane
+) -> LaneRecord:
     opened = _unknown_if_unreadable(lambda: _claim_commit(toplevel, released))
     outcome, merge_commit = released.outcome, released.merge_commit
     if isinstance(outcome, protocol.AbandonedRelease):
@@ -364,3 +476,156 @@ def _recorded_routing(values: Mapping[LaneTrailerKey, str]) -> RoutingLine:
         blocking=_whole_number(values.get(LaneTrailerKey.BLOCKING)),
         experiment=values.get(LaneTrailerKey.EXPERIMENT),
     )
+
+
+RECORD_FILE_VERSION = 1
+_MAXIMUM_COUNT = 999
+_RECORD_FIELDS = ("version", "stages", "fix_rounds", "blocking", "verdicts")
+_OPTIONAL_RECORD_FIELDS = ("risk", "experiment")
+_VERDICT_FIELDS = ("stage", "verdict", "sha")
+
+
+class _RecordFileError(Exception):
+    """One thing wrong with a lane record file, worded for the refusal that names the file."""
+
+
+def read_record_file(path_text: str) -> LaneRecordFile:
+    """The lane record file at `path_text`, read once and validated whole; a file that is not
+    exactly what the spec states refuses before any command acts on it."""
+    shown = protocol.terminal_text(path_text)
+    try:
+        raw = json.loads(Path(path_text).read_bytes(), object_pairs_hook=_keys_once)
+    except OSError as error:
+        raise _record_file_refusal(shown, f"cannot be read ({error.strerror})") from error
+    except ValueError as error:
+        raise _record_file_refusal(shown, "not valid JSON") from error
+    try:
+        return _record_file(raw)
+    except _RecordFileError as defect:
+        raise _record_file_refusal(shown, str(defect)) from defect
+
+
+def _record_file_refusal(shown: str, defect: str) -> protocol.ClaimUnavailableError:
+    return protocol.ClaimUnavailableError(
+        report.bounded_refusal(f"lane record {shown} is invalid: {defect}")
+    )
+
+
+def _keys_once(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) != len(keys):
+        raise ValueError("a key stated twice")
+    return dict(pairs)
+
+
+def _record_file(raw: object) -> LaneRecordFile:
+    fields = _members(raw, "the record", _RECORD_FIELDS, _OPTIONAL_RECORD_FIELDS)
+    version = fields["version"]
+    if type(version) is not int or version != RECORD_FILE_VERSION:
+        raise _RecordFileError(
+            f"version {version!r} is unknown; this aco reads version {RECORD_FILE_VERSION}"
+        )
+    fix_rounds = _counts_by_stage(fields["fix_rounds"], "fix_rounds")
+    blocking = _counts_by_stage(fields["blocking"], "blocking")
+    return LaneRecordFile(
+        stages=_stage_choices(fields["stages"]),
+        counts={stage: StageCounts(fix_rounds[stage], blocking[stage]) for stage in FindingStage},
+        verdicts=_verdicts(fields["verdicts"]),
+        risk=_optional_tag(fields, "risk"),
+        experiment=_optional_tag(fields, "experiment"),
+    )
+
+
+def _members(
+    value: object, where: str, required: Collection[str], optional: Collection[str] = ()
+) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise _RecordFileError(f"{where} must be an object")
+    members = cast(dict[str, object], value)
+    for name in members:
+        if name not in required and name not in optional:
+            raise _RecordFileError(f"{where} has an unknown key {name!r}")
+    for name in map(str, required):
+        if name not in members:
+            raise _RecordFileError(f"{where} lacks {name!r}")
+    return members
+
+
+def _stage_choices(value: object) -> dict[RoutingStage, str]:
+    members = _members(value, "stages", tuple(RoutingStage))
+    choices: dict[RoutingStage, str] = {}
+    for stage in RoutingStage:
+        choice = members[stage]
+        if not isinstance(choice, str) or not stage_choice_fits(stage, choice):
+            raise _RecordFileError(f"stage {stage} must be <model>/<effort> or none")
+        choices[stage] = choice
+    return choices
+
+
+def _counts_by_stage(value: object, where: str) -> dict[FindingStage, int]:
+    members = _members(value, where, tuple(FindingStage))
+    counts: dict[FindingStage, int] = {}
+    for stage in FindingStage:
+        count = members[stage]
+        if type(count) is not int or not 0 <= count <= _MAXIMUM_COUNT:
+            raise _RecordFileError(
+                f"{where}.{stage} must be a whole number from 0 to {_MAXIMUM_COUNT}"
+            )
+        counts[stage] = count
+    return counts
+
+
+def _verdicts(value: object) -> tuple[JudgedVerdict, ...]:
+    if not isinstance(value, list):
+        raise _RecordFileError("verdicts must be a list")
+    return tuple(
+        _verdict(item, f"verdicts[{position}]")
+        for position, item in enumerate(cast(list[object], value))
+    )
+
+
+def _verdict(value: object, where: str) -> JudgedVerdict:
+    members = _members(value, where, _VERDICT_FIELDS)
+    stage, verdict, sha = (members[name] for name in _VERDICT_FIELDS)
+    if not isinstance(stage, str) or stage not in VerdictStage:
+        raise _RecordFileError(f"{where}.stage must be one of {', '.join(VerdictStage)}")
+    if not isinstance(verdict, str) or verdict not in Verdict:
+        raise _RecordFileError(f"{where}.verdict must be one of {', '.join(Verdict)}")
+    if not isinstance(sha, str) or protocol.COMMIT_PATTERN.fullmatch(sha) is None:
+        raise _RecordFileError(f"{where}.sha must be a full 40-digit commit sha")
+    return JudgedVerdict(VerdictStage(stage), Verdict(verdict), sha)
+
+
+def _optional_tag(fields: Mapping[str, object], name: str) -> str | None:
+    if name not in fields:
+        return None
+    tag = fields[name]
+    if not isinstance(tag, str) or EXPERIMENT_TAG.fullmatch(tag) is None:
+        raise _RecordFileError(f"{name} must be 1 to 40 lowercase letters, digits and `-`")
+    return tag
+
+
+def require_abandoned_release(record: LaneRecordFile | None, abandoned: str | None) -> None:
+    """Refuse a `release` given a lane record file for a landing: `aco land` takes it there."""
+    if record is not None and abandoned is None:
+        raise protocol.ClaimUnavailableError(
+            "--record applies to --abandoned; aco land takes the record of a landing"
+        )
+
+
+def require_landing_head(record: LaneRecordFile | None, reviewed: str) -> None:
+    """Refuse a landing whose lane record file judged another commit than `reviewed` (a full
+    sha or a prefix of one): nothing is merged or written for it. A landing without a record
+    file has nothing to compare."""
+    if record is None:
+        return
+    if not record.verdicts:
+        raise protocol.ClaimUnavailableError(
+            "the lane record states no review or gate verdict, so it judged no head to land"
+        )
+    judged = record.verdicts[-1].sha
+    if not judged.startswith(reviewed):
+        raise protocol.ClaimUnavailableError(
+            f"the lane record's last verdict judged {judged}, not the reviewed {reviewed}; "
+            "write the record again for the head to land"
+        )
