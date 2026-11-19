@@ -5,7 +5,7 @@ it went: trailers on the release commit of `refs/aco/state`, so a later reader c
 compare process experiments. This file owns those trailer keys and values, the
 lane record file their routing figures are read from (LANREC-30..LANREC-46), the runs a lane
 stores with its claim, what `aco lane-record show` prints of them and the record a release
-computes from them (LANREC-52..LANREC-95), the `Routing:` line grammar they are read from where
+computes from them (LANREC-52..LANREC-96), the `Routing:` line grammar they are read from where
 neither a file nor stored runs are given, and what a figure that cannot be computed does. `specs/release.spec.md` owns the release itself,
 `specs/land.spec.md` the landing, `specs/storage-pin.spec.md` the `production_paths` key
 (PIN-54..PIN-56), and `specs/ref-store-cas.spec.md` the trailers every transition carries
@@ -32,7 +32,7 @@ last verdict judged and `<reviewed>` the `--head` value of `aco land`.
 | `aco lane-record add <item> <file> --run <run>` | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89 | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89 |
 | `aco lane-record show <item>` | LANREC-71..LANREC-89 | LANREC-71..LANREC-89 |
 | stored runs and a handover, a rescope, a release or a landing | LANREC-61, LANREC-67 | LANREC-61, LANREC-67 |
-| a release of a claim with stored runs | LANREC-90..LANREC-95 | LANREC-90..LANREC-95 |
+| a release of a claim with stored runs | LANREC-90..LANREC-96 | LANREC-90..LANREC-96 |
 | a figure read back from a release commit | LANREC-51 | LANREC-51 |
 | a figure that cannot be computed | LANREC-21 | LANREC-21 |
 | a malformed `production_paths` | LANREC-22 | LANREC-22 |
@@ -160,11 +160,12 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 ## Releasing a lane with stored runs
 
 - [ ] [LANREC-90] A release of a claim whose runs file holds an entry (one with none is no stored runs) writes its routing trailers from those runs, never from a routing line or a file (E-LANREC-17).
-- [ ] [LANREC-91] With stored runs and `--record <file>` a release refuses `<label> has stored runs, so aco computes its record from them; drop --record`, exit `2`, before it writes, after REL-09 (E-LANREC-18).
+- [ ] [LANREC-91] With stored runs and `--record <file>` a release refuses `<label> has stored runs, so aco computes its record from them; drop --record`, exit `2`, before it writes, in LANREC-96's order (E-LANREC-18).
 - [ ] [LANREC-92] A release carries the runs file it read; a state whose file for the claim differs refuses LANREC-59's sentence, exit `2`, and its rerun reads the new runs; an unrelated write is applied over.
 - [ ] [LANREC-93] A runs file a release cannot read states every routing figure unknown, is removed and refuses nothing (LANREC-21); with `--record`, LANREC-91 refuses.
 - [ ] [LANREC-94] A lane with a lost run (a begun run without a record, or one that does not follow) writes the stage lines its rules know and `lane_risk`, and no count, total, misses or experiment line (E-LANREC-19).
 - [ ] [LANREC-95] `lane_fix_rounds` and `lane_blocking` sum the four per-stage figures, each clamped at `999` before the sum and the sum not; a total is unknown where a per-stage figure is.
+- [ ] [LANREC-96] A release refuses in this order: `--merged` with `--record` (LANREC-41), the missing claim (REL-09), the releaser's authorization, LANREC-91, then LANREC-92 at the push.
 
 ## Failure
 
