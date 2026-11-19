@@ -11,9 +11,9 @@ from board_fixtures import REPOSITORY, complete_contract
 from check_pull_request_fixtures import LANE_BRANCH, LANE_CLAIM
 from cli_fixtures import freeze_cli_now, run_cli
 from github_pages import api_head, api_pull_request
+from rate_limit_fixtures import GRAPHQL_REFUSAL
 from store_fixtures import publish_claims_from_a_second_clone
 
-RATE_LIMIT_REFUSAL = "GraphQL: API rate limit already exceeded for user ID 1."
 # Answers a REST route (a request's path with the issue state it filters on) with the JSON its
 # `FAKE_GH_ROUTES` file holds, through the request's own `--jq` filter as `gh` does; refuses a
 # GraphQL or `pr` call, noting its arguments in `FAKE_GH_REFUSED`.
@@ -86,7 +86,7 @@ def serve_rest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, rest: dict[str, 
     monkeypatch.setenv("PATH", f"{shims}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_GH_ROUTES", str(routes))
     monkeypatch.setenv("FAKE_GH_REFUSED", str(refused))
-    monkeypatch.setenv("FAKE_GH_REFUSAL", RATE_LIMIT_REFUSAL)
+    monkeypatch.setenv("FAKE_GH_REFUSAL", GRAPHQL_REFUSAL)
     return refused
 
 

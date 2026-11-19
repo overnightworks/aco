@@ -10,7 +10,7 @@ import os
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from . import (
@@ -215,6 +215,35 @@ def read_board(context: RunContext) -> BoardReading:
     )
 
 
+def retry_seconds(failure: forge.ForgeTransientError, wall_now: datetime) -> float:
+    """How long after `failure` GitHub is asked again: until the reset a rate limit named
+    when that is more than `PROBE_SECONDS` away, else `PROBE_SECONDS`."""
+    if isinstance(failure, forge.ForgeRateLimitedError) and failure.resets_at is not None:
+        return max(PROBE_SECONDS, (failure.resets_at - wall_now).total_seconds())
+    return PROBE_SECONDS
+
+
+class FailureRun:
+    """The failures a wait has met since a read or check last answered. It says the first of
+    them once, and says a rate limit once more where the run began with another failure."""
+
+    def __init__(self, say: Callable[[forge.ForgeTransientError], None]) -> None:
+        self._say = say
+        self._failing = False
+        self._limited = False
+
+    def add(self, failure: forge.ForgeTransientError) -> None:
+        limited = isinstance(failure, forge.ForgeRateLimitedError)
+        if not self._failing or (limited and not self._limited):
+            self._say(failure)
+        self._failing = True
+        self._limited = self._limited or limited
+
+    def end(self) -> None:
+        self._failing = False
+        self._limited = False
+
+
 def _say_still_waiting(failure: forge.ForgeTransientError) -> None:
     sys.stderr.write(f"WARNING: the board could not be read, still waiting: {failure}\n")
     sys.stderr.flush()
@@ -237,45 +266,68 @@ class _BoardWatch:
         self._until: item_wait.UntilWait | None = None
         self._schedule = Schedule(clock.now(), clock.now())
         self._pending = False
-        self._failing = False
+        self._failures = FailureRun(_say_still_waiting)
         self._read_before = False
 
     def start(self) -> BoardEnd | None:
-        """The first read: a failure here refuses, and the state ref's tip and the
-        probes' tokens are taken before it, so what changes during the read is seen."""
+        """The first read: a failure here refuses, a rate limit apart (the first read is then
+        owed at the retry time), and the state ref's tip and the probes' tokens are taken
+        before it, so what changes during the read is seen."""
         # The target's own refusals (`--repo` under `state-ref`) come before anything is watched.
         _ = self._context.repository_id
         self._tip = self._tip_of_the_state_ref()
-        self._probe_the_forge()
-        return self._read(self._clock.now())
+        try:
+            self._probe_the_forge()
+            return self._read(self._clock.now())
+        except forge.ForgeRateLimitedError as limited:
+            self._fail(limited, self._clock.now())
+            self._pending = True
+            self._read_before = True
+            return None
 
     def tick(self) -> BoardEnd | None:
         """What one pause brings; a transient failure is said once per run of failures."""
-        now = self._clock.now()
         try:
-            return self._tick(now)
+            return self._tick(self._clock.now())
         except forge.ForgeTransientError as failure:
-            self._fail(failure, now)
+            self._fail(failure, self._clock.now())
             return None
 
     def _tick(self, now: float) -> BoardEnd | None:
         moved = self._moved_items()
+        held = now < self._schedule.retry_after
         probed = probe_due(now, self._schedule)
         if probed:
             self._schedule = replace(self._schedule, last_probe=now)
-            self._pending = self._probe_the_forge() or self._pending
-            self._probe_the_state_ref()
-        if now >= self._schedule.retry_after:
-            end = self._reread_items(moved) if moved else None
-            if end is not None:
-                return end
-            if self._read_due(now, self._schedule.retry_after):
-                return self._read(now)
-            probed, moved = probed or bool(moved), []
-        owed = bool(moved) or self._read_due(now, retry_after=0.0)
-        if probed and not owed:
-            self._failing = False
+            self._probe(held)
+        if held:
+            return None
+        end = self._reread_items(moved) if moved else None
+        if end is not None:
+            return end
+        if self._read_due(now, self._schedule.retry_after):
+            return self._read(now)
+        if probed or moved:
+            self._failures.end()
         return None
+
+    def _probe(self, held: bool) -> None:
+        """The state ref is asked at every probe, the forge only outside a hold; the forge's
+        refusal does not skip the state ref, and a state ref failure on that tick does not
+        replace the refusal, whose reset holds the next call to GitHub."""
+        refused: forge.ForgeTransientError | None = None
+        if not held:
+            try:
+                self._pending = self._probe_the_forge() or self._pending
+            except forge.ForgeTransientError as failure:
+                refused = failure
+        try:
+            self._probe_the_state_ref()
+        except forge.ForgeTransientError:
+            if refused is None:
+                raise
+        if refused is not None:
+            raise refused
 
     def _read_due(self, now: float, retry_after: float) -> bool:
         return read_due(
@@ -287,10 +339,13 @@ class _BoardWatch:
         )
 
     def _fail(self, failure: forge.ForgeTransientError, now: float) -> None:
-        if not self._failing:
-            _say_still_waiting(failure)
-        self._failing = True
-        self._schedule = replace(self._schedule, retry_after=now + PROBE_SECONDS)
+        """Say the failure unless its run has been said, and hold every call to GitHub for
+        `retry_seconds`; a failure that names no reset never shortens a hold already set."""
+        self._failures.add(failure)
+        retry_after = now + retry_seconds(failure, self._context.now())
+        self._schedule = replace(
+            self._schedule, retry_after=max(self._schedule.retry_after, retry_after)
+        )
 
     def _modified(self, item: int) -> int | None:
         return signal_modified(decide.item_signal_path(self._context, item, self._state))
@@ -377,7 +432,7 @@ class _BoardWatch:
         watched = sorted({item for item, _index in self._waiting})
         self._signals = {item: before.get(item, _UNSEEN) for item in watched}
         self._pending = False
-        self._failing = False
+        self._failures.end()
         self._schedule = Schedule(now, now)
         if not self._probe_the_forge():
             return None

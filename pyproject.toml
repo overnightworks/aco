@@ -99,7 +99,7 @@ layers = [
     "github_probe",
     "github | state_board | github_search",
     "github_body_check | github_pull_requests",
-    "github_graphql | github_actions | github_issue_payload | github_body_write | github_merge_queue | earlier_rulings",
+    "github_graphql | github_actions | github_issue_payload | github_body_write | github_failure | github_merge_queue | earlier_rulings",
     "forge | rulings",
     "workboard",
     "items | expectations",
