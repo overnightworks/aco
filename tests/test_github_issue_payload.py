@@ -5,7 +5,7 @@ import json
 
 import pytest
 from board_fixtures import REPOSITORY
-from github_fixtures import api_pull_request
+from github_pages import api_head, api_pull_request
 
 from aco import github
 from aco.forge import ForgeMalformedResponseError
@@ -46,14 +46,13 @@ def test_the_single_item_read_says_whether_a_member_wrote_the_item(
     assert reference.author_is_member is is_member
 
 
-def _landing_client(login: str, body: object = "") -> github.GitHubForge:
+def _landing_client(login: str, body: object = "", user_type: str = "Bot") -> github.GitHubForge:
     payload = api_pull_request(
         body=body,
         title="Bump ruff",
-        headRefName="dependabot/uv/ruff",
-        author={"login": login},
-        mergedAt=None,
-        mergeCommit=None,
+        head=api_head(ref="dependabot/uv/ruff"),
+        user={"login": login, "type": user_type},
+        merged_at=None,
     )
     return github.GitHubForge(
         github.repository_id(REPOSITORY), run=lambda _arguments: json.dumps(payload)
@@ -61,17 +60,20 @@ def _landing_client(login: str, body: object = "") -> github.GitHubForge:
 
 
 @pytest.mark.parametrize(
-    ("login", "is_dependency_bot"),
+    ("login", "user_type", "is_dependency_bot"),
     [
-        pytest.param("app/dependabot", True, id="dependabot-app"),
-        pytest.param("dependabot", False, id="user-named-dependabot"),
-        pytest.param("ada", False, id="member"),
+        pytest.param("dependabot[bot]", "Bot", True, id="dependabot-app"),
+        pytest.param("renovate[bot]", "Bot", False, id="another-app"),
+        pytest.param("dependabot", "User", False, id="user-named-dependabot"),
+        pytest.param("ada", "User", False, id="member"),
     ],
 )
 def test_the_landing_read_flags_only_the_dependabot_app_as_a_dependency_bot(
-    login: str, is_dependency_bot: bool
+    login: str, user_type: str, is_dependency_bot: bool
 ) -> None:
-    assert _landing_client(login).landing(12).author_is_dependency_bot is is_dependency_bot
+    landing = _landing_client(login, user_type=user_type).landing(12)
+
+    assert landing.author_is_dependency_bot is is_dependency_bot
 
 
 @pytest.mark.parametrize(
@@ -84,7 +86,7 @@ def test_the_landing_read_flags_only_the_dependabot_app_as_a_dependency_bot(
     ],
 )
 def test_the_landing_read_refuses_a_falsy_body_that_is_not_text(body: object) -> None:
-    client = _landing_client("app/dependabot", body)
+    client = _landing_client("dependabot[bot]", body)
 
     with pytest.raises(ForgeMalformedResponseError):
         client.landing(12)
