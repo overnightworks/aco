@@ -1,0 +1,8 @@
+claim_id = "83023437013140cc96f6704ac5cf144e"
+agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
+role = "builder"
+base = "145ac2c43a76c27e910a30c2e9c6082f6eb6edab"
+branch = "claude/issue-972-unreadable-checkout-refusal"
+scope = ["specs/item.spec.md", "specs/mcp.spec.md", "src/aco/inbox.py", "src/aco/repositories.py", "tests/test_cmd_item_new_repo.py", "tests/test_cmd_mcp.py", "tests/test_inbox.py", "tests/test_repositories.py"]
+opened_commit = "9e772627eca9f85905696b963d09c606280ea997"
+whole_reason = "One shared lookup with its two specs and four test modules; the change is about twenty production lines in two modules."
