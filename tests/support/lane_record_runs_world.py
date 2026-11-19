@@ -110,6 +110,14 @@ def lane_record_runs_world(
     return World(body.Storage.STATE_REF, item, item, (), standpoint.directory, bare_remote, scratch)
 
 
+def commit_on(directory: Path, name: str) -> str:
+    """One commit adding `name` to the checkout at `directory`; its sha."""
+    (directory / name).write_text(f"{name}\n")
+    real_git(directory, "add", name)
+    real_git(directory, "commit", "-q", "-m", f"add {name}")
+    return real_git(directory, "rev-parse", "HEAD").stdout.strip()
+
+
 def begin_arguments(world: World, run: str = FIRST_RUN, *flags: str) -> tuple[str, ...]:
     return ("lane-record", "begin", world.item, "--run", run, *flags)
 

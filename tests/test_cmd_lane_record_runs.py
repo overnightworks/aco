@@ -18,6 +18,7 @@ from lane_record_runs_world import (
     World,
     add_arguments,
     begin_arguments,
+    commit_on,
 )
 
 from aco import lane_runs, protocol, store
@@ -27,14 +28,6 @@ from aco.routing_line import RoutingStage
 @pytest.fixture
 def world(lane_record_runs_world: World) -> World:
     return lane_record_runs_world
-
-
-def commit_on(directory: Path, name: str) -> str:
-    """One commit adding `name` to the checkout at `directory`; its sha."""
-    (directory / name).write_text(f"{name}\n")
-    real_git(directory, "add", name)
-    real_git(directory, "commit", "-q", "-m", f"add {name}")
-    return real_git(directory, "rev-parse", "HEAD").stdout.strip()
 
 
 def test_a_begin_then_an_add_store_the_run_under_the_claims_id_and_say_so(
@@ -492,7 +485,7 @@ def test_json_add_reports_a_fresh_entry_as_added_and_a_repeat_as_already_added(
 
 
 def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: LANREC-57, LANREC-63, LANREC-66, LANREC-69."""
+    """Spec: LANREC-57, LANREC-63, LANREC-66, LANREC-89."""
     unbegun = world.run(capsys, *add_arguments(world), "--json")
     stranger = world.run(
         capsys, *begin_arguments(world, FIRST_RUN, "--agent", OTHER_AGENT, "--json")
@@ -508,7 +501,7 @@ def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFix
 def test_stored_runs_that_changed_since_the_command_read_them_refuse_as_a_transient_refusal(
     world: World, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: LANREC-59, LANREC-69."""
+    """Spec: LANREC-59, LANREC-89."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     claim = world.claim()
     stored_before = store.fetch_state(worktree=world.directory, remote="origin").runs[
@@ -579,3 +572,32 @@ def test_stored_runs_that_are_not_the_stored_shape_refuse_and_write_nothing(
         f"ERROR: the stored runs of {world.label} cannot be used: not valid JSON\n"
     )
     assert world.state_tip() == tip
+
+
+@pytest.mark.parametrize("command", ["begin", "add"])
+def test_a_non_holder_is_refused_as_one_before_the_stored_runs_are_read(
+    world: World, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    """Spec: LANREC-63, LANREC-89."""
+    world.commit_state(
+        protocol.RunsWriteIntent(
+            claim_id=world.claim().claim_id,
+            agent="Ada",
+            expected=None,
+            new_oid=store.hash_blob(world.directory, b"not json"),
+            operation_id="op-malformed",
+            holder_refusal="{}".format,
+            stale_refusal="never reached",
+        )
+    )
+    arguments = (
+        begin_arguments(world, FIRST_RUN, "--agent", OTHER_AGENT, "--json")
+        if command == "begin"
+        else add_arguments(world, flags=("--agent", OTHER_AGENT, "--json"))
+    )
+
+    refused = world.run(capsys, *arguments)
+
+    assert refused.status == 2
+    assert f"holder='Ada', this session='{OTHER_AGENT}'" in refused.stderr
+    assert_json_refusal_object(refused.stderr, refused.stdout, reason="precondition_failed")

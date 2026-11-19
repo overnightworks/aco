@@ -162,6 +162,18 @@ class LaneRecordFile:
 
 
 @dataclass(frozen=True)
+class LaneFigures:
+    """The figures of a whole lane computed from its stored runs: `None` is unknown, never zero.
+    `lane_runs.lane_figures` computes them; `stages` holds every routing stage."""
+
+    stages: Mapping[RoutingStage, str | None]
+    risk: str | None
+    experiment: str | None
+    counts: Mapping[FindingStage, StageCounts]
+    verdicts: tuple[JudgedVerdict, ...]
+
+
+@dataclass(frozen=True)
 class ProductionSize:
     files: int
     added: int
@@ -538,7 +550,7 @@ def _recorded_risk(values: Mapping[LaneTrailerKey, str]) -> str | None:
 
 def _stage_count(text: str | None) -> int | None:
     count = _whole_number(text)
-    return count if count is not None and count <= _MAXIMUM_COUNT else None
+    return count if count is not None and count <= MAXIMUM_COUNT else None
 
 
 def _recorded_counts(values: Mapping[LaneTrailerKey, str]) -> dict[FindingStage, StageCounts]:
@@ -553,7 +565,7 @@ def _recorded_counts(values: Mapping[LaneTrailerKey, str]) -> dict[FindingStage,
 
 
 RECORD_FILE_VERSION = 1
-_MAXIMUM_COUNT = 999
+MAXIMUM_COUNT = 999
 _RECORD_FIELDS = ("version", "stages", "fix_rounds", "blocking", "verdicts")
 _OPTIONAL_RECORD_FIELDS = ("risk", "misses", "experiment")
 _VERDICT_FIELDS = ("stage", "verdict", "sha")
@@ -671,9 +683,9 @@ def _counts_by_stage(value: object, where: str) -> dict[FindingStage, int]:
     counts: dict[FindingStage, int] = {}
     for stage in FindingStage:
         count = members[stage]
-        if type(count) is not int or not 0 <= count <= _MAXIMUM_COUNT:
+        if type(count) is not int or not 0 <= count <= MAXIMUM_COUNT:
             raise RecordFileError(
-                f"{where}.{stage} must be a whole number from 0 to {_MAXIMUM_COUNT}"
+                f"{where}.{stage} must be a whole number from 0 to {MAXIMUM_COUNT}"
             )
         counts[stage] = count
     return counts
