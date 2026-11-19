@@ -295,6 +295,31 @@ class TestTheBareWait:
         assert (result.status, result.stdout) == (0, ACTIONABLE)
         assert set(asked_at) == {60.0 * minute for minute in range(6)}
 
+    def test_a_state_ref_failure_on_the_tick_of_a_refusal_keeps_the_known_reset(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: WAIT-22 -- the state ref cannot be reached on the tick the forge refuses with
+        a reset: the next call to GitHub still waits for the reset."""
+        first_refused = 60.0
+        world = serve_board(
+            monkeypatch,
+            issues=(waiting_card(),),
+            probe_failing=failing_in((first_refused, RETRY_AT_THE_RESET, LIMIT)),
+        )
+        reachable = store.ls_remote_state
+
+        def ls_remote(worktree: Path, remote: str) -> protocol.ObjectId | None:
+            if world.ticks.now == first_refused:
+                raise protocol.ClaimError("cannot reach origin refs/aco/state")
+            return reachable(worktree, remote)
+
+        monkeypatch.setattr(store, "ls_remote_state", ls_remote)
+        world.ticks.afterwards[1] = a_board_that_gains_an_action(world)
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stdout) == (0, ACTIONABLE)
+        assert result.stderr == f"{BOARD_WARNING}{SENTENCE}\n"
+        assert min(at for at in world.probe.asked_at if at > first_refused) >= RETRY_AT_THE_RESET
+
     def test_a_run_of_failures_that_met_another_failure_first_warns_again_for_a_rate_limit(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:

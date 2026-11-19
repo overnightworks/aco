@@ -313,14 +313,19 @@ class _BoardWatch:
 
     def _probe(self, held: bool) -> None:
         """The state ref is asked at every probe, the forge only outside a hold; the forge's
-        refusal does not skip the state ref."""
+        refusal does not skip the state ref, and a state ref failure on that tick does not
+        replace the refusal, whose reset holds the next call to GitHub."""
         refused: forge.ForgeTransientError | None = None
         if not held:
             try:
                 self._pending = self._probe_the_forge() or self._pending
             except forge.ForgeTransientError as failure:
                 refused = failure
-        self._probe_the_state_ref()
+        try:
+            self._probe_the_state_ref()
+        except forge.ForgeTransientError:
+            if refused is None:
+                raise
         if refused is not None:
             raise refused
 
