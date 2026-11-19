@@ -382,7 +382,13 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         lane_record.require_abandoned_release(parsed.record, parsed.abandoned)
         release_transition(parsed, context, _release_branch_for(parsed))
     except protocol.ClaimError as error:
-        named = workboard.named_refusal(error, context.config.storage)
+        # Only a refusal that names an item needs the storage, so a refusal that does not
+        # still reaches the envelope when the board configuration cannot be read.
+        named = (
+            error
+            if error.naming is None
+            else workboard.named_refusal(error, context.config.storage)
+        )
         return report.refuse(_ReleaseReason.PRECONDITION_FAILED, named, as_json=as_json)
     return 0
 

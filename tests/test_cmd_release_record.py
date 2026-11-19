@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY
-from claim_worktrees import lane_held_by_ada, make_stand_in
+from claim_worktrees import assert_json_refusal_object, lane_held_by_ada, make_stand_in
 from cli_fixtures import run_cli
 from lane_record_fixtures import (
     LANE_BRANCH,
@@ -110,6 +110,31 @@ def test_a_release_refuses_a_record_it_cannot_use_before_any_write(
         f"ERROR: {sentence.format(record=record)}\n",
         tip_before,
     )
+
+
+def test_a_record_for_a_landing_refuses_in_json_when_the_board_configuration_cannot_be_read(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: LANREC-41, REL-24 -- a refusal that names no item needs no configuration."""
+    stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
+    stand_in(
+        branch=LANE_BRANCH,
+        standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)),
+        board_config="storage = [\n",
+    )
+    record = write_lane_record_file(tmp_path, lane_record_object())
+
+    result = run_cli(
+        ["release", "--agent", "Ada", "--merged", "12", "--record", str(record), "--json"], capsys
+    )
+
+    assert result.status == 2
+    assert_json_refusal_object(result.stderr, result.stdout, reason="precondition_failed")
+    assert result.stderr == "ERROR: --record applies to --abandoned only\n"
 
 
 def test_an_abandoned_release_accepts_a_record_whose_last_verdict_asks_for_revision(
