@@ -76,7 +76,7 @@ def _stored_runs(context: RunContext, claim: protocol.ActiveClaim) -> _StoredRun
         runs = lane_runs.parse_runs(state_runs.read_runs_file(context.toplevel, blob))
     except lane_runs.RunsFileError, protocol.ClaimError:
         return _StoredRuns(blob, lane_record.UNKNOWN_FIGURES)
-    return _StoredRuns(blob, lane_runs.lane_figures(runs) if runs.runs else None)
+    return _StoredRuns(blob, lane_runs.lane_figures(runs) if runs.holds_runs() else None)
 
 
 def _stated_figures(

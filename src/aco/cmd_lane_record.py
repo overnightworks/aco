@@ -362,7 +362,7 @@ def _print_shown(label: str, runs: lane_runs.RunsFile, lane: Mapping[str, object
 def _show(parsed: argparse.Namespace, context: RunContext) -> int:
     live = _live_claim(parsed, context)
     stored = _stored_runs(context, live)
-    shown = bool(stored.runs)
+    shown = stored.holds_runs()
     lane = _lane_object(lane_runs.lane_figures(stored)) if shown else None
     if parsed.json:
         report.emit_json(
