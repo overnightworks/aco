@@ -113,7 +113,7 @@ A lane may run its stages in more than one workflow run. `aco lane-record begin`
 - [ ] [LANREC-52] `aco lane-record begin <item> --run <run> [--start-tip <tip>] [--agent NAME] [--json]` adds a begun entry and prints `BEGAN run <run> of <label>` (E-LANREC-12).
 - [ ] [LANREC-63] Only the claim's holder may begin or add: another session refuses `only the holder may begin a run of <label> (holder='…', this session='…')`, `add a run to` for an add (E-LANREC-13).
 - [ ] [LANREC-68] A begin or an add for an unclaimed item refuses with the sentence of REL-09.
-- [ ] [LANREC-53] The same run id and start tip prints `ALREADY BEGUN run <run> of <label>` and changes nothing; another start tip refuses `run <run> of <label> was begun with start tip <tip>, not <tip>`, `none` for a missing one.
+- [ ] [LANREC-53] The same run id and start tip prints `ALREADY BEGUN run <run> of <label>` and changes nothing; another refuses `run <run> of <label> was begun with start tip <tip>, not <tip>`, `none` if missing.
 - [ ] [LANREC-64] A begin of a run already added refuses `run <run> of <label> was added already; it cannot be begun again`, exit `2`.
 - [ ] [LANREC-54] An entry stores whether it follows, judged once at its begin: the first entry when it has no start tip, a later one when the newest stored entry's end tip is its start tip or an ancestor of it.
 - [ ] [LANREC-65] A start tip or end tip git cannot read, a first entry with a start tip and an earlier entry without an end tip do not follow.
