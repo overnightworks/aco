@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, Lister, serving
+from aco_board_fixtures import BoardClient, Lister, LoggedLines, serving
 from board_fixtures import (
     MINIMAL_BLOCK_TOML,
     OPERATOR_WAIT,
@@ -104,7 +104,9 @@ def checkout(
 
 
 @pytest.fixture
-def state_ref_board(checkout: _StateRefCheckout) -> Iterator[BoardClient]:
+def state_ref_board(checkout: _StateRefCheckout, logged: LoggedLines) -> Iterator[BoardClient]:
+    """The real board server over the state-ref checkout; its request lines go to
+    `logged`, never to a test's captured output."""
     with serving(AcoSource(directory=checkout.worktree)) as client:
         yield client
 

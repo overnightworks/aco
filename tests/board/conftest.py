@@ -59,7 +59,9 @@ def port(repository: BoardForge) -> RecordedPort:
 
 
 @pytest.fixture
-def board(port: RecordedPort) -> Iterator[BoardClient]:
+def board(port: RecordedPort, logged: LoggedLines) -> Iterator[BoardClient]:
+    """The real board server over `port`; its request lines go to `logged`, never to a
+    test's captured output."""
     with serving(port) as client:
         yield client
 
