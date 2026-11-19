@@ -3,6 +3,10 @@ claim, whether the lane is complete and the figures computed from them, as text 
 (`specs/lane-record.spec.md`, LANREC-71..LANREC-88)."""
 
 import json
+import os
+import shutil
+import stat
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -32,7 +36,7 @@ from lane_record_runs_world import (
     commit_on,
 )
 
-from aco import protocol, state_runs, store, workboard
+from aco import protocol, store, workboard
 from aco.routing_line import RoutingStage
 
 ENVELOPE_KEYS = ["ok", "reason", "item", "claim_id", "runs", "complete", "lane"]
@@ -538,8 +542,29 @@ def test_an_item_without_a_live_claim_refuses_as_a_release_does(
     assert_json_refusal_object(as_json[2], as_json[1], reason="precondition_failed")
 
 
-def unreadable(oid: protocol.ObjectId) -> bytes:
-    raise protocol.ClaimError(f"cannot read the runs file {oid}: the object is gone")
+FAILING_CAT_FILE_GIT = """#!{python}
+import os, sys
+arguments = sys.argv[1:]
+if arguments[-3:-1] == ["cat-file", "blob"] and arguments[-1] == os.environ["UNREADABLE_BLOB"]:
+    sys.stderr.write("fatal: the object is gone\\n")
+    sys.exit(128)
+os.execv({git!r}, [{git!r}, *arguments])
+"""
+
+
+def git_failing_to_read_blob(
+    monkeypatch: pytest.MonkeyPatch, scratch: Path, oid: protocol.ObjectId
+) -> None:
+    """Put a `git` on PATH that fails `cat-file blob <oid>` and runs the real git otherwise."""
+    real_git_path = shutil.which("git")
+    assert real_git_path is not None
+    wrapper_directory = scratch / "failing-cat-file-git"
+    wrapper_directory.mkdir()
+    wrapper = wrapper_directory / "git"
+    wrapper.write_text(FAILING_CAT_FILE_GIT.format(python=sys.executable, git=real_git_path))
+    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setenv("UNREADABLE_BLOB", str(oid))
+    monkeypatch.setenv("PATH", f"{wrapper_directory}{os.pathsep}{os.environ['PATH']}")
 
 
 @pytest.mark.parametrize("flags", [(), ("--json",)], ids=["text", "json"])
@@ -559,19 +584,20 @@ def test_stored_runs_that_cannot_be_used_refuse_as_unavailable(
     defect: str,
 ) -> None:
     """Spec: LANREC-87, LANREC-62."""
+    stored_runs = store.hash_blob(world.directory, b"not json")
     world.commit_state(
         protocol.RunsWriteIntent(
             claim_id=world.claim().claim_id,
             agent="Ada",
             expected=None,
-            new_oid=store.hash_blob(world.directory, b"not json"),
+            new_oid=stored_runs,
             operation_id="op-unusable",
             holder_refusal="{}".format,
             stale_refusal="never reached",
         )
     )
     if not readable:
-        monkeypatch.setattr(state_runs, "read_runs_file", lambda _worktree, oid: unreadable(oid))
+        git_failing_to_read_blob(monkeypatch, world.scratch, stored_runs)
 
     status, stdout, stderr = show(world, capsys, *flags)
 
