@@ -8,7 +8,7 @@ from typing import cast
 
 import pytest
 
-from aco import forge, lane_record, protocol, store, workboard
+from aco import forge, protocol, release_record, store, workboard
 from aco.routing_line import RoutingStage
 from aco.session import RunContext
 
@@ -28,11 +28,11 @@ def stub_lane_record(monkeypatch: pytest.MonkeyPatch) -> None:
         _context: object,
         claim: protocol.ActiveClaim,
         _outcome: protocol.ReleaseOutcome,
-        _evidence: lane_record.ReleaseEvidence,
+        _evidence: release_record.ReleaseEvidence,
     ) -> store.TransitionSubject:
         return store.transition_subject("release", claim.identity, claim.branch)
 
-    monkeypatch.setattr(lane_record, "release_subject", plain_subject)
+    monkeypatch.setattr(release_record, "release_subject", plain_subject)
 
 
 def release_trailers_of(
@@ -51,9 +51,11 @@ def release_trailers_of(
     context = SimpleNamespace(
         toplevel=toplevel, config=config, observation=SimpleNamespace(tip=tip), now=lambda: now
     )
-    evidence = lane_record.ReleaseEvidence(verified_merge, item)
+    evidence = release_record.ReleaseEvidence(verified_merge, item)
 
-    return lane_record.release_subject(cast(RunContext, context), claim, outcome, evidence).trailers
+    return release_record.release_subject(
+        cast(RunContext, context), claim, outcome, evidence
+    ).trailers
 
 
 JUDGED_SHA = "c" * 40

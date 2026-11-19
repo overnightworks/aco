@@ -4,7 +4,6 @@ The record is computed once, before the release commit is pushed. A figure that 
 is unknown and has no trailer: no failure here refuses or delays a release."""
 
 import codecs
-import dataclasses
 import json
 import re
 from collections.abc import Callable, Collection, Iterator, Mapping
@@ -14,7 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from . import body, checkout, forge, protocol, store, workboard
+from . import body, checkout, protocol, workboard
 from .routing_line import (
     EXPERIMENT_TAG,
     RoutingLine,
@@ -22,7 +21,6 @@ from .routing_line import (
     parse_routing_line,
     stage_choice_fits,
 )
-from .session import RunContext
 
 
 class LaneOutcome(StrEnum):
@@ -244,51 +242,6 @@ class ReleasedLane:
     state_tip: str | None
     item_size: body.Size | None = None
     record_file: LaneRecordFile | None = None
-
-
-@dataclass(frozen=True)
-class ReleaseEvidence:
-    """What a release holds beyond its claim and outcome: `verified_merge` is the merge commit
-    the forge's landing was verified to have (a github `--merged` release reads it nowhere
-    else), `item` the work item the landing release already read, whose body declares the size,
-    `record_file` the lane record file the release was given."""
-
-    verified_merge: str | None = None
-    item: forge.ItemReference | None = None
-    record_file: LaneRecordFile | None = None
-
-
-def release_subject(
-    context: RunContext,
-    claim: protocol.ActiveClaim,
-    outcome: protocol.ReleaseOutcome,
-    evidence: ReleaseEvidence,
-) -> store.TransitionSubject:
-    """The release transition's subject for `claim`, carrying its lane record."""
-    released = ReleasedLane(
-        claim,
-        outcome,
-        _merge_commit(outcome, evidence.verified_merge),
-        int(context.now().timestamp()),
-        context.observation.tip,
-        _declared_size(evidence.item, context.config.storage),
-        evidence.record_file,
-    )
-    record = compute_record(context.toplevel, context.config, released)
-    subject = store.transition_subject("release", claim.identity, claim.branch)
-    return dataclasses.replace(
-        subject, trailers=record.trailers(), committed_at=released.released_at
-    )
-
-
-def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:
-    return outcome.commit if isinstance(outcome, protocol.LandedRelease) else verified_merge
-
-
-def _declared_size(item: forge.ItemReference | None, storage: body.Storage) -> body.Size | None:
-    if item is None or item.body is None:
-        return None
-    return body.parse_body(item.body, storage=storage).size
 
 
 def compute_record(

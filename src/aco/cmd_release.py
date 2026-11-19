@@ -19,6 +19,7 @@ from . import (
     landed_worktree,
     lane_record,
     protocol,
+    release_record,
     report,
     state_board,
     store,
@@ -437,9 +438,9 @@ def release_transition(
         coordinator_override=parsed.coordinator_override,
     )
     merge_commit, item = (None, None) if lane is None else (lane.merge_commit, lane.item)
-    evidence = lane_record.ReleaseEvidence(merge_commit, item, parsed.record)
+    evidence = release_record.ReleaseEvidence(merge_commit, item, parsed.record)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, evidence), intent
+        release_record.release_subject(context, resolved.selected, outcome, evidence), intent
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
     landing = worktree_cleanup = None
@@ -656,9 +657,9 @@ def _cmd_release_landed(
         operation_id=uuid.uuid4().hex,
         coordinator_override=parsed.coordinator_override,
     )
-    evidence = lane_record.ReleaseEvidence(item=item)
+    evidence = release_record.ReleaseEvidence(item=item)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, evidence), intent
+        release_record.release_subject(context, resolved.selected, outcome, evidence), intent
     )
     client.mark_landed(write, new_oid)
     landing = _landing_report(context, identity, new_state, storage, trunk_ref)
