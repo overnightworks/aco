@@ -13,19 +13,26 @@ import pytest
 from board_fixtures import (
     REPOSITORY,
     FakeBoardProbe,
-    board_issue,
-    complete_contract,
-    holding_for_the_operator,
     serve_board_probe,
 )
-from cli_fixtures import FROZEN_CLI_NOW, CliRun, freeze_cli_now, run_cli
+from cli_fixtures import FROZEN_CLI_NOW, CliRun, run_cli
 from github_fixtures import FakeForge, serve_forge
 from option_cards import decide, group_body, ruled_card
-from wait_fixtures import ITEM, Ticks, install, open_reference, reads_of, serve_item
+from wait_fixtures import (
+    ITEM,
+    OTHER_ITEM,
+    Ticks,
+    free_item,
+    install,
+    open_reference,
+    reads_of,
+    serve_item,
+    waiting_card,
+)
 
 from aco import board_wait, cmd_wait, forge, protocol, session, store, workboard
 
-OTHER = 50
+OTHER = OTHER_ITEM
 RESET_IN = timedelta(minutes=30)
 RETRY_AT_THE_RESET = RESET_IN.total_seconds()
 RETRY_WITHOUT_A_RESET = board_wait.PROBE_SECONDS
@@ -98,17 +105,7 @@ class BoardWorld:
     ticks: Ticks
 
 
-def waiting_card() -> workboard.Issue:
-    return board_issue(ITEM, "Karte", holding_for_the_operator(group_body()))
-
-
-def free_item() -> workboard.Issue:
-    return board_issue(OTHER, "Alpha", complete_contract(f"Claim #{OTHER}."))
-
-
-@pytest.fixture(autouse=True)
-def _world(monkeypatch: pytest.MonkeyPatch, github_world: Path) -> None:
-    freeze_cli_now(monkeypatch)
+pytestmark = pytest.mark.usefixtures("frozen_wait_world")
 
 
 def serve_board(
