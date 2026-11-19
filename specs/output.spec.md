@@ -15,7 +15,8 @@ raises on the way into a command that declares `--json` (OUT-06). It also
 owns the sentences and the two `reason` tokens, `overwritten` and
 `not_verified`, of a body write the forge's check answers (OUT-10, OUT-11), shared
 by every writer that answers it, and the `reason` token `unreachable` of a refusal
-whose cause is a forge aco could not reach (OUT-12), shared by every command that gives it.
+whose cause is a forge aco could not reach or a GitHub rate limit (OUT-12), shared by every
+command that gives it, and the sentence of a GitHub rate limit (OUT-13).
 
 ## Behavior table
 
@@ -29,6 +30,7 @@ whose cause is a forge aco could not reach (OUT-12), shared by every command tha
 | a long option spelled short of its full name | OUT-09 |
 | a body write the forge's check finds overwritten or not verified | OUT-10, OUT-11 |
 | a refusal whose cause is a forge aco could not reach | OUT-12 |
+| a GitHub call refused under a rate limit | OUT-12, OUT-13 |
 
 ## The envelope
 
@@ -42,10 +44,12 @@ whose cause is a forge aco could not reach (OUT-12), shared by every command tha
 - [ ] [OUT-09] On every command, a long option spelled short of its full name is never read as that option: it is a parser refusal, exit `2`, with `--json` as OUT-06 (see E-OUT-06).
 - [ ] [OUT-10] A body write the check finds overwritten, written over an unread change (`kept`: it stands only in the edit history) or not verified refuses with the check's sentence, exit `2`; the body was written.
 - [ ] [OUT-11] Under `--json`, OUT-10 gives `reason: "overwritten"` with `kept` (false: a later revision replaced the write) after the payload, or `"not_verified"` without `kept`; `message` stays last (E-OUT-07).
-- [ ] [OUT-12] Under `--json`, a refusal whose cause is a forge aco could not reach (a timeout, an HTTP 5xx, a DNS or connect failure) carries `reason: "unreachable"` where its command gives it; exit stays `2`.
+- [ ] [OUT-12] Under `--json`, a refusal from an unreachable forge (a timeout, an HTTP 5xx, a DNS or connect failure) or a GitHub rate limit carries `reason: "unreachable"` where its command gives it, exit `2`.
+- [ ] [OUT-13] A GitHub call refused under a rate limit is told by one sentence, alone as `ERROR: <sentence>` or as the cause inside a command's own sentence, exit `2`, never as a permission refusal (see E-OUT-07).
 - OUT-04 (retired).
 - The check's sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (`kept` true) or `#<n> body written, not verified (<cause>)`.
-- A forge that answered and refused (a 404, a 403) is not unreachable: it keeps its command's own token, and the text form keeps its sentence either way.
+- The rate-limit sentence is `GitHub's <GraphQL|REST> rate limit is reached; it resets at <time>`, with `<time>` in UTC as `YYYY-MM-DDTHH:MM:SSZ` also when it is already past, `GitHub's <GraphQL|REST> rate limit is reached; its reset time could not be read`, or `GitHub's secondary rate limit is reached; try again in a minute`.
+- A forge that answered and refused (a 404, a 403 that names no rate limit) is not unreachable: it keeps its command's own token, and the text form keeps its sentence either way.
 
 ## Never
 
@@ -57,6 +61,7 @@ whose cause is a forge aco could not reach (OUT-12), shared by every command tha
 - A command that declares no `--json` never answers in this envelope: `aco bootstrap --json` stays argparse's own text, and so does `aco release 42 --merged --jso`, an abbreviation OUT-09 refuses.
 - An abbreviation never stands for a destructive flag: `aco reset --conf --f` refuses before any read, never acting as `--confirm --force-unreadable`.
 - A `--repo` path, bare owner, third segment, or `.`/`..` name is never dropped for the checkout's own remote: it refuses by name (OUT-08).
+- Only the GitHub CLI's own closing message of a rate limit, or an HTTP 429, marks a rate limit: the same words inside a body, a diff or a JSON answer, and a 403 that names no rate limit, never do.
 - A non-zero exit never means a refusal on its own: a command may name a further code for an answer it did give, and its own spec owns that code.
 - `bootstrap`, `reset`, `start`, and `adopt` never gain a `--json` mode of their own (each command's own product decision, not a pending migration): each names it in its own `## Never` (`specs/bootstrap.spec.md`, `specs/reset.spec.md`, `specs/start.spec.md`, `specs/adopt.spec.md`).
 
@@ -159,3 +164,5 @@ exit 2
 ```
 
 With the edit history unreadable instead, `ERROR: #90 body written, not verified (<cause>)` and `{"ok": false, "reason": "not_verified", "message": "#90 body written, not verified (<cause>)"}`.
+
+With GraphQL's rate limit reached instead, the cause is OUT-13's sentence: `ERROR: #90 body written, not verified (GitHub's GraphQL rate limit is reached; it resets at 2026-11-19T20:15:27Z)` and `reason: "not_verified"`.

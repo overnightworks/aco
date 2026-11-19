@@ -1,6 +1,7 @@
 """A GitHub read that fails before the merge refuses naming what was read."""
 
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -88,6 +89,17 @@ def lane(
                 PRECONDITIONS_STEP,
             ),
             id="transient",
+        ),
+        pytest.param(
+            ReadFailure(
+                "landing_readiness",
+                forge.ForgeRateLimitedError(
+                    "GitHub's REST rate limit is reached; it resets at 2026-11-19T20:15:27Z",
+                    datetime(2026, 11, 19, 20, 15, 27, tzinfo=UTC),
+                ),
+                PRECONDITIONS_STEP,
+            ),
+            id="rate-limited",
         ),
         pytest.param(
             ReadFailure(

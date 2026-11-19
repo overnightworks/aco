@@ -112,6 +112,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
 - [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
 - [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`.
+  - a GitHub rate limit is such a transient failure: `<error>` is the sentence of OUT-13
 - [ ] [LANDCMD-49] `was not merged` means this run merged nothing: it also holds when an earlier run merged the pull request and a read of this rerun fails (LANDCMD-18).
 - [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions`, `its merge rules` or `its merge queue state`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
 - [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable or invalid `quality/config.toml` takes LANDCMD-46).

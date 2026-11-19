@@ -57,8 +57,22 @@ class GitHubBoardProbe:
         if status == _NOT_MODIFIED and token is not None:
             return forge.ProbeAnswer(changed=False, token=token)
         if status != _CHANGED:
-            raise github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
+            raise self._failure(decoded, exit_status)
         etag = _etag(lines)
         if etag is None:
             raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned no ETag")
         return forge.ProbeAnswer(changed=True, token=etag)
+
+    def _failure(self, decoded: str, exit_status: int) -> forge.ForgeError:
+        """The failure of a refused probe; a rate limit carries the reset its owner states,
+        read through this probe's own runner."""
+        failure = github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
+        if isinstance(failure, github_failure.RateLimitedError):
+            return github_failure.with_reset(failure, self._answer)
+        return failure
+
+    def _answer(self, arguments: list[str]) -> str:
+        decoded, exit_status = self._run(["gh", *arguments], purpose=_PURPOSE)
+        if exit_status != 0:
+            raise github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
+        return decoded

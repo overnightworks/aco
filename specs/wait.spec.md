@@ -23,17 +23,18 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | every named line open | WAIT-01, WAIT-07, WAIT-08, WAIT-09 | WAIT-02 |
 | a named line not open at the start | WAIT-03 | WAIT-02 |
 | a named line ruled, returned or withdrawn while it waits | WAIT-01 | WAIT-02 |
-| `N` out of range | WAIT-05 | WAIT-11 |
-| item does not exist, is a pull request, is closed, or its body is malformed | WAIT-04 | WAIT-11 |
+| `N` out of range | WAIT-05, WAIT-22 | WAIT-11 |
+| item does not exist, is a pull request, is closed, or its body is malformed | WAIT-04, WAIT-22 | WAIT-11 |
 | `--repo` given, `storage = "state-ref"` | WAIT-06 | WAIT-11 |
-| a forge failure at the start, a forge failure that is not transient while it waits, or a signal that cannot be read | WAIT-10 | WAIT-10 |
-| a transient forge failure while it waits | WAIT-10 | — |
+| a forge failure at the start other than a rate limit, a forge failure that is not transient while it waits, or a signal that cannot be read | WAIT-10 | WAIT-10 |
+| a transient forge failure other than a rate limit while it waits | WAIT-10 | — |
+| a rate limit, at the start or while it waits, with or without an item | WAIT-22 | — |
 | a ruling, return or withdrawal written by aco | WAIT-12 | — |
 | the signal cannot be touched | WAIT-13 | — |
 | no item, `aco next` names an action at the start or while it waits | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, a line that waited on the operator is no longer open | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, a ruling written by aco, a closed blocker, a released claim or an `until` date that arrives | WAIT-17, WAIT-18, WAIT-19 | — |
-| no item, a transient failure while it waits | WAIT-20 | — |
+| no item, a transient failure other than a rate limit while it waits | WAIT-20 | — |
 | no item, a failure that is not transient | WAIT-20 | WAIT-20 |
 | `--line` without an item, or an item without `--line` | WAIT-21 | WAIT-21 |
 
@@ -42,17 +43,18 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - `<state>` is the text `aco rulings` prints after the index (RUL-02, RUL-18, RUL-22): `ruled <ruling> <date>`, `with head <date>` or `withdrawn <date>`.
 - [ ] [WAIT-02] `--json` on the same call prints the envelope with `reason: "changed"`, then `"item": <n>, "lines": [{"index": <k>, "state": "<state>"}, …]`, the lines as WAIT-01 names them (see E-WAIT-01).
 - [ ] [WAIT-03] A named line that is not open when the command starts ends it at once, the same way as WAIT-01; a yes/no line is never open (see E-WAIT-02).
-- [ ] [WAIT-04] A missing item, a pull request, a closed item or a MALFORMED body refuses, exit `2`, before any waiting (see E-WAIT-03):
+- [ ] [WAIT-04] A missing item, a pull request, a closed item or a MALFORMED body refuses, exit `2`, before any waiting, once the first read answers (WAIT-22) (see E-WAIT-03):
   - a missing item: `<label> does not exist`; a pull request: `#<n> is a pull request, not an issue; wait needs an issue`
   - a closed item: `<label> is closed; there is nothing to wait for`
   - a MALFORMED body: `<label> <body defect sentence>; wait needs a valid aco block`; PIN-14/PIN-15's sentence replaces it under `state-ref`
-- [ ] [WAIT-05] `--line N` outside the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any waiting; `<m>` counts withdrawn lines (see E-WAIT-03).
+- [ ] [WAIT-05] `--line N` beyond the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any waiting but a rate limit's (WAIT-22).
+  - `<m>` counts withdrawn lines (see E-WAIT-03)
 - [ ] [WAIT-06] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
-- [ ] [WAIT-07] The command reads the item once at its start, then only the modification time of the item's signal file (WAIT-12), every two seconds; waiting costs no forge read.
+- [ ] [WAIT-07] The command reads the item once at its start (again under a rate limit, WAIT-22), then only the modification time of the signal file (WAIT-12), every two seconds; waiting costs no forge read.
   - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01; every read is fresh from the store, under `state-ref` a new fetch of the state ref.
-- [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too.
+- [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too; after a rate limit the next read is WAIT-22's.
 - [ ] [WAIT-09] The command has no timeout and no other end of its own; the session that started it stops it.
-- [ ] [WAIT-10] A forge failure at the start refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, so do an unreadable signal file and a later read's forge failure that is not transient:
+- [ ] [WAIT-10] A forge failure at the start, other than a rate limit (WAIT-22), refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, as do an unreadable signal and a later non-transient failure:
   - `cannot watch the item's signal at <signal path>: <detail>`, before the item is read
   - a later read that fails transiently prints one `WARNING: the item could not be read, still waiting: <sentence>` to stderr for a run of failed reads; the wait goes on and the next read that answers decides (WAIT-01, WAIT-04)
 - [ ] [WAIT-11] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
@@ -80,9 +82,14 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 - [ ] [WAIT-19] It reads the board every hour, and on the first tick on or after 00:00 UTC of the earliest `until` date still ahead; the date is compared on each tick and found again after each read.
 - [ ] [WAIT-20] A forge answer "not modified" means unchanged, whatever the exit status of the call; "modified" means changed and its tag is sent back as it came (see E-WAIT-08):
   - a transient forge failure, or a failed read of the state ref's tip, prints one `WARNING: the board could not be read, still waiting: <sentence>` to stderr per run of failures; the wait goes on
-  - a failure at the start, or any other failure, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`
+  - a failure at the start other than a rate limit (WAIT-22), or any other failure, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`
 - [ ] [WAIT-21] `--line` without an item, or an item without `--line`, refuses `wait needs an item together with --line, or neither of them`, exit `2`, `--json` `reason: "invalid_usage"` (see E-WAIT-07).
   - `aco wait ITEM --line N` is WAIT-01 to WAIT-13 unchanged.
+- [ ] [WAIT-22] A read or check refused under a rate limit (OUT-13), at the start or while it waits, prints the WAIT-10 or WAIT-20 warning with its sentence once per run of failures and goes on (see E-WAIT-09):
+  - the next call to GitHub's REST API, a probe included, comes no earlier than the reset the sentence names and at least a minute later; a minute later when no reset was read
+  - a run that began with another failure prints the warning once more when it meets the rate limit
+  - a later failure without a reset never moves that time earlier; a moved signal causes no read before it; the state ref's own check goes on
+  - the first read of the board stays owed to that time; the item's own first read answers before WAIT-04 and WAIT-05 apply
 
 `reason`, by which refusal fired:
 
@@ -93,7 +100,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | WAIT-04 (missing item, pull request, closed item, malformed body) | `invalid_item` |
 | WAIT-05 (out of range) | `line_out_of_range` |
 | WAIT-06 (`--repo` under `storage = state-ref`), WAIT-21, the parser's own refusals | `invalid_usage` |
-| WAIT-10 and WAIT-20 (a forge failure at the start or that is not transient, a signal that cannot be read) | `unavailable` |
+| WAIT-10 and WAIT-20 (a forge failure at the start other than a rate limit or that is not transient, a signal that cannot be read) | `unavailable` |
 
 ## Never
 
@@ -235,3 +242,16 @@ exit 0
 ```
 
 The warning appears once for the failed minutes; the wait goes on and ends by WAIT-14 once the remote answers.
+
+### E-WAIT-09 — a rate limit at the start
+
+Setup: bare-remote, bootstrapped, `storage = "github"`, fake `gh` answering REST with a rate limit that resets at 2026-11-19T20:15:27Z, `aco wait` started at 20:00:00Z, item `#50` open and claimable
+
+```console
+$ aco wait
+2> WARNING: the board could not be read, still waiting: GitHub's REST rate limit is reached; it resets at 2026-11-19T20:15:27Z
+ACTIONABLE #50
+exit 0
+```
+
+The warning appears once; no call goes to GitHub before 20:15:27Z, where the board is read and the wait ends by WAIT-14.

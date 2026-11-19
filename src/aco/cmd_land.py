@@ -454,9 +454,7 @@ def _land_merge(
         )
 
 
-_LAND_READ_FAILURE_ERRORS = frozenset(
-    {forge.ForgeError, forge.ForgeTransientError, forge.ForgeMalformedResponseError}
-)
+_LAND_READ_FAILURE_ERRORS = frozenset({forge.ForgeError, forge.ForgeMalformedResponseError})
 _LAND_READ_FAILURE_REFUSAL = (
     "pull request #{number} was not merged: reading {what} failed ({foreign}); "
     "re-run aco land {number} --head <sha>"
@@ -498,7 +496,9 @@ def _land_read[LandStepResult](
     try:
         return read()
     except forge.ForgeError as error:
-        if type(error) not in _LAND_READ_FAILURE_ERRORS:
+        if type(error) not in _LAND_READ_FAILURE_ERRORS and not isinstance(
+            error, forge.ForgeTransientError
+        ):
             raise
         raise protocol.ClaimUnavailableError(
             report.refusal_around_foreign_text(

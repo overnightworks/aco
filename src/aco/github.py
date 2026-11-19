@@ -31,7 +31,7 @@ _Page = TypeVar("_Page")
 # gh 2.45 colorizes --jq output when it believes stdout is a TTY.
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 # Page walks and per-item reads are independent fetches. This bounds how many `gh` subprocesses
-# run at once, comfortably under GitHub's secondary rate limit for concurrent requests.
+# one call runs at once, comfortably under GitHub's secondary rate limit for concurrent requests.
 PARALLEL_FETCH_CONCURRENCY = 20
 GH_TIMEOUT_SECONDS = 60
 GH_QUIET_ENVIRONMENT = {
@@ -224,7 +224,11 @@ def response_command(
 def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
     decoded, exit_status = response_command(command, purpose=purpose, input_data=input_data)
     if exit_status != 0:
-        raise github_failure.nonzero_exit_failure(decoded, exit_status, purpose)
+        graphql = command[1:3] == ["api", "graphql"]
+        limit = github_failure.RateLimit.GRAPHQL if graphql else github_failure.RateLimit.REST
+        raise github_failure.nonzero_exit_failure(
+            decoded, exit_status, purpose, request_limit=limit
+        )
     return decoded
 
 
@@ -280,10 +284,17 @@ class GitHubForge:
         )
 
     def _run(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
-        """The one chokepoint every operation funnels through, so `requests` counts
-        every round trip exactly once. Locked because `board` fans reads out across
-        worker threads. Forwards `input_data` only when a caller passed one: tests
-        inject `run=` callables that take no such keyword."""
+        """The one chokepoint every operation funnels through. A call refused under a rate
+        limit reads that limit's reset once, through `_counted`, which no reset read follows."""
+        try:
+            return self._counted(arguments, input_data)
+        except github_failure.RateLimitedError as limited:
+            raise github_failure.with_reset(limited, self._counted) from limited
+
+    def _counted(self, arguments: list[str], input_data: bytes | None = None) -> str:
+        """One round trip, so `requests` counts every one exactly once. Locked because `board`
+        fans reads out across worker threads. Forwards `input_data` only when a caller passed
+        one: tests inject `run=` callables that take no such keyword."""
         with self._requests_lock:
             self.requests += 1
         if input_data is None:
