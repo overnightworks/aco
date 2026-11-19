@@ -310,36 +310,27 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
         },
     ]
     open_prs_json = [
-        {"number": 90, "title": "Fixes #10", "body": "", "headRefName": "other", "mergedAt": None},
+        {"number": 90, "title": "Fixes #10", "body": "", "head": {"ref": "other"}},
         {
             "number": 91,
             "title": "In progress",
             "body": "",
-            "headRefName": "codex/issue-11-claims",
-            "mergedAt": None,
+            "head": {"ref": "codex/issue-11-claims"},
         },
-        {
-            "number": 93,
-            "title": "Planning note",
-            "body": None,
-            "headRefName": "notes",
-            "mergedAt": None,
-        },
+        {"number": 93, "title": "Planning note", "body": None, "head": {"ref": "notes"}},
     ]
     merged_prs_json = [
         {
             "number": 92,
             "title": "Fixes #13",
             "body": "",
-            "headRefName": "codex/issue-13-cleanup",
-            "mergedAt": "2026-08-20T12:00:00Z",
+            "pull_request": {"merged_at": "2026-08-20T12:00:00Z"},
         },
         {
             "number": 94,
             "title": "Fixes #14",
             "body": "",
-            "headRefName": "codex/issue-14-cleanup",
-            "mergedAt": "2026-08-06T23:59:59Z",
+            "pull_request": {"merged_at": "2026-08-06T23:59:59Z"},
         },
     ]
     active = request("board-claim", issue=11, branch="codex/issue-11-claims")
@@ -350,7 +341,9 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
         assert input_data is None
         observed.append(arguments)
         endpoint = next((argument for argument in arguments if argument.startswith("repos/")), "")
-        if "/issues?" in endpoint:
+        if "/issues?state=closed" in endpoint:
+            rows = merged_prs_json
+        elif "/issues?" in endpoint:
             rows = issues_json
         elif endpoint.startswith(f"repos/{repository}/issues/11/dependencies/blocked_by"):
             rows = [
@@ -362,28 +355,21 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
                     "isPullRequest": False,
                 }
             ]
-        elif arguments[:2] == ["pr", "list"] and "open" in arguments:
+        elif endpoint.startswith(f"repos/{repository}/pulls?state=open"):
             rows = open_prs_json
-        elif arguments[:2] == ["pr", "list"] and "merged" in arguments:
-            day = arguments[arguments.index("--search") + 1].removeprefix("merged:")
-            rows = [row for row in merged_prs_json if row["mergedAt"].startswith(day)]
+        elif endpoint.endswith("/events?per_page=100&page=1"):
+            rows = []
         else:
             pytest.fail(f"unexpected board request: {arguments}")
         return "\n".join(json.dumps(row) for row in rows)
 
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return cls(2026, 8, 21, tzinfo=UTC)
-
     client = GitHubForge(repository, run=run)
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)
-    monkeypatch.setattr(github, "datetime", FixedDateTime)
     _patch_store_write(monkeypatch, store_claim_from_request(active))
     return observed
 
 
-def test_board_json_shards_the_merged_pull_request_query_by_day_without_writes(
+def test_board_json_reads_the_merged_pull_requests_from_the_closed_issue_list_without_writes(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
     observed = _board_fixture_environment(monkeypatch)
@@ -392,18 +378,13 @@ def test_board_json_shards_the_merged_pull_request_query_by_day_without_writes(
     capsys.readouterr()
     assert all("--method" not in arguments for arguments in observed)
     assert all("--jq" in arguments for arguments in observed)
-    merged_days = {
-        arguments[arguments.index("--search") + 1].removeprefix("merged:")
-        for arguments in observed
-        if arguments[:2] == ["pr", "list"] and "merged" in arguments
-    }
+    closed_reads = [
+        argument for arguments in observed for argument in arguments if "state=closed" in argument
+    ]
     # The floor is the oldest open issue's creation (#12, 2026-08-01), not a
     # fixed 14 days back — nothing merged before #12 existed could touch any
-    # currently open issue. Each day between that floor and "now" is its own
-    # query shard (`github._query_days`), fetched in parallel.
-    assert merged_days == {
-        day.isoformat() for day in github._query_days(date(2026, 8, 1), date(2026, 8, 21))
-    }
+    # currently open issue.
+    assert [("since=2026-08-01T00:00:00Z" in read) for read in closed_reads] == [True]
 
 
 def test_board_projects_fixture_json_without_github_writes(

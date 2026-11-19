@@ -98,7 +98,7 @@ layers = [
     "checkout | store",
     "github_probe",
     "github | state_board | github_search",
-    "github_body_check",
+    "github_body_check | github_pull_requests",
     "github_graphql | github_actions | github_issue_payload | github_body_write | github_merge_queue | earlier_rulings",
     "forge | rulings",
     "workboard",

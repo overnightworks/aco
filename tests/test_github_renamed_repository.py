@@ -12,6 +12,7 @@ import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
 from cli_fixtures import real_git, set_agent_identity_env
 from github_fixtures import FakeForge, serve_forge
+from github_pages import api_head, api_pull_request
 from store_fixtures import publish_claims_from_a_second_clone, state_ref_tip
 
 from aco import board_read, checkout, forge, github, workboard
@@ -38,21 +39,8 @@ def _reference_url(repository: str) -> str:
 
 def _pull_request_reply(repository: str) -> str:
     owner, _, name = repository.partition("/")
-    return json.dumps(
-        {
-            "number": 12,
-            "title": "Land it",
-            "body": "Work-Item: #72",
-            "baseRefName": "main",
-            "headRefName": "claude/issue-72-land",
-            "headRefOid": "a" * 40,
-            "headRepository": {"name": name},
-            "headRepositoryOwner": {"login": owner},
-            "author": {"login": "ada"},
-            "mergedAt": None,
-            "mergeCommit": None,
-        }
-    )
+    head = api_head(ref="claude/issue-72-land", repo={"name": name, "owner": {"login": owner}})
+    return json.dumps(api_pull_request(title="Land it", head=head, merged_at=None))
 
 
 def _blocker_reply(repository: str, number: int = 7) -> str:
