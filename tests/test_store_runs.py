@@ -350,7 +350,7 @@ def test_a_runs_write_commit_names_its_intent_and_claim_without_any_lane_trailer
     assert "\nlane_" not in message
 
 
-def test_the_holder_refusal_of_a_runs_write_by_another_agent_names_no_write(
+def test_a_runs_write_by_another_agent_refuses_with_the_holder_sentence_and_writes_nothing(
     bare_remote: Path, worktree: Path
 ) -> None:
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
