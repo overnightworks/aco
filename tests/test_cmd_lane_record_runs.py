@@ -572,3 +572,32 @@ def test_stored_runs_that_are_not_the_stored_shape_refuse_and_write_nothing(
         f"ERROR: the stored runs of {world.label} cannot be used: not valid JSON\n"
     )
     assert world.state_tip() == tip
+
+
+@pytest.mark.parametrize("command", ["begin", "add"])
+def test_a_non_holder_is_refused_as_one_before_the_stored_runs_are_read(
+    world: World, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    """Spec: LANREC-63, LANREC-69."""
+    world.commit_state(
+        protocol.RunsWriteIntent(
+            claim_id=world.claim().claim_id,
+            agent="Ada",
+            expected=None,
+            new_oid=store.hash_blob(world.directory, b"not json"),
+            operation_id="op-malformed",
+            holder_refusal="{}".format,
+            stale_refusal="never reached",
+        )
+    )
+    arguments = (
+        begin_arguments(world, FIRST_RUN, "--agent", OTHER_AGENT, "--json")
+        if command == "begin"
+        else add_arguments(world, flags=("--agent", OTHER_AGENT, "--json"))
+    )
+
+    refused = world.run(capsys, *arguments)
+
+    assert refused.status == 2
+    assert f"holder='Ada', this session='{OTHER_AGENT}'" in refused.stderr
+    assert_json_refusal_object(refused.stderr, refused.stdout, reason="precondition_failed")

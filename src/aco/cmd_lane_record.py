@@ -198,17 +198,16 @@ def _session_agent(parsed: argparse.Namespace) -> str:
 
 
 @dataclass(frozen=True)
-class _StoredRuns:
-    """The live claim of an item, its label and the runs stored with it."""
+class _LiveClaim:
+    """The live claim of an item, its label and the oid of the runs stored with it."""
 
     claim: protocol.ActiveClaim
     label: str
-    runs: lane_runs.RunsFile
     stored: protocol.ObjectId | None
 
 
-def _read_runs(parsed: argparse.Namespace, context: RunContext) -> _StoredRuns:
-    """The runs of the item's live claim, whoever holds it; an item without one refuses."""
+def _live_claim(parsed: argparse.Namespace, context: RunContext) -> _LiveClaim:
+    """The item's live claim, whoever holds it; an item without one refuses."""
     try:
         storage = context.config.storage
         label = workboard.item_label(parsed.item, storage)
@@ -217,32 +216,32 @@ def _read_runs(parsed: argparse.Namespace, context: RunContext) -> _StoredRuns:
         )
     except protocol.ClaimError as error:
         raise lane_runs.RunsRefusedError(str(error)) from error
-    stored = context.observation.runs.get(claim.claim_id)
-    return _StoredRuns(claim, label, _stored_runs(context, stored, label), stored)
+    return _LiveClaim(claim, label, context.observation.runs.get(claim.claim_id))
 
 
 def _open_runs(
     parsed: argparse.Namespace, context: RunContext, action: lane_runs.RunsAction, agent: str
 ) -> _ClaimRuns:
-    """The runs of the item's claim, for the session `agent` that holds it; any other refuses."""
-    read = _read_runs(parsed, context)
-    if read.claim.agent != agent:
+    """The runs of the item's claim, for the session `agent` that holds it; any other refuses
+    before the stored runs are read."""
+    live = _live_claim(parsed, context)
+    if live.claim.agent != agent:
         raise lane_runs.RunsRefusedError(
-            lane_runs.holder_refusal(action, read.label, session=agent)(read.claim.agent)
+            lane_runs.holder_refusal(action, live.label, session=agent)(live.claim.agent)
         )
-    return _ClaimRuns(context, read.claim, agent, action, read.label, read.runs, read.stored)
+    runs = _stored_runs(context, live)
+    return _ClaimRuns(context, live.claim, agent, action, live.label, runs, live.stored)
 
 
-def _stored_runs(
-    context: RunContext, stored: protocol.ObjectId | None, label: str
-) -> lane_runs.RunsFile:
-    if stored is None:
+def _stored_runs(context: RunContext, live: _LiveClaim) -> lane_runs.RunsFile:
+    """The runs stored with `live`, none when it stores none; unusable ones are unavailable."""
+    if live.stored is None:
         return lane_runs.RunsFile()
     try:
-        return lane_runs.parse_runs(state_runs.read_runs_file(context.toplevel, stored))
-    except lane_runs.RunsFileError as error:
+        return lane_runs.parse_runs(state_runs.read_runs_file(context.toplevel, live.stored))
+    except (lane_runs.RunsFileError, protocol.ClaimError) as error:
         raise protocol.ClaimUnavailableError(
-            f"the stored runs of {label} cannot be used: {error}"
+            f"the stored runs of {live.label} cannot be used: {error}"
         ) from error
 
 
@@ -361,8 +360,8 @@ def _print_shown(label: str, runs: lane_runs.RunsFile, lane: Mapping[str, object
 
 
 def _show(parsed: argparse.Namespace, context: RunContext) -> int:
-    read = _read_runs(parsed, context)
-    stored = read.runs
+    live = _live_claim(parsed, context)
+    stored = _stored_runs(context, live)
     shown = bool(stored.runs)
     lane = _lane_object(lane_runs.lane_figures(stored)) if shown else None
     if parsed.json:
@@ -370,15 +369,15 @@ def _show(parsed: argparse.Namespace, context: RunContext) -> int:
             True,
             _RunsReason.SHOWN,
             item=parsed.item,
-            claim_id=read.claim.claim_id,
+            claim_id=live.claim.claim_id,
             runs=[_run_object(entry) for entry in stored.runs],
             complete=lane_runs.is_complete(stored) if shown else None,
             lane=lane,
         )
     elif lane is None:
-        print(f"{read.label} has no stored runs")
+        print(f"{live.label} has no stored runs")
     else:
-        _print_shown(read.label, stored, lane)
+        _print_shown(live.label, stored, lane)
     return 0
 
 

@@ -32,7 +32,7 @@ from lane_record_runs_world import (
     commit_on,
 )
 
-from aco import protocol, store, workboard
+from aco import protocol, state_runs, store, workboard
 from aco.routing_line import RoutingStage
 
 ENVELOPE_KEYS = ["ok", "reason", "item", "claim_id", "runs", "complete", "lane"]
@@ -348,9 +348,7 @@ def test_the_experiment_is_the_tag_every_run_states_and_unknown_where_they_diffe
     """Spec: LANREC-83."""
     steps = (
         Step(FIRST_RUN),
-        Step(
-            SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes={"experiment": second_experiment}
-        ),
+        Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes={"experiment": second_experiment}),
     )
 
     assert_shown(world, capsys, steps, {"complete": True, "lane.experiment": expected})
@@ -540,9 +538,25 @@ def test_an_item_without_a_live_claim_refuses_as_a_release_does(
     assert_json_refusal_object(as_json[2], as_json[1], reason="precondition_failed")
 
 
+def unreadable(oid: protocol.ObjectId) -> bytes:
+    raise protocol.ClaimError(f"cannot read the runs file {oid}: the object is gone")
+
+
 @pytest.mark.parametrize("flags", [(), ("--json",)], ids=["text", "json"])
-def test_stored_runs_that_are_not_the_stored_shape_refuse_as_unavailable(
-    world: World, capsys: pytest.CaptureFixture[str], flags: tuple[str, ...]
+@pytest.mark.parametrize(
+    ("readable", "defect"),
+    [
+        pytest.param(True, "not valid JSON", id="not-the-stored-shape"),
+        pytest.param(False, "the object is gone", id="not-readable"),
+    ],
+)
+def test_stored_runs_that_cannot_be_used_refuse_as_unavailable(
+    world: World,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    flags: tuple[str, ...],
+    readable: bool,
+    defect: str,
 ) -> None:
     """Spec: LANREC-87, LANREC-62."""
     world.commit_state(
@@ -551,16 +565,19 @@ def test_stored_runs_that_are_not_the_stored_shape_refuse_as_unavailable(
             agent="Ada",
             expected=None,
             new_oid=store.hash_blob(world.directory, b"not json"),
-            operation_id="op-malformed",
+            operation_id="op-unusable",
             holder_refusal="{}".format,
             stale_refusal="never reached",
         )
     )
+    if not readable:
+        monkeypatch.setattr(state_runs, "read_runs_file", lambda _worktree, oid: unreadable(oid))
 
     status, stdout, stderr = show(world, capsys, *flags)
 
     assert status == 2
-    assert stderr == f"ERROR: the stored runs of {world.label} cannot be used: not valid JSON\n"
+    assert stderr.startswith(f"ERROR: the stored runs of {world.label} cannot be used: ")
+    assert defect in stderr
     if flags:
         assert_json_refusal_object(stderr, stdout, reason="unavailable")
     else:
