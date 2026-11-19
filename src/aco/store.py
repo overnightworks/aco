@@ -35,6 +35,7 @@ from . import lineage_stamp, process
 from .protocol import (
     CLAIM_ID_PATTERN,
     EMPTY_STATE,
+    ITEM_FILENAME_SUFFIX,
     MISSING_STATE_REF,
     ActiveClaim,
     ClaimError,
@@ -56,12 +57,12 @@ from .protocol import (
     ReleaseIntent,
     RescopeIntent,
     ResourceRecord,
+    RunsWriteIntent,
     StateLineageError,
     UncertainWriteError,
     UnreadableState,
     UnsupportedStateSchemaError,
     apply,
-    item_filename,
     item_id_of_filename,
     parse_schema_toml,
     serialize_empty_schema_toml,
@@ -85,6 +86,10 @@ RESOURCES_DIRECTORY = "resources"
 # structure is folded into `ClaimState.items` for free from the same
 # recursive `ls-tree`; only the byte content stays excluded.
 ITEMS_DIRECTORY = "items"
+# `runs/<claim-id>.json`: the runs of each live claim, lane data like `items/`, so its content is
+# excluded from the state read and only its claim id -> blob oid structure is folded in.
+RUNS_DIRECTORY = "runs"
+RUN_FILE_SUFFIX = ".json"
 SCHEMA_TOML_FILENAME = "schema.toml"
 TOML_SUFFIX = ".toml"
 # Tree entry names travel as git's raw bytes (`-z`);
@@ -95,8 +100,11 @@ _TREE_NAME_ERRORS = "surrogateescape"
 # git's two file modes: a symlink (120000) also lists as a blob, yet
 # `git archive` yields no file for it, so the mode decides.
 _FILE_MODES = frozenset({"100644", "100755"})
-_STATE_TOP_LEVEL_NAMES = frozenset(
-    {SCHEMA_TOML_FILENAME, CLAIMS_DIRECTORY, IDS_DIRECTORY, RESOURCES_DIRECTORY, ITEMS_DIRECTORY}
+# The directories whose content the state read never fetches.
+_LAZY_DIRECTORIES = frozenset({ITEMS_DIRECTORY, RUNS_DIRECTORY})
+_STATE_TOP_LEVEL_NAMES = (
+    frozenset({SCHEMA_TOML_FILENAME, CLAIMS_DIRECTORY, IDS_DIRECTORY, RESOURCES_DIRECTORY})
+    | _LAZY_DIRECTORIES
 )
 
 
@@ -110,6 +118,7 @@ class TransitionIntent(StrEnum):
     RELEASE = "release"
     ITEM_WRITE = "item_write"
     LANDING = "landing"
+    LANE_RECORD = "lane_record"
 
 
 # ref-store-cas.spec.md, CAS-06: one `intent:` trailer label per transition intent.
@@ -122,6 +131,7 @@ _TRANSITION_LABELS: dict[type[ClaimTransitionIntent], TransitionIntent] = {
     # A close commits as an item write; its live-claim check is a precondition of `apply`.
     ItemCloseIntent: TransitionIntent.ITEM_WRITE,
     LandingIntent: TransitionIntent.LANDING,
+    RunsWriteIntent: TransitionIntent.LANE_RECORD,
 }
 
 # `git ls-remote --exit-code` (git(1)): 2 is "no matching refs" -- the only
@@ -604,7 +614,7 @@ def _parse_items_subtree(
     file (`_require_item_file`).
     Only an entry `protocol.item_id_of_filename` names an item is keyed;
     a foreign entry stays in the tree, carried over by every
-    write (`_patch_items_subtree`), and is the whole-board read's to refuse.
+    write (`_patch_keyed_subtree`), and is the whole-board read's to refuse.
     The `[record]` content grammar stays `items.py`'s.
     """
     if not present:
@@ -616,6 +626,24 @@ def _parse_items_subtree(
         if item_id is not None:
             items[item_id] = entry.oid
     return MappingProxyType(items)
+
+
+def _parse_runs_subtree(
+    entries: dict[str, _ListedEntry], *, present: bool, tip: ObjectId
+) -> Mapping[str, ObjectId]:
+    """`runs/`'s claim id -> blob oid mapping: every entry must be a file named
+    `<claim-id>.json`, whether or not a live claim holds that id; the content stays unread."""
+    if not present:
+        return MappingProxyType({})
+    runs: dict[str, ObjectId] = {}
+    for name, entry in _direct_children(entries, RUNS_DIRECTORY).items():
+        path = f"{RUNS_DIRECTORY}/{name}"
+        _require_file_entry(path, entry, tip, "is not a run file", suffix=RUN_FILE_SUFFIX)
+        claim_id = name.removesuffix(RUN_FILE_SUFFIX)
+        if CLAIM_ID_PATTERN.fullmatch(claim_id) is None:
+            raise MalformedStateTreeError(f"{path} at {tip} is not a run file")
+        runs[claim_id] = entry.oid
+    return MappingProxyType(runs)
 
 
 def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
@@ -643,7 +671,7 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
     if unknown:
         raise MalformedStateTreeError(f"state tree at {tip} has unknown entries: {sorted(unknown)}")
     archive = _read_state_archive(
-        worktree, tree_oid, tip=tip, paths=sorted(top_level.keys() - {ITEMS_DIRECTORY})
+        worktree, tree_oid, tip=tip, paths=sorted(top_level.keys() - _LAZY_DIRECTORIES)
     )
     parse_schema_toml(_read_schema_toml(top_level, archive, tip=tip), tip=tip)
     return ClaimState(
@@ -668,6 +696,11 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
         items=_parse_items_subtree(
             entries,
             present=_subtree_oid(top_level, ITEMS_DIRECTORY, tip=tip) is not None,
+            tip=tip,
+        ),
+        runs=_parse_runs_subtree(
+            entries,
+            present=_subtree_oid(top_level, RUNS_DIRECTORY, tip=tip) is not None,
             tip=tip,
         ),
     )
@@ -698,6 +731,16 @@ def read_item_files(worktree: Path, tip: ObjectId) -> Mapping[str, bytes]:
     for name, entry in item_entries.items():
         _require_item_file(name, entry, tip=tip)
     return MappingProxyType(_read_state_archive(worktree, items_oid, tip=tip))
+
+
+def read_runs_file(worktree: Path, oid: ObjectId) -> bytes:
+    """The raw bytes of the runs file blob `oid`, which `ClaimState.runs` names."""
+    result = run_git(worktree, ["cat-file", "blob", str(oid)])
+    if result.exit_status != 0:
+        raise ClaimError(
+            f"cannot read the runs file {oid}: {git_failure_detail_from_stderr(result)}"
+        )
+    return result.stdout
 
 
 def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
@@ -1047,33 +1090,35 @@ def _reuse_or_write_ids_subtree(
     return _mktree(worktree, entries)
 
 
-def _patch_items_subtree(
+def _patch_keyed_subtree(
     worktree: Path,
     *,
     existing: _ExistingSubtree,
-    old_items: Mapping[str, ObjectId],
-    new_items: Mapping[str, ObjectId],
+    old_members: Mapping[str, ObjectId],
+    new_members: Mapping[str, ObjectId],
+    suffix: str,
 ) -> ObjectId | None:
-    """`items/`'s new subtree oid, or `None` while there is no `items/` at
-    all: this attempt's own `items/` children carried over byte
-    for byte -- name, mode, blob -- with only the ids whose oid changed
-    placed on top. A foreign entry (`protocol.item_id_of_filename` names no
-    item) is never renamed, merged, or dropped, and keeps `items/` alive on
-    its own. `existing` is read fresh from each attempt's tip, so a retry
-    that lost a race carries every other writer's already-landed id. An
-    item write already carries its blob's finished oid (hashed once by the
+    """The new subtree oid of an `items/`- or `runs/`-shaped directory (a key -> blob oid
+    mapping, each blob at `<key><suffix>`), or `None` while there is no such directory at all:
+    this attempt's own children carried over byte for byte -- name, mode, blob -- with only the
+    keys whose oid changed placed on top and the keys the write dropped left out. A foreign entry
+    is never renamed, merged, or dropped, and keeps the directory alive on its own. `existing` is
+    read fresh from each attempt's tip, so a retry that lost a race carries every other writer's
+    already-landed key. A write already carries its blob's finished oid (hashed once by the
     caller, before the retry loop), so there is never a blob to write here.
     """
-    removed = old_items.keys() - new_items.keys()
-    if removed:
-        raise ClaimError(f"a write never removes an item, yet it drops {sorted(removed)}")
-    written = {item_id: oid for item_id, oid in new_items.items() if old_items.get(item_id) != oid}
-    if not written:
+    removed = {f"{key}{suffix}" for key in old_members.keys() - new_members.keys()}
+    written = {key: oid for key, oid in new_members.items() if old_members.get(key) != oid}
+    if not written and not removed:
         return existing.oid
-    children = {name: _carried_entry(existing.children, name) for name in existing.children}
-    for item_id, oid in written.items():
-        children[item_filename(item_id)] = ("100644", "blob", oid, item_filename(item_id))
-    return _mktree(worktree, list(children.values()))
+    children = {
+        name: _carried_entry(existing.children, name)
+        for name in existing.children
+        if name not in removed
+    }
+    for key, oid in written.items():
+        children[f"{key}{suffix}"] = ("100644", "blob", oid, f"{key}{suffix}")
+    return _mktree(worktree, list(children.values())) if children else None
 
 
 def _write_incremental_state_tree(
@@ -1098,14 +1143,23 @@ def _write_incremental_state_tree(
     assert observed.tip is not None  # noqa: S101 - commit_transition already refused a missing ref
     existing = _list_tree(worktree, observed.tip, tip=observed.tip, context="state")
     top_entries: list[_TreeEntry] = [_carried_entry(existing, SCHEMA_TOML_FILENAME)]
-    items_subtree = _patch_items_subtree(
-        worktree,
-        existing=_existing_subtree(existing, ITEMS_DIRECTORY),
-        old_items=observed.items,
-        new_items=new_state.items,
-    )
+    if dropped_items := observed.items.keys() - new_state.items.keys():
+        raise ClaimError(f"a write never removes an item, yet it drops {sorted(dropped_items)}")
     subtrees = {
-        ITEMS_DIRECTORY: items_subtree,
+        ITEMS_DIRECTORY: _patch_keyed_subtree(
+            worktree,
+            existing=_existing_subtree(existing, ITEMS_DIRECTORY),
+            old_members=observed.items,
+            new_members=new_state.items,
+            suffix=ITEM_FILENAME_SUFFIX,
+        ),
+        RUNS_DIRECTORY: _patch_keyed_subtree(
+            worktree,
+            existing=_existing_subtree(existing, RUNS_DIRECTORY),
+            old_members=observed.runs,
+            new_members=new_state.runs,
+            suffix=RUN_FILE_SUFFIX,
+        ),
         CLAIMS_DIRECTORY: _reuse_or_write_mapping_subtree(
             worktree,
             existing=_existing_subtree(existing, CLAIMS_DIRECTORY),

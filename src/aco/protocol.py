@@ -1528,8 +1528,6 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
         applied = _apply_landing_intent(state, intent)
     elif isinstance(intent, RunsWriteIntent):
         applied = _apply_runs_write_intent(state, intent)
-    elif isinstance(intent, RunsWriteIntent):
-        applied = _apply_runs_write_intent(state, intent)
     elif isinstance(intent, ItemCloseIntent):
         applied = _apply_item_close_intent(state, intent)
     else:
