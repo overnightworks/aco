@@ -283,7 +283,7 @@ Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_
 ## Logging
 
 - [ ] [ABRD-179] After the URL every stdout line is one JSON record: `server_listen.started` follows the URL, `server_process.finished` the stop on Ctrl-C or SIGTERM (ABRD-04 holds under both).
-- [ ] [ABRD-180] Every answered request, refusals of the HTTP layer included, writes one `request.ended` with `outcome`, `method`, `route`, `status`, `duration_ms`, `sub` (null), `ip`; 5xx is `failed`, else `ok`.
+- [ ] [ABRD-180] Every answered request, refusals of the HTTP layer included (a request target the URL parser refuses answers 400), writes one `request.ended` with `outcome`, `method`, `route`, `status`, `duration_ms`, `sub` (null), `ip`; 5xx is `failed`, else `ok`.
 - [ ] [ABRD-181] `route` is `/`, `/api/board`, `/api/rule`, `/api/step` or `/assets/` (any asset path, found or not); any other path is null. A connection closed before a request line writes none.
 - [ ] [ABRD-182] No line holds the token, the URL, a request's path or query or a header value; a traceback holds source frames and exception messages, never local variables.
 - [ ] [ABRD-183] An unexpected exception ends `request.ended` as `failed` (500 if no status was sent), then writes one `request_handling.failed` with `error_type`, traceback and the same `trace_id`; no stderr.

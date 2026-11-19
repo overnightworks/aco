@@ -301,7 +301,12 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             return False
         # Opened before the path is read, so a path `urlsplit` refuses still ends in a line.
         line = self._request_line(self._trace_headers())
-        path = urlsplit(self.path).path
+        try:
+            path = urlsplit(self.path).path
+        except ValueError:
+            # The parser's message echoes the target, which may hold the token.
+            self.send_error(HTTPStatus.BAD_REQUEST)
+            return False
         route = _route_template(path)
         if route is not None:
             line.set_route(route)

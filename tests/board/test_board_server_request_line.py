@@ -95,6 +95,12 @@ def _a_forge_that_cannot_list(repository: BoardForge) -> None:
         ),
         pytest.param(b"GARBAGE\r\n\r\n", ("_OTHER", None, 400, "ok"), None, id="malformed-line"),
         pytest.param(
+            b"GET http://[{token}]/ HTTP/1.1\r\nHost: x\r\n\r\n",
+            ("GET", None, 400, "ok"),
+            None,
+            id="malformed-absolute-target",
+        ),
+        pytest.param(
             b"GET /" + b"a" * 70000 + b" HTTP/1.1\r\n\r\n",
             ("_OTHER", None, 414, "ok"),
             None,
@@ -161,6 +167,8 @@ def test_no_line_holds_the_token_a_path_a_query_or_a_header_value(
         + b"tracestate: "
         + secret_marker
         + b"\r\n\r\n",
+        b"GET http://[{token}]/ HTTP/1.1\r\nHost: x\r\n\r\n",
+        b"GET http://[" + secret_marker + b"]/ HTTP/1.1\r\nHost: x\r\n\r\n",
     ]
 
     for request in requests:
