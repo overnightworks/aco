@@ -1,5 +1,5 @@
 """Direct `protocol.py` behavior: body/slice claim identities, scope and
-branch validation, claim conflict/overlap, and the wide-scope trip rule.
+branch validation, and claim conflict/overlap.
 Tests that drive these through `issue_claim.main([...])` stay in
 `tests/test_cli.py` as CLI-wiring behavior; `protocol.apply` and its TOML
 codecs are `tests/test_store.py`'s own (the store's pure counterpart) --
@@ -181,85 +181,6 @@ def test_scope_overlap_is_repository_wide_and_path_aware() -> None:
 def test_lane_and_issue_conflict_matrix(right: ClaimRequest, expected: bool) -> None:
     left = request(lane=True, branch="docs/lane-a", scope=("shared",))
     assert claims_conflict(left, right) == expected
-
-
-def test_wide_scope_trip_for_paths_directory_or_share_above_the_limits() -> None:
-    three = ("a.py", "b.py", "c.py")
-    four = (*three, "d.py")
-    assert (
-        protocol.wide_scope_trip(
-            three, directories=(), covered_file_count=3, versioned_file_count=20
-        )
-        is None
-    )
-    assert (
-        protocol.wide_scope_trip(
-            four, directories=(), covered_file_count=4, versioned_file_count=20
-        )
-        is not None
-    )
-    assert (
-        protocol.wide_scope_trip(
-            ("docs",), directories=("docs",), covered_file_count=1, versioned_file_count=20
-        )
-        is not None
-    )
-    assert (
-        protocol.wide_scope_trip(
-            ("a.py",), directories=(), covered_file_count=1, versioned_file_count=4
-        )
-        is None
-    )
-    assert (
-        protocol.wide_scope_trip(
-            ("a.py", "b.py", "c.py"),
-            directories=(),
-            covered_file_count=3,
-            versioned_file_count=protocol.WIDE_SCOPE_SHARE_FLOOR - 1,
-        )
-        is None
-    ), "below the share floor, a share over a quarter still does not trip"
-    assert (
-        protocol.wide_scope_trip(
-            ("a.py", "b.py", "c.py"),
-            directories=(),
-            covered_file_count=4,
-            versioned_file_count=protocol.WIDE_SCOPE_SHARE_FLOOR,
-        )
-        is not None
-    ), "at the share floor, a share over a quarter trips"
-    assert (
-        protocol.wide_scope_trip(
-            ("a.py",), directories=(), covered_file_count=0, versioned_file_count=0
-        )
-        is None
-    )
-
-
-def test_wide_scope_trip_names_the_condition_in_the_rule_s_priority_order() -> None:
-    """`wide_scope_trip(...) is not None` is the one rule owner -- a
-    path-count trip outranks a directory trip that would also fire."""
-    four = ("a.py", "b.py", "c.py", "d.py")
-    assert protocol.wide_scope_trip(
-        four, directories=("a.py",), covered_file_count=4, versioned_file_count=20
-    ) == protocol.WideScopeTrip(protocol.WideScopeReason.PATH_COUNT, 4, ("a.py",), 4, 20)
-    assert protocol.wide_scope_trip(
-        ("docs",), directories=("docs",), covered_file_count=1, versioned_file_count=20
-    ) == protocol.WideScopeTrip(protocol.WideScopeReason.DIRECTORY, 1, ("docs",), 1, 20)
-    assert protocol.wide_scope_trip(
-        ("a.py", "b.py", "c.py"),
-        directories=(),
-        covered_file_count=4,
-        versioned_file_count=protocol.WIDE_SCOPE_SHARE_FLOOR,
-    ) == protocol.WideScopeTrip(
-        protocol.WideScopeReason.SHARE, 3, (), 4, protocol.WIDE_SCOPE_SHARE_FLOOR
-    )
-    assert (
-        protocol.wide_scope_trip(
-            ("a.py",), directories=(), covered_file_count=1, versioned_file_count=4
-        )
-        is None
-    )
 
 
 # --- `LandingIntent`: the atomic close-and-release ------------

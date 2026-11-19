@@ -104,7 +104,7 @@ layers = [
     "lineage_stamp",
     "file_lock",
     "state_files",
-    "protocol | process | routing_line",
+    "protocol | process | routing_line | wide_scope",
     "toml_text",
 ]
 # `items` may import `body`, never the reverse.

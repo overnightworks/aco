@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cache
 
-from . import body, checkout, forge, protocol, workboard
+from . import body, checkout, forge, protocol, wide_scope, workboard
 from .session import RunContext, paths_outside_claim, trunk_lane_shared_reading
 
 
@@ -16,12 +16,12 @@ def _scope_cost(versioned: tuple[str, ...], scope: tuple[str, ...]) -> tuple[int
     return covered_file_count, versioned_file_count, share
 
 
-def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
+def _wide_scope_condition(trip: wide_scope.WideScopeTrip) -> str:
     """The tripped condition in words, with the numbers it was judged
     against -- what the refusal names instead of restating the whole rule."""
-    if trip.reason is protocol.WideScopeReason.PATH_COUNT:
+    if trip.reason is wide_scope.WideScopeReason.PATH_COUNT:
         return f"{trip.path_count} paths exceeds three"
-    if trip.reason is protocol.WideScopeReason.DIRECTORY:
+    if trip.reason is wide_scope.WideScopeReason.DIRECTORY:
         noun = "directory" if len(trip.directories) == 1 else "directories"
         return f"{len(trip.directories)} {noun} in scope ({', '.join(trip.directories)})"
     covered, total = trip.covered_file_count, trip.versioned_file_count
@@ -30,7 +30,7 @@ def _wide_scope_condition(trip: protocol.WideScopeTrip) -> str:
     return f"{covered} {path_word} of {total} versioned files ({percent} %) exceeds a quarter"
 
 
-def _wide_scope_refusal(trip: protocol.WideScopeTrip, *, names_body_fallback: bool) -> str:
+def _wide_scope_refusal(trip: wide_scope.WideScopeTrip, *, names_body_fallback: bool) -> str:
     suffix = " or set whole in the body" if names_body_fallback else ""
     return f"scope is wide: {_wide_scope_condition(trip)}; pass --whole REASON{suffix}"
 
@@ -70,12 +70,12 @@ def reject_wide_scope(
 
 def wide_scope_trip(
     scope: tuple[str, ...], versioned: tuple[str, ...], *, directories: tuple[str, ...]
-) -> protocol.WideScopeTrip | None:
+) -> wide_scope.WideScopeTrip | None:
     """`scope`'s width judged against the tree `versioned` lists, whose
     entries naming a directory are `directories` -- the one measure the
     width gate refuses by and `next`'s advice anticipates."""
     covered_file_count, versioned_file_count, _share = _scope_cost(versioned, scope)
-    return protocol.wide_scope_trip(
+    return wide_scope.wide_scope_trip(
         scope,
         directories=directories,
         covered_file_count=covered_file_count,
