@@ -124,7 +124,7 @@ A lane may run its stages in more than one workflow run. `aco lane-record begin`
 - [ ] [LANREC-58] A `<run>` is 1 to 128 characters of the claim id's grammar, a `<tip>` 40 lowercase hexadecimal digits, `--ran` given once, naming one or more of the five stages once each; a breach is a usage refusal.
 - [ ] [LANREC-59] A write that finds the stored runs changed since the command read them refuses `the stored runs of <label> were written since this command read them; run the same command again`.
 - [ ] [LANREC-60] A begin and an add each land one compare-and-swap commit, `lane-record issue <n>`, with CAS-06's trailers (intent `lane_record`), then `run: <run>`, and no `lane_` trailer: `aco stats` counts no lane.
-- [ ] [LANREC-69] With `--json` the successes report `begun`, `already_begun`, `added`, `already_added` or `shown`; LANREC-57, LANREC-63..68, 70 and 87 `precondition_failed`, LANREC-59 and 62 `unavailable`.
+- [ ] [LANREC-69] With `--json` the successes report `begun`, `already_begun`, `added`, `already_added` or `shown`; LANREC-57, LANREC-63..68, 70 and LANREC-87's item without a live claim `precondition_failed`, LANREC-59, 62 and LANREC-87's stored runs that cannot be used `unavailable`.
 - [ ] [LANREC-70] A begin or an add without `--agent` and without an agent identity in the environment refuses as every writing command does, before it reads anything.
 - [ ] [LANREC-61] Stored runs survive `aco handover` (the new holder may begin and add, the previous holder's add refuses as a non-holder's) and `aco rescope`.
 - [ ] [LANREC-67] A release and a landing remove the claim's runs file in the release's own commit; a re-claimed item starts empty.
