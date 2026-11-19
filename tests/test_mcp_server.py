@@ -476,7 +476,13 @@ _ARGUMENT_DEFECTS = {
             id="no-expected",
         ),
         pytest.param(
+            _step_arguments(purpose=" \n"), "purpose must not be blank", id="blank-purpose"
+        ),
+        pytest.param(
             _step_arguments(actions=" \n"), "actions must not be blank", id="blank-actions"
+        ),
+        pytest.param(
+            _step_arguments(expected=" \n"), "expected must not be blank", id="blank-expected"
         ),
         pytest.param(_step_arguments(answer=" "), "answer must not be blank", id="blank-answer"),
         pytest.param(_step_arguments(expected=3), "expected must be a string", id="expected-int"),
