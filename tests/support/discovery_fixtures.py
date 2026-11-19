@@ -10,6 +10,8 @@ from board_forge import BoardForge, item_body
 from cli_fixtures import push_repository_trunk, real_git, track_board_config
 from option_cards import open_option_entry
 
+from aco import workboard
+
 
 def isolated_xdg_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variable: str, *relative: str
@@ -68,5 +70,5 @@ def unreadable_checkout(directory: Path, remote_url: str) -> Path:
     real_git(directory, "init", "--quiet")
     real_git(directory, "remote", "add", "origin", remote_url)
     write_repository_config(directory, 'unknown_key = "x"\n')
-    real_git(directory, "add", ".aco/board.toml")
+    real_git(directory, "add", workboard.CONFIG_PATH.as_posix())
     return directory
