@@ -156,16 +156,18 @@ release commits; the command writes nothing and asks no forge
 
 ### The per-item turn
 
-Every write of an item's body runs under one per-item lock
+Most writes of an item's body run under one per-item lock
 (`decide.item_lock`): an exclusive `flock` (`file_lock`) on one file per item
 under aco's state directory, named by a digest of the forge repository id and
 the item number. `decide.turn` is that lock plus the fresh read, then one write;
-every command that writes a body, `aco mcp` tools and the board included, writes
-inside it through `decide.write_item_body`, the one writer. A writer that finds
+`aco cut`, `aco mcp` tools and the board write inside it through
+`decide.write_item_body`, the one writer, except a whole-body `aco item edit`
+under `state-ref`, which calls the board directly. `aco adopt` and the land
+queue write through the forge writer, unlocked. A writer that finds
 the lock held prints one line to stderr and waits, so writers on this machine
 never overwrite each other's bodies. A whole-body `aco item edit` also compares
-the hash it names (`--base`) with a fresh read under the lock, so a head writing
-from a stale copy is refused, never merged.
+the hash it names (`--base`) with a fresh read under the lock, so a stale copy is
+refused, never merged.
 
 GitHub's REST API has no conditional body write, so a hand edit or another
 machine between that read and the write is not prevented, and a write past aco
@@ -209,10 +211,8 @@ but not grow.
   store, the block's `[record]` table is that owner
   (`specs/storage-pin.spec.md`). The `Parent:` line `aco cut` writes is a
   recovery marker (`specs/cut.spec.md`, `specs/body-block.spec.md`).
-- Forge errors are typed, so no caller matches error text.
-- The state ref advances by a plain fast-forward push. A push already accepts
-  fast-forwards and rejects the rest, which is the serialization needed; a
-  matching `--force-with-lease` can replace history, so it is not used.
+- The state ref advances by a plain fast-forward push: a push already accepts
+  fast-forwards and rejects the rest, which is the serialization needed.
 - A claim's holder changes only through `aco handover`, which records the takeover on
   the item and in the transition's commit trailers.
 - A released claim is absent from the tree and readable at the parent commit.
@@ -221,9 +221,8 @@ but not grow.
 - A resource is allocated in the same commit as the claim that requests it, so
   two lanes racing for it serialize on the one ref. No cross-key invariant
   rests on a server capability.
-- The storage pin is read from configuration and never chosen at run time from
-  forge capabilities, so a forge plan change cannot silently move a fact's
-  owner without a migration.
+- The storage pin is read from configuration, never from forge capabilities
+  (`specs/storage-pin.spec.md`).
 - Wide-scope thresholds are protocol constants, not configuration, so two
   fleets in one repository cannot disagree on what "too wide" means.
 - `.aco/board.toml` gains a setting only when that setting has a caller,
@@ -231,12 +230,11 @@ but not grow.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
   decision surface: his questions, from every repository under one root
   (`repositories.py`, `specs/serve.spec.md` ABRD-14), in use and growing.
-  Its Progress view is derived from the same listing, each top-level
-  container's sub-issue list and the trunk's `Work-Item:` trailers:
-  `progress.py` counts each container's closed, landed, waiting and planned
-  work (ABRD-131); it keeps no state and adds no store. The same read prices
-  the lanes left from the lane records on the state ref's tip (`inbox.py`); a
-  failed state read leaves only the ranges unknown.
+  Its Progress view counts each top-level container's closed, landed, waiting
+  and planned work from the same listing and the trunk's `Work-Item:` trailers
+  (`progress.py`, ABRD-131), keeping no state; the lanes left are priced from
+  the state ref's lane records (`inbox.py`), and a failed read leaves only the
+  ranges unknown.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
   the item commands still carries both storage paths. It is known and
@@ -244,30 +242,33 @@ but not grow.
 
 ## Not chosen
 
-- Per-item claim comments: the comment API has no conditional write, and a
-  lane without an issue has no comment to hold.
-- The assignee as the lock: it has no compare-and-swap and names a forge
-  account, not the session holding the claim.
-- Projects v2 fields: no demonstrated compare-and-swap, and they tie the
-  claim's pure git push to a forge API.
-- One ref per key plus a resources ref: a claim's hold and its number would
-  sit in two owners that can disagree.
-- `--force-with-lease` for the state ref: it opens a history-loss path.
-- A second history ref: the parent commit already holds the history.
-- Runtime capability selection of the storage owner: a forge plan change
-  would silently move a fact's owner.
-- Renaming `.aco/board.toml`: it costs a migration to buy a better name.
-- Deleting the board: it would remove the operator's decision surface the
-  vision names.
-- Deleting the state-ref item store: a repository without a forge would need
-  a rebuild.
+- Per-item claim comments: no conditional comment write, and a lane without
+  an issue has none to hold. Reopens if the comment API gains one.
+- The assignee as the lock: no compare-and-swap, and it names an account, not
+  the session. Reopens if a forge swap names the session atomically.
+- Projects v2 fields: no demonstrated compare-and-swap, and they tie the claim's
+  git push to a forge API. Reopens on a verified forge compare-and-swap.
+- One ref per key plus a resources ref: hold and number would sit in two
+  owners. Reopens when `git push --atomic` across refs is verified.
+- `--force-with-lease` for the state ref: it opens a history-loss path. Reopens
+  if a lease can reject non-fast-forward updates.
+- A second history ref: the parent commit already holds the history. Reopens if
+  a reader needs history the parent chain lacks.
+- Runtime capability selection of the storage owner: a forge plan change would
+  move a fact's owner silently. Reopens with a migration that runs alongside.
+- Renaming `.aco/board.toml`: a migration to buy a better name. Reopens when a
+  migration is needed anyway.
+- Deleting the board: it removes the operator's decision surface. Reopens when
+  the operator drops it.
+- Deleting the state-ref item store: a repository without a forge would need a
+  rebuild. Reopens when the operator drops it.
 
 ## Risks and Technical Debt
 
 - Two storage paths are carried by `session`, `store` and
   the item commands (see Constraints and reasons).
-- The forge seam is not exclusive: landing, item and release depend on
-  concrete adapters, so a second forge is more than one adapter.
+- The forge seam is not exclusive (see Building Block View): a second forge is
+  more than one adapter.
 - GitHub access goes through the `gh` CLI, whose output and permissions aco
   does not control; errors are typed at the adapter, not prevented.
 - Trust is cooperative; see Trust above.
