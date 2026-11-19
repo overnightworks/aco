@@ -144,6 +144,38 @@ def _say_still_waiting(failure: forge.ForgeTransientError) -> None:
     sys.stderr.flush()
 
 
+def _first_read(
+    context: RunContext, number: int, pause: Callable[[float], None]
+) -> decide.FreshItem:
+    """The item's first read. Any failure but a rate limit refuses; a rate limit is said once,
+    and the read is tried again at the retry time (WAIT-22)."""
+    failures = board_wait.FailureRun(_say_still_waiting)
+    reading = context
+    while True:
+        try:
+            return decide.fresh_item(reading, number, command="wait")
+        except forge.ForgeRateLimitedError as limited:
+            failures.add(limited)
+            pause(board_wait.retry_seconds(limited, context.now()))
+            reading = context.observed_afresh()
+
+
+def _read_due(*, moved: bool, now: float, last_read: float, retry_at: float | None) -> bool:
+    """Whether the item is read now: at the retry time a rate limit set, and then not before
+    even if the signal moved; otherwise when the signal moved or `ITEM_READ_SECONDS` passed."""
+    if retry_at is not None:
+        return now >= retry_at
+    return moved or now - last_read >= ITEM_READ_SECONDS
+
+
+def _retry_at(failure: forge.ForgeTransientError, context: RunContext, now: float) -> float | None:
+    """When a failed read is tried again: at the reset a rate limit named, else on the
+    ordinary schedule (`None`)."""
+    if not isinstance(failure, forge.ForgeRateLimitedError):
+        return None
+    return now + board_wait.retry_seconds(failure, context.now())
+
+
 def _wait_for_lines(
     parsed: argparse.Namespace,
     context: RunContext,
@@ -162,24 +194,25 @@ def _wait_for_lines(
     state = repositories.state_directory(os.environ, Path.home())
     signal = decide.item_signal_path(context, number, state)
     watched = board_wait.signal_modified(signal)
-    fresh = decide.fresh_item(context, number, command="wait")
+    fresh = _first_read(context, number, pause)
     _refuse_a_closed_item(fresh)
     changed = _changed_lines(fresh, named)
     last_read = now()
-    failing = False
+    failures = board_wait.FailureRun(_say_still_waiting)
+    retry_at: float | None = None
     while not changed:
         pause(SIGNAL_POLL_SECONDS)
         moved = board_wait.signal_modified(signal)
-        if moved == watched and now() - last_read < ITEM_READ_SECONDS:
+        if not _read_due(moved=moved != watched, now=now(), last_read=last_read, retry_at=retry_at):
             continue
         watched, last_read = moved, now()
         reread = _reread_or_failure(context, number)
         if isinstance(reread, forge.ForgeTransientError):
-            if not failing:
-                _say_still_waiting(reread)
-            failing = True
+            failures.add(reread)
+            retry_at = _retry_at(reread, context, now())
             continue
-        failing = False
+        failures.end()
+        retry_at = None
         _refuse_a_closed_item(reread)
         changed = _changed_lines(reread, named)
     _emit_changed(changed, number, fresh.storage, as_json=parsed.json)

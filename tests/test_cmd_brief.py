@@ -251,6 +251,9 @@ def test_brief_refuses_with_gits_text_when_the_lane_tip_read_fails_outright(
     ("failure", "reason"),
     [
         pytest.param(forge.ForgeTransientError("simulated timeout"), "unreachable", id="transient"),
+        pytest.param(
+            forge.ForgeRateLimitedError("simulated rate limit"), "unreachable", id="rate-limited"
+        ),
         pytest.param(forge.ForgeNotFoundError("simulated 404"), "unavailable", id="not-found"),
         pytest.param(
             forge.ForgePermissionDeniedError("simulated 403"), "unavailable", id="permission"

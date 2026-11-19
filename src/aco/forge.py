@@ -41,6 +41,15 @@ class ForgeTransientError(ForgeError):
     """The forge failed in a way a retry might not."""
 
 
+class ForgeRateLimitedError(ForgeTransientError):
+    """The forge refused the call under a rate limit; its message says which and when it
+    ends. `resets_at` is that time, `None` when none was read."""
+
+    def __init__(self, message: str, resets_at: datetime | None = None) -> None:
+        super().__init__(message)
+        self.resets_at = resets_at
+
+
 class ForgeMalformedResponseError(ForgeError):
     """The forge's response could not be parsed into the expected shape."""
 

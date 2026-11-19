@@ -20,12 +20,13 @@ class BodyWriteOutcome(StrEnum):
 
 def body_write_outcome(error: ClaimError) -> BodyWriteOutcome:
     """The outcome of a body write that raised `error`: the forge's own
-    refusal of the call (authorization, no such item), and a `gh` that never
-    ran (a plain `ClaimError` -- `bounded_command` raises only typed forge
-    errors once the process has started) wrote nothing; any other forge
+    refusal of the call (authorization, no such item, a rate limit), and a `gh`
+    that never ran (a plain `ClaimError` -- `bounded_command` raises only typed
+    forge errors once the process has started) wrote nothing; any other forge
     failure may have come after the write."""
     refused = isinstance(
-        error, forge.ForgePermissionDeniedError | forge.ForgeNotFoundError
+        error,
+        forge.ForgePermissionDeniedError | forge.ForgeNotFoundError | forge.ForgeRateLimitedError,
     ) or not isinstance(error, forge.ForgeError)
     return BodyWriteOutcome.REFUSED if refused else BodyWriteOutcome.UNKNOWN
 

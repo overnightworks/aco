@@ -15,6 +15,7 @@ from aco.protocol import ClaimError
             ClaimError("gh is required for issue claims"), "REFUSED", id="W4-gh-never-ran"
         ),
         pytest.param(forge.ForgeTransientError("timeout"), "UNKNOWN", id="W5-transient"),
+        pytest.param(forge.ForgeRateLimitedError("limited"), "REFUSED", id="W6-rate-limited"),
         pytest.param(
             forge.ForgeMalformedResponseError("not json"), "UNKNOWN", id="W7-malformed-response"
         ),
