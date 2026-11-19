@@ -141,19 +141,21 @@ def test_the_merged_list_fails_loud_on_a_row_it_cannot_read(row: object) -> None
 
 
 @pytest.mark.parametrize(
-    "merged_at",
+    ("merged_at", "refusal"),
     [
-        pytest.param("yesterday", id="not-a-time"),
-        pytest.param(5, id="not-text"),
-        pytest.param("9999-99-99T00:00:00Z", id="not-a-calendar-time"),
+        pytest.param("yesterday", "malformed board pull request", id="not-a-time"),
+        pytest.param(5, "malformed board pull request", id="not-text"),
+        pytest.param(
+            "9999-99-99T00:00:00Z", "malformed merged board pull request", id="not-a-calendar-time"
+        ),
     ],
 )
-def test_the_merged_list_fails_loud_on_a_merge_time_it_cannot_read(merged_at: object) -> None:
+def test_the_merged_list_fails_loud_on_a_merge_time_it_cannot_read(
+    merged_at: object, refusal: str
+) -> None:
     client, _ = scripted_rest({ISSUES: [[merged_row(1, merged_at)]]})
 
-    with pytest.raises(
-        forge.ForgeMalformedResponseError, match="malformed merged board pull request"
-    ):
+    with pytest.raises(forge.ForgeMalformedResponseError, match=refusal):
         client.list_recent_merged_board_pull_requests(FLOOR)
 
 

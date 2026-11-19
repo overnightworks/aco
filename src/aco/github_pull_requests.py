@@ -63,14 +63,16 @@ def _object(value: object, message: str) -> dict[str, object]:
     return value
 
 
-def _timestamp(value: object, message: str) -> str:
-    """`value`, once it is an RFC 3339 instant with real calendar and clock values."""
+def _timestamp(value: object, message: str, calendar_message: str | None = None) -> str:
+    """`value`, once it is an RFC 3339 instant with real calendar and clock values. A value of
+    the wrong type or shape refuses with `message`, a well-shaped one that is no real instant with
+    `calendar_message` (default `message`)."""
     if not isinstance(value, str) or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(value) is None:
         raise _malformed(message)
     try:
         datetime.fromisoformat(value)
     except ValueError as error:
-        raise _malformed(message) from error
+        raise _malformed(calendar_message or message) from error
     return value
 
 
@@ -114,7 +116,9 @@ def _merge_time_of_issue_row(row: dict[str, object]) -> str | None:
     merged_at = pull_request["merged_at"]
     if merged_at is None:
         return None
-    return _timestamp(merged_at, _MALFORMED_MERGED_BOARD_PULL_REQUEST)
+    return _timestamp(
+        merged_at, _MALFORMED_BOARD_PULL_REQUEST, _MALFORMED_MERGED_BOARD_PULL_REQUEST
+    )
 
 
 def _merged_pull_request(value: object, floor: str) -> workboard.PullRequest | None:
