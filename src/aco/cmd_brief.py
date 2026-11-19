@@ -15,7 +15,7 @@ from . import (
     forge,
     protocol,
     report,
-    store,
+    state_history,
     workboard,
 )
 from .body import Storage
@@ -56,7 +56,9 @@ def _brief_live_claim(worktree: Path, state: protocol.ClaimState, item: int) -> 
         return None
     # A live claim cannot exist without the ref it was read from.
     tip = cast(protocol.ObjectId, state.tip)
-    opened_at = store.claim_ages(worktree=worktree, tip=tip, claims=(claim,))[claim.claim_id]
+    opened_at = state_history.claim_ages(worktree=worktree, tip=tip, claims=(claim,))[
+        claim.claim_id
+    ]
     return _BriefClaim(claim, opened_at)
 
 

@@ -8076,7 +8076,7 @@ def _patch_store_write(
     monkeypatch.setattr(store, "fetch_state", fake.fetch_state)
     monkeypatch.setattr(store, "peek_state", fake.peek_state)
     monkeypatch.setattr(store, "commit_transition", fake.commit_transition)
-    monkeypatch.setattr(store, "claim_ages", fake.claim_ages)
+    monkeypatch.setattr(board_read.state_history, "claim_ages", fake.claim_ages)
     monkeypatch.setattr(
         checkout, "remote_url", lambda remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
     )
@@ -8124,7 +8124,7 @@ def _patch_status_store(
     ) -> dict[str, datetime]:
         return {claim.claim_id: resolved_ages[claim.claim_id] for claim in claims}
 
-    monkeypatch.setattr(store, "claim_ages", fake_claim_ages)
+    monkeypatch.setattr(board_read.state_history, "claim_ages", fake_claim_ages)
     monkeypatch.setattr(cmd_status, "datetime", FixedDateTime)
 
 
@@ -11778,7 +11778,7 @@ def test_item_edit_json_reports_body_invalid_with_defects(
 _REAL_STORE_FETCH_STATE = store.fetch_state
 _REAL_STORE_PEEK_STATE = store.peek_state
 _REAL_STORE_COMMIT_TRANSITION = store.commit_transition
-_REAL_STORE_CLAIM_AGES = store.claim_ages
+_REAL_STORE_CLAIM_AGES = board_read.state_history.claim_ages
 
 
 def _use_real_store(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -11786,7 +11786,7 @@ def _use_real_store(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(store, "fetch_state", _REAL_STORE_FETCH_STATE)
     monkeypatch.setattr(store, "peek_state", _REAL_STORE_PEEK_STATE)
     monkeypatch.setattr(store, "commit_transition", _REAL_STORE_COMMIT_TRANSITION)
-    monkeypatch.setattr(store, "claim_ages", _REAL_STORE_CLAIM_AGES)
+    monkeypatch.setattr(board_read.state_history, "claim_ages", _REAL_STORE_CLAIM_AGES)
 
 
 def _reset_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path]:

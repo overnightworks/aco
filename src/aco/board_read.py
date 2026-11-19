@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import ahead_of_caller, body, checkout, forge, github, protocol, store, workboard
+from . import ahead_of_caller, body, checkout, forge, github, protocol, state_history, workboard
 from .session import RunContext
 
 
@@ -301,12 +301,12 @@ def build_board(
 
 def claim_ages(worktree: Path, state: protocol.ClaimState) -> dict[str, datetime]:
     """Each live claim's age in an already-fetched state -- one batched read
-    of `state.tip`'s history (`store.claim_ages`), never a git
+    of `state.tip`'s history (`state_history.claim_ages`), never a git
     call per claim.
     """
     if state.tip is None:
         return {}
-    return store.claim_ages(worktree=worktree, tip=state.tip, claims=state.claims.values())
+    return state_history.claim_ages(worktree=worktree, tip=state.tip, claims=state.claims.values())
 
 
 def _claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
