@@ -7,14 +7,14 @@ touches no git, no state ref and no clock: the ancestry fact `follows` judges by
 argument."""
 
 import json
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import partial
 from typing import cast
 
 from . import lane_record, protocol
-from .routing_line import NO_STAGE, RoutingStage
+from .routing_line import NO_STAGE, RoutingStage, stage_choice_fits
 
 RUNS_FILE_VERSION = 1
 RUN_ID_PATTERN = protocol.CLAIM_ID_PATTERN
@@ -183,11 +183,12 @@ def _entry_object(entry: RunEntry) -> dict[str, object]:
     if entry.added is not None:
         stored["end_tip"] = entry.added.end_tip
         stored["ran"] = [str(stage) for stage in entry.added.ran]
-        stored["record"] = _record_object(entry.added.record)
+        stored["record"] = record_object(entry.added.record)
     return stored
 
 
-def _record_object(record: lane_record.LaneRecordFile) -> dict[str, object]:
+def record_object(record: lane_record.LaneRecordFile) -> dict[str, object]:
+    """The record as its file states it: a key the file omitted is absent."""
     stored: dict[str, object] = {
         "version": lane_record.RECORD_FILE_VERSION,
         "stages": {str(stage): choice for stage, choice in record.stages.items()},
@@ -205,6 +206,82 @@ def _record_object(record: lane_record.LaneRecordFile) -> dict[str, object]:
         if tag is not None:
             stored[name] = tag
     return stored
+
+
+def _sequence(runs: RunsFile) -> tuple[RunAdded | None, ...]:
+    """The runs the lane is made of, in begin order, `None` for a lost run: one stands before
+    each entry that does not follow, and an entry without a record is one."""
+    elements: list[RunAdded | None] = []
+    for entry in runs.runs:
+        if not entry.follows:
+            elements.append(None)
+        elements.append(entry.added)
+    return tuple(elements)
+
+
+def is_complete(runs: RunsFile) -> bool:
+    """Whether the lane holds no lost run, judged now as a release would judge it."""
+    return None not in _sequence(runs)
+
+
+def _stage_figure(sequence: Sequence[RunAdded | None], stage: RoutingStage) -> str | None:
+    """The stage's choice from the element that decides it: the first run that ran `build`, the
+    last that ran any other stage. A lost run decides too, and its choice is unknown; where no run
+    ran the stage, the choice is `none` if the stage may be, else unknown."""
+    ran = [element for element in sequence if element is None or stage in element.ran]
+    if not ran:
+        return NO_STAGE if stage_choice_fits(stage, NO_STAGE) else None
+    decisive = ran[0] if stage is RoutingStage.BUILD else ran[-1]
+    return None if decisive is None else decisive.record.stages[stage]
+
+
+def _land_figure(newest: RunEntry | None) -> str | None:
+    """The newest entry's `land` choice; unknown without a record."""
+    if newest is None or newest.added is None:
+        return None
+    return newest.added.record.stages[RoutingStage.LAND]
+
+
+def _total(counts: Iterable[int | None]) -> int | None:
+    stated = list(counts)
+    return None if None in stated else min(sum(cast(list[int], stated)), lane_record.MAXIMUM_COUNT)
+
+
+def _counts(
+    sequence: Sequence[RunAdded | None],
+) -> dict[lane_record.FindingStage, lane_record.StageCounts]:
+    """The counts summed over the known records and clamped; all unknown when a run is lost, and
+    the misses unknown when a known record states none."""
+    if None in sequence:
+        return dict.fromkeys(lane_record.FindingStage, lane_record.StageCounts(None, None, None))
+    stated = [element.record.stage_counts() for element in sequence if element is not None]
+    return {
+        stage: lane_record.StageCounts(
+            _total(counts[stage].fix_rounds for counts in stated),
+            _total(counts[stage].blocking for counts in stated),
+            _total(counts[stage].misses for counts in stated),
+        )
+        for stage in lane_record.FindingStage
+    }
+
+
+def lane_figures(runs: RunsFile) -> lane_record.LaneFigures:
+    """The figures of the lane the stored `runs` make up, for a lane with at least one entry:
+    which stages a run ran comes from its `ran`, never from its record's slots, and aco counts no
+    miss of its own."""
+    sequence = _sequence(runs)
+    known = [element.record for element in sequence if element is not None]
+    newest = runs.newest()
+    stages = {stage: _stage_figure(sequence, stage) for stage in RAN_STAGES}
+    stages[RoutingStage.LAND] = _land_figure(newest)
+    tags = {record.experiment for record in known}
+    return lane_record.LaneFigures(
+        stages=stages,
+        risk=None if newest is None or newest.added is None else newest.added.record.risk,
+        experiment=tags.pop() if len(tags) == 1 and None not in sequence else None,
+        counts=_counts(sequence),
+        verdicts=tuple(judged for record in known for judged in record.verdicts),
+    )
 
 
 def end_tip_to_follow(runs: RunsFile) -> str | None:
