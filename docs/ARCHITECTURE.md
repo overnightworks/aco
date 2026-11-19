@@ -74,8 +74,8 @@ flowchart LR
   label. An item's contract is one fenced TOML block, specified in
   `specs/body-block.spec.md`.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
-  forge; its errors are typed, and an adapter that cannot do an operation raises
-  `ForgeUnsupportedError`. GitHub is the only forge adapter; the state-ref item
+  forge; its errors are typed, so no caller matches error text, and an adapter
+  that cannot do an operation raises `ForgeUnsupportedError`. GitHub is the only forge adapter; the state-ref item
   store implements the same port. The seam is not exclusive: `cmd_land` depends
   on `GitHubForge` for the whole landing, `cmd_item`, `cmd_item_edit` and
   `cmd_item_common` on `StateRefBoard` and `cmd_release` on both, so another
@@ -142,8 +142,8 @@ stranger's; a state-ref item counts as a member's, since only a writer of the
 state ref can create one), because in a public repository a stranger can open an
 issue carrying a card. `inbox.py` owns that per-repository read; `aco rulings`
 and `aco next` stay unfiltered. `aco mcp` and `aco fleet-plans` read the same
-listing and keep no state of their own. The write tools of `aco mcp` and the
-board's step answer each write one line or one wait in the item's turn
+listing and keep no state. The write tools of `aco mcp` and the
+board's step answer each write one line or wait in the item's turn
 (`specs/mcp.spec.md`, `specs/serve.spec.md`); `record_answer` refuses neither a
 closed item nor a non-member's, because the card's hash binds the answer to what
 the agent read. The ruling search of `ask` shows earlier rulings and applies
@@ -151,7 +151,7 @@ none; a line from a private repository can reach a head working in a public one,
 as the inbox already allows.
 
 `aco stats` compares two groups of lanes by the records on the state ref's
-release commits; the command writes nothing and asks no forge
+release commits; it writes nothing and asks no forge
 (`specs/stats.spec.md`).
 
 ### The per-item turn
@@ -160,21 +160,21 @@ Most writes of an item's body run under one per-item lock
 (`decide.item_lock`): an exclusive `flock` (`file_lock`) on one file per item
 under aco's state directory, named by a digest of the forge repository id and
 the item number. `decide.turn` is that lock plus the fresh read, then one write;
-`aco cut`, `aco mcp` tools and the board write inside it through
-`decide.write_item_body`, the one writer, except a whole-body `aco item edit`
+the item and claim commands, `aco mcp` tools and the board write under the lock
+through `decide.write_item_body`, the one writer, except a whole-body `aco item edit`
 under `state-ref`, which calls the board directly. `aco adopt` and the land
 queue write through the forge writer, unlocked. A writer that finds
-the lock held prints one line to stderr and waits, so writers on this machine
-never overwrite each other's bodies. A whole-body `aco item edit` also compares
+the lock held prints one line to stderr and waits, so writers here never
+overwrite each other's bodies. A whole-body `aco item edit` also compares
 the hash it names (`--base`) with a fresh read under the lock, so a stale copy is
 refused, never merged.
 
 GitHub's REST API has no conditional body write, so a hand edit or another
-machine between that read and the write is not prevented, and a write past aco
+machine between read and write is not prevented, and a write past aco
 (`gh issue edit`, a browser tab) is not seen. After each GitHub write the
 adapter reads the item's newest two edit revisions and raises a typed answer
 when its write was overwritten, kept over an unread change, or cannot be
-verified; an edit saved after that read still overwrites unseen. Under
+verified; an edit saved after that read overwrites unseen. Under
 `state-ref` the store's compare-and-swap refuses a write from a stale snapshot.
 
 ### The ruling signal
@@ -191,7 +191,7 @@ An idle head's `aco wait` without an item watches its own board
 repository and a service would save no request. The signal files wake it within
 seconds of a ruling, and a cheap check decides when to read the rest: the state
 ref's tip and, under GitHub storage, one conditional request (`BoardProbe`) for
-the repository's newest updated issue and for each open blocker elsewhere.
+the newest updated issue and for each open blocker elsewhere.
 
 ### Proof strategy
 
