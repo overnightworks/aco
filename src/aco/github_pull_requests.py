@@ -13,6 +13,7 @@ from . import forge, github_issue_payload, protocol, workboard
 
 MALFORMED_PULL_REQUEST = "GitHub returned a malformed pull request"
 _MALFORMED_BOARD_PULL_REQUEST = "GitHub returned a malformed board pull request"
+_MALFORMED_MERGED_BOARD_PULL_REQUEST = "GitHub returned a malformed merged board pull request"
 _MALFORMED_EVENT = "GitHub returned a malformed issue event"
 _BOT_TYPE = "Bot"
 _BOT_LOGIN_SUFFIX = "[bot]"
@@ -104,16 +105,16 @@ def open_pull_requests(rows: Iterable[object]) -> tuple[workboard.PullRequest, .
 def _merge_time_of_issue_row(row: dict[str, object]) -> str | None:
     """The time a closed issue-list row was merged, or `None` for a plain issue and a pull
     request closed unmerged. A pull request row without its `merged_at` key is malformed: it
-    never reads as unmerged."""
-    pull_request = row.get("pull_request")
-    if pull_request is None:
+    never reads as unmerged, and a present `pull_request` that is no object is no plain issue."""
+    if "pull_request" not in row:
         return None
+    pull_request = row["pull_request"]
     if not isinstance(pull_request, dict) or "merged_at" not in pull_request:
         raise _malformed(_MALFORMED_BOARD_PULL_REQUEST)
     merged_at = pull_request["merged_at"]
     if merged_at is None:
         return None
-    return _timestamp(merged_at, _MALFORMED_BOARD_PULL_REQUEST)
+    return _timestamp(merged_at, _MALFORMED_MERGED_BOARD_PULL_REQUEST)
 
 
 def _merged_pull_request(value: object, floor: str) -> workboard.PullRequest | None:

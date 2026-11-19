@@ -124,10 +124,8 @@ def test_the_merged_list_walks_every_page_and_counts_a_row_on_two_pages_once() -
     "row",
     [
         pytest.param(merged_row(1, pull_request={}), id="no-merged-at-key"),
-        pytest.param(merged_row(1, "yesterday"), id="merged-at-not-a-time"),
-        pytest.param(merged_row(1, 5), id="merged-at-not-text"),
-        pytest.param(merged_row(1, "9999-99-99T00:00:00Z"), id="merged-at-not-a-calendar-time"),
         pytest.param(merged_row(1, pull_request="merged"), id="pull-request-not-an-object"),
+        pytest.param(merged_row(1, pull_request=None), id="pull-request-null"),
         pytest.param(merged_row(None), id="no-number"),
         pytest.param(merged_row(True), id="number-is-a-bool"),
         pytest.param(merged_row(1, title=5), id="title-not-text"),
@@ -139,6 +137,23 @@ def test_the_merged_list_fails_loud_on_a_row_it_cannot_read(row: object) -> None
     client, _ = scripted_rest({ISSUES: [[merged_row(2), row]]})
 
     with pytest.raises(forge.ForgeMalformedResponseError, match="malformed board pull request"):
+        client.list_recent_merged_board_pull_requests(FLOOR)
+
+
+@pytest.mark.parametrize(
+    "merged_at",
+    [
+        pytest.param("yesterday", id="not-a-time"),
+        pytest.param(5, id="not-text"),
+        pytest.param("9999-99-99T00:00:00Z", id="not-a-calendar-time"),
+    ],
+)
+def test_the_merged_list_fails_loud_on_a_merge_time_it_cannot_read(merged_at: object) -> None:
+    client, _ = scripted_rest({ISSUES: [[merged_row(1, merged_at)]]})
+
+    with pytest.raises(
+        forge.ForgeMalformedResponseError, match="malformed merged board pull request"
+    ):
         client.list_recent_merged_board_pull_requests(FLOOR)
 
 
