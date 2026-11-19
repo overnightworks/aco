@@ -3,147 +3,30 @@ storages: a begin marks a run under the claim and an add stores its record, both
 holder, in the state ref's `runs/<claim-id>.json` (`specs/lane-record.spec.md`, "Stored runs")."""
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, complete_contract
-from claim_worktrees import (
-    ISSUE,
-    StandIn,
-    assert_json_refusal_object,
-    held_by_ada,
-    make_stand_in,
+from claim_worktrees import assert_json_refusal_object
+from cli_fixtures import real_git, run_cli
+from lane_record_runs_world import (
+    END_TIP,
+    FIRST_RUN,
+    OTHER_AGENT,
+    OTHER_TIP,
+    SECOND_RUN,
+    STAGES_RAN,
+    World,
+    add_arguments,
+    begin_arguments,
 )
-from cli_fixtures import CliRun, real_git, run_cli
-from lane_record_fixtures import lane_record_object, write_lane_record_file
 
-from aco import body, lane_runs, protocol, store
+from aco import lane_runs, protocol, store
 from aco.routing_line import RoutingStage
 
-TRUNK_FILES = ("src/widget.py",)
-HELD_SCOPE = ("src/widget.py",)
-FIRST_RUN = "run-1"
-SECOND_RUN = "run-2"
-OTHER_AGENT = "Bea"
-END_TIP = "b" * 40
-OTHER_TIP = "c" * 40
-STAGES_RAN = (RoutingStage.BUILD, RoutingStage.REVIEW)
 
-
-@dataclass(frozen=True)
-class World:
-    """A claimed item under one storage, the checkout a command runs in and its bare remote."""
-
-    storage: body.Storage
-    item: str
-    label: str
-    arguments_before_command: tuple[str, ...]
-    directory: Path
-    remote: Path
-    scratch: Path
-
-    def claim(self) -> protocol.ActiveClaim:
-        [claim] = standing_claims_of(self)
-        return claim
-
-    def run(self, capsys: pytest.CaptureFixture[str], *command: str) -> CliRun:
-        return run_cli([*self.arguments_before_command, *command], capsys)
-
-    def commit_state(self, intent: protocol.ClaimTransitionIntent, subject: str = "test") -> None:
-        observed = store.fetch_state(worktree=self.directory, remote="origin")
-        store.commit_transition(
-            observed=store.Observation(self.directory, "origin", observed),
-            subject=store.TransitionSubject(subject),
-            intent=intent,
-        )
-
-    def state_tip(self) -> str:
-        return real_git(self.remote, "rev-parse", store.STATE_REF).stdout.strip()
-
-    def stored_runs(self, claim_id: str | None = None) -> lane_runs.RunsFile | None:
-        name = claim_id if claim_id is not None else self.claim().claim_id
-        shown = real_git(self.remote, "show", f"{store.STATE_REF}:runs/{name}.json", check=False)
-        return None if shown.returncode != 0 else lane_runs.parse_runs(shown.stdout.encode())
-
-    def runs_files(self) -> list[str]:
-        listing = real_git(self.remote, "ls-tree", "-r", "--name-only", store.STATE_REF).stdout
-        return [path for path in listing.splitlines() if path.startswith("runs/")]
-
-    def commit_message(self) -> str:
-        return real_git(self.remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
-
-    def record_file(self, **changes: object) -> Path:
-        return write_lane_record_file(self.scratch, lane_record_object(**changes))
-
-
-def standing_claims_of(world: World) -> list[protocol.ActiveClaim]:
-    state = store.fetch_state(worktree=world.directory, remote="origin")
-    return list(state.claims.values())
-
-
-@pytest.fixture(params=[body.Storage.GITHUB, body.Storage.STATE_REF], ids=["github", "state-ref"])
-def world(
-    request: pytest.FixtureRequest,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    github_clone: Path,
-    bare_remote: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> World:
-    stand_in: StandIn = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, TRUNK_FILES)
-    scratch = tmp_path / "scratch"
-    scratch.mkdir()
-    if request.param is body.Storage.GITHUB:
-        standpoint = stand_in(standing=held_by_ada(HELD_SCOPE))
-        return World(
-            body.Storage.GITHUB,
-            str(ISSUE),
-            f"#{ISSUE}",
-            ("--repo", REPOSITORY),
-            standpoint.directory,
-            bare_remote,
-            scratch,
-        )
-    standpoint = stand_in(board_config=f'storage = "{body.Storage.STATE_REF.value}"\n')
-    minted = run_cli(
-        ["item", "new", "--title", "Runs"],
-        capsys,
-        stdin=complete_contract("Build it.", scope=["src"], whole="the scenario claims it as one"),
-    )
-    item = minted.stdout.strip()
-    claimed = run_cli(["claim", item, "--agent", "Ada", "--scope", "src"], capsys)
-    assert claimed.status == 0, claimed.stderr
-    return World(body.Storage.STATE_REF, item, item, (), standpoint.directory, bare_remote, scratch)
-
-
-def begin_arguments(world: World, run: str = FIRST_RUN, *flags: str) -> tuple[str, ...]:
-    return ("lane-record", "begin", world.item, "--run", run, *flags)
-
-
-def add_arguments(
-    world: World,
-    run: str = FIRST_RUN,
-    *,
-    file: Path | None = None,
-    end_tip: str = END_TIP,
-    stages: tuple[RoutingStage, ...] = STAGES_RAN,
-    flags: tuple[str, ...] = (),
-) -> tuple[str, ...]:
-    record = file if file is not None else world.record_file()
-    return (
-        "lane-record",
-        "add",
-        world.item,
-        str(record),
-        "--run",
-        run,
-        "--end-tip",
-        end_tip,
-        "--ran",
-        *stages,
-        *flags,
-    )
+@pytest.fixture
+def world(lane_record_runs_world: World) -> World:
+    return lane_record_runs_world
 
 
 def commit_on(directory: Path, name: str) -> str:
@@ -575,110 +458,6 @@ def test_a_run_after_an_unreadable_end_tip_does_not_follow(
     stored = world.stored_runs()
     assert stored is not None
     assert stored.runs[1].follows is False
-
-
-@pytest.mark.parametrize(
-    "flags",
-    [
-        pytest.param(("--run", "has space"), id="run-id-with-a-space"),
-        pytest.param(("--run", "-leading-dash"), id="run-id-starting-with-a-dash"),
-        pytest.param(("--run", "r" * 129), id="run-id-past-128-characters"),
-        pytest.param(("--run", FIRST_RUN, "--start-tip", "abc"), id="start-tip-too-short"),
-        pytest.param(("--run", FIRST_RUN, "--start-tip", "A" * 40), id="start-tip-upper-case"),
-    ],
-)
-def test_a_begin_flag_off_the_grammar_is_a_usage_refusal(
-    world: World, capsys: pytest.CaptureFixture[str], flags: tuple[str, ...]
-) -> None:
-    """Spec: LANREC-58."""
-    refused = world.run(capsys, "lane-record", "begin", world.item, *flags)
-
-    assert refused.status == 2
-    assert refused.stdout == ""
-    assert "usage:" in refused.stderr
-    assert world.runs_files() == []
-
-
-@pytest.mark.parametrize(
-    "end_tip",
-    [
-        pytest.param("abc", id="end-tip-too-short"),
-        pytest.param("G" * 40, id="end-tip-not-hexadecimal"),
-    ],
-)
-def test_an_add_tip_off_the_grammar_is_a_usage_refusal(
-    world: World, capsys: pytest.CaptureFixture[str], end_tip: str
-) -> None:
-    """Spec: LANREC-58."""
-    world.run(capsys, *begin_arguments(world))
-
-    refused = world.run(capsys, *add_arguments(world, end_tip=end_tip))
-
-    assert refused.status == 2
-    assert "usage:" in refused.stderr
-
-
-def test_an_add_without_a_stage_or_with_an_unknown_stage_is_a_usage_refusal(
-    world: World, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LANREC-58."""
-    world.run(capsys, *begin_arguments(world))
-    file = str(world.record_file())
-    common = ("lane-record", "add", world.item, file, "--run", FIRST_RUN, "--end-tip", END_TIP)
-
-    without = world.run(capsys, *common)
-    unknown = world.run(capsys, *common, "--ran", "land")
-
-    assert (without.status, unknown.status) == (2, 2)
-    assert "usage:" in without.stderr
-    assert "usage:" in unknown.stderr
-
-
-@pytest.mark.parametrize(
-    ("stages", "flags"),
-    [
-        pytest.param((RoutingStage.BUILD, RoutingStage.BUILD), (), id="a-stage-twice-in-one-ran"),
-        pytest.param((RoutingStage.BUILD,), ("--ran", "build"), id="a-stage-in-two-rans"),
-        pytest.param((RoutingStage.BUILD,), ("--ran", "review"), id="two-rans-naming-two-stages"),
-    ],
-)
-def test_a_stage_named_twice_or_a_second_ran_is_a_usage_refusal_and_writes_nothing(
-    world: World,
-    capsys: pytest.CaptureFixture[str],
-    stages: tuple[RoutingStage, ...],
-    flags: tuple[str, ...],
-) -> None:
-    """Spec: LANREC-58."""
-    world.run(capsys, *begin_arguments(world))
-    tip = world.state_tip()
-
-    refused = world.run(capsys, *add_arguments(world, stages=stages, flags=flags))
-
-    assert refused.status == 2
-    assert "usage:" in refused.stderr
-    assert world.state_tip() == tip
-
-
-@pytest.mark.parametrize("command", ["begin", "add"])
-def test_a_missing_agent_identity_refuses_before_the_record_file_is_read_and_writes_nothing(
-    world: World,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    command: str,
-) -> None:
-    """Spec: LANREC-70."""
-    monkeypatch.delenv("ACO_AGENT")
-    tip = world.state_tip()
-    unreadable = world.scratch / "absent.json"
-    arguments = (
-        begin_arguments(world) if command == "begin" else add_arguments(world, file=unreadable)
-    )
-
-    refused = world.run(capsys, *arguments)
-
-    assert refused.status == 2
-    assert "agent identity is required" in refused.stderr
-    assert world.state_tip() == tip
 
 
 def test_json_begin_reports_a_fresh_run_as_begun_and_a_repeat_as_already_begun(
