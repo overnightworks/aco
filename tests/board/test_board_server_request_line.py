@@ -37,7 +37,7 @@ def _without_token(path: bytes, method: bytes = b"GET") -> bytes:
     return method + b" " + path + _HEADERS + b"\r\n"
 
 
-def _post(body: bytes, declared_length: int) -> bytes:
+def _post(body: bytes, declared_length: int | str) -> bytes:
     head = b"POST /api/rule" + _HEADERS + _TOKEN_HEADER
     return head + b"Content-Length: " + str(declared_length).encode() + b"\r\n\r\n" + body
 
@@ -89,6 +89,9 @@ def _a_forge_that_cannot_list(repository: BoardForge) -> None:
         ),
         pytest.param(
             _post(b"{}", 2), ("POST", "/api/rule", 400, "ok"), None, id="bad-decision-body"
+        ),
+        pytest.param(
+            _post(b"", "x"), ("POST", "/api/rule", 400, "ok"), None, id="bad-content-length"
         ),
         pytest.param(
             _post(b'{"item": 42}', 40), ("POST", "/api/rule", 408, "ok"), None, id="short-body"
