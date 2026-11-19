@@ -3,6 +3,6 @@ agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
 role = "builder"
 base = "e0813de269d34a40dfebe84117c996fbcf4892fc"
 branch = "claude/issue-976-state-export-and-file-codecs"
-scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco", "tests"]
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco", "tests"]
 opened_commit = "d81918fb00c5f35136f4e0f6851b65a38b41ebb4"
 whole_reason = "A move of two code groups changes the imports of their callers across src and tests; the diff is mechanical and one reviewer reads it in one sitting."
