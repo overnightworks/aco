@@ -1,0 +1,8 @@
+claim_id = "2284b33b8e7543378c9897d537b02d33"
+agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
+role = "builder"
+base = "1d665fbe3b93fb4d616550432b486258efc03041"
+branch = "claude/issue-990-release-from-stored-runs"
+scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/lane-record.spec.md", "specs/ref-store-cas.spec.md", "specs/release.spec.md", "src/aco/claim_json.py", "src/aco/cmd_claim.py", "src/aco/cmd_release.py", "src/aco/cmd_rescope.py", "src/aco/cmd_status.py", "src/aco/lane_record.py", "src/aco/protocol.py", "src/aco/release_record.py", "tests"]
+opened_commit = "cc0f20c68a60d943df6f731a8aaa5477eaeaa421"
+whole_reason = "The release's choice of figures, the intent's expectation and their spec lines are one contract and land together."
