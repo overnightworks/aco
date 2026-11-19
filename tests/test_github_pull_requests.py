@@ -250,6 +250,7 @@ def test_the_landing_maps_a_pull_request_as_rest_carries_it(
         pytest.param(api_pull_request(user={"type": "User"}), id="author-without-login"),
         pytest.param(api_pull_request(title=None), id="missing-title"),
         pytest.param(api_pull_request(base=None), id="missing-base"),
+        pytest.param(api_pull_request(base={"ref": None}), id="missing-target-branch"),
         pytest.param(api_pull_request(head=api_head(sha=None)), id="missing-head-sha"),
         pytest.param(api_pull_request(head=api_head(sha="not-a-sha")), id="malformed-head-sha"),
         pytest.param(api_pull_request(head=api_head(ref=None)), id="missing-head-branch"),
