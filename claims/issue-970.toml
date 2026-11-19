@@ -1,0 +1,8 @@
+claim_id = "ce82ec22fa674dbd80f40cede296f61b"
+agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
+role = "builder"
+base = "e0813de269d34a40dfebe84117c996fbcf4892fc"
+branch = "claude/issue-970-serve-logs-through-logline"
+scope = [".github/dependabot.yml", "README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "scripts/package_smoke.sh", "scripts/vulture_whitelist.py", "specs/serve.spec.md", "src/aco/board/cli.py", "src/aco/board/server.py", "tests/board/test_board_cli.py", "tests/board/test_board_server.py", "tests/board/test_board_server_request_line.py", "tests/support/aco_board_fixtures.py", "uv.lock"]
+opened_commit = "2d5dff5baefe4ec16e247d856656e3edc609e436"
+whole_reason = "The dependency, its wiring in the board's two modules, the spec, the documents and the tests that pin stdout are one change; none lands alone."
