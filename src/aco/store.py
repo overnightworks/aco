@@ -188,7 +188,7 @@ _STATE_FETCH_OPTIONS = (
 # the shared local namespace `STATE_REF` reserves. `fetch_state`'s own
 # anchoring is the sole production writer and reader of this name --
 # `state_export.export_state_bundle` has its own, separate ref in the same private
-# namespace (`EXPORT_BUNDLE_REF`), never this one, and `peek_state` never
+# namespace (`state_export.EXPORT_BUNDLE_REF`), never this one, and `peek_state` never
 # writes here at all: its read comes from
 # `ls_remote_state`'s own answer, since a dry run, a live-claim refusal, or
 # a failed export must change nothing durable.
@@ -1430,7 +1430,7 @@ def local_state_ref_exists(worktree: Path) -> bool:
     lands fetched objects in its own per-worktree anchor, `peek_state` in
     this worktree's object store alone), nor does `state_export.export_state_bundle`,
     which bundles its own private
-    `EXPORT_BUNDLE_REF` instead of `STATE_REF` -- but a foreign tool might
+    `state_export.EXPORT_BUNDLE_REF` instead of `STATE_REF` -- but a foreign tool might
     still leave a local `STATE_REF`, and
     `delete_state_ref`, the reset step right after export, deletes it only
     when this is true.
