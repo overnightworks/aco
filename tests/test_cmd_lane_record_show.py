@@ -358,7 +358,7 @@ def test_a_count_summed_beyond_999_in_one_stage_is_shown_as_999(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: LANREC-81."""
-    changes = {"fix_rounds": four(600, 0, 0, 0), "misses": four(0, 0, 0, 0)}
+    changes: dict[str, object] = {"fix_rounds": four(600, 0, 0, 0), "misses": four(0, 0, 0, 0)}
     steps = (
         Step(FIRST_RUN, changes=changes),
         Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes=changes),
