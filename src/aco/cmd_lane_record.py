@@ -9,7 +9,17 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from . import checkout, lane_record, lane_runs, protocol, report, store, usage, workboard
+from . import (
+    checkout,
+    lane_record,
+    lane_runs,
+    protocol,
+    report,
+    state_runs,
+    store,
+    usage,
+    workboard,
+)
 from .routing_line import RoutingStage
 from .session import RunContext
 
@@ -207,7 +217,7 @@ def _stored_runs(
     if stored is None:
         return lane_runs.RunsFile()
     try:
-        return lane_runs.parse_runs(store.read_runs_file(context.toplevel, stored))
+        return lane_runs.parse_runs(state_runs.read_runs_file(context.toplevel, stored))
     except lane_runs.RunsFileError as error:
         raise protocol.ClaimUnavailableError(
             f"the stored runs of {label} cannot be used: {error}"

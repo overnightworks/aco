@@ -730,16 +730,6 @@ def read_item_files(worktree: Path, tip: ObjectId) -> Mapping[str, bytes]:
     return MappingProxyType(_read_state_archive(worktree, items_oid, tip=tip))
 
 
-def read_runs_file(worktree: Path, oid: ObjectId) -> bytes:
-    """The raw bytes of the runs file blob `oid`, which `ClaimState.runs` names."""
-    result = run_git(worktree, ["cat-file", "blob", str(oid)])
-    if result.exit_status != 0:
-        raise ClaimError(
-            f"cannot read the runs file {oid}: {git_failure_detail_from_stderr(result)}"
-        )
-    return result.stdout
-
-
 def fetch_state(*, worktree: Path, remote: str) -> ClaimState:
     """Read `refs/aco/state` from `remote` without ever checking it out.
 
