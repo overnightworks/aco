@@ -104,7 +104,7 @@ def counts_of(figures: lane_record.LaneFigures, kind: str) -> tuple[int | None, 
 def test_the_build_stage_is_the_choice_of_the_first_lost_or_build_running_element(
     entries: tuple[lane_runs.RunEntry, ...], expected: str | None
 ) -> None:
-    """Spec: LANREC-74."""
+    """Spec: LANREC-77."""
     figures = figures_of(*entries)
 
     assert figures.stages[RoutingStage.BUILD] == expected
@@ -145,7 +145,7 @@ def test_the_build_stage_is_the_choice_of_the_first_lost_or_build_running_elemen
 def test_a_later_stage_is_the_choice_of_the_last_lost_or_stage_running_element(
     entries: tuple[lane_runs.RunEntry, ...], marker: str | None, stage: str
 ) -> None:
-    """Spec: LANREC-75."""
+    """Spec: LANREC-78."""
     figures = figures_of(*entries)
 
     expected = None if marker is None else f"{stage}-{marker}/low"
@@ -164,7 +164,7 @@ def test_a_later_stage_is_the_choice_of_the_last_lost_or_stage_running_element(
 def test_a_stage_no_run_ran_is_none_for_fix_test_and_gate_and_unknown_for_review(
     stage: str, expected: str | None
 ) -> None:
-    """Spec: LANREC-75."""
+    """Spec: LANREC-79."""
     figures = figures_of(added("one", "build"))
 
     assert figures.stages[RoutingStage(stage)] == expected
@@ -190,7 +190,7 @@ def test_a_stage_no_run_ran_is_none_for_fix_test_and_gate_and_unknown_for_review
 def test_land_and_risk_are_the_newest_entrys_or_unknown(
     entries: tuple[lane_runs.RunEntry, ...], land: str | None, risk: str | None
 ) -> None:
-    """Spec: LANREC-76."""
+    """Spec: LANREC-80."""
     figures = figures_of(*entries)
 
     assert (figures.stages[RoutingStage.LAND], figures.risk) == (land, risk)
@@ -255,7 +255,7 @@ def test_land_and_risk_are_the_newest_entrys_or_unknown(
 def test_the_counts_are_the_sums_clamped_and_unknown_with_a_lost_run(
     entries: tuple[lane_runs.RunEntry, ...], kind: str, expected: tuple[int | None, ...]
 ) -> None:
-    """Spec: LANREC-77."""
+    """Spec: LANREC-81."""
     figures = figures_of(*entries)
 
     assert counts_of(figures, kind) == expected
@@ -272,14 +272,14 @@ def test_the_counts_are_the_sums_clamped_and_unknown_with_a_lost_run(
 def test_a_known_record_without_misses_makes_misses_unknown_alone(
     kind: str, expected: tuple[int | None, ...]
 ) -> None:
-    """Spec: LANREC-77."""
+    """Spec: LANREC-82."""
     figures = figures_of(added("one", "build"), added("two", "review", misses=None))
 
     assert counts_of(figures, kind) == expected
 
 
 def test_the_verdicts_are_those_of_the_known_records_in_run_order() -> None:
-    """Spec: LANREC-78."""
+    """Spec: LANREC-83."""
     first = {"stage": "review", "verdict": "revise", "sha": "1" * 40}
     second = {"stage": "gate", "verdict": "approve", "sha": "2" * 40}
     third = {"stage": "review", "verdict": "approve", "sha": "3" * 40}
@@ -325,7 +325,7 @@ def test_the_verdicts_are_those_of_the_known_records_in_run_order() -> None:
 def test_the_experiment_is_the_tag_every_known_record_states_when_no_run_is_lost(
     entries: tuple[lane_runs.RunEntry, ...], expected: str | None
 ) -> None:
-    """Spec: LANREC-78."""
+    """Spec: LANREC-83."""
     figures = figures_of(*entries)
 
     assert figures.experiment == expected
@@ -355,12 +355,12 @@ def test_the_experiment_is_the_tag_every_known_record_states_when_no_run_is_lost
 def test_a_lane_is_complete_when_no_run_is_lost(
     entries: tuple[lane_runs.RunEntry, ...], expected: bool
 ) -> None:
-    """Spec: LANREC-73."""
+    """Spec: LANREC-75, LANREC-76."""
     assert lane_runs.is_complete(lane_runs.RunsFile(entries)) is expected
 
 
 def test_the_stages_come_from_what_a_run_ran_never_from_its_records_slots() -> None:
-    """Spec: LANREC-75."""
+    """Spec: LANREC-79."""
     figures = figures_of(added("one", "build", marker="x"))
 
     assert figures.stages == {
@@ -374,7 +374,7 @@ def test_the_stages_come_from_what_a_run_ran_never_from_its_records_slots() -> N
 
 
 def test_the_figures_hold_every_stage_and_every_finding_stage() -> None:
-    """Spec: LANREC-74."""
+    """Spec: LANREC-86."""
     figures = figures_of(added("one", "build"))
 
     stages: Mapping[RoutingStage, str | None] = figures.stages

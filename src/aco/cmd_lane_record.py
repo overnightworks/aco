@@ -2,8 +2,9 @@
 # ruff: noqa: T201 - the lane-record command writes its result line to stdout
 
 import argparse
+import json
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import partial
@@ -32,15 +33,16 @@ _RUN_TRAILER = "run"
 
 
 class _RunsReason(StrEnum):
-    """`aco lane-record begin` and `add`'s own `--json` `reason` vocabulary
-    (`specs/lane-record.spec.md`): `begun`, `already_begun`, `added` and `already_added` are the
-    successes; `precondition_failed` is a claim, a holder or a stored run that does not allow
-    the command, every other refusal `unavailable`."""
+    """`aco lane-record begin`, `add` and `show`'s own `--json` `reason` vocabulary
+    (`specs/lane-record.spec.md`): `begun`, `already_begun`, `added`, `already_added` and `shown`
+    are the successes; `precondition_failed` is a claim, a holder or a stored run that does not
+    allow the command, every other refusal `unavailable`."""
 
     BEGUN = "begun"
     ALREADY_BEGUN = "already_begun"
     ADDED = "added"
     ALREADY_ADDED = "already_added"
+    SHOWN = "shown"
     PRECONDITION_FAILED = "precondition_failed"
     UNAVAILABLE = "unavailable"
 
@@ -124,7 +126,8 @@ def _add_run_arguments(command: argparse.ArgumentParser) -> None:
 
 def add_parser(commands: usage.Subcommands, name: str) -> None:
     command = commands.add_parser(
-        name, help="check a lane record file, or store a run of a claimed lane with its claim"
+        name,
+        help="check a lane record file, store a run of a claimed lane with its claim, or show them",
     )
     command.subcommands = usage.Subcommands(command, "lane_record_command")
     check = command.subcommands.add_parser(
@@ -150,6 +153,11 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         choices=[str(stage) for stage in lane_runs.RAN_STAGES],
         help="each stage the run ran, once",
     )
+    show = command.subcommands.add_parser(
+        "show", help="print the runs stored with a claim and the lane figures computed from them"
+    )
+    show.add_argument("item", type=workboard.parse_item_reference, help="the claimed item")
+    report.add_json_flag(show)
 
 
 @dataclass(frozen=True)
@@ -189,10 +197,18 @@ def _session_agent(parsed: argparse.Namespace) -> str:
         raise lane_runs.RunsRefusedError(str(error)) from error
 
 
-def _open_runs(
-    parsed: argparse.Namespace, context: RunContext, action: lane_runs.RunsAction, agent: str
-) -> _ClaimRuns:
-    """The runs of the item's claim, for the session `agent` that holds it; any other refuses."""
+@dataclass(frozen=True)
+class _StoredRuns:
+    """The live claim of an item, its label and the runs stored with it."""
+
+    claim: protocol.ActiveClaim
+    label: str
+    runs: lane_runs.RunsFile
+    stored: protocol.ObjectId | None
+
+
+def _read_runs(parsed: argparse.Namespace, context: RunContext) -> _StoredRuns:
+    """The runs of the item's live claim, whoever holds it; an item without one refuses."""
     try:
         storage = context.config.storage
         label = workboard.item_label(parsed.item, storage)
@@ -201,14 +217,20 @@ def _open_runs(
         )
     except protocol.ClaimError as error:
         raise lane_runs.RunsRefusedError(str(error)) from error
-    if claim.agent != agent:
-        raise lane_runs.RunsRefusedError(
-            lane_runs.holder_refusal(action, label, session=agent)(claim.agent)
-        )
     stored = context.observation.runs.get(claim.claim_id)
-    return _ClaimRuns(
-        context, claim, agent, action, label, _stored_runs(context, stored, label), stored
-    )
+    return _StoredRuns(claim, label, _stored_runs(context, stored, label), stored)
+
+
+def _open_runs(
+    parsed: argparse.Namespace, context: RunContext, action: lane_runs.RunsAction, agent: str
+) -> _ClaimRuns:
+    """The runs of the item's claim, for the session `agent` that holds it; any other refuses."""
+    read = _read_runs(parsed, context)
+    if read.claim.agent != agent:
+        raise lane_runs.RunsRefusedError(
+            lane_runs.holder_refusal(action, read.label, session=agent)(read.claim.agent)
+        )
+    return _ClaimRuns(context, read.claim, agent, action, read.label, read.runs, read.stored)
 
 
 def _stored_runs(
@@ -287,7 +309,80 @@ def _add(parsed: argparse.Namespace, context: RunContext) -> int:
     return 0
 
 
-_RUNS_COMMANDS = {"begin": _begin, "add": _add}
+def _run_object(entry: lane_runs.RunEntry) -> dict[str, object]:
+    added = entry.added
+    return {
+        "run": entry.run,
+        "start_tip": entry.start_tip,
+        "follows": entry.follows,
+        "end_tip": None if added is None else added.end_tip,
+        "ran": None if added is None else [str(stage) for stage in added.ran],
+        "record": None if added is None else lane_runs.record_object(added.record),
+    }
+
+
+def _counts_object(figures: lane_record.LaneFigures, kind: str) -> dict[str, int] | None:
+    """One count kind per finding stage: a whole object, or `None` when a stage's is unknown."""
+    counts = {str(stage): getattr(figures.counts[stage], kind) for stage in figures.counts}
+    return None if None in counts.values() else counts
+
+
+def _lane_object(figures: lane_record.LaneFigures) -> dict[str, object]:
+    return {
+        "stages": {str(stage): choice for stage, choice in figures.stages.items()},
+        "fix_rounds": _counts_object(figures, "fix_rounds"),
+        "blocking": _counts_object(figures, "blocking"),
+        "misses": _counts_object(figures, "misses"),
+        "verdicts": lane_runs.verdict_objects(figures.verdicts),
+        "risk": figures.risk,
+        "experiment": figures.experiment,
+    }
+
+
+def _compact(value: object) -> str:
+    return json.dumps(value, separators=(",", ":"))
+
+
+def _run_line(entry: lane_runs.RunEntry, label: str) -> str:
+    added = entry.added
+    recorded = "no record" if added is None else f"end {added.end_tip}, ran {' '.join(added.ran)}"
+    follows = "follows" if entry.follows else "does not follow"
+    return f"run {entry.run} of {label}: start {entry.start_tip or 'none'}, {recorded}, {follows}"
+
+
+def _print_shown(label: str, runs: lane_runs.RunsFile, lane: Mapping[str, object]) -> None:
+    for entry in runs.runs:
+        print(_run_line(entry, label))
+        if entry.added is not None:
+            print(f"  record {_compact(lane_runs.record_object(entry.added.record))}")
+    state = "complete" if lane_runs.is_complete(runs) else "incomplete"
+    print(f"lane {label}: {state}")
+    print(f"  record {_compact(lane)}")
+
+
+def _show(parsed: argparse.Namespace, context: RunContext) -> int:
+    read = _read_runs(parsed, context)
+    stored = read.runs
+    shown = bool(stored.runs)
+    lane = _lane_object(lane_runs.lane_figures(stored)) if shown else None
+    if parsed.json:
+        report.emit_json(
+            True,
+            _RunsReason.SHOWN,
+            item=parsed.item,
+            claim_id=read.claim.claim_id,
+            runs=[_run_object(entry) for entry in stored.runs],
+            complete=lane_runs.is_complete(stored) if shown else None,
+            lane=lane,
+        )
+    elif lane is None:
+        print(f"{read.label} has no stored runs")
+    else:
+        _print_shown(read.label, stored, lane)
+    return 0
+
+
+_RUNS_COMMANDS = {"begin": _begin, "add": _add, "show": _show}
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:

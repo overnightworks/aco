@@ -18,6 +18,7 @@ from lane_record_runs_world import (
     World,
     add_arguments,
     begin_arguments,
+    commit_on,
 )
 
 from aco import lane_runs, protocol, store
@@ -27,14 +28,6 @@ from aco.routing_line import RoutingStage
 @pytest.fixture
 def world(lane_record_runs_world: World) -> World:
     return lane_record_runs_world
-
-
-def commit_on(directory: Path, name: str) -> str:
-    """One commit adding `name` to the checkout at `directory`; its sha."""
-    (directory / name).write_text(f"{name}\n")
-    real_git(directory, "add", name)
-    real_git(directory, "commit", "-q", "-m", f"add {name}")
-    return real_git(directory, "rev-parse", "HEAD").stdout.strip()
 
 
 def test_a_begin_then_an_add_store_the_run_under_the_claims_id_and_say_so(

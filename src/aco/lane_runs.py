@@ -197,15 +197,19 @@ def record_object(record: lane_record.LaneRecordFile) -> dict[str, object]:
     }
     if record.misses is not None:
         stored["misses"] = {str(stage): count for stage, count in record.misses.items()}
-    stored["verdicts"] = [
-        {"stage": str(judged.stage), "verdict": str(judged.verdict), "sha": judged.sha}
-        for judged in record.verdicts
-    ]
+    stored["verdicts"] = verdict_objects(record.verdicts)
     for name in ("risk", "experiment"):
         tag = getattr(record, name)
         if tag is not None:
             stored[name] = tag
     return stored
+
+
+def verdict_objects(verdicts: Iterable[lane_record.JudgedVerdict]) -> list[dict[str, str]]:
+    return [
+        {"stage": str(judged.stage), "verdict": str(judged.verdict), "sha": judged.sha}
+        for judged in verdicts
+    ]
 
 
 def _sequence(runs: RunsFile) -> tuple[RunAdded | None, ...]:
