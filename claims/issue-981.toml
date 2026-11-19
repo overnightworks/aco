@@ -1,8 +1,0 @@
-claim_id = "94858366b03041bab6472e5cf7de21c5"
-agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
-role = "builder"
-base = "052546e1e0c7970024d0fe6fc131be33849b9c91"
-branch = "claude/issue-981-lane-record-begin-and-add"
-scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/handover.spec.md", "specs/lane-record.spec.md", "specs/ref-store-cas.spec.md", "specs/release.spec.md", "src/aco", "tests"]
-opened_commit = "bd0e131dc6a4216783ebeb3be8bedbf72e00ea38"
-whole_reason = "The runs file touches the state tree's reader, the transitions, a new module and the command together, and their tests share the store and claim fixtures; none proves anything alone."
