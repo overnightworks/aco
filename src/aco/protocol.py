@@ -916,7 +916,8 @@ class ClaimState:
     transition builds and returns a whole new `ClaimState`. `items`
     maps an item id to its blob oid alone, never its content --
     content stays a lazy, separate read (`store.read_item_files`), which is
-    what keeps this state cheap to fetch regardless of item count.
+    what keeps this state cheap to fetch regardless of item count. `runs` maps a claim id to the
+    blob oid of its runs file the same way.
     """
 
     tip: ObjectId | None
@@ -924,6 +925,7 @@ class ClaimState:
     consumed_ids: frozenset[ClaimId] = field(default_factory=frozenset)
     resources: Mapping[str, ResourceRecord] = field(default_factory=lambda: MappingProxyType({}))
     items: Mapping[str, ObjectId] = field(default_factory=lambda: MappingProxyType({}))
+    runs: Mapping[str, ObjectId] = field(default_factory=lambda: MappingProxyType({}))
 
 
 EMPTY_STATE = ClaimState(tip=None)
@@ -1133,6 +1135,22 @@ class LandingIntent:
     coordinator_override: bool = False
 
 
+@dataclass(frozen=True)
+class RunsWriteIntent:
+    """Replaces `runs/<claim_id>.json`'s blob oid with `new_oid`: only the live claim's holder
+    `agent` may, and only while the file is still the blob `expected` the writer read (`None`:
+    none yet). The writer's own sentences refuse a non-holder (as a function of the holder)
+    and a file written since, because they name the item as the writer's storage does."""
+
+    claim_id: ClaimId
+    agent: str
+    expected: ObjectId | None
+    new_oid: ObjectId
+    operation_id: str
+    holder_refusal: Callable[[str], str]
+    stale_refusal: str
+
+
 ClaimTransitionIntent = (
     ClaimIntent
     | RescopeIntent
@@ -1141,6 +1159,7 @@ ClaimTransitionIntent = (
     | ItemWriteIntent
     | ItemCloseIntent
     | LandingIntent
+    | RunsWriteIntent
 )
 
 
@@ -1384,6 +1403,7 @@ def _apply_release_intent(state: ClaimState, intent: ReleaseIntent) -> ClaimStat
     return replace(  # NOSONAR(S5886) pyright types replace()
         state,
         claims=MappingProxyType(new_claims),
+        runs=_runs_without(state, intent.claim_id),
     )
 
 
@@ -1470,12 +1490,30 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
         state,
         claims=MappingProxyType(new_claims),
         items=MappingProxyType(new_items),
+        runs=_runs_without(state, intent.claim_id),
     )
+
+
+def _runs_without(state: ClaimState, claim_id: ClaimId) -> Mapping[str, ObjectId]:
+    """`state.runs` without the file of `claim_id`: a released or landed claim keeps none."""
+    return MappingProxyType({key: oid for key, oid in state.runs.items() if key != claim_id})
+
+
+def _apply_runs_write_intent(state: ClaimState, intent: RunsWriteIntent) -> ClaimState:
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim")
+    if found[1].agent != intent.agent:
+        raise ClaimUnavailableError(intent.holder_refusal(found[1].agent))
+    if state.runs.get(intent.claim_id) != intent.expected:
+        raise ClaimUnavailableError(intent.stale_refusal)
+    runs = {**state.runs, intent.claim_id: intent.new_oid}
+    return replace(state, runs=MappingProxyType(runs))  # NOSONAR(S5886) pyright types replace()
 
 
 def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
     """The pure claim-state transition: the sole writer of
-    `ClaimState.claims`/`consumed_ids`/`resources`/`items`. Assumes
+    `ClaimState.claims`/`consumed_ids`/`resources`/`items`/`runs`. Assumes
     `state.tip` is already real -- `store.py` never calls this against
     `EMPTY_STATE`."""
     if isinstance(intent, ClaimIntent):
@@ -1488,6 +1526,10 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
         applied = _apply_release_intent(state, intent)
     elif isinstance(intent, LandingIntent):
         applied = _apply_landing_intent(state, intent)
+    elif isinstance(intent, RunsWriteIntent):
+        applied = _apply_runs_write_intent(state, intent)
+    elif isinstance(intent, RunsWriteIntent):
+        applied = _apply_runs_write_intent(state, intent)
     elif isinstance(intent, ItemCloseIntent):
         applied = _apply_item_close_intent(state, intent)
     else:
