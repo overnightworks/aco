@@ -6,6 +6,7 @@ from dataclasses import replace
 from functools import partial
 
 import pytest
+from lane_record_runs_world import stale_runs_sentence
 from store_fixtures import STATE_WITH_TIP, claim_intent
 
 from aco import protocol
@@ -79,13 +80,6 @@ def release_or_landing(
     kind: str, expected_runs: protocol.ObjectId | None
 ) -> protocol.ReleaseIntent | protocol.LandingIntent:
     return release_intent(expected_runs) if kind == "release" else landing_intent(expected_runs)
-
-
-def stale_runs_sentence(label: str) -> str:
-    return (
-        f"the stored runs of {label} were written since this command read them; "
-        "run the same command again"
-    )
 
 
 def test_a_write_by_the_holder_stores_the_runs_file_under_the_claim_id() -> None:
@@ -241,19 +235,6 @@ def test_a_refused_release_or_landing_of_a_lane_claim_names_its_claim_id(kind: s
 
 
 @pytest.mark.parametrize("kind", ["release", "landing"])
-def test_a_release_or_landing_that_expects_no_runs_file_refuses_a_claim_that_has_one(
-    kind: str,
-) -> None:
-    state = replace(with_runs(), items={ITEM_ID: ITEM_OID})
-    intent = release_or_landing(kind, None)
-
-    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
-        protocol.apply(state, intent)
-
-    assert str(refusal.value) == stale_runs_sentence("#42")
-
-
-@pytest.mark.parametrize("kind", ["release", "landing"])
 def test_a_write_to_another_claims_runs_file_is_applied_over(kind: str) -> None:
     runs = {CLAIM_ID: FIRST_OID, OTHER_CLAIM_ID: THIRD_OID}
     state = replace(claimed_state(), items={ITEM_ID: ITEM_OID}, runs=runs)
@@ -307,7 +288,4 @@ def test_a_rescope_keeps_the_runs_file() -> None:
 
 
 def test_the_stale_runs_sentence_names_the_item_and_the_command_to_run_again() -> None:
-    assert protocol.stale_runs_sentence("#42") == (
-        "the stored runs of #42 were written since this command read them; "
-        "run the same command again"
-    )
+    assert protocol.stale_runs_sentence("#42") == stale_runs_sentence("#42")

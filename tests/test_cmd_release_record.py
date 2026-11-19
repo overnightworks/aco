@@ -119,7 +119,7 @@ def test_a_record_for_a_landing_refuses_in_json_when_the_board_configuration_can
     bare_remote: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: LANREC-41, REL-24 -- a refusal that names no item needs no configuration."""
+    """Spec: LANREC-41, LANREC-96, REL-24 -- a refusal that names no item needs no configuration."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(
         branch=LANE_BRANCH,
