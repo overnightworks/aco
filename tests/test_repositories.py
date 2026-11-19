@@ -54,6 +54,12 @@ def _with_malformed_board_configuration(directory: Path) -> None:
     _tracked_checkout(directory, remote="https://github.com/owner/repo", board_toml="= nope")
 
 
+def _with_unknown_board_key(directory: Path) -> None:
+    _tracked_checkout(
+        directory, remote="https://github.com/owner/repo", board_toml='unknown_key = "x"\n'
+    )
+
+
 def _untracked_board_configuration(directory: Path) -> None:
     _checkout_without_board_configuration(directory)
     board_file = directory / ".aco" / "board.toml"
@@ -156,6 +162,26 @@ def test_a_checkout_that_cannot_be_read_is_unavailable_with_its_path(
     [unavailable] = discovery.unavailable
     assert unavailable.directory == broken
     assert unavailable.reason
+
+
+@pytest.mark.parametrize(
+    ("arrange", "label"),
+    [
+        pytest.param(_with_malformed_board_configuration, "owner/repo", id="malformed-board-file"),
+        pytest.param(_with_unknown_board_key, "owner/repo", id="unknown-board-key"),
+        pytest.param(_with_non_github_remote, "owner/repo", id="non-github-remote"),
+        pytest.param(_without_remote, None, id="no-remote"),
+        pytest.param(_git_directory_only, None, id="git-directory-only"),
+    ],
+)
+def test_an_unavailable_checkout_knows_its_label_where_its_origin_url_can_be_read(
+    tmp_path: Path, arrange: Callable[[Path], None], label: str | None
+) -> None:
+    arrange(tmp_path / "broken")
+
+    [unavailable] = repositories.discover(tmp_path).unavailable
+
+    assert unavailable.label == label
 
 
 def test_a_state_ref_checkout_is_found_under_its_remote_path_on_any_host(tmp_path: Path) -> None:

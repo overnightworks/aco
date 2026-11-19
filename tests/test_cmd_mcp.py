@@ -16,19 +16,25 @@ from typing import IO, Any, cast
 
 import board_forge
 import pytest
-from board_fixtures import OPERATOR_WAIT, board_issue, complete_contract, searchless
+from board_fixtures import (
+    OPERATOR_WAIT,
+    board_issue,
+    complete_contract,
+    searchless,
+)
 from cli_fixtures import run_cli
 from discovery_fixtures import (
     configure_root,
     isolate_config_file,
     repository_with_card,
+    unreadable_checkout,
     write_config,
 )
 from github_fixtures import FakeForge, serve_forge
 from mcp_lines import Script, call_line
 from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
 
-from aco import body_fence, cli, expectations, forge, session
+from aco import body_fence, cli, expectations, forge, repositories, session
 from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
@@ -637,6 +643,22 @@ def test_an_undiscovered_repository_is_a_tool_error_that_writes_nothing(
     result = answer["result"]
     assert result["isError"] is True
     assert "no repository" in result["content"][0]["text"]
+    assert here.body_writes() == []
+
+
+def test_a_repository_whose_checkout_cannot_be_read_is_a_tool_error_naming_the_checkout(
+    here: board_forge.BoardForge, root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken = unreadable_checkout(root / "broken", "https://github.com/board-forge/broken")
+    [unavailable] = repositories.discover(root).unavailable
+
+    _, [answer] = _serve_in_process(monkeypatch, _record_line(repository="board-forge/broken"))
+
+    result = answer["result"]
+    assert result["isError"] is True
+    assert result["content"][0]["text"] == (
+        f"repository board-forge/broken is unreadable: {broken}: {unavailable.reason}"
+    )
     assert here.body_writes() == []
 
 

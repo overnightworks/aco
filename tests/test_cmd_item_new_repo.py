@@ -9,11 +9,16 @@ import pytest
 from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import make_stand_in
 from cli_fixtures import init_bare_repository, run_cli
-from discovery_fixtures import configure_root, discovered_checkout, isolate_config_file
+from discovery_fixtures import (
+    configure_root,
+    discovered_checkout,
+    isolate_config_file,
+    unreadable_checkout,
+)
 from github_fixtures import FakeForge
 from store_fixtures import path_without_gh, push_item_tree, state_ref_listing, state_ref_tip
 
-from aco import forge, github
+from aco import forge, github, repositories
 
 OTHER = "example/other"
 OTHER_URL = f"https://github.com/{OTHER}"
@@ -129,6 +134,34 @@ def test_item_new_in_an_undiscovered_repository_refuses_by_name_and_writes_nothi
 
     assert result.status == 2
     assert "no repository example/absent found" in result.stderr + result.stdout
+    if flags:
+        assert json.loads(result.stdout)["reason"] == "precondition_failed"
+    assert built_for == []
+
+
+@pytest.mark.parametrize("flags", [[], ["--json"]])
+def test_item_new_in_a_repository_whose_checkout_cannot_be_read_refuses_naming_the_checkout(
+    flags: list[str],
+    root: Path,
+    other_bare: Path,
+    own_checkout: Path,
+    built_for: list[tuple[str, FakeForge]],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: ITEM-78. The refusal names the label, the checkout's directory and
+    the stored defect; under `--json` it is ITEM-25's precondition_failed."""
+    discovered_checkout(root / "kept", "https://github.com/example/kept", other_bare, "")
+    broken = unreadable_checkout(root / "broken", OTHER_URL)
+    [unavailable] = repositories.discover(root).unavailable
+
+    result = run_cli(
+        ["--repo", OTHER, "item", "new", "--title", "Friction", *flags], capsys, stdin=BODY
+    )
+
+    assert result.status == 2
+    assert unavailable.directory == broken
+    sentence = f"repository {OTHER} is unreadable: {broken}: {unavailable.reason}"
+    assert sentence in result.stderr + result.stdout
     if flags:
         assert json.loads(result.stdout)["reason"] == "precondition_failed"
     assert built_for == []

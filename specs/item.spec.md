@@ -52,6 +52,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | `--whole` given, valid or invalid | ITEM-23 | — | ITEM-24, ITEM-49, ITEM-51 | — |
 | `--size`, `--whole` or `--kind` naming the value already set | — | — | ITEM-64 | — |
 | `--repo` names another repository, discovered or not | ITEM-67, ITEM-68 | — | — | — |
+| `--repo` names a repository whose checkout cannot be read | — | — | ITEM-78 | — |
 | `--repo` names this checkout's own repository | ITEM-69 | — | — | — |
 | the item's lock is held, or cannot be taken | — | — | ITEM-65 | — |
 | prose piped without a block, or nothing piped, either storage | ITEM-58, ITEM-60 | — | — | — |
@@ -104,6 +105,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 - [ ] [ITEM-67] `aco --repo OWNER/NAME item new` naming another repository creates the item in its checkout, found by MCP-19's scan, under its own storage, rules and canonical remote (PIN-57).
 - [ ] [ITEM-68] A `--repo` no discovered repository carries refuses `no repository <OWNER/NAME> found`, exit `2`, under `--json` as ITEM-25's `precondition_failed`, and writes nothing.
+- [ ] [ITEM-78] A `--repo` whose checkout the scan could not read refuses `repository <OWNER/NAME> is unreadable: <directory>: <reason>` as MCP-18 lists it, exit `2`, ITEM-25's `precondition_failed`, no write.
 - ITEM-57 (retired).
 - [ ] [ITEM-69] A `--repo` naming this checkout's own repository (its canonical remote's) creates the item here without any scan, so a checkout outside the configured root works; under `state-ref` PIN-04 refuses it.
 
