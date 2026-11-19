@@ -121,7 +121,7 @@ A lane may run its stages in more than one workflow run. `aco lane-record begin`
 - [ ] [LANREC-66] An add judges the file as `aco lane-record check` does (LANREC-31); a `--ran` stage whose slot in the file is `none` refuses `the record's stage <stage> is none, which --ran contradicts`.
 - [ ] [LANREC-56] The same entry again prints `ALREADY ADDED run <run> to <label>: <n> stored` and changes nothing; another entry under an added run id refuses `run <run> of <label> has another entry stored already`.
 - [ ] [LANREC-57] An add for a run that was not begun refuses `run <run> of <label> was not begun; run aco lane-record begin first`, exit `2` (E-LANREC-14).
-- [ ] [LANREC-58] A `<run>` is 1 to 128 characters of the claim id's grammar, a `<tip>` 40 lowercase hexadecimal digits, `--ran` given once and naming one or more of the five stages, each once; a breach is a usage refusal.
+- [ ] [LANREC-58] A `<run>` is 1 to 128 characters of the claim id's grammar, a `<tip>` 40 lowercase hexadecimal digits, `--ran` given once, naming one or more of the five stages once each; a breach is a usage refusal.
 - [ ] [LANREC-59] A write that finds the stored runs changed since the command read them refuses `the stored runs of <label> were written since this command read them; run the same command again`.
 - [ ] [LANREC-60] A begin and an add each land one compare-and-swap commit, `lane-record issue <n>`, with CAS-06's trailers (intent `lane_record`), then `run: <run>`, and no `lane_` trailer: `aco stats` counts no lane.
 - [ ] [LANREC-69] With `--json` the successes report `begun`, `already_begun`, `added` or `already_added`; LANREC-57, LANREC-63..68 and LANREC-70 `precondition_failed`, LANREC-59 and LANREC-62 `unavailable`.
@@ -330,11 +330,14 @@ lane-record issue 42
 
 ### E-LANREC-13 — a session that does not hold the claim stores no run
 
-Setup: bare-remote, issue `#42` claimed by `Ada`, `ACO_AGENT` set to `Bea`
+Setup: bare-remote, issue `#42` claimed by `Ada`, a valid file `lane-record.json`, `ACO_AGENT` set to `Bea`
 
 ```console
 $ aco lane-record begin 42 --run run-1
 ERROR: only the holder may begin a run of #42 (holder='Ada', this session='Bea')
+exit 2
+$ aco lane-record add 42 lane-record.json --run run-1 --end-tip <sha> --ran build
+ERROR: only the holder may add a run to #42 (holder='Ada', this session='Bea')
 exit 2
 ```
 
