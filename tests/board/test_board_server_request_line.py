@@ -136,7 +136,8 @@ def test_every_answered_request_writes_one_request_line_with_its_outcome_status_
 
     [record] = logged.records()
     assert record["event"] == _REQUEST_EVENT
-    assert (record["method"], record["route"], record["status"], record["outcome"]) == expected
+    answered = (record["method"], record["route"], record["status"], record["outcome"])
+    assert answered == expected
     assert (record["service"], record["sub"], record["ip"]) == ("aco-board", None, LOOPBACK_HOST)
     assert record["duration_ms"] >= 0
 
