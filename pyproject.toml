@@ -83,6 +83,7 @@ layers = [
     "inbox",
     "progress",
     "lane_measure",
+    "lane_runs",
     "board_read | policy | report | lane_record",
     "repositories",
     "session",
