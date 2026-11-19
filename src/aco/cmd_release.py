@@ -3,7 +3,7 @@
 
 import argparse
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
@@ -15,6 +15,7 @@ from . import (
     forge,
     github,
     item_handover,
+    landed_worktree,
     lane_record,
     protocol,
     report,
@@ -68,7 +69,7 @@ def _release_json(release_report: _ReleaseReport) -> None:
         payload["next"] = None if landing.next_item is None else landing.next_item.number
         payload["parent_closable"] = landing.parent_closable
     if release_report.worktree is not None:
-        payload["worktree"] = _worktree_cleanup_outcome_text(release_report.worktree)
+        payload["worktree"] = landed_worktree.worktree_cleanup_outcome_text(release_report.worktree)
     report.emit_json(True, _release_reason(release_report.outcome), **payload)
 
 
@@ -445,7 +446,7 @@ def release_transition(
         landing = _landing_report(
             context, identity, new_state, storage, context.fetched_default_branch_ref()
         )
-        worktree_cleanup = _cleanup_landed_worktree(
+        worktree_cleanup = landed_worktree.cleanup_landed_worktree(
             parsed, lane, context, context.fetched_default_branch_ref
         )
     _print_release_result(
@@ -468,7 +469,7 @@ def _verify_and_close_merged_release(
     identity: protocol.ClaimIdentity,
     merged: protocol.MergedRelease,
     selected: protocol.ActiveClaim,
-) -> _LandedLane:
+) -> landed_worktree.LandedLane:
     """A github `--merged` release's forge half, run once `selected` is resolved and its releaser
     authorized: an unauthorized or mismatched-claim release never reaches the forge. `storage` is
     proven `github` here (`release_transition` returned for `state-ref`), so the cast is honest:
@@ -490,7 +491,9 @@ def _verify_and_close_merged_release(
     tips = (verified.landed_head,)
     if _is_adopted_lane(selected.identity, selected.branch):
         tips += (selected.base,)
-    lane = _landed_lane(identity, storage, str(merged.pull_request), selected.branch, tips)
+    lane = landed_worktree.landed_lane(
+        identity, storage, str(merged.pull_request), selected.branch, tips
+    )
     return lane.landed_as(verified.merge_commit, item)
 
 
@@ -516,7 +519,7 @@ def _report_merged_pull_request_left_nothing(
         parsed,
         context,
         f"pull request #{merged.pull_request}",
-        _landed_lane(
+        landed_worktree.landed_lane(
             identity,
             storage,
             str(merged.pull_request),
@@ -534,7 +537,7 @@ def _report_nothing_left_to_release(
     parsed: argparse.Namespace,
     context: RunContext,
     landing: str,
-    lane: _LandedLane,
+    lane: landed_worktree.LandedLane,
     fetched_trunk_ref: Callable[[], str],
 ) -> None:
     """REL-49/REL-51: a verified landing already released closes nothing, writes no claim state;
@@ -545,7 +548,7 @@ def _report_nothing_left_to_release(
         if on_trunk
         else _cleanup_unless_claimed_again(parsed, context, lane, fetched_trunk_ref)
     )
-    worktree = None if cleanup is None else _worktree_cleanup_outcome_text(cleanup)
+    worktree = None if cleanup is None else landed_worktree.worktree_cleanup_outcome_text(cleanup)
     if parsed.json:
         report.emit_json(
             True,
@@ -561,10 +564,13 @@ def _report_nothing_left_to_release(
         print(f"worktree: {worktree}")
 
 
+_WORKTREE_KEPT_CLAIMED_AGAIN_REASON = "claimed again while this release ran"
+
+
 def _cleanup_unless_claimed_again(
     parsed: argparse.Namespace,
     context: RunContext,
-    lane: _LandedLane,
+    lane: landed_worktree.LandedLane,
     fetched_trunk_ref: Callable[[], str],
 ) -> checkout.WorktreeCleanupOutcome | None:
     """REL-55: the missing claim REL-47 acts on was read before the landing's verification, so the
@@ -577,120 +583,7 @@ def _cleanup_unless_claimed_again(
             return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_CLAIMED_AGAIN_REASON)
     if not checkout.branch_exists(lane.branch):
         return None
-    return _cleanup_landed_worktree(parsed, lane, context, fetched_trunk_ref)
-
-
-@dataclass(frozen=True)
-class _LandedLane:
-    """The lane a `--merged` release cleans up after: `proven_tips` (the head the forge recorded as
-    landed, none under `state-ref`, plus an adopted lane's `base`), `rerun` (the `release` line
-    repeating this cleanup where its worktree is, REL-52), `merge_commit` (the forge's), `item`
-    (the work item as the release read it)."""
-
-    identity: protocol.ClaimIdentity
-    branch: str
-    proven_tips: frozenset[str]
-    rerun: str
-    merge_commit: str | None = None
-    item: forge.ItemReference | None = None
-
-    def landed_as(self, commit: str, item: forge.ItemReference | None) -> _LandedLane:
-        return _LandedLane(self.identity, self.branch, self.proven_tips, self.rerun, commit, item)
-
-
-def _landed_lane(
-    identity: protocol.ClaimIdentity,
-    storage: body.Storage,
-    landing: str,
-    branch: str,
-    proven_tips: Iterable[str],
-) -> _LandedLane:
-    """`branch`'s lane, landed as `landing` -- a pull request number, or the verified trunk sha
-    under `storage = "state-ref"` -- with its `rerun` rendered by the one advice renderer, so it
-    runs as printed under either storage pin and from any checkout (REL-52)."""
-    item = (
-        ()
-        if isinstance(identity, protocol.LaneIdentity)
-        else (workboard.item_argument(identity.issue, storage),)
-    )
-    rerun = workboard.advice_command("release", *item, "--merged", landing, "--branch", branch)
-    return _LandedLane(identity, branch, frozenset(proven_tips), rerun)
-
-
-_WORKTREE_KEPT_FLAG_REASON = "--keep-worktree was given"
-
-
-_WORKTREE_KEPT_RAN_FROM_INSIDE_REASON = "release ran from inside it"
-
-
-_WORKTREE_KEPT_CLAIMED_AGAIN_REASON = "claimed again while this release ran"
-
-
-# Names the repair: a landing from a separate clone holds
-# no lane worktree, which stays where it lives for that checkout to remove.
-_WORKTREE_KEPT_NO_WORKTREE_REASON = (
-    "no linked worktree on {branch} in this checkout; run {rerun} in the checkout that holds it"
-)
-
-
-def _worktree_cleanup_outcome_text(outcome: checkout.WorktreeCleanupOutcome) -> str:
-    """The tail `release` prints after `worktree: ` in text, and the exact `--json` value of its
-    `worktree` field: one owner, so the two shapes can never drift apart. A branch-deletion
-    failure after the worktree is already gone names both halves -- never a bare `kept`, which
-    would hide that the worktree itself is gone; a section git kept after the branch itself
-    went names that section, never the branch; a delete that timed out reads the branch
-    unknown, never kept."""
-    if not outcome.worktree.removed:
-        return f"kept -- {outcome.worktree.reason}"
-    if outcome.branch.fate is not checkout.BranchFate.REMOVED:
-        return f"removed; branch {outcome.branch.fate} -- {outcome.branch.reason}"
-    section_kept = outcome.branch.section_kept
-    if section_kept is not None:
-        return f"removed; {section_kept.section} section kept -- {section_kept.reason}"
-    return "removed"
-
-
-def _cleanup_landed_worktree(
-    parsed: argparse.Namespace,
-    lane: _LandedLane,
-    context: RunContext,
-    fetched_trunk_ref: Callable[[], str],
-) -> checkout.WorktreeCleanupOutcome:
-    """After a successful `--merged` release, remove the lane's local worktree and local branch
-    when both are safe to remove, and report exactly what happened either way: loud for every
-    outcome, never a silent decline. `--keep-worktree` opts out outright; a worktree cannot
-    remove its own cwd, so a release running from inside it keeps both; neither needs
-    `checkout.py`'s own merged/elsewhere/dirty/removal policy
-    (`checkout.cleanup_landed_worktree`), since both read only this process's own cwd and
-    worktree listing. A git failure at any step -- including one resolving which worktree
-    matches `branch` at all -- is reported in the same `kept` line rather than swallowed. The
-    run's own checkout is judged from the toplevel its context already holds, never resolved a
-    second time. `fetched_trunk_ref` names the ref the lane must be merged into -- the one its
-    release judged the landing on -- asked only here, so a failure to resolve it reads as
-    `kept` too. The lane's `proven_tips` are the tips it may be removed on besides trunk. The
-    remote branch stays the forge merge's own business either way."""
-    if parsed.keep_worktree:
-        return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_FLAG_REASON)
-    branch = lane.branch
-    try:
-        toplevel = context.toplevel
-        others = tuple(path for path in store.list_worktrees(toplevel) if path != toplevel)
-        if checkout.current_branch(directory=toplevel) == branch:
-            return checkout.worktree_cleanup_kept(_WORKTREE_KEPT_RAN_FROM_INSIDE_REASON)
-        matching = checkout.worktree_on_branch(others, branch)
-        if matching is None:
-            return checkout.worktree_cleanup_kept(
-                _WORKTREE_KEPT_NO_WORKTREE_REASON.format(branch=branch, rerun=lane.rerun)
-            )
-        return checkout.cleanup_landed_worktree(
-            matching,
-            branch,
-            trunk=fetched_trunk_ref(),
-            proven_tips=lane.proven_tips,
-            directory=toplevel,
-        )
-    except protocol.ClaimError as error:
-        return checkout.worktree_cleanup_kept(f"git failure: {error}")
+    return landed_worktree.cleanup_landed_worktree(parsed, lane, context, fetched_trunk_ref)
 
 
 def _cmd_release_landed(
@@ -736,7 +629,7 @@ def _cmd_release_landed(
             parsed,
             context,
             landing_label,
-            _landed_lane(identity, storage, commit, unclaimed_branch, ()),
+            landed_worktree.landed_lane(identity, storage, commit, unclaimed_branch, ()),
             context.fetched_trunk_ref,
         )
         return ReleaseEnding.NOTHING_LEFT
@@ -768,9 +661,9 @@ def _cmd_release_landed(
     )
     client.mark_landed(write, new_oid)
     landing = _landing_report(context, identity, new_state, storage, trunk_ref)
-    worktree_cleanup = _cleanup_landed_worktree(
+    worktree_cleanup = landed_worktree.cleanup_landed_worktree(
         parsed,
-        _landed_lane(identity, storage, commit, resolved.selected.branch, ()),
+        landed_worktree.landed_lane(identity, storage, commit, resolved.selected.branch, ()),
         context,
         context.fetched_trunk_ref,
     )
@@ -847,7 +740,7 @@ def _print_release_result(result: _ReleaseReport, *, as_json: bool) -> None:
         if parent_line is not None:
             print(parent_line)
     if result.worktree is not None:
-        print(f"worktree: {_worktree_cleanup_outcome_text(result.worktree)}")
+        print(f"worktree: {landed_worktree.worktree_cleanup_outcome_text(result.worktree)}")
 
 
 def _release_branch_for(parsed: argparse.Namespace) -> str | None:
