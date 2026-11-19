@@ -181,6 +181,20 @@ def test_one_run_that_ran_build_and_review_shows_its_record_and_the_lane_compute
     assert list(shown) == ENVELOPE_KEYS
 
 
+def assert_shown(
+    world: World,
+    capsys: pytest.CaptureFixture[str],
+    steps: tuple[Step, ...],
+    expected: dict[str, object],
+) -> None:
+    """After `steps` play, the values `show --json` holds at the dotted paths of `expected`."""
+    play(world, capsys, *steps)
+
+    shown = shown_json(world, capsys)
+
+    assert {path: pick(shown, path) for path in expected} == expected
+
+
 @pytest.mark.parametrize(
     ("steps", "expected"),
     [
@@ -206,49 +220,18 @@ def test_one_run_that_ran_build_and_review_shows_its_record_and_the_lane_compute
                 "lane.experiment": None,
                 "lane.verdicts": [],
             },
-            id="3-one-run-begun-without-a-record",
+            id="the-only-run-is-begun-without-a-record",
         ),
         pytest.param(
-            (
-                Step(
-                    FIRST_RUN,
-                    ran=(RoutingStage.BUILD,),
-                    changes={
-                        "stages": marked("one"),
-                        "fix_rounds": four(1, 0, 0, 0),
-                        "blocking": four(2, 0, 0, 0),
-                        "misses": four(1, 0, 0, 0),
-                        "verdicts": [{"stage": "review", "verdict": "revise", "sha": "1" * 40}],
-                    },
-                ),
-                Step(
-                    SECOND_RUN,
-                    Start.AFTER_THE_EARLIER_RUN,
-                    ran=(RoutingStage.BUILD, RoutingStage.REVIEW),
-                    changes={
-                        "stages": marked("two"),
-                        "fix_rounds": four(0, 0, 3, 0),
-                        "blocking": four(1, 0, 4, 0),
-                        "misses": four(0, 0, 1, 0),
-                        "verdicts": [{"stage": "review", "verdict": "approve", "sha": "2" * 40}],
-                    },
-                ),
-            ),
+            (Step(FIRST_RUN), Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, ran=None)),
             {
-                "complete": True,
-                "lane.stages.build": "build-one/low",
-                "lane.stages.review": "review-two/low",
-                "lane.stages.fix": "none",
-                "lane.stages.land": "land-two/low",
-                "lane.fix_rounds": four(1, 0, 3, 0),
-                "lane.blocking": four(3, 0, 4, 0),
-                "lane.misses": four(1, 0, 1, 0),
-                "lane.verdicts": [
-                    {"stage": "review", "verdict": "revise", "sha": "1" * 40},
-                    {"stage": "review", "verdict": "approve", "sha": "2" * 40},
-                ],
+                "complete": False,
+                "lane.stages.review": None,
+                "lane.stages.land": None,
+                "lane.risk": None,
+                "lane.fix_rounds": None,
             },
-            id="5-two-chained-runs",
+            id="a-second-run-is-begun-without-a-record",
         ),
         pytest.param(
             (
@@ -268,90 +251,137 @@ def test_one_run_that_ran_build_and_review_shows_its_record_and_the_lane_compute
                 "lane.stages.review": "review-two/low",
                 "lane.stages.build": "sonnet-5.5/high",
             },
-            id="7-a-run-that-does-not-follow",
-        ),
-        pytest.param(
-            (Step(FIRST_RUN), Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, ran=None)),
-            {
-                "complete": False,
-                "lane.stages.review": None,
-                "lane.stages.land": None,
-                "lane.risk": None,
-                "lane.fix_rounds": None,
-            },
-            id="8-a-second-run-begun-without-a-record",
+            id="a-run-does-not-follow-the-earlier-one",
         ),
         pytest.param(
             (Step(FIRST_RUN, Start.ELSEWHERE),),
             {"complete": False, "lane.stages.build": None, "lane.fix_rounds": None},
-            id="9-the-first-run-has-a-start-tip",
-        ),
-        pytest.param(
-            (
-                Step(FIRST_RUN),
-                Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, omitted=("misses",)),
-            ),
-            {
-                "complete": True,
-                "lane.misses": None,
-                "lane.fix_rounds": four(2, 0, 4, 0),
-                "lane.blocking": four(6, 0, 2, 0),
-            },
-            id="10-one-record-lacks-misses",
-        ),
-        pytest.param(
-            (Step(FIRST_RUN), Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN)),
-            {"complete": True, "lane.experiment": "builder-sonnet"},
-            id="11-the-same-experiment-tag-in-every-run",
-        ),
-        pytest.param(
-            (
-                Step(FIRST_RUN),
-                Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes={"experiment": "other-tag"}),
-            ),
-            {"complete": True, "lane.experiment": None},
-            id="11-differing-experiment-tags",
-        ),
-        pytest.param(
-            (
-                Step(
-                    FIRST_RUN,
-                    changes={"fix_rounds": four(600, 0, 0, 0), "misses": four(0, 0, 0, 0)},
-                ),
-                Step(
-                    SECOND_RUN,
-                    Start.AFTER_THE_EARLIER_RUN,
-                    changes={"fix_rounds": four(600, 0, 0, 0), "misses": four(0, 0, 0, 0)},
-                ),
-            ),
-            {"complete": True, "lane.fix_rounds": four(999, 0, 0, 0)},
-            id="12-600-and-600-in-one-stage",
-        ),
-        pytest.param(
-            (Step(FIRST_RUN, ran=(RoutingStage.BUILD,)),),
-            {
-                "complete": True,
-                "lane.stages.review": None,
-                "lane.stages.fix": "none",
-                "lane.stages.test": "none",
-                "lane.stages.gate": "none",
-            },
-            id="13-no-run-ran-review",
+            id="the-first-run-has-a-start-tip",
         ),
     ],
 )
-def test_the_lane_is_computed_from_the_stored_runs_as_the_matrix_states(
+def test_a_lost_run_makes_the_lane_incomplete_and_the_figures_it_could_state_unknown(
     world: World,
     capsys: pytest.CaptureFixture[str],
     steps: tuple[Step, ...],
     expected: dict[str, object],
 ) -> None:
-    """Spec: LANREC-75..LANREC-86, E-LANREC-15."""
-    play(world, capsys, *steps)
+    """Spec: LANREC-75..LANREC-78, LANREC-82."""
+    assert_shown(world, capsys, steps, expected)
 
-    shown = shown_json(world, capsys)
 
-    assert {path: pick(shown, path) for path in expected} == expected
+def test_two_chained_runs_show_the_first_build_the_last_review_summed_counts_and_both_verdicts(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-76..LANREC-78, LANREC-80, LANREC-81, LANREC-83."""
+    steps = (
+        Step(
+            FIRST_RUN,
+            ran=(RoutingStage.BUILD,),
+            changes={
+                "stages": marked("one"),
+                "fix_rounds": four(1, 0, 0, 0),
+                "blocking": four(2, 0, 0, 0),
+                "misses": four(1, 0, 0, 0),
+                "verdicts": [{"stage": "review", "verdict": "revise", "sha": "1" * 40}],
+            },
+        ),
+        Step(
+            SECOND_RUN,
+            Start.AFTER_THE_EARLIER_RUN,
+            ran=(RoutingStage.BUILD, RoutingStage.REVIEW),
+            changes={
+                "stages": marked("two"),
+                "fix_rounds": four(0, 0, 3, 0),
+                "blocking": four(1, 0, 4, 0),
+                "misses": four(0, 0, 1, 0),
+                "verdicts": [{"stage": "review", "verdict": "approve", "sha": "2" * 40}],
+            },
+        ),
+    )
+    expected: dict[str, object] = {
+        "complete": True,
+        "lane.stages.build": "build-one/low",
+        "lane.stages.review": "review-two/low",
+        "lane.stages.fix": "none",
+        "lane.stages.land": "land-two/low",
+        "lane.fix_rounds": four(1, 0, 3, 0),
+        "lane.blocking": four(3, 0, 4, 0),
+        "lane.misses": four(1, 0, 1, 0),
+        "lane.verdicts": [
+            {"stage": "review", "verdict": "revise", "sha": "1" * 40},
+            {"stage": "review", "verdict": "approve", "sha": "2" * 40},
+        ],
+    }
+
+    assert_shown(world, capsys, steps, expected)
+
+
+def test_a_record_that_lacks_misses_leaves_the_misses_unknown_and_the_other_counts_summed(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-81, LANREC-82."""
+    steps = (Step(FIRST_RUN), Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, omitted=("misses",)))
+    expected: dict[str, object] = {
+        "complete": True,
+        "lane.misses": None,
+        "lane.fix_rounds": four(2, 0, 4, 0),
+        "lane.blocking": four(6, 0, 2, 0),
+    }
+
+    assert_shown(world, capsys, steps, expected)
+
+
+@pytest.mark.parametrize(
+    ("second_experiment", "expected"),
+    [
+        pytest.param("builder-sonnet", "builder-sonnet", id="the-same-tag-in-every-run"),
+        pytest.param("other-tag", None, id="differing-tags"),
+    ],
+)
+def test_the_experiment_is_the_tag_every_run_states_and_unknown_where_they_differ(
+    world: World,
+    capsys: pytest.CaptureFixture[str],
+    second_experiment: str,
+    expected: str | None,
+) -> None:
+    """Spec: LANREC-83."""
+    steps = (
+        Step(FIRST_RUN),
+        Step(
+            SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes={"experiment": second_experiment}
+        ),
+    )
+
+    assert_shown(world, capsys, steps, {"complete": True, "lane.experiment": expected})
+
+
+def test_a_count_summed_beyond_999_in_one_stage_is_shown_as_999(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-81."""
+    changes = {"fix_rounds": four(600, 0, 0, 0), "misses": four(0, 0, 0, 0)}
+    steps = (
+        Step(FIRST_RUN, changes=changes),
+        Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes=changes),
+    )
+
+    assert_shown(world, capsys, steps, {"complete": True, "lane.fix_rounds": four(999, 0, 0, 0)})
+
+
+def test_a_stage_no_run_ran_is_none_except_review_which_is_unknown(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-79."""
+    expected: dict[str, object] = {
+        "complete": True,
+        "lane.stages.review": None,
+        "lane.stages.fix": "none",
+        "lane.stages.test": "none",
+        "lane.stages.gate": "none",
+    }
+
+    assert_shown(world, capsys, (Step(FIRST_RUN, ran=(RoutingStage.BUILD,)),), expected)
 
 
 def test_a_run_that_starts_at_a_merge_of_trunk_onto_the_earlier_end_tip_follows(
