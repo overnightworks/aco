@@ -79,6 +79,19 @@ def push_raw_state_tree(
     return commit
 
 
+def push_custom_tree(
+    remote: Path, worktree: Path, *, parent: str | None, files: dict[str, bytes]
+) -> str:
+    """Push an arbitrary tree onto `STATE_REF`, bypassing `store` entirely.
+
+    Test scaffolding for constructing malformed or rewritten remote states
+    that `store`'s own write path can never produce -- it never writes
+    anything but a well-formed `schema.toml`-only tree.
+    """
+    entries = [("100644", "blob", blob(worktree, content), name) for name, content in files.items()]
+    return push_raw_state_tree(remote, worktree, entries, successor_of=parent)
+
+
 def lineage_observation(repository: Path) -> tuple[protocol.ObjectId | None, str | None]:
     """This worktree's lineage stamp and fetch anchor -- the two
     per-worktree values a reset dry run, a live-claim refusal, or a failed

@@ -87,6 +87,7 @@ layers = [
     "repositories",
     "session",
     "ahead_of_caller",
+    "state_export",
     "checkout | store",
     "github_probe",
     "github | state_board | github_search",
@@ -102,6 +103,7 @@ layers = [
     "usage",
     "lineage_stamp",
     "file_lock",
+    "state_files",
     "protocol | process | routing_line",
     "toml_text",
 ]
@@ -247,6 +249,7 @@ ignore_imports = [
     "aco.github -> aco.process",
     "aco.checkout -> aco.process",
     "aco.store -> aco.process",
+    "aco.state_export -> aco.process",
 ]
 
 [tool.pyright]
