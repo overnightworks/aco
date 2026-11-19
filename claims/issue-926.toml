@@ -1,8 +1,0 @@
-claim_id = "c3e8cffb7c144e52923733843dabfa5a"
-agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
-role = "builder"
-base = "145ac2c43a76c27e910a30c2e9c6082f6eb6edab"
-branch = "claude/issue-926-stats-cost-and-architecture-budget"
-scope = ["docs/ARCHITECTURE.md", "specs/stats.spec.md", "src/aco/lane_measure.py", "tests/test_cmd_stats.py", "tests/test_lane_measure.py"]
-opened_commit = "3de57e4ec29d0bec06732724ae581e824451fd94"
-whole_reason = "Three small findings of one review share the lane; the code part is one enum member with its spec and two test modules."
