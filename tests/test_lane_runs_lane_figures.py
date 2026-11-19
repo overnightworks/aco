@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 
 import pytest
-from lane_record_fixtures import lane_record_object
+from lane_record_fixtures import UNKNOWN, four, lane_record_object, marked
 
 from aco import lane_record, lane_runs
 from aco.lane_record import FindingStage
@@ -13,17 +13,7 @@ from aco.routing_line import RoutingStage
 
 END_TIP = "b" * 40
 START_TIP = "a" * 40
-UNKNOWN = None
 ALL_STAGES = ("build", "fix", "review", "test", "gate")
-
-
-def marked(marker: str) -> dict[str, str]:
-    """The stage slots of one stated record, every choice carrying `marker`."""
-    return {stage: f"{stage}-{marker}/low" for stage in (*ALL_STAGES, "land")}
-
-
-def four(review: int, gate: int, ci: int, test: int) -> dict[str, int]:
-    return {"review": review, "gate": gate, "ci": ci, "test": test}
 
 
 def begun(run: str, *, follows: bool = True, start_tip: str | None = None) -> lane_runs.RunEntry:

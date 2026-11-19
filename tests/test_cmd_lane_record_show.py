@@ -12,7 +12,13 @@ from typing import cast
 import pytest
 from claim_worktrees import assert_json_refusal_object
 from cli_fixtures import real_git
-from lane_record_fixtures import lane_record_object, write_lane_record_file
+from lane_record_fixtures import (
+    UNKNOWN,
+    four,
+    lane_record_object,
+    marked,
+    write_lane_record_file,
+)
 from lane_record_runs_world import (
     END_TIP,
     FIRST_RUN,
@@ -29,7 +35,6 @@ from lane_record_runs_world import (
 from aco import protocol, store, workboard
 from aco.routing_line import RoutingStage
 
-UNKNOWN = None
 ENVELOPE_KEYS = ["ok", "reason", "item", "claim_id", "runs", "complete", "lane"]
 NO_STAGES = dict.fromkeys(RoutingStage, UNKNOWN)
 
@@ -57,14 +62,6 @@ class Step:
     ran: tuple[RoutingStage, ...] | None = STAGES_RAN
     changes: dict[str, object] = field(default_factory=dict)
     omitted: tuple[str, ...] = ()
-
-
-def marked(marker: str) -> dict[str, str]:
-    return {stage: f"{stage}-{marker}/low" for stage in RoutingStage}
-
-
-def four(review: int, gate: int, ci: int, test: int) -> dict[str, int]:
-    return {"review": review, "gate": gate, "ci": ci, "test": test}
 
 
 def head_of(world: World) -> str:

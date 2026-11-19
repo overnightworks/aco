@@ -9,6 +9,7 @@ from typing import cast
 import pytest
 
 from aco import forge, lane_record, protocol, store, workboard
+from aco.routing_line import RoutingStage
 from aco.session import RunContext
 
 LANE_BRANCH = "docs/tidy-readme"
@@ -56,6 +57,17 @@ def release_trailers_of(
 
 
 JUDGED_SHA = "c" * 40
+UNKNOWN = None
+
+
+def marked(marker: str) -> dict[str, str]:
+    """The stage slots of one stated record, every choice carrying `marker`."""
+    return {stage: f"{stage}-{marker}/low" for stage in RoutingStage}
+
+
+def four(review: int, gate: int, ci: int, test: int) -> dict[str, int]:
+    """The four finding-stage counts of a record."""
+    return {"review": review, "gate": gate, "ci": ci, "test": test}
 
 
 def lane_record_object(**changes: object) -> dict[str, object]:
