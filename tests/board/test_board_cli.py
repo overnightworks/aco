@@ -1,22 +1,29 @@
 """`aco serve` driven in-process through its real entry point, `aco.cli.main`.
 
 `main` serves until interrupted, so a helper thread drives the printed URL and
-then interrupts the main thread the way Ctrl-C does.
+then interrupts the main thread the way Ctrl-C or the unit's SIGTERM does.
 """
 
 import _thread
 import io
+import json
 import shutil
+import signal
 import socket
 import sys
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from aco_board_fixtures import BoardClient, HeldRuling, RecordedPort
+from aco_board_fixtures import (
+    BoardClient,
+    HeldRuling,
+    RecordedPort,
+    wait_for_request_handlers,
+)
 from discovery_fixtures import (
     configure_root,
     isolate_config_file,
@@ -24,7 +31,9 @@ from discovery_fixtures import (
     repository_with_card,
     write_config,
 )
+from logline.testing import configured
 
+import aco
 from aco import cli
 from aco.board import cli as board_cli
 from aco.board import static
@@ -52,10 +61,31 @@ class _PrintedLines(io.StringIO):
         return self.getvalue().splitlines()[0]
 
 
+_STOP_SIGNALS = [
+    pytest.param(signal.SIGINT, id="ctrl-c"),
+    pytest.param(signal.SIGTERM, id="sigterm"),
+]
+_SERVICE_VERSION = "SERVICE_VERSION"
+
+
 def _serve_until_done(
-    monkeypatch: pytest.MonkeyPatch, scenario: Callable[[BoardClient], None]
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: Callable[[BoardClient], None],
+    stop_signal: signal.Signals = signal.SIGINT,
 ) -> int:
     """Run `aco serve`, drive `scenario`, then press Ctrl-C."""
+    exit_code, _printed = _serve_printing(monkeypatch, scenario, stop_signal)
+    return exit_code
+
+
+def _serve_printing(
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: Callable[[BoardClient], None],
+    stop_signal: signal.Signals,
+) -> tuple[int, _PrintedLines]:
+    """Run `aco serve`, drive `scenario`, then deliver `stop_signal` to the
+    main thread, as the terminal or the unit's stop does; every line the run
+    printed comes back with the exit code."""
     printed = _PrintedLines()
     monkeypatch.setattr(sys, "stdout", printed)
     failures: list[BaseException] = []
@@ -70,7 +100,7 @@ def _serve_until_done(
         except BaseException as failure:
             failures.append(failure)
         finally:
-            _thread.interrupt_main()
+            _thread.interrupt_main(stop_signal)
 
     driver = threading.Thread(target=drive)
     driver.start()
@@ -78,7 +108,19 @@ def _serve_until_done(
     driver.join()
     if failures:
         raise failures[0]
-    return exit_code
+    return exit_code, printed
+
+
+@pytest.fixture(autouse=True)
+def restored_logging(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """`serve` configures logline for the whole process and sets
+    `SERVICE_VERSION`; both are put back after every test."""
+    # An absent variable is restored only if monkeypatch saw it set once.
+    monkeypatch.setenv(_SERVICE_VERSION, "")
+    monkeypatch.delenv(_SERVICE_VERSION)
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    with configured("restored"):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -332,8 +374,9 @@ def test_serve_refuses_to_start_without_a_usable_root_and_names_why(
     assert captured.err.count("\n") == 1
 
 
-def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
-    root: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("stop_signal", _STOP_SIGNALS)
+def test_stopping_serve_during_a_ruling_waits_until_the_ruling_is_stored(
+    root: Path, monkeypatch: pytest.MonkeyPatch, stop_signal: signal.Signals
 ) -> None:
     repository = repository_with_card(root / "here", 42, "Share page")
     shutdown_waits = threading.Event()
@@ -374,13 +417,96 @@ def test_interrupting_serve_during_a_ruling_waits_until_the_ruling_is_stored(
             releasers.append(threading.Thread(target=release_once_shutdown_waits, args=(held,)))
             releasers[0].start()
 
-        assert _serve_until_done(monkeypatch, click_then_interrupt) == 0
+        assert _serve_until_done(monkeypatch, click_then_interrupt, stop_signal) == 0
         # Checked before the click's own answer is awaited: `main` returning
         # must already mean the ruling is stored.
         assert repository.stored_entries(42)[0]["ruling"] == "A"
     releasers[0].join(_URL_WAIT_SECONDS)
     # Shutdown was already waiting while the held ruling had not yet written its item.
     assert written_while_shutdown_waited == [[]]
+
+
+def _read_the_board_once(board: BoardClient) -> None:
+    assert board.get_board_json().status == 200
+    wait_for_request_handlers()
+
+
+def _printed_records(printed: _PrintedLines) -> list[dict[str, Any]]:
+    """Every line after the URL, each read as the JSON record it must be."""
+    _url, *lines = printed.getvalue().splitlines()
+    return [json.loads(line) for line in lines]
+
+
+@pytest.mark.parametrize("stop_signal", _STOP_SIGNALS)
+def test_serve_prints_the_url_first_then_only_records_with_its_start_request_and_stop_lines(
+    root: Path, monkeypatch: pytest.MonkeyPatch, stop_signal: signal.Signals
+) -> None:
+    repository_with_card(root / "here", 1, "Here")
+
+    exit_code, printed = _serve_printing(monkeypatch, _read_the_board_once, stop_signal)
+
+    records = _printed_records(printed)
+    assert exit_code == 0
+    assert printed.first_line().startswith(f"http://{LOOPBACK_HOST}:")
+    assert [record["event"] for record in records] == [
+        "server_listen.started",
+        "request.ended",
+        "server_process.finished",
+    ]
+    assert {record["service"] for record in records} == {"aco-board"}
+    assert [record["route"] for record in records if record["event"] == "request.ended"] == [
+        "/api/board"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("operators_version", "expected"),
+    [(None, aco.__version__), ("7.1.2-operator", "7.1.2-operator")],
+    ids=["default-is-the-installed-version", "operators-wins"],
+)
+def test_serve_writes_its_version_on_every_record(
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operators_version: str | None,
+    expected: str,
+) -> None:
+    repository_with_card(root / "here", 1, "Here")
+    if operators_version is not None:
+        monkeypatch.setenv(_SERVICE_VERSION, operators_version)
+
+    _exit_code, printed = _serve_printing(monkeypatch, _read_the_board_once, signal.SIGINT)
+
+    assert {record["version"] for record in _printed_records(printed)} == {expected}
+
+
+def test_serve_restores_the_terminate_handler_it_replaced_once_serving_ends(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository_with_card(root / "here", 1, "Here")
+    before = signal.getsignal(signal.SIGTERM)
+
+    _serve_until_done(monkeypatch, _read_the_board_once, signal.SIGTERM)
+
+    assert signal.getsignal(signal.SIGTERM) is before
+
+
+def test_serve_refuses_a_malformed_log_level_and_binds_nothing(
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    board_token_file: Path,
+) -> None:
+    repository_with_card(root / "here", 1, "Here")
+    monkeypatch.setenv("LOG_LEVEL", "loud")
+
+    exit_code = cli.main(["serve", "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert captured.err.startswith("ERROR: ")
+    assert captured.err.count("\n") == 1
+    assert not board_token_file.exists()
 
 
 _NOT_A_PORT = "is not a port between 0 and 65535"

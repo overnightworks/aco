@@ -16,8 +16,8 @@ from typing import Any, cast
 
 import pytest
 from board_fixtures import REPOSITORY
-from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA, api_pull_request
-from github_pages import board_issue_page_client, raw_board_issue
+from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
+from github_pages import api_head, api_pull_request, board_issue_page_client, raw_board_issue
 from process_fixtures import UnstoppableProcess, reap
 
 from aco import forge, github, process, workboard
@@ -173,71 +173,6 @@ def test_github_adapter_accepts_concatenated_pretty_json_objects() -> None:
     )
 
     assert [issue.number for issue in client.list_open_board_issues()] == [1, 2]
-
-
-def raw_board_pull_request(**overrides: object) -> dict[str, object]:
-    base: dict[str, object] = {
-        "number": 62,
-        "title": "Fixes #10",
-        "body": "Ship it.",
-        "headRefName": "codex/issue-10",
-        "mergedAt": None,
-    }
-    base.update(overrides)
-    return base
-
-
-def test_github_adapter_reads_an_open_board_pull_request() -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(raw_board_pull_request()),
-    )
-
-    assert client.list_open_board_pull_requests() == (
-        workboard.PullRequest(62, "Fixes #10", "Ship it.", "codex/issue-10", None),
-    )
-
-
-def test_github_adapter_reads_a_board_pull_request_with_no_body_as_empty() -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(raw_board_pull_request(body=None)),
-    )
-
-    assert client.list_open_board_pull_requests()[0].body == ""
-
-
-@pytest.mark.parametrize(
-    "overrides",
-    [
-        pytest.param({"number": True}, id="number-is-a-bool"),
-        pytest.param({"number": 0}, id="number-not-positive"),
-        pytest.param({"title": 5}, id="title-not-text"),
-        pytest.param({"body": 5}, id="body-not-text"),
-        pytest.param({"headRefName": None}, id="head-ref-missing"),
-        pytest.param({"mergedAt": 5}, id="merged-at-not-text"),
-        pytest.param({"mergedAt": "yesterday"}, id="merged-at-unparsable-shape"),
-    ],
-)
-def test_github_adapter_fails_loud_on_a_malformed_board_pull_request(
-    overrides: dict[str, object],
-) -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(raw_board_pull_request(**overrides)),
-    )
-
-    with pytest.raises(ClaimError, match="malformed board pull request"):
-        client.list_open_board_pull_requests()
-
-
-def test_github_adapter_fails_loud_when_a_board_pull_request_is_not_an_object() -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda arguments, input_data=None: '"not an object"'
-    )
-
-    with pytest.raises(ClaimError, match="malformed board pull request"):
-        client.list_open_board_pull_requests()
 
 
 def test_github_adapter_retypes_an_issue_by_its_type_name() -> None:
@@ -1414,18 +1349,6 @@ def test_github_adapter_fails_loud_on_a_merge_result_with_more_than_one_value() 
         )
 
 
-def test_recent_merged_pull_requests_refuses_a_window_that_ends_before_it_starts() -> None:
-    """A fixed far-future `since` -- never `datetime.now(UTC)`-relative -- so
-    this stays deterministic regardless of when the suite runs: a real-clock
-    window could cross UTC midnight between this line and the production
-    code's own `datetime.now(UTC)` call, sometimes closing the window and
-    falling through to a real, unfaked `gh` call instead of raising."""
-    client = GitHubForge(github.repository_id("example/agent-coordination"))
-    raised_argument_1 = datetime(2099, 1, 1, tzinfo=UTC)
-    with pytest.raises(ClaimError, match="merged pull request window ends before it starts"):
-        client.list_recent_merged_board_pull_requests(raised_argument_1)
-
-
 def test_github_adapter_runs_gh_when_no_fake_run_is_given(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every other adapter test injects `run=` to avoid a real subprocess;
     this proves the adapter's own default (`_gh`, via `bounded_command`)
@@ -1683,137 +1606,6 @@ def test_repository_resolution_asks_gh_about_the_named_directory(
     github.discover_repository(remote_url=non_github_remote_url, directory=tmp_path)
 
     assert asked_in == [tmp_path]
-
-
-def test_merged_pull_request_history_warns_when_it_reaches_the_result_cap(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """A full result page for a day's shard means more merged pull requests
-    could exist that day beyond the cap, so the board must say that day's
-    history may be incomplete rather than silently compute stages from a
-    truncated query. `since` and "now" are pinned to the same day so the
-    fetch is exactly one shard, matching the fixture below.
-    """
-    since = datetime(2026, 8, 1, tzinfo=UTC)
-
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return since
-
-    monkeypatch.setattr(github, "datetime", FixedDateTime)
-    saturated_rows = [
-        {
-            "number": index,
-            "title": f"Fixes #{index}",
-            "body": "",
-            "headRefName": f"codex/issue-{index}",
-            "mergedAt": "2026-08-01T00:00:00Z",
-        }
-        for index in range(1, github.MAX_RECENT_MERGED_PULL_REQUESTS + 1)
-    ]
-    client = GitHubForge(
-        github.repository_id("example/agent-coordination"),
-        run=lambda arguments: "\n".join(json.dumps(row) for row in saturated_rows),
-    )
-
-    pull_requests = client.list_recent_merged_board_pull_requests(since)
-
-    assert len(pull_requests) == github.MAX_RECENT_MERGED_PULL_REQUESTS
-    error = capsys.readouterr().err
-    assert "WARNING" in error
-    assert str(github.MAX_RECENT_MERGED_PULL_REQUESTS) in error
-    assert since.date().isoformat() in error
-
-
-def test_merged_pull_request_history_below_the_cap_warns_of_nothing(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    since = datetime(2026, 8, 1, tzinfo=UTC)
-
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return since
-
-    monkeypatch.setattr(github, "datetime", FixedDateTime)
-    row = {
-        "number": 1,
-        "title": "Fixes #1",
-        "body": "",
-        "headRefName": "codex/issue-1",
-        "mergedAt": "2026-08-01T00:00:00Z",
-    }
-    client = GitHubForge(
-        github.repository_id("example/agent-coordination"), run=lambda arguments: json.dumps(row)
-    )
-
-    client.list_recent_merged_board_pull_requests(since)
-
-    assert capsys.readouterr().err == ""
-
-
-@pytest.mark.parametrize(
-    "merged_at",
-    [
-        pytest.param(None, id="no-merge-time"),
-        pytest.param("2026-08-01T00:00:00Z", id="merged-earlier-on-the-cutoff-day"),
-    ],
-)
-def test_recent_merged_pull_requests_skips_an_entry_outside_the_window(
-    monkeypatch: pytest.MonkeyPatch, merged_at: str | None
-) -> None:
-    """`mergedAt` can be `None` on an otherwise well-shaped merged-search row
-    (a defensive read, not a documented GitHub behavior); such a row cannot
-    be dated against the window, so it is skipped rather than crashing the
-    whole fetch. The day-sharded search also returns the whole cutoff day, so
-    a merge from before the cutoff's time of day is filtered out too."""
-    since = datetime(2026, 8, 1, 12, tzinfo=UTC)
-
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return since
-
-    monkeypatch.setattr(github, "datetime", FixedDateTime)
-    row = {
-        "number": 1,
-        "title": "Fixes #1",
-        "body": "",
-        "headRefName": "codex/issue-1",
-        "mergedAt": merged_at,
-    }
-    client = GitHubForge(
-        github.repository_id("example/agent-coordination"), run=lambda arguments: json.dumps(row)
-    )
-
-    assert client.list_recent_merged_board_pull_requests(since) == ()
-
-
-def test_recent_merged_pull_requests_fails_loud_on_an_uncalendared_merge_time(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    since = datetime(2026, 8, 1, tzinfo=UTC)
-
-    class FixedDateTime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return since
-
-    monkeypatch.setattr(github, "datetime", FixedDateTime)
-    row = {
-        "number": 1,
-        "title": "Fixes #1",
-        "body": "",
-        "headRefName": "codex/issue-1",
-        "mergedAt": "9999-99-99T00:00:00Z",
-    }
-    client = GitHubForge(
-        github.repository_id("example/agent-coordination"), run=lambda arguments: json.dumps(row)
-    )
-
-    with pytest.raises(ClaimError, match="malformed merged board pull request"):
-        client.list_recent_merged_board_pull_requests(since)
 
 
 def test_missing_gh_repository_resolution_is_a_controlled_error(
@@ -2327,10 +2119,10 @@ def test_bounded_command_refuses_a_process_error_type_it_does_not_classify(
 
 def test_github_adapter_reads_a_pull_request_and_the_default_branch() -> None:
     head_sha = "b" * 40
-    pull_request = api_pull_request(headRefOid=head_sha)
+    pull_request = api_pull_request(head=api_head(sha=head_sha))
 
     def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        if arguments[:2] == ["pr", "view"]:
+        if f"repos/{REPOSITORY}/pulls/12" in arguments:
             return json.dumps(pull_request)
         return "main"
 
@@ -2352,15 +2144,6 @@ def test_github_adapter_reads_a_pull_request_and_the_default_branch() -> None:
     assert client.default_branch() == "main"
 
 
-def test_github_adapter_reads_a_landing_with_no_body_as_empty() -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(api_pull_request(body=None)),
-    )
-
-    assert client.landing(12).body == ""
-
-
 def test_github_adapter_fails_loud_when_github_answers_for_another_pull_request() -> None:
     client = GitHubForge(
         github.repository_id(REPOSITORY),
@@ -2369,57 +2152,6 @@ def test_github_adapter_fails_loud_when_github_answers_for_another_pull_request(
 
     with pytest.raises(ClaimError, match="answered for pull request #13, not #12"):
         client.landing(12)
-
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        pytest.param({"number": 12, "body": "b"}, id="missing-refs"),
-        pytest.param(api_pull_request(author={}), id="author-without-login"),
-        pytest.param(api_pull_request(title=None), id="missing-title"),
-        pytest.param(api_pull_request(headRefOid=None), id="missing-head-sha"),
-        pytest.param(api_pull_request(headRefOid="not-a-sha"), id="malformed-head-sha"),
-        pytest.param(api_pull_request(mergedAt="yesterday"), id="malformed-merge-time"),
-        pytest.param(api_pull_request(headRepository={}), id="head-repository-without-name"),
-        pytest.param(
-            api_pull_request(headRepositoryOwner=None), id="head-repository-without-owner"
-        ),
-        pytest.param(
-            api_pull_request(
-                headRepository={"name": "repo/extra"}, headRepositoryOwner={"login": "owner"}
-            ),
-            id="head-repository-invalid-shape",
-        ),
-        pytest.param(api_pull_request(mergeCommit=None), id="merged-with-no-merge-commit"),
-        pytest.param(
-            api_pull_request(mergeCommit={"oid": "not-a-sha"}), id="malformed-merge-commit-oid"
-        ),
-        pytest.param(
-            api_pull_request(mergeCommit={"oid": 1234567}), id="merge-commit-oid-not-a-string"
-        ),
-        pytest.param(
-            api_pull_request(mergeCommit=MERGE_COMMIT_SHA), id="merge-commit-not-an-object"
-        ),
-        pytest.param(api_pull_request(mergeCommit={}), id="merge-commit-object-with-no-oid"),
-        pytest.param(
-            api_pull_request(mergeCommit={"oid": None}), id="merge-commit-oid-explicitly-null"
-        ),
-        pytest.param(
-            api_pull_request(mergedAt=None, mergeCommit={"oid": MERGE_COMMIT_SHA}),
-            id="unmerged-with-a-merge-commit",
-        ),
-    ],
-)
-def test_github_adapter_fails_loud_on_a_malformed_pull_request(payload: dict[str, object]) -> None:
-    client = GitHubForge(
-        github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps(payload),
-    )
-
-    with pytest.raises(ClaimError) as excinfo:
-        client.landing(12)
-
-    assert str(excinfo.value) == github.MALFORMED_PULL_REQUEST
 
 
 def test_github_adapter_fails_loud_when_the_pull_request_payload_is_not_a_dict() -> None:

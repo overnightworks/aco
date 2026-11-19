@@ -35,6 +35,10 @@ file's value (`Verdict(value)`) and by iteration when its refusal lists the acce
 to read each of GitHub's merge settings, and no code names the one method
 `aco land` never merges with.
 
+`aco.board.server._BoardServer.handle_error` is `socketserver`'s hook: the server
+calls it for an exception a handler thread raised, never through a call this
+package writes.
+
 `aco.board.server._BoardRequestHandler.send_error` and its
 `close_connection` and `request_version` assignments are
 `http.server`'s own hooks: the stdlib calls `self.send_error(...)` for a
@@ -56,6 +60,7 @@ no command calls yet; its tests drive them.
 import argparse
 
 from aco.board.server import _BoardRequestHandler as _BoardApiRequestHandler
+from aco.board.server import _BoardServer
 from aco.body import Size
 from aco.expectation_grammar import DecisionKind, RulingVia
 from aco.forge import UnqueuedPullRequest
@@ -127,6 +132,7 @@ _referenced_only_for_vulture = (
     _BoardApiRequestHandler.do_GET,
     _BoardApiRequestHandler.do_POST,
     _BoardApiRequestHandler.log_message,
+    _BoardServer.handle_error,
     _BoardApiRequestHandler.send_error,
     _BoardApiRequestHandler.close_connection,
     _BoardApiRequestHandler.request_version,

@@ -10,14 +10,18 @@ decision source, `POST /api/rule` submits one decision or one whole option card,
 `POST /api/step` the answer to one step, and every other method is refused. A malformed or
 stalled request gets a fixed 4xx answer, never a traceback; every answer, the HTTP layer's own
 refusals included, carries the same guard headers, and none carries a cross-origin header, so a
-page from another origin can never read one.
+page from another origin can never read one. Every answered request writes one logline request
+line (`request.ended`), and a request that raises writes one `request_handling.failed` line; no line
+carries the token, a path, a query or a header value.
 """
 
 import hmac
+import logging
 import socket
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from contextlib import ExitStack
 from dataclasses import dataclass
 from functools import partial
 from http import HTTPStatus
@@ -26,12 +30,15 @@ from io import BufferedIOBase
 from typing import cast
 from urllib.parse import urlsplit
 
+from logline import RequestLine
+
 from . import api, static
 from .board import Boards, RepositoriesUnavailableError, all_repos_unavailable
 from .ports import DecisionResult
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"  # noqa: S105 - names the query field that carries the token and holds no secret
+_TRACEPARENT_HEADER = "traceparent"
 TOKEN_HEADER = "X-Board-Token"  # noqa: S105 - names the header that carries the token and holds no secret
 PAGE_PATH = "/"
 API_PREFIX = "/api/"
@@ -58,6 +65,7 @@ an asset path (every filename under `static.ASSETS_PREFIX`) is handled
 alongside these in `_allowed_methods`, and a path outside both still lives
 under a method the board serves at all, so it advertises every method
 (`_DEFAULT_ALLOW`)."""
+_LOGGER = logging.getLogger(__name__)
 _TEXT_CONTENT_TYPE = "text/plain; charset=utf-8"
 CONTENT_SECURITY_POLICY = (
     "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "
@@ -73,6 +81,14 @@ def _allowed_methods(path: str) -> str:
     if path == PAGE_PATH or path.startswith(static.ASSETS_PREFIX):
         return "GET"
     return _ALLOWED_METHODS_BY_PATH.get(path, _DEFAULT_ALLOW)
+
+
+def _route_template(path: str) -> str | None:
+    """The request line's route: a literal from the closed set of the board's
+    routes, never the path itself; None for any other path."""
+    if path.startswith(static.ASSETS_PREFIX):
+        return static.ASSETS_PREFIX
+    return path if path in _ALLOWED_METHODS_BY_PATH else None
 
 
 _MAX_REQUEST_BYTES = 16 * 1024
@@ -109,11 +125,13 @@ class _BoardServer(ThreadingHTTPServer):
     def handle_error(
         self, request: socket.socket | tuple[bytes, socket.socket], client_address: tuple[str, int]
     ) -> None:
-        """A browser that leaves mid-response is no defect: stay quiet for it
-        and keep the stdlib's traceback for everything else."""
-        if isinstance(sys.exc_info()[1], _ClientDisconnectedError):
-            return
-        super().handle_error(request, client_address)
+        """The one line of an exception no handler expected, under the trace of
+        the request it ended; the handler's own scope already caught a browser
+        that left mid-answer, which is no defect."""
+        del request, client_address
+        _LOGGER.exception(
+            "request_handling.failed", extra={"error_type": type(sys.exception()).__name__}
+        )
 
     def server_close(self) -> None:
         """Stop listening, then wait for a ruling already being written.
@@ -188,9 +206,41 @@ def _content_length(header: str) -> int | None:
 
 
 class _BoardRequestHandler(BaseHTTPRequestHandler):
+    _request_scope: ExitStack
+    _line: RequestLine | None = None
+
     def _server(self) -> _BoardServer:
         # `_BoardServer.__init__` is this handler's only constructor.
         return cast(_BoardServer, self.server)
+
+    def handle_one_request(self) -> None:
+        """One request, not one connection: its logline request line opens
+        when the request first needs it and ends with the request, whatever
+        ends it. A browser that leaves mid-answer ends the connection, not
+        the request line's outcome."""
+        self._line = None
+        with ExitStack() as scope:
+            self._request_scope = scope
+            try:
+                super().handle_one_request()
+            except _ClientDisconnectedError:
+                self.close_connection = True
+
+    def _trace_headers(self) -> list[tuple[str, str]]:
+        """Only `traceparent`: OpenTelemetry's warning for a malformed
+        `tracestate` member names the member, and the board writes no header
+        value."""
+        return [
+            (_TRACEPARENT_HEADER, value) for value in self.headers.get_all(_TRACEPARENT_HEADER, [])
+        ]
+
+    def _request_line(self, headers: Iterable[tuple[str, str]] = ()) -> RequestLine:
+        """The line of the request being answered; the first call opens it.
+        `headers` only carry the trace context."""
+        if self._line is None:
+            line = RequestLine(self.command, headers, ip=self.client_address[0])
+            self._line = self._request_scope.enter_context(line)
+        return self._line
 
     def setup(self) -> None:
         # The per-server form of `StreamRequestHandler.timeout`, whose class
@@ -215,6 +265,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         *,
         allow: str | None = None,
     ) -> None:
+        self._request_line().set_status(int(status))
         try:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
@@ -243,15 +294,26 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         )
 
     def parse_request(self) -> bool:
-        """Answer a method the board does not serve here, so the stdlib never
-        dispatches it to its bare 501 -- the API's token check comes first."""
+        """Open the request's line with its route, then answer a method the
+        board does not serve here, so the stdlib never dispatches it to its
+        bare 501 -- the API's token check comes first."""
         if not super().parse_request():
             return False
+        # Opened before the path is read, so a path `urlsplit` refuses still ends in a line.
+        line = self._request_line(self._trace_headers())
+        try:
+            path = urlsplit(self.path).path
+        except ValueError:
+            # The parser's message echoes the target, which may hold the token.
+            self.send_error(HTTPStatus.BAD_REQUEST)
+            return False
+        route = _route_template(path)
+        if route is not None:
+            line.set_route(route)
         if self.command in _SERVED_METHODS:
             return True
         # Its body, if any, stays unread, so the connection cannot carry on.
         self.close_connection = True
-        path = urlsplit(self.path).path
         allow = _allowed_methods(path)
         if path.startswith(API_PREFIX):
             self._answer_api(lambda: self._refuse_method(allow))
@@ -393,5 +455,5 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *_args: object) -> None:
         # The default request log would print the page URL, token included,
-        # to the terminal; the printed start URL is the board's only output.
+        # to the terminal; the request line is the board's one record of a request.
         return

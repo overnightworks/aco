@@ -2,7 +2,9 @@
 checkout's own forge, board checkouts, and the real board server serving one
 of them."""
 
+import io
 from collections.abc import Iterator
+from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
 from typing import Any, cast
 
@@ -11,12 +13,14 @@ import pytest
 from aco_board_fixtures import (
     BoardClient,
     Lister,
+    LoggedLines,
     RecordedPort,
     board_checkout,
     decision_port,
     serving,
 )
 from board_forge import BoardForge
+from logline.testing import configured
 
 from aco import session
 
@@ -31,6 +35,19 @@ def board_forge_seam(monkeypatch: pytest.MonkeyPatch, isolated_global_git_config
 
 
 @pytest.fixture
+def logged() -> Iterator[LoggedLines]:
+    """logline configured as the board's service for the length of the test,
+    writing to a stream of its own: pytest's capture handlers would take every
+    record otherwise, and a capture fixture's stream is replaced between the
+    setup and the call of a test."""
+    standard_output = io.StringIO()
+    with ExitStack() as scope:
+        with redirect_stdout(standard_output):
+            scope.enter_context(configured("aco-board"))
+        yield LoggedLines(standard_output)
+
+
+@pytest.fixture
 def repository(tmp_path: Path) -> BoardForge:
     return board_checkout(tmp_path / "repository")
 
@@ -42,7 +59,9 @@ def port(repository: BoardForge) -> RecordedPort:
 
 
 @pytest.fixture
-def board(port: RecordedPort) -> Iterator[BoardClient]:
+def board(port: RecordedPort, logged: LoggedLines) -> Iterator[BoardClient]:
+    """The real board server over `port`; its request lines go to `logged`, never to a
+    test's captured output."""
     with serving(port) as client:
         yield client
 

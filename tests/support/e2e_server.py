@@ -19,8 +19,9 @@ reads the `now` of its stored block. An arrangement's `lane_records` are the
 finished items whose release commits the state ref holds.
 
 One line of JSON on stdout once both servers listen:
-`{"host", "port", "token", "control_url", "repository"}`. Stops on SIGTERM or SIGINT,
-which the launcher sends on teardown.
+`{"host", "port", "token", "control_url", "repository"}`; the board's request lines
+follow it, logline unconfigured, and the launcher reads only the first line. Stops on
+SIGTERM or SIGINT, which the launcher sends on teardown.
 """
 # ruff: noqa: T201 - the server announces its address to the test that starts it
 
@@ -196,7 +197,7 @@ def control_handler(repository: BoardForge) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(encoded)
 
         def log_message(self, format: str, *_args: object) -> None:
-            """Silent: stdout carries only the ready line."""
+            """Silent: the control server writes no access line of its own."""
 
     return ControlHandler
 

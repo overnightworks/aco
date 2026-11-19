@@ -94,8 +94,9 @@ expectation lines of every checkout under the `root` in `~/.config/aco/config.to
 Other… or Unclear, stored all or none), and lists the decided ones; the
 access token travels only in the printed URL's `#` fragment and survives
 restarts in a user-only file (deleting it rotates the token)
-(`specs/serve.spec.md`). The browser app lives in `frontend/`; its build
-output is committed under `src/aco/board/static/`.
+(`specs/serve.spec.md`). After the URL, every line on standard output is one JSON
+log record, one per answered request plus the start and stop lines. The browser app
+lives in `frontend/`; its build output is committed under `src/aco/board/static/`.
 
 ## MCP
 

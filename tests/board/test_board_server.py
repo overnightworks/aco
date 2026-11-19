@@ -20,14 +20,14 @@ from typing import Any, cast
 import pytest
 from aco_board_fixtures import (
     BoardClient,
-    CallPhase,
     Lister,
+    LoggedLines,
     PortCall,
-    PortOperation,
     RecordedPort,
     Response,
     decision_port,
     serving,
+    wait_for_request_handlers,
 )
 from board_forge import BoardForge, ForgeRequest, item_body
 from option_cards import open_option_entry
@@ -105,18 +105,19 @@ def test_a_malformed_api_request_gets_a_fixed_400_without_a_traceback(
     repository: BoardForge,
     board: BoardClient,
     port: RecordedPort,
-    capsys: pytest.CaptureFixture[str],
+    logged: LoggedLines,
     request_template: bytes,
 ) -> None:
     arranged = _aco_traffic(port, repository)
 
     answer = board.send_raw(request_template.replace(b"{token}", board.token.encode()))
+    wait_for_request_handlers()
 
     status_line, _, rest = answer.partition(b"\r\n")
     assert status_line.split(b" ")[1] == b"400"
     assert b"Traceback" not in rest
     assert str(Path(__file__).parents[2]).encode() not in rest
-    assert "Traceback" not in capsys.readouterr().err
+    assert logged.with_event("request_handling.failed") == []
     assert _aco_traffic(port, repository) == arranged
 
 
@@ -147,7 +148,7 @@ _SHORT_DEADLINE_SECONDS = 0.2
 )
 def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
     repository: BoardForge,
-    capsys: pytest.CaptureFixture[str],
+    logged: LoggedLines,
     unfinished_template: bytes,
     status: bytes | None,
 ) -> None:
@@ -155,9 +156,10 @@ def test_a_stalled_request_is_dropped_after_the_deadline_without_a_traceback(
     with serving(decisions, request_deadline_seconds=_SHORT_DEADLINE_SECONDS) as board:
         filled = unfinished_template.replace(b"{token}", board.token.encode())
         answer = board.send_unfinished(filled)
+        wait_for_request_handlers()
 
     assert (answer.split(b" ")[1] if answer else None) == status
-    assert "Traceback" not in capsys.readouterr().err
+    assert logged.with_event("request_handling.failed") == []
     assert (decisions.calls(), repository.request_log()) == ((), ())
 
 
@@ -210,52 +212,15 @@ def test_a_stalled_request_does_not_hold_up_shutdown(repository: BoardForge) -> 
         assert not stopping.is_alive()
 
 
-def test_a_browser_leaving_mid_answer_prints_no_traceback(
-    repository: BoardForge, capsys: pytest.CaptureFixture[str]
-) -> None:
-    repository.put_item(42, _OPEN_CARD, title="Share page")
-    browser_left, read_returned = threading.Event(), threading.Event()
-    port = decision_port(repository)
-
-    class ReadAfterTheBrowserLeft:
-        def reading(self) -> inbox.Reading:
-            assert browser_left.wait(timeout=10)
-            try:
-                return port.reading()
-            finally:
-                read_returned.set()
-
-        def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
-            return port.rule_card(item, check)
-
-        def answer_step(
-            self, item: int, result: item_step.StepResult, check: StepCheck
-        ) -> DecisionResult | CardChanged:
-            return port.answer_step(item, result, check)
-
-    with serving(ReadAfterTheBrowserLeft()) as board:
-        board.send_and_reset(
-            f"GET /api/board HTTP/1.1\r\nHost: x\r\nX-Board-Token: {board.token}\r\n\r\n".encode()
-        )
-        browser_left.set()
-        # Past the read its handler thread surely exists, so the wait below joins it.
-        assert read_returned.wait(timeout=10)
-        _wait_for_request_handlers()
-
-    entered = [call.operation for call in port.calls() if call.phase is CallPhase.ENTERED]
-    assert entered == [PortOperation.READING]
-    assert "Traceback" not in capsys.readouterr().err
-
-
 def test_a_browser_leaving_during_a_held_ruling_still_rules_and_frees_the_turn(
     repository: BoardForge,
     board: BoardClient,
     port: RecordedPort,
     listed_items: Lister,
-    capsys: pytest.CaptureFixture[str],
+    logged: LoggedLines,
 ) -> None:
     """The browser resets its connection while its ruling waits inside the
-    port: the ruling is written, no traceback is printed, and the next
+    port: the ruling is written, no failure line is written, and the next
     decision is answered."""
     repository.put_item(42, _OPEN_CARD, title="Share page")
     held = port.hold_next_rule_card(10)
@@ -265,14 +230,14 @@ def test_a_browser_leaving_during_a_held_ruling_still_rules_and_frees_the_turn(
         reset_when=held.entered,
     )
     held.release.set()
-    _wait_for_request_handlers()
+    wait_for_request_handlers()
     repository.put_item(43, _OPEN_CARD, title="Next card")
     [next_card] = [item for item in listed_items(board) if item["number"] == 43]
     answered = board.decide_card_through_api(43, next_card["lines"], ["B"])
 
     assert [repository.stored_entries(item)[0].get("ruling") for item in (42, 43)] == ["A", "B"]
     assert answered.status_and_message() == {"status": "ruled", "message": None}
-    assert "Traceback" not in capsys.readouterr().err
+    assert logged.with_event("request_handling.failed") == []
 
 
 class _HugeLineSource:
@@ -295,7 +260,7 @@ class _HugeLineSource:
 
 
 def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
-    repository: BoardForge, capsys: pytest.CaptureFixture[str]
+    repository: BoardForge, logged: LoggedLines
 ) -> None:
     repository.put_item(42, _OPEN_CARD, title="Share page")
     [small_row] = decision_port(repository).reading().rows
@@ -310,43 +275,9 @@ def test_a_browser_that_stops_reading_is_dropped_without_a_traceback(
         # Connections are accepted in order, so this answer means the
         # unread one already holds a handler.
         board.send_raw(b"GET /elsewhere HTTP/1.1\r\nHost: x\r\n\r\n")
-        _wait_for_request_handlers()
+        wait_for_request_handlers()
 
-    assert "Traceback" not in capsys.readouterr().err
-
-
-class _BrokenPipeSource:
-    """A decision source whose own pipe breaks: a server defect, not a client leaving."""
-
-    def reading(self) -> inbox.Reading:
-        raise BrokenPipeError("aco's pipe broke")
-
-    def rule_card(self, item: int, check: CardCheck) -> DecisionResult | CardChanged:
-        raise AssertionError("the board must not write after a failed read")
-
-    def answer_step(
-        self, item: int, result: item_step.StepResult, check: StepCheck
-    ) -> DecisionResult | CardChanged:
-        raise AssertionError("the board must not write after a failed read")
-
-
-def test_a_broken_pipe_inside_the_board_still_prints_its_traceback(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with serving(_BrokenPipeSource()) as board:
-        board.send_raw(
-            f"GET /api/board HTTP/1.1\r\nHost: x\r\nX-Board-Token: {board.token}\r\n\r\n".encode()
-        )
-        _wait_for_request_handlers()
-
-    assert "BrokenPipeError: aco's pipe broke" in capsys.readouterr().err
-
-
-def _wait_for_request_handlers() -> None:
-    # `socketserver.ThreadingMixIn` names every handler thread after its target.
-    for thread in threading.enumerate():
-        if thread.name.endswith("(process_request_thread)"):
-            thread.join(timeout=10)
+    assert logged.with_event("request_handling.failed") == []
 
 
 def test_the_board_listens_on_loopback_only(board: BoardClient) -> None:

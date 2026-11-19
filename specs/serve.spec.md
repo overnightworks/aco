@@ -12,7 +12,9 @@ owns (RUL-10) and the write `specs/rule.spec.md` owns (RULE-01, RULE-14, RULE-20
 rather than restating them. It also owns the JSON API under `/api/` -- its
 shapes, token, and headers -- and the shell's own delivery contract (who may
 fetch it, and how it is contained to its own files); the SPA's own behaviour
-once loaded is `frontend/`'s. `<n>` is an item number, `<k>` an expectation
+once loaded is `frontend/`'s. It owns the log lines after the URL on standard output --
+`server_listen.started`, `request.ended`, `request_handling.failed` and
+`server_process.finished`, each one JSON record of the fleet's logger. `<n>` is an item number, `<k>` an expectation
 line's 1-based index, `<repo>` a found repository's label, its forge name `owner/repo`.
 
 ## Behavior table
@@ -62,6 +64,9 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | no repository found, at start or on a later read | ABRD-109 | — | — |
 | a directory under the root that cannot be read | ABRD-110 | — | — |
 | a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139, ABRD-147, ABRD-148, ABRD-149, ABRD-150, ABRD-151 | — | — |
+| any request answered | ABRD-180, ABRD-181, ABRD-182 | ABRD-180, ABRD-181, ABRD-182 | ABRD-180, ABRD-181, ABRD-182 |
+| a request that raises, or whose browser leaves mid-answer | ABRD-183, ABRD-184 | ABRD-183, ABRD-184 | ABRD-183, ABRD-184 |
+| the board starting, or stopping on Ctrl-C or SIGTERM | ABRD-179, ABRD-185 | — | — |
 
 ## Writing a decision
 
@@ -274,6 +279,18 @@ Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_
 - [ ] [ABRD-26] `aco serve --json` is refused by the argument parser as plain text, never in the envelope: `aco: error: unrecognized arguments: --json`, exit `2` (see E-ABRD-09).
 - [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve finds its repositories itself; --repo does not apply to it`, exit `2` (see E-ABRD-10).
 - [ ] [ABRD-124] `GET /assets/**` answers a built `.woff2` file as `font/woff2`; the shell's stylesheets load Open Sans and Oswald from there and the board makes no request to another host (see E-ABRD-08).
+
+## Logging
+
+- [ ] [ABRD-179] After the URL every stdout line is one JSON record: `server_listen.started` follows the URL, `server_process.finished` the stop on Ctrl-C or SIGTERM (ABRD-04 holds under both).
+- [ ] [ABRD-180] Every answered request, HTTP-layer refusals included, writes one `request.ended` with `outcome`, `method`, `route`, `status`, `duration_ms`, `sub` (null), `ip`; 5xx is `failed`, else `ok`.
+- [ ] [ABRD-181] `route` is `/`, `/api/board`, `/api/rule`, `/api/step` or `/assets/` (any asset path, found or not); any other path is null. A connection closed before a request line writes none.
+- [ ] [ABRD-182] No line holds the token, the URL, a request's path or query or a header value; a traceback holds source frames and exception messages, never local variables.
+- [ ] [ABRD-183] An unexpected exception ends `request.ended` as `failed` (500 if no status was sent), then writes one `request_handling.failed` with `error_type`, traceback and the same `trace_id`; no stderr.
+- [ ] [ABRD-184] A browser that leaves mid-answer reads `ok` with the status sent and writes no `request_handling.failed`.
+- [ ] [ABRD-185] `service` is `aco-board` and `version` aco's version unless `SERVICE_VERSION` is set; a malformed `LOG_LEVEL` refuses `ERROR: <sentence>`, exit `2`, nothing bound (see E-ABRD-27).
+
+Proofs: `tests/board/test_board_server_request_line.py` and `tests/board/test_board_cli.py`; `scripts/package_smoke.sh` proves the lines from an installed tool. A request answered after the URL reads as E-ABRD-26.
 
 ## Never
 
@@ -612,3 +629,32 @@ answer 200: {"status": "answered", "message": null}
 stored block: no `wait`, no `[step]`, now = The operator answered "Decide." on the board on 2026-10-03: Fehlgeschlagen: Stayed red.
               next = as it was before the answer
 ```
+
+### E-ABRD-26 -- the lines after the URL
+
+Setup: a root holding one checkout; `/api/board` is called once with the token only in the query and once with the header token
+
+```console
+$ aco serve
+http://127.0.0.1:<port>/#t=<board token>
+{"event": "server_listen.started", "logger": "aco.board.cli", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": null}
+{"outcome": "ok", "method": "GET", "route": "/api/board", "status": 403, "duration_ms": <ms>, "sub": null, "ip": "127.0.0.1", "event": "request.ended", "logger": "logline.request", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": "<32 hex digits>"}
+{"outcome": "ok", "method": "GET", "route": "/api/board", "status": 200, "duration_ms": <ms>, "sub": null, "ip": "127.0.0.1", "event": "request.ended", "logger": "logline.request", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": "<32 hex digits>"}
+^C
+{"event": "server_process.finished", "logger": "aco.board.cli", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": null}
+exit 0
+```
+
+The first request carried the token only in the query, which `/api/` refuses (ABRD-10); neither line shows the query, the path or the token.
+
+### E-ABRD-27 -- a malformed `LOG_LEVEL`
+
+Setup: `LOG_LEVEL=loud`
+
+```console
+$ aco serve
+2> ERROR: LOG_LEVEL is 'loud'; accepted names are debug, info, warning, error, critical
+exit 2
+```
+
+Nothing is bound and standard output stays empty; the logger's sentence is its own wording.
