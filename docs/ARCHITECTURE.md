@@ -8,7 +8,7 @@ only what no spec owns.
 
 aco coordinates agents working in one repository. Claims live in git, work
 items live on the forge, and the commands join the two. It runs no lease or
-coordination server; the state ref is the serialization point. An agent
+coordination server. An agent
 host can start `aco mcp` for one session (`specs/mcp.spec.md`).
 
 ```mermaid
@@ -60,7 +60,8 @@ flowchart LR
 - The **state ref** is one git ref on the configured canonical remote
   (`canonical_remote` in `.aco/board.toml`; `specs/storage-pin.spec.md` owns
   its default). Its tree is the current state: `claims/`,
-  `resources/`, `ids/`, `schema.toml` (the format version) and, for a
+  `resources/`, `ids/`, `schema.toml` (the format version), `runs/<claim-id>.json`
+  (lane runs, keyed by claim id so a release removes them) and, for a
   repository without a forge, items.
 - A transition is a pure function from the observed state and a typed intent
   to a new state (`protocol.apply`). The store commits it on the observed tip.
@@ -116,7 +117,7 @@ sequenceDiagram
 aco is a CLI installed per machine (the README owns installation); every
 machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
-operator starts with `aco serve`, by hand or by a unit the operator keeps; it keeps no
+operator starts with `aco serve`, by hand or by a unit; it keeps no
 coordination state of its own, only its access token file; the root it scans
 comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
 kind of process: an agent host starts it over stdio for one session and it ends
