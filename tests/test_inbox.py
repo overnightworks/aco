@@ -182,22 +182,6 @@ def _discovery_with_unavailable(
     )
 
 
-def test_a_label_an_unavailable_checkout_carries_is_refused_naming_its_directory_and_reason(
-    tmp_path: Path,
-) -> None:
-    directory = tmp_path / "broken"
-    discovery = _discovery_with_unavailable(
-        tmp_path, repositories.UnavailableCheckout(directory, "cannot be read", "owner/broken")
-    )
-
-    with pytest.raises(inbox.UnreadableRepositoryError) as refusal:
-        inbox.context_in_checkout_of(discovery, "owner/broken")
-
-    assert str(refusal.value) == "repository owner/broken is unreadable: " + (
-        f"{directory}: cannot be read"
-    )
-
-
 @pytest.mark.parametrize(
     "unavailable",
     [
