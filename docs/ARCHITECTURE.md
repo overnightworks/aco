@@ -182,7 +182,7 @@ verified; an edit saved after that read overwrites unseen. Under
 `decide.rule` and `decide.withdraw`, the one write of a ruled, returned or
 withdrawn line, touch one signal file per item after the verified write, named
 by the same digest as the item's lock (`decide.item_signal_path`). `aco wait`
-watches that file's modification time instead of polling the item; the signal
+watches that file's modification time instead of reading the item on every tick; the signal
 carries no content, names no asker and never fails a write
 (`specs/wait.spec.md`).
 
@@ -192,6 +192,14 @@ repository and a service would save no request. The signal files wake it within
 seconds of a ruling, and a cheap check decides when to read the rest: the state
 ref's tip and, under GitHub storage, one conditional request (`BoardProbe`) for
 the newest updated issue and for each open blocker elsewhere.
+
+### Logging
+
+`aco serve` is the one deployed process and the one logline host: it configures
+the fleet's logger once, as `aco-board`, and only `aco.board` imports it. After
+the URL its stdout is one JSON record per answered request plus its start and
+stop lines (`specs/serve.spec.md`). `aco mcp` keeps stdout for JSON-RPC, and no
+other command logs.
 
 ### Proof strategy
 
@@ -209,8 +217,7 @@ but not grow.
   native fields (issue type, sub-issue, blocked-by), so each fact has one
   owner and no reader derives one from the body. Under the state-ref item
   store, the block's `[record]` table is that owner
-  (`specs/storage-pin.spec.md`). The `Parent:` line `aco cut` writes is a
-  recovery marker (`specs/cut.spec.md`, `specs/body-block.spec.md`).
+  (`specs/storage-pin.spec.md`).
 - The state ref advances by a plain fast-forward push: a push already accepts
   fast-forwards and rejects the rest, which is the serialization needed.
 - A claim's holder changes only through `aco handover`, which records the takeover on
@@ -230,15 +237,10 @@ but not grow.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
   decision surface: his questions, from every repository under one root
   (`repositories.py`, `specs/serve.spec.md` ABRD-14), in use and growing.
-  Its Progress view counts each top-level container's closed, landed, waiting
-  and planned work from the same listing and the trunk's `Work-Item:` trailers
-  (`progress.py`, ABRD-131), keeping no state; the lanes left are priced from
-  the state ref's lane records (`inbox.py`), and a failed read leaves only the
-  ranges unknown.
+  Its Progress view keeps no state (`progress.py`, ABRD-131).
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
-  the item commands still carries both storage paths. It is known and
-  deliberately kept, not unnoticed dead code.
+  the item commands still carries both storage paths, deliberately.
 
 ## Not chosen
 

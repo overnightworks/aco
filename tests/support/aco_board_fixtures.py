@@ -9,6 +9,7 @@ every call at the port.
 
 import errno
 import http.client
+import io
 import json
 import secrets
 import select
@@ -480,3 +481,29 @@ def assert_guarded(response: Response) -> None:
 
 def cross_origin_headers(response: Response) -> list[str]:
     return [name for name in response.headers if name.lower().startswith("access-control-")]
+
+
+class LoggedLines:
+    """What logline has written to its standard output under one test: every
+    line is one JSON record."""
+
+    def __init__(self, standard_output: io.StringIO) -> None:
+        self._standard_output = standard_output
+
+    def text(self) -> str:
+        return self._standard_output.getvalue()
+
+    def records(self) -> list[dict[str, Any]]:
+        return [json.loads(line) for line in self.text().splitlines()]
+
+    def with_event(self, event: str) -> list[dict[str, Any]]:
+        return [record for record in self.records() if record["event"] == event]
+
+
+def wait_for_request_handlers() -> None:
+    """Join every handler thread the board's server started: its answer reaches
+    the client before the handler writes its request line."""
+    # `socketserver.ThreadingMixIn` names every handler thread after its target.
+    for thread in threading.enumerate():
+        if thread.name.endswith("(process_request_thread)"):
+            thread.join(timeout=10)

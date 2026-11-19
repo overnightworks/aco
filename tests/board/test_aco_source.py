@@ -8,7 +8,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from aco_board_fixtures import BoardClient, Lister, first_listed_line, serving_two
+from aco_board_fixtures import BoardClient, Lister, LoggedLines, first_listed_line, serving_two
 from board_forge import BoardForge, ForgeOperation, ForgeRequest, item_body, item_signals
 from option_cards import open_option_entry
 
@@ -211,7 +211,7 @@ def test_a_write_the_forges_check_kept_over_an_unread_change_answers_ruled_with_
 
 
 def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_turn(
-    repository: BoardForge, board: BoardClient, capsys: pytest.CaptureFixture[str]
+    repository: BoardForge, board: BoardClient, logged: LoggedLines
 ) -> None:
     """ABRD-03: the request fails loudly, the board answers the next one, and
     the next decision is stored."""
@@ -222,7 +222,8 @@ def test_an_unexpected_error_inside_the_write_fails_the_request_and_frees_the_tu
     with pytest.raises(http.client.RemoteDisconnected):
         board.decide_card_through_api(_ITEM, [shown], ["A"])
 
-    assert "RuntimeError: the write broke" in capsys.readouterr().err
+    [failure] = logged.with_event("request_handling.failed")
+    assert failure["exception"].endswith("RuntimeError: the write broke")
     answered = board.decide_card_through_api(_ITEM, [first_listed_line(board)], ["A"])
     assert answered.status_and_message() == {"status": "ruled", "message": None}
     assert repository.stored_entries(_ITEM)[0]["ruling"] == "A"
