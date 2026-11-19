@@ -87,8 +87,6 @@ RESOURCES_DIRECTORY = "resources"
 ITEMS_DIRECTORY = "items"
 SCHEMA_TOML_FILENAME = "schema.toml"
 TOML_SUFFIX = ".toml"
-git_failure_detail = process.git_failure_detail
-git_failure_detail_from_stderr = process.git_failure_detail_from_stderr
 # Tree entry names travel as git's raw bytes (`-z`);
 # `surrogateescape` lets a name that is not UTF-8 survive the round trip
 # from `_list_tree` back into `_mktree` byte for byte.
@@ -241,7 +239,11 @@ class GitPushTransport:
                 f"git push to the claim state store did not finish: {cause}"
             ) from error
         if result.exit_status != 0:
-            raise PushRejectedError(process.git_failure_detail(result))
+            raise PushRejectedError(git_failure_detail(result))
+
+
+git_failure_detail = process.git_failure_detail
+git_failure_detail_from_stderr = process.git_failure_detail_from_stderr
 
 
 def run_git(
@@ -281,7 +283,7 @@ def _git_dir(worktree: Path) -> Path:
     """
     result = run_git(worktree, ["rev-parse", "--absolute-git-dir"])
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise ClaimError(git_failure_detail(result))
     return Path(result.stdout.decode().strip())
 
 
@@ -299,7 +301,7 @@ def _is_ancestor(worktree: Path) -> lineage_stamp.IsAncestor:
         if result.exit_status == _MERGE_BASE_EXIT_NOT_ANCESTOR:
             return False
         if result.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(result)
+            detail = git_failure_detail_from_stderr(result)
             raise ClaimError(
                 f"cannot check whether {ancestor} is an ancestor of {descendant}: {detail}"
             )
@@ -338,7 +340,7 @@ def ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
         return None
     raise ClaimError(
         f"cannot reach {remote} {STATE_REF}: auth or transport failure "
-        f"(ls-remote exited {result.exit_status}): {process.git_failure_detail(result)}"
+        f"(ls-remote exited {result.exit_status}): {git_failure_detail(result)}"
     )
 
 
@@ -358,11 +360,11 @@ def _fetch_into_anchor(worktree: Path, remote: str) -> ObjectId:
     refspec = f"+{STATE_REF}:{_FETCH_ANCHOR_REF}"
     result = run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, refspec])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
     read = run_git(worktree, ["rev-parse", _FETCH_ANCHOR_REF])
     if read.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(read)
+        detail = git_failure_detail_from_stderr(read)
         raise ClaimError(f"cannot read the fetched tip at {_FETCH_ANCHOR_REF}: {detail}")
     return ObjectId(read.stdout.decode().strip())
 
@@ -384,14 +386,14 @@ def _fetch_ref_objects(worktree: Path, remote: str) -> None:
     """
     result = run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, STATE_REF])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
 
 
 def _tree_oid(worktree: Path, tip: ObjectId) -> ObjectId:
     result = run_git(worktree, ["rev-parse", f"{tip}^{{tree}}"])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise MalformedStateTreeError(f"cannot resolve the tree for {tip}: {detail}")
     return ObjectId(result.stdout.decode().strip())
 
@@ -434,7 +436,7 @@ def _list_tree(
     """
     listing = run_git(worktree, ["ls-tree", "-r", "-t", "-z", str(tree_ref)])
     if listing.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(listing)
+        detail = git_failure_detail_from_stderr(listing)
         raise MalformedStateTreeError(
             f"cannot list the {context} tree {tree_ref} at {tip}: {detail}"
         )
@@ -495,7 +497,7 @@ def _read_state_archive(
         command.extend(["--", *paths])
     result = run_git(worktree, command)
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise MalformedStateTreeError(f"cannot read the state tree at {tip}: {detail}")
     try:
         with tarfile.open(
@@ -814,7 +816,7 @@ def _commit_tree(
         environment = {**os.environ, "GIT_AUTHOR_DATE": moment, "GIT_COMMITTER_DATE": moment}
     result = run_git(worktree, arguments, environment)
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise ClaimError(git_failure_detail(result))
     return ObjectId(result.stdout.decode().strip())
 
 
@@ -838,7 +840,7 @@ def _find_operation_id(
     range_argument = f"{since}..{until}" if since is not None else str(until)
     listing = run_git(worktree, ["log", "--format=%H", range_argument])
     if listing.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(listing)
+        detail = git_failure_detail_from_stderr(listing)
         raise ClaimError(
             f"cannot search {range_argument} for operation_id {operation_id}: {detail}"
         )
@@ -846,7 +848,7 @@ def _find_operation_id(
     for candidate in listing.stdout.decode().split():
         message = run_git(worktree, ["log", "-1", "--format=%B", candidate])
         if message.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(message)
+            detail = git_failure_detail_from_stderr(message)
             raise ClaimError(
                 f"cannot read commit {candidate} while searching for operation_id "
                 f"{operation_id}: {detail}"
@@ -1348,7 +1350,7 @@ def list_worktrees(worktree: Path) -> tuple[Path, ...]:
     runs there."""
     result = run_git(worktree, ["worktree", "list", "--porcelain"])
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise ClaimError(git_failure_detail(result))
     return tuple(
         Path(line.removeprefix(_WORKTREE_LIST_PATH_PREFIX))
         for line in result.stdout.decode().splitlines()
@@ -1378,9 +1380,7 @@ def local_state_ref_exists(worktree: Path) -> bool:
         return True
     if result.exit_status == _SHOW_REF_EXIT_MISSING and not result.stdout and not result.stderr:
         return False
-    raise ClaimError(
-        f"cannot check {STATE_REF} in {worktree}: {process.git_failure_detail(result)}"
-    )
+    raise ClaimError(f"cannot check {STATE_REF} in {worktree}: {git_failure_detail(result)}")
 
 
 def _repair_after_failed_remote_delete(
@@ -1447,13 +1447,13 @@ def delete_state_ref(*, worktree: Path, remote: str, expected_remote_tip: Object
         result = run_git(worktree, ["push", remote, f"--force-with-lease={lease}", f":{STATE_REF}"])
         if result.exit_status != 0:
             _repair_after_failed_remote_delete(
-                worktree, remote, expected_remote_tip, process.git_failure_detail(result)
+                worktree, remote, expected_remote_tip, git_failure_detail(result)
             )
     if not local_state_ref_exists(worktree):
         return False
     result = run_git(worktree, ["update-ref", "-d", STATE_REF])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot delete local {STATE_REF}: {detail}")
     return True
 
@@ -1478,6 +1478,6 @@ def clear_lineage_stamps(*, worktree: Path) -> tuple[Path, ...]:
             lineage_stamp.remove(stamp_directory)
             result = run_git(path, ["update-ref", "-d", _FETCH_ANCHOR_REF])
         if result.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(result)
+            detail = git_failure_detail_from_stderr(result)
             raise ClaimError(f"cannot clear {_FETCH_ANCHOR_REF} in {path}: {detail}")
     return worktrees
