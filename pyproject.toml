@@ -112,7 +112,7 @@ layers = [
     "lineage_stamp",
     "file_lock",
     "state_files",
-    "claim_conflicts",
+    "claim_conflicts | claim_json",
     "protocol | process | routing_line | wide_scope",
     "toml_text",
 ]

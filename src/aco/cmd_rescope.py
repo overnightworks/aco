@@ -13,6 +13,7 @@ from pathlib import Path
 from . import (
     body,
     checkout,
+    claim_json,
     decide,
     forge,
     item_handover,
@@ -46,7 +47,7 @@ class _RescopeReason(StrEnum):
 
 
 def _rescope_json(claimed: protocol.ActiveClaim) -> None:
-    report.emit_json(True, _RescopeReason.RESCOPED, **protocol.claim_identity_fields(claimed))
+    report.emit_json(True, _RescopeReason.RESCOPED, **claim_json.claim_identity_fields(claimed))
 
 
 @dataclass(frozen=True)

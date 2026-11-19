@@ -12,6 +12,7 @@ from . import (
     board_read,
     body,
     checkout,
+    claim_json,
     forge,
     github,
     item_handover,
@@ -58,7 +59,7 @@ def _release_json(release_report: _ReleaseReport) -> None:
     released, landing = release_report.selected, release_report.landing
     payload: dict[str, object] = {
         "outcome": release_report.outcome.reason,
-        **protocol.identity_json(released.identity),
+        **claim_json.identity_json(released.identity),
         "branch": released.branch,
         "claim_id": released.claim_id,
         "agent": release_report.agent,
@@ -554,7 +555,7 @@ def _report_nothing_left_to_release(
             True,
             _ReleaseReason.MERGED,
             outcome=_NOTHING_LEFT_TO_RELEASE,
-            **protocol.identity_json(lane.identity),
+            **claim_json.identity_json(lane.identity),
             branch=None if on_trunk else lane.branch,
             worktree=worktree,
         )

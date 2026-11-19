@@ -11,6 +11,7 @@ from . import (
     board_read,
     body,
     claim_conflicts,
+    claim_json,
     protocol,
     report,
     workboard,
@@ -50,7 +51,7 @@ def _overlap_subjects(
 ) -> list[dict[str, object]]:
     return [
         {
-            **protocol.identity_json(peer.identity),
+            **claim_json.identity_json(peer.identity),
             "claim_id": peer.claim_id,
             "agent": peer.agent,
         }
@@ -166,8 +167,8 @@ def _status_claim_json(
 ) -> dict[str, object]:
     age, old = workboard.claim_age_fields(ages[claim.claim_id], observed_at)
     return {
-        **protocol.claim_identity_fields(claim),
-        **protocol.resource_fields(claim.resource),
+        **claim_json.claim_identity_fields(claim),
+        **claim_json.resource_fields(claim.resource),
         **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
         "overlaps": _overlap_subjects(claims_by_id, claim_conflicts.overlap_peer_ids(index, claim)),
         "state": "CONFLICT" if claim.claim_id in index.conflict_ids else "CLAIMED",
@@ -290,8 +291,8 @@ def _status_path_json(
     reason = _StatusReason.UNCLAIMED if not holders else _StatusReason.CLAIMED
     claims_payload = [
         {
-            **protocol.claim_identity_fields(claim),
-            **protocol.resource_fields(claim.resource),
+            **claim_json.claim_identity_fields(claim),
+            **claim_json.resource_fields(claim.resource),
             **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
             "state": "CLAIMED",
         }
