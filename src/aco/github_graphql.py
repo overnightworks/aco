@@ -151,35 +151,6 @@ def read_batched[Value](
     return merged
 
 
-def _parsed_reopened_node(node: object) -> datetime | None:
-    """One issue's last reopen: `None` when it was never reopened. A missing
-    issue or a time that is no RFC 3339 instant raises loud, never read as
-    "not reopened"."""
-    timeline = node.get("timelineItems") if isinstance(node, dict) else None
-    events = timeline.get("nodes") if isinstance(timeline, dict) else None
-    if not isinstance(events, list) or len(events) > 1:
-        raise malformed_response(_REOPENED_SUBJECT)
-    if not events:
-        return None
-    created_at = events[0].get("createdAt") if isinstance(events[0], dict) else None
-    if (
-        not isinstance(created_at, str)
-        or protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(created_at) is None
-    ):
-        raise malformed_response(_REOPENED_SUBJECT)
-    return datetime.fromisoformat(created_at)
-
-
-_REOPENED_SUBJECT = "reopen time"
-REOPENED_AT_READ = BatchedRead(
-    "issue",
-    "timelineItems(itemTypes: [REOPENED_EVENT], last: 1) "
-    "{ nodes { ... on ReopenedEvent { createdAt } } }",
-    _REOPENED_SUBJECT,
-    _parsed_reopened_node,
-)
-
-
 @dataclass(frozen=True)
 class BodyRevision:
     """One revision of an item's body from its edit history: the full `text`,

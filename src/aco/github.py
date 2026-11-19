@@ -1,15 +1,13 @@
 """GitHub adapter for the forge port."""
-# ruff: noqa: T201 - the forge adapter's one operator warning goes to stderr
 
 import base64
 import json
 import os
 import re
-import sys
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
 from urllib.parse import quote
@@ -17,9 +15,9 @@ from urllib.parse import quote
 from . import (
     forge,
     github_actions,
-    github_graphql,
     github_issue_payload,
     github_merge_queue,
+    github_pull_requests,
     process,
     protocol,
     workboard,
@@ -31,13 +29,8 @@ from .protocol import REPOSITORY_PATTERN, ClaimError
 _Page = TypeVar("_Page")
 # gh 2.45 colorizes --jq output when it believes stdout is a TTY.
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-MAX_RECENT_MERGED_PULL_REQUESTS = 1000
-# GitHub's merged-pull-request search accepts an exact-day filter, so a
-# board's merged-pull-request date shards are independent, order-agnostic
-# fetches. Walking them one `gh` subprocess at a time made shard count the
-# dominant cost of a wide `board`/`next` read; fetched in parallel batches
-# instead. This bounds how many `gh` subprocesses run at once, comfortably under
-# GitHub's secondary rate limit for concurrent requests.
+# Page walks and per-item reads are independent fetches. This bounds how many `gh` subprocesses
+# run at once, comfortably under GitHub's secondary rate limit for concurrent requests.
 PARALLEL_FETCH_CONCURRENCY = 20
 GH_TIMEOUT_SECONDS = 60
 GH_QUIET_ENVIRONMENT = {
@@ -60,7 +53,7 @@ ITEM_KIND_TYPE_NAMES: dict[ItemKind, str] = {
 # snapshot a concurrent open/close cannot have shifted an issue across.
 ISSUES_PER_PAGE = 100
 _READINESS_JQ = "{state,draft:.draft,headSha:.head.sha,mergeableState:.mergeable_state}"
-MALFORMED_PULL_REQUEST = "GitHub returned a malformed pull request"
+MALFORMED_PULL_REQUEST = github_pull_requests.MALFORMED_PULL_REQUEST
 MALFORMED_FILE_CONTENTS = "GitHub returned malformed file contents"
 MALFORMED_MERGE_SETTINGS = "GitHub returned malformed repository merge settings"
 MALFORMED_CLOSED_ISSUE = "GitHub returned a malformed closed issue"
@@ -184,38 +177,8 @@ def discover_repository(*, remote_url: str, directory: Path | None = None) -> fo
     raise ClaimError("cannot resolve GitHub repository; pass --repo OWNER/REPO")
 
 
-def _merge_commit_oid(merge_commit_field: object) -> str | None:
-    oid = merge_commit_field.get("oid") if isinstance(merge_commit_field, dict) else None
-    if merge_commit_field is not None and not isinstance(oid, str):
-        raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
-    return oid
-
-
-def _head_repository(pull_request: dict[str, object]) -> forge.RepositoryId | None:
-    """The identity of the repository whose branch a pull request proposes,
-    or None when GitHub does not name both halves — a fork deleted after the
-    pull request opened, say.
-    """
-    repository = pull_request.get("headRepository")
-    owner = pull_request.get("headRepositoryOwner")
-    name = repository.get("name") if isinstance(repository, dict) else None
-    login = owner.get("login") if isinstance(owner, dict) else None
-    if not isinstance(name, str) or not isinstance(login, str):
-        return None
-    if re.fullmatch(REPOSITORY_PATTERN, f"{login}/{name}") is None:
-        return None
-    return forge.RepositoryId(GITHUB_HOST, (login,), name)
-
-
 def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE.sub("", text)
-
-
-def _query_days(start: date, end: date) -> tuple[date, ...]:
-    """One calendar UTC day per merged-pull-request query shard, `start` through `end` inclusive."""
-    if end < start:
-        raise ClaimError("merged pull request window ends before it starts")
-    return tuple(start + timedelta(days=offset) for offset in range((end - start).days + 1))
 
 
 def _decoded(result: process.BoundedResult, purpose: str) -> str:
@@ -322,12 +285,14 @@ class GitHubForge:
         if self._current_name != self.repository.path:
             raise forge.ForgeRepositoryRenamedError(self.repository.path, self._current_name)
 
-    def _current_head_repository(
-        self, pull_request: dict[str, object]
-    ) -> forge.RepositoryId | None:
-        head = _head_repository(pull_request)
-        if head is not None:
-            self._require_current_name(head.path)
+    def _source_repository(self, path: str) -> forge.RepositoryId | None:
+        """The repository a pull request's head names, or `None` when `path` is no repository,
+        after the check that GitHub has not renamed the run's own."""
+        try:
+            head = repository_id(path)
+        except ClaimError:
+            return None
+        self._require_current_name(head.path)
         return head
 
     def _gh(self, arguments: list[str], *, input_data: bytes | None = None) -> str:
@@ -381,13 +346,31 @@ class GitHubForge:
         variables = {"owner": self.repository.namespace[0], "name": self.repository.name}
         return self._graphql(query, variables, ".data.repository", description)
 
-    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
-        return github_graphql.read_batched(
-            github_graphql.REOPENED_AT_READ,
-            numbers,
-            fetch=self._graphql_block,
-            concurrency=PARALLEL_FETCH_CONCURRENCY,
+    def _paged_rows(
+        self, request: Callable[[int], list[str]], description: str
+    ) -> tuple[object, ...]:
+        """Every row of the REST list whose page `request` names, `ISSUES_PER_PAGE` to a page."""
+        return self._fetch_pages(
+            lambda page: self._json_lines(self._run(request(page)), description),
+            per_page=ISSUES_PER_PAGE,
         )
+
+    def _reopened_at(self, number: int) -> datetime | None:
+        events = self._paged_rows(
+            lambda page: github_pull_requests.events_page_request(
+                self.repository, number, page, ISSUES_PER_PAGE
+            ),
+            "issue event",
+        )
+        return github_pull_requests.reopened_at(events)
+
+    def reopened_at(self, numbers: Iterable[int]) -> Mapping[int, datetime | None]:
+        ordered = tuple(dict.fromkeys(numbers))
+        if not ordered:
+            return {}
+        with ThreadPoolExecutor(max_workers=min(len(ordered), PARALLEL_FETCH_CONCURRENCY)) as pool:
+            reopened = list(pool.map(self._reopened_at, ordered))
+        return dict(zip(ordered, reopened, strict=True))
 
     def _json_lines(self, raw: str, description: str) -> tuple[object, ...]:
         """Parse compact NDJSON, pretty JSON, or a concatenated JSON sequence."""
@@ -439,108 +422,15 @@ class GitHubForge:
                 return tuple(pages)
             start += PARALLEL_FETCH_CONCURRENCY
 
-    def _board_pull_request(self, value: object) -> workboard.PullRequest:
-        if not isinstance(value, dict):
-            raise forge.ForgeMalformedResponseError(
-                "GitHub returned a malformed board pull request"
-            )
-        number = value.get("number")
-        title = value.get("title")
-        body = value.get("body")
-        if body is None:
-            body = ""
-        head_ref_name = value.get("headRefName")
-        merged_at = value.get("mergedAt")
-        if (
-            isinstance(number, bool)
-            or not isinstance(number, int)
-            or number < 1
-            or not isinstance(title, str)
-            or not isinstance(body, str)
-            or not isinstance(head_ref_name, str)
-            or (merged_at is not None and not isinstance(merged_at, str))
-            or (
-                isinstance(merged_at, str)
-                and protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(merged_at) is None
-            )
-        ):
-            raise forge.ForgeMalformedResponseError(
-                "GitHub returned a malformed board pull request"
-            )
-        return workboard.PullRequest(number, title, body, head_ref_name, merged_at)
-
-    def _landing(self, value: object) -> forge.Landing:
-        if not isinstance(value, dict):
-            raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
-        number = value.get("number")
-        title = value.get("title")
-        body = value.get("body")
-        if body is None:
-            body = ""
-        base_ref_name = value.get("baseRefName")
-        head_ref_name = value.get("headRefName")
-        head_sha = value.get("headRefOid")
-        source_repository = self._current_head_repository(value)
-        author = value.get("author")
-        login = author.get("login") if isinstance(author, dict) else None
-        merged_at = value.get("mergedAt")
-        merged = merged_at is not None
-        merge_commit = _merge_commit_oid(value.get("mergeCommit"))
-        if (
-            isinstance(number, bool)
-            or not isinstance(number, int)
-            or number < 1
-            or not isinstance(title, str)
-            or not isinstance(body, str)
-            or not isinstance(base_ref_name, str)
-            or not isinstance(head_ref_name, str)
-            or not isinstance(head_sha, str)
-            or protocol.COMMIT_PATTERN.fullmatch(head_sha) is None
-            or source_repository is None
-            or not isinstance(login, str)
-            or not login
-            or (merged_at is not None and not isinstance(merged_at, str))
-            or (
-                isinstance(merged_at, str)
-                and protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(merged_at) is None
-            )
-            or (merged and protocol.COMMIT_PATTERN.fullmatch(merge_commit or "") is None)
-            or (not merged and merge_commit is not None)
-        ):
-            raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
-        return forge.Landing(
-            number,
-            login,
-            body,
-            source_repository,
-            head_ref_name,
-            base_ref_name,
-            merged,
-            merge_commit,
-            title,
-            head_sha,
-            github_issue_payload.is_dependency_bot(login),
-        )
-
     def landing(self, number: int) -> forge.Landing:
-        raw = self._run(
-            [
-                "pr",
-                "view",
-                str(number),
-                "--repo",
-                self.repository.path,
-                "--json",
-                "number,title,body,baseRefName,headRefName,headRefOid,headRepository,"
-                "headRepositoryOwner,author,mergedAt,mergeCommit",
-                "--jq",
-                ".",
-            ]
-        )
+        try:
+            raw = self._run(github_pull_requests.landing_request(self.repository, number))
+        except forge.ForgeNotFoundError as error:
+            raise forge.ForgeError(str(error)) from error
         values = self._json_lines(raw, "pull request")
         if len(values) != 1:
             raise forge.ForgeMalformedResponseError(MALFORMED_PULL_REQUEST)
-        landing = self._landing(values[0])
+        landing = github_pull_requests.landing(values[0], self._source_repository)
         if landing.number != number:
             raise ClaimError(f"GitHub answered for pull request #{landing.number}, not #{number}")
         return landing
@@ -1119,92 +1009,25 @@ class GitHubForge:
         )
 
     def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
-        raw = self._run(
-            [
-                "pr",
-                "list",
-                "--repo",
-                self.repository.path,
-                "--state",
-                "open",
-                "--limit",
-                "1000",
-                "--json",
-                "number,title,body,headRefName",
-                "--jq",
-                ".[]",
-            ]
+        rows = self._paged_rows(
+            lambda page: github_pull_requests.open_page_request(
+                self.repository, page, ISSUES_PER_PAGE
+            ),
+            "open board pull request",
         )
-        return tuple(
-            self._board_pull_request(value)
-            for value in self._json_lines(raw, "open board pull request")
-        )
-
-    def _merged_pull_requests_for_day(self, day: date) -> tuple[workboard.PullRequest, ...]:
-        raw = self._run(
-            [
-                "pr",
-                "list",
-                "--repo",
-                self.repository.path,
-                "--state",
-                "merged",
-                "--search",
-                f"merged:{day.isoformat()}",
-                "--limit",
-                str(MAX_RECENT_MERGED_PULL_REQUESTS),
-                "--json",
-                "number,title,body,headRefName,mergedAt",
-                "--jq",
-                ".[]",
-            ]
-        )
-        return tuple(
-            self._board_pull_request(value)
-            for value in self._json_lines(raw, "merged board pull request")
-        )
+        return github_pull_requests.open_pull_requests(rows)
 
     def list_recent_merged_board_pull_requests(
         self, since: datetime
     ) -> tuple[workboard.PullRequest, ...]:
-        cutoff = since.astimezone(UTC)
-        days = _query_days(cutoff.date(), datetime.now(UTC).date())
-        with ThreadPoolExecutor(max_workers=min(len(days), PARALLEL_FETCH_CONCURRENCY)) as pool:
-            shards = list(pool.map(self._merged_pull_requests_for_day, days))
-        # GitHub's search date qualifier is an exact UTC day, so slicing the
-        # window this way turns one query that walks `since` to today through
-        # GraphQL cursor pagination (measured ~4-9s for a three-week, ~630-PR
-        # window) into independent single-page requests fetched in parallel
-        # (~1-2s for the same window). A day whose own shard fills its limit
-        # is the only way a merged pull request can go missing (a single query's
-        # cap would truncate the *whole* window), so that is
-        # what the residual warning below watches for.
-        saturated_days = tuple(
-            day
-            for day, shard in zip(days, shards, strict=True)
-            if len(shard) >= MAX_RECENT_MERGED_PULL_REQUESTS
+        floor = since.astimezone(UTC).strftime(protocol.RFC3339_TIMESTAMP_FORMAT)
+        rows = self._paged_rows(
+            lambda page: github_pull_requests.merged_page_request(
+                self.repository, floor, page, ISSUES_PER_PAGE
+            ),
+            "merged board pull request",
         )
-        if saturated_days:
-            print(
-                "WARNING: merged pull request history is capped at "
-                f"{MAX_RECENT_MERGED_PULL_REQUESTS} results for "
-                f"{', '.join(day.isoformat() for day in saturated_days)}; "
-                "an older landing that day could be missing from a board/next stage",
-                file=sys.stderr,
-            )
-        recent: list[workboard.PullRequest] = []
-        for pull_request in (pr for shard in shards for pr in shard):
-            if pull_request.merged_at is None:
-                continue
-            try:
-                merged_at = datetime.fromisoformat(pull_request.merged_at)
-            except ValueError as error:
-                raise forge.ForgeMalformedResponseError(
-                    "GitHub returned a malformed merged board pull request"
-                ) from error
-            if merged_at >= cutoff:
-                recent.append(pull_request)
-        return tuple(recent)
+        return github_pull_requests.merged_pull_requests(rows, floor)
 
     def _closed_issue_page(self, since: str, page: int) -> tuple[object, ...]:
         """One page of issues GitHub reports closed and updated at or after
@@ -1213,8 +1036,9 @@ class GitHubForge:
         raw = self._run(
             [
                 "api",
-                f"repos/{self.repository}/issues?state=closed&since={since}"
-                f"&per_page={ISSUES_PER_PAGE}&page={page}",
+                github_pull_requests.closed_issues_path(
+                    self.repository, since, page, ISSUES_PER_PAGE
+                ),
                 "--jq",
                 '.[] | {number,title,closedAt:.closed_at,isPullRequest:has("pull_request")}',
             ]
