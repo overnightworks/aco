@@ -1,5 +1,5 @@
 claim_id = "2284b33b8e7543378c9897d537b02d33"
-agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
+agent = "Claude deb862cb-0966-452b-a001-fbf8c7b46d71"
 role = "builder"
 base = "1d665fbe3b93fb4d616550432b486258efc03041"
 branch = "claude/issue-990-release-from-stored-runs"
