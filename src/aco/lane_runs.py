@@ -150,8 +150,8 @@ def _added(members: Mapping[str, object], where: str) -> RunAdded:
     stages = tuple(cast(list[object], ran)) if isinstance(ran, list) else ()
     if (
         not stages
-        or len(set(stages)) != len(stages)
         or not all(isinstance(stage, str) and stage in RAN_STAGES for stage in stages)
+        or len(set(stages)) != len(stages)
     ):
         raise RunsFileError(f"{where}.ran must list each stage that ran once")
     try:

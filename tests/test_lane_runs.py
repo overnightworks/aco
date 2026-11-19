@@ -165,6 +165,7 @@ def with_key(key: str, value: object) -> Callable[[dict[str, object]], None]:
         pytest.param(with_run_changed(1, ran=["build", "build"]), id="a-stage-twice"),
         pytest.param(with_run_changed(1, ran=["land"]), id="land-did-not-run"),
         pytest.param(with_run_changed(1, ran="build"), id="ran-not-a-list"),
+        pytest.param(with_run_changed(1, ran=[[]]), id="a-stage-that-is-a-list"),
         pytest.param(without_run_key(1, "record"), id="added-without-record"),
         pytest.param(without_run_key(1, "end_tip"), id="added-without-end-tip"),
         pytest.param(with_run_changed(0, end_tip=SECOND_TIP), id="end-tip-without-the-rest"),
