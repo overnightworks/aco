@@ -3,6 +3,6 @@ agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
 role = "builder"
 base = "e0813de269d34a40dfebe84117c996fbcf4892fc"
 branch = "claude/issue-978-pull-request-reads-over-rest"
-scope = ["quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco", "tests"]
+scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco", "tests"]
 opened_commit = "50a590db8d930ffa8dc72c59f26d4a26113de88c"
 whole_reason = "The four reads share one adapter and one set of fake-forge fixtures that many test modules route on; moving one alone leaves the board read on GraphQL."
