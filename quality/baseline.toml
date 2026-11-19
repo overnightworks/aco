@@ -36,7 +36,7 @@
 "tests/test_cmd_reset.py" = 950
 "tests/test_github.py" = 2741
 "tests/test_state_board.py" = 5898
-"tests/test_store.py" = 4410
+"tests/test_store.py" = 4393
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 80

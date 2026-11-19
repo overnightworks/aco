@@ -38,6 +38,7 @@ from store_fixtures import (
     RaceOnceTransport,
     blob,
     claim_intent,
+    fail_git_subprocesses_carrying,
     push_custom_tree,
     push_raw_state_tree,
     raw_tree,
@@ -1706,24 +1707,6 @@ def test_find_operation_id_fails_loud_when_the_range_is_unresolvable(worktree: P
         )
 
 
-def _fake_run_captured_failing_candidate_log(
-    real: Callable[[list[str]], process.CapturedResult],
-) -> Callable[[list[str]], process.CapturedResult]:
-    """Every real git subprocess runs except the per-candidate `git log -1`
-    inside `_find_operation_id`'s search -- distinguished from that
-    function's own outer `git log --format=%H` listing by the `-1` argument the inner read
-    alone carries."""
-
-    def fake(arguments: list[str]) -> process.CapturedResult:
-        if "log" in arguments and "-1" in arguments:
-            return process.CapturedResult(
-                exit_status=1, stdout=b"", stderr=b"simulated candidate read failure"
-            )
-        return real(arguments)
-
-    return fake
-
-
 def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
@@ -1735,10 +1718,10 @@ def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     observed = fresh_observation(worktree, bare_remote)
     transport = _AcceptThenRaiseTransport()
-    monkeypatch.setattr(
-        store.process,
-        "run_captured",
-        _fake_run_captured_failing_candidate_log(process.run_captured),
+    # Only the per-candidate `git log -1` inside `_find_operation_id`'s search
+    # fails, not its outer `git log --format=%H` listing.
+    fail_git_subprocesses_carrying(
+        monkeypatch, "log", "-1", stderr=b"simulated candidate read failure"
     )
 
     subject = store.TransitionSubject("claim issue 42")

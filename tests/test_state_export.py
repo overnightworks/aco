@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 import pytest
 from cli_fixtures import real_git, set_git_identity
-from store_fixtures import push_custom_tree
+from store_fixtures import fail_git_subprocesses_carrying, push_custom_tree
 
 from aco import process, protocol, state_export, store
 
@@ -114,16 +114,9 @@ def _break_export_via_a_failed_bundle_create(
     behind empty, and `destination` itself must never come to exist at all."""
     tip = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
     assert tip is not None
-    real_run_captured = process.run_captured
-
-    def fake_run_captured(arguments: list[str]) -> process.CapturedResult:
-        if "bundle" in arguments and "create" in arguments:
-            return process.CapturedResult(
-                exit_status=1, stdout=b"", stderr=b"simulated bundle create failure"
-            )
-        return real_run_captured(arguments)
-
-    monkeypatch.setattr(store.process, "run_captured", fake_run_captured)
+    fail_git_subprocesses_carrying(
+        monkeypatch, "bundle", "create", stderr=b"simulated bundle create failure"
+    )
     return tip, tmp_path / "state.bundle", lambda: None
 
 
