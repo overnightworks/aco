@@ -382,7 +382,8 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         lane_record.require_abandoned_release(parsed.record, parsed.abandoned)
         release_transition(parsed, context, _release_branch_for(parsed))
     except protocol.ClaimError as error:
-        return report.refuse(_ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
+        named = workboard.named_refusal(error, context.config.storage)
+        return report.refuse(_ReleaseReason.PRECONDITION_FAILED, named, as_json=as_json)
     return 0
 
 
@@ -440,7 +441,7 @@ def release_transition(
     merge_commit, item = (None, None) if lane is None else (lane.merge_commit, lane.item)
     evidence = release_record.ReleaseEvidence(merge_commit, item, parsed.record)
     new_state = context.transition(
-        release_record.release_subject(context, resolved.selected, outcome, evidence), intent
+        *release_record.release_write(context, resolved.selected, outcome, evidence, intent)
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
     landing = worktree_cleanup = None
@@ -659,7 +660,7 @@ def _cmd_release_landed(
     )
     evidence = release_record.ReleaseEvidence(item=item)
     new_state = context.transition(
-        release_record.release_subject(context, resolved.selected, outcome, evidence), intent
+        *release_record.release_write(context, resolved.selected, outcome, evidence, intent)
     )
     client.mark_landed(write, new_oid)
     landing = _landing_report(context, identity, new_state, storage, trunk_ref)

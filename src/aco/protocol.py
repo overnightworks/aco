@@ -960,9 +960,7 @@ class ReleaseIntent:
     of its own -- `apply` never inspects it -- but is carried on the intent
     for the commit message `store.py` builds from this transition, and for
     `MergedRelease`'s own pre-`apply` forge verification (failure there
-    never reaches `apply` at all). `expected_runs` is the blob of the claim's
-    runs file the release computed its record from (`None`: it had none);
-    `apply` refuses a state whose file for the claim differs.
+    never reaches `apply` at all).
     """
 
     claim_id: ClaimId
@@ -971,6 +969,7 @@ class ReleaseIntent:
     outcome: ReleaseOutcome
     operation_id: str
     coordinator_override: bool = False
+    # The claim's runs file as the release read it; `apply` refuses a state whose file differs.
     expected_runs: ObjectId | None = None
 
 
@@ -1037,8 +1036,7 @@ class LandingIntent:
     close its item without releasing the claim, or release the claim while
     leaving its item open. Replay-safe like every other intent, entirely
     through `store.commit_transition`'s own generic `operation_id` replay
-    search: nothing further is needed here for that. `expected_runs` is
-    `ReleaseIntent`'s own.
+    search: nothing further is needed here for that.
     """
 
     item_id: str
@@ -1310,33 +1308,32 @@ def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingInte
 
 
 def stale_runs_sentence(label: str) -> str:
-    """The refusal of a write that read a claim's runs file before it changed."""
     return (
         f"the stored runs of {label} were written since this command read them; "
         "run the same command again"
     )
 
 
-def _stale_runs_naming(claim: ActiveClaim, item_label: ItemLabel) -> str:
-    named = item_label(claim.identity.issue) if isinstance(claim.identity, IssueIdentity) else None
-    return stale_runs_sentence(claim.claim_id if named is None else named)
+def claim_label(claim: ActiveClaim, item_label: ItemLabel) -> str:
+    """The item an issue claim holds as `item_label` names it; an issue-less lane its claim id."""
+    identity = claim.identity
+    return item_label(identity.issue) if isinstance(identity, IssueIdentity) else claim.claim_id
 
 
 def _apply_release_intent(state: ClaimState, intent: ReleaseIntent | LandingIntent) -> ClaimState:
-    """`state` without the claim `intent` releases and without its runs file, once the
-    releaser is the claimant or a coordinator and the file is the one the intent read."""
+    """`state` without the released claim and its runs file, which must be the one `intent` read."""
     found = _live_claim_by_id(state, intent.claim_id)
     if found is None:
         raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to release")
     key, current = found
     _authorize_release(current, intent)
     if state.runs.get(intent.claim_id) != intent.expected_runs:
-        raise ClaimUnavailableError(naming=partial(_stale_runs_naming, current))
-    claims = {existing: claim for existing, claim in state.claims.items() if existing != key}
-    runs = {existing: oid for existing, oid in state.runs.items() if existing != intent.claim_id}
-    return replace(  # NOSONAR(S5886) pyright types replace()
-        state, claims=MappingProxyType(claims), runs=MappingProxyType(runs)
-    )
+        raise ClaimUnavailableError(
+            naming=lambda item_label: stale_runs_sentence(claim_label(current, item_label))
+        )
+    claims = MappingProxyType({k: claim for k, claim in state.claims.items() if k != key})
+    runs = MappingProxyType({k: oid for k, oid in state.runs.items() if k != intent.claim_id})
+    return replace(state, claims=claims, runs=runs)  # NOSONAR(S5886) pyright types replace()
 
 
 ITEMS_WRITTEN_SINCE_CHECKED = "items/ was written since this write checked it; re-read and retry"
@@ -1410,10 +1407,8 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
         raise ClaimError(MISSING_STATE_REF)
     released = _apply_release_intent(state, intent)
     _require_item_unwritten(state, intent.item_id, intent.item_expected)
-    new_items = {**state.items, intent.item_id: intent.item_new_oid}
-    return replace(  # NOSONAR(S5886) pyright types replace()
-        released, items=MappingProxyType(new_items)
-    )
+    items = MappingProxyType({**state.items, intent.item_id: intent.item_new_oid})
+    return replace(released, items=items)  # NOSONAR(S5886) pyright types replace()
 
 
 def _apply_runs_write_intent(state: ClaimState, intent: RunsWriteIntent) -> ClaimState:
