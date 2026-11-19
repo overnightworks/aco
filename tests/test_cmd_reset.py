@@ -30,6 +30,7 @@ from store_fixtures import (
 )
 
 from aco import checkout, process, protocol, session, store
+from aco.state_export import EXPORT_BUNDLE_REF, export_state_bundle
 
 
 def _bootstrap_output(stdout: str) -> tuple[tuple[str, ...], str | None]:
@@ -366,7 +367,7 @@ def test_reset_plans_or_performs_each_state(
     if case.explicit_directory:
         arguments += ["--export-dir", str(export_dir)]
     expected_lines = tuple(
-        line.format(ref=store.STATE_REF, tip=tip, bundle=bundle, export_ref=store.EXPORT_BUNDLE_REF)
+        line.format(ref=store.STATE_REF, tip=tip, bundle=bundle, export_ref=EXPORT_BUNDLE_REF)
         for line in case.lines
     )
     capsys.readouterr()
@@ -412,7 +413,7 @@ def test_reset_plans_or_performs_each_state(
                 clone, "bundle", "list-heads", str(bundle), check=False
             ).stdout.strip(),
         )
-        expected.update(bundle_verified=0, bundle_heads=f"{tip} {store.EXPORT_BUNDLE_REF}")
+        expected.update(bundle_verified=0, bundle_heads=f"{tip} {EXPORT_BUNDLE_REF}")
     assert actual == expected
 
 
@@ -698,16 +699,15 @@ def _moved_remote(
     tree = real_git(clone, "rev-parse", f"{tip}^{{tree}}").stdout.strip()
     moved_tip = real_git(clone, "commit-tree", tree, "-p", tip, "-m", "moved").stdout.strip()
     assert moved_tip != tip
-    real_export = store.export_state_bundle
 
     def export_then_move_remote(
         *, worktree: Path, tip: protocol.ObjectId, destination: Path
     ) -> Path:
-        result = real_export(worktree=worktree, tip=tip, destination=destination)
+        result = export_state_bundle(worktree=worktree, tip=tip, destination=destination)
         real_git(clone, "push", "--force", str(bare_remote), f"{moved_tip}:{store.STATE_REF}")
         return result
 
-    monkeypatch.setattr(store, "export_state_bundle", export_then_move_remote)
+    monkeypatch.setattr("aco.state_export.export_state_bundle", export_then_move_remote)
     yield ResetFailure(
         status=2,
         error=(
@@ -920,7 +920,7 @@ def test_reset_bundle_restores_the_released_history(
         "fetch",
         "-q",
         str(bundle),
-        f"{store.EXPORT_BUNDLE_REF}:{store.STATE_REF}",
+        f"{EXPORT_BUNDLE_REF}:{store.STATE_REF}",
         check=False,
     )
     assert restored.returncode == 0
