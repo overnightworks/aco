@@ -1,21 +1,27 @@
 """Shared test isolation.
 
 Only isolation fixtures live here -- the autouse ones and the isolation more
-than one module asks for by name -- plus `github_world`, the GitHub-checkout
+than one module asks for by name -- plus `git_call_spy`, the git call counter two store
+modules share, and `github_world`, the GitHub-checkout
 world check many modules share; everything else stays local to its test
 module. The one exception is registration: `cli_fixtures`, `adoption_world`,
-`release_cleanup_world` and `check_pull_request_fixtures` are loaded as pytest plugins
-(`pytest_plugins` below).
+`release_cleanup_world`, `check_pull_request_fixtures` and `lane_record_runs_world` are
+loaded as pytest plugins (`pytest_plugins` below).
 `cli_fixtures` gives every test module its `bare_remote` and `worktree` fixtures
 by name, and its autouse `_isolate_agent_identity` applies to every test;
 `adoption_world` gives every module its `world` fixture, and
 `release_cleanup_world` gives the release cleanup modules their `cleanup_check`;
-`check_pull_request_fixtures` gives the `aco check <pr>` tests their `check_pull_request`.
+`check_pull_request_fixtures` gives the `aco check <pr>` tests their `check_pull_request`;
+`lane_record_runs_world` gives the `aco lane-record begin` and `add` tests their world.
 """
 
+from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+
+from aco import process, store
 
 # Registers `cli_fixtures` (`bare_remote`, `worktree`, the autouse identity
 # isolation), `adoption_world` (`world`) and `release_cleanup_world`
@@ -26,6 +32,7 @@ pytest_plugins = [
     "adoption_world",
     "release_cleanup_world",
     "check_pull_request_fixtures",
+    "lane_record_runs_world",
 ]
 
 
@@ -68,3 +75,30 @@ def _isolate_state_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None
     """aco's state directory (item locks, the board token) is the test's own,
     never the operator's."""
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+
+@pytest.fixture
+def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
+    """Counts real git subprocess invocations by subcommand, patched at the
+    `process` chokepoint both of `store`'s call shapes go through --
+    `run_git` (`process.run_captured`) and `_run_git_with_input`
+    (`process.run_bounded_captured`) -- the proof that a transition's or a read's
+    git-invocation count is independent of how many claims the state tree
+    holds.
+    """
+    counts: Counter[str] = Counter()
+
+    def record(command: list[str]) -> None:
+        if command[0] == "git":
+            counts[command[3]] += 1
+
+    def spy(real: Callable[..., object]) -> Callable[..., object]:
+        def wrapped(command: list[str], **kwargs: object) -> object:
+            record(command)
+            return real(command, **kwargs)
+
+        return wrapped
+
+    monkeypatch.setattr(store.process, "run_captured", spy(process.run_captured))
+    monkeypatch.setattr(store.process, "run_bounded_captured", spy(process.run_bounded_captured))
+    return counts

@@ -5,7 +5,6 @@ import tomllib
 import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
-from enum import StrEnum
 from functools import partial
 from pathlib import PurePosixPath, PureWindowsPath
 from types import MappingProxyType
@@ -25,7 +24,7 @@ ISSUELESS_LANE_BRANCH_PREFIXES = ("docs/", "fix/")
 CLAIM_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 # `aco-` plus six lowercase hex characters:
 # a short random id, never a counter, never reused. An item
-# lives at exactly this id plus `.md` under `items/` (`item_filename`), so a
+# lives at exactly this id plus `.md` under `items/` (`ITEM_FILENAME_SUFFIX`), so a
 # rename of the file is the only way its id ever changes.
 ITEM_ID_PATTERN = re.compile(r"aco-[0-9a-f]{6}")
 ITEM_FILENAME_SUFFIX = ".md"
@@ -47,10 +46,6 @@ RFC3339_TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 RFC3339_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 MAX_SCOPE_ENTRIES = 256
 MAX_SCOPE_PATH_LENGTH = 512
-WIDE_SCOPE_PATH_LIMIT = 3
-WIDE_SCOPE_SHARE_LIMIT = 0.25
-# A tiny repository must not trip the share condition.
-WIDE_SCOPE_SHARE_FLOOR = 12
 # How many paths a truncated listing names in full before counting the rest --
 # the dirty-tree refusal's and the claim overlap notice's shared shape for a
 # list too long to print whole.
@@ -407,56 +402,6 @@ def valid_scope(scope: object, *, allow_glob_characters: bool = False) -> tuple[
     if len(set(result)) != len(result):
         raise InvalidClaimMarkerError("claim scope contains duplicate paths")
     return tuple(sorted(result))
-
-
-class WideScopeReason(StrEnum):
-    """Which of the three wide-scope conditions tripped -- named so a
-    refusal can print the one that actually fired instead of restating the
-    whole rule."""
-
-    PATH_COUNT = "path_count"
-    DIRECTORY = "directory"
-    SHARE = "share"
-
-
-@dataclass(frozen=True)
-class WideScopeTrip:
-    """The tripped condition, plus the numbers it was judged against -- a
-    refusal renders these instead of recomputing them."""
-
-    reason: WideScopeReason
-    path_count: int
-    directories: tuple[str, ...]
-    covered_file_count: int
-    versioned_file_count: int
-
-
-def wide_scope_trip(
-    scope: tuple[str, ...],
-    *,
-    directories: tuple[str, ...],
-    covered_file_count: int,
-    versioned_file_count: int,
-) -> WideScopeTrip | None:
-    """Which wide-scope condition fires first, in the rule's own priority
-    order -- more than three paths, then any directory, then, once the
-    repository has at least `WIDE_SCOPE_SHARE_FLOOR` versioned files, more
-    than a quarter of them -- or `None` when scope is not wide."""
-
-    def trip(reason: WideScopeReason) -> WideScopeTrip:
-        return WideScopeTrip(
-            reason, len(scope), directories, covered_file_count, versioned_file_count
-        )
-
-    if len(scope) > WIDE_SCOPE_PATH_LIMIT:
-        return trip(WideScopeReason.PATH_COUNT)
-    if directories:
-        return trip(WideScopeReason.DIRECTORY)
-    if versioned_file_count < WIDE_SCOPE_SHARE_FLOOR:
-        return None
-    if covered_file_count / versioned_file_count > WIDE_SCOPE_SHARE_LIMIT:
-        return trip(WideScopeReason.SHARE)
-    return None
 
 
 def scope_overlap_paths(left: tuple[str, ...], right: tuple[str, ...]) -> tuple[str, ...]:
@@ -914,11 +859,6 @@ def parse_claim_key(key: str) -> ClaimIdentity:
 # rename.
 
 
-def item_filename(item_id: str) -> str:
-    """The `items/` entry name item `item_id` lives at."""
-    return f"{item_id}{ITEM_FILENAME_SUFFIX}"
-
-
 def item_id_of_filename(filename: str) -> str | None:
     """The item id `filename` names, or `None` for a foreign `items/` entry."""
     if not filename.endswith(ITEM_FILENAME_SUFFIX):
@@ -971,7 +911,8 @@ class ClaimState:
     transition builds and returns a whole new `ClaimState`. `items`
     maps an item id to its blob oid alone, never its content --
     content stays a lazy, separate read (`store.read_item_files`), which is
-    what keeps this state cheap to fetch regardless of item count.
+    what keeps this state cheap to fetch regardless of item count. `runs` maps a claim id to the
+    blob oid of its runs file the same way.
     """
 
     tip: ObjectId | None
@@ -979,6 +920,7 @@ class ClaimState:
     consumed_ids: frozenset[ClaimId] = field(default_factory=frozenset)
     resources: Mapping[str, ResourceRecord] = field(default_factory=lambda: MappingProxyType({}))
     items: Mapping[str, ObjectId] = field(default_factory=lambda: MappingProxyType({}))
+    runs: Mapping[str, ObjectId] = field(default_factory=lambda: MappingProxyType({}))
 
 
 EMPTY_STATE = ClaimState(tip=None)
@@ -1188,6 +1130,22 @@ class LandingIntent:
     coordinator_override: bool = False
 
 
+@dataclass(frozen=True)
+class RunsWriteIntent:
+    """Replaces `runs/<claim_id>.json`'s blob oid with `new_oid`: only the live claim's holder
+    `agent` may, and only while the file is still the blob `expected` the writer read (`None`:
+    none yet). The writer's own sentences refuse a non-holder (as a function of the holder)
+    and a file written since, because they name the item as the writer's storage does."""
+
+    claim_id: ClaimId
+    agent: str
+    expected: ObjectId | None
+    new_oid: ObjectId
+    operation_id: str
+    holder_refusal: Callable[[str], str]
+    stale_refusal: str
+
+
 ClaimTransitionIntent = (
     ClaimIntent
     | RescopeIntent
@@ -1196,6 +1154,7 @@ ClaimTransitionIntent = (
     | ItemWriteIntent
     | ItemCloseIntent
     | LandingIntent
+    | RunsWriteIntent
 )
 
 
@@ -1439,6 +1398,7 @@ def _apply_release_intent(state: ClaimState, intent: ReleaseIntent) -> ClaimStat
     return replace(  # NOSONAR(S5886) pyright types replace()
         state,
         claims=MappingProxyType(new_claims),
+        runs=_runs_without(state, intent.claim_id),
     )
 
 
@@ -1525,12 +1485,30 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
         state,
         claims=MappingProxyType(new_claims),
         items=MappingProxyType(new_items),
+        runs=_runs_without(state, intent.claim_id),
     )
+
+
+def _runs_without(state: ClaimState, claim_id: ClaimId) -> Mapping[str, ObjectId]:
+    """`state.runs` without the file of `claim_id`: a released or landed claim keeps none."""
+    return MappingProxyType({key: oid for key, oid in state.runs.items() if key != claim_id})
+
+
+def _apply_runs_write_intent(state: ClaimState, intent: RunsWriteIntent) -> ClaimState:
+    found = _live_claim_by_id(state, intent.claim_id)
+    if found is None:
+        raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim")
+    if found[1].agent != intent.agent:
+        raise ClaimUnavailableError(intent.holder_refusal(found[1].agent))
+    if state.runs.get(intent.claim_id) != intent.expected:
+        raise ClaimUnavailableError(intent.stale_refusal)
+    runs = {**state.runs, intent.claim_id: intent.new_oid}
+    return replace(state, runs=MappingProxyType(runs))  # NOSONAR(S5886) pyright types replace()
 
 
 def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
     """The pure claim-state transition: the sole writer of
-    `ClaimState.claims`/`consumed_ids`/`resources`/`items`. Assumes
+    `ClaimState.claims`/`consumed_ids`/`resources`/`items`/`runs`. Assumes
     `state.tip` is already real -- `store.py` never calls this against
     `EMPTY_STATE`."""
     if isinstance(intent, ClaimIntent):
@@ -1543,6 +1521,8 @@ def apply(state: ClaimState, intent: ClaimTransitionIntent) -> ClaimState:
         applied = _apply_release_intent(state, intent)
     elif isinstance(intent, LandingIntent):
         applied = _apply_landing_intent(state, intent)
+    elif isinstance(intent, RunsWriteIntent):
+        applied = _apply_runs_write_intent(state, intent)
     elif isinstance(intent, ItemCloseIntent):
         applied = _apply_item_close_intent(state, intent)
     else:

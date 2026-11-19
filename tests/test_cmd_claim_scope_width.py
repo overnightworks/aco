@@ -33,7 +33,7 @@ CUT_BODY = complete_contract("Claim #72.") + "\n\n## Schnitt\n\n**Scheibe 1: Tit
 UNCUT_BODY = complete_contract("Claim #72.") + "\n\n## Schnitt\n\nNo slices yet.\n"
 
 # The trunk files beside the tracked board configuration: eleven make twelve
-# versioned files, `protocol.WIDE_SCOPE_SHARE_FLOOR`: LICENSE, README.md and
+# versioned files, `wide_scope.WIDE_SCOPE_SHARE_FLOOR`: LICENSE, README.md and
 # `src` cover four of them.
 TRUNK_OF_TWELVE = (
     "LICENSE",

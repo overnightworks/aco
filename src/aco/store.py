@@ -25,7 +25,6 @@ import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
 from enum import StrEnum
 from io import BytesIO
 from pathlib import Path
@@ -36,6 +35,7 @@ from . import lineage_stamp, process
 from .protocol import (
     CLAIM_ID_PATTERN,
     EMPTY_STATE,
+    ITEM_FILENAME_SUFFIX,
     MISSING_STATE_REF,
     ActiveClaim,
     ClaimError,
@@ -57,12 +57,12 @@ from .protocol import (
     ReleaseIntent,
     RescopeIntent,
     ResourceRecord,
+    RunsWriteIntent,
     StateLineageError,
     UncertainWriteError,
     UnreadableState,
     UnsupportedStateSchemaError,
     apply,
-    item_filename,
     item_id_of_filename,
     parse_schema_toml,
     serialize_empty_schema_toml,
@@ -86,10 +86,11 @@ RESOURCES_DIRECTORY = "resources"
 # structure is folded into `ClaimState.items` for free from the same
 # recursive `ls-tree`; only the byte content stays excluded.
 ITEMS_DIRECTORY = "items"
+# `runs/<claim-id>.json`: a claim's runs, lane data read lazily like `items/`.
+RUNS_DIRECTORY = "runs"
+RUN_FILE_SUFFIX = ".json"
 SCHEMA_TOML_FILENAME = "schema.toml"
 TOML_SUFFIX = ".toml"
-git_failure_detail = process.git_failure_detail
-git_failure_detail_from_stderr = process.git_failure_detail_from_stderr
 # Tree entry names travel as git's raw bytes (`-z`);
 # `surrogateescape` lets a name that is not UTF-8 survive the round trip
 # from `_list_tree` back into `_mktree` byte for byte.
@@ -98,8 +99,10 @@ _TREE_NAME_ERRORS = "surrogateescape"
 # git's two file modes: a symlink (120000) also lists as a blob, yet
 # `git archive` yields no file for it, so the mode decides.
 _FILE_MODES = frozenset({"100644", "100755"})
-_STATE_TOP_LEVEL_NAMES = frozenset(
-    {SCHEMA_TOML_FILENAME, CLAIMS_DIRECTORY, IDS_DIRECTORY, RESOURCES_DIRECTORY, ITEMS_DIRECTORY}
+_LAZY_DIRECTORIES = frozenset({ITEMS_DIRECTORY, RUNS_DIRECTORY})
+_STATE_TOP_LEVEL_NAMES = (
+    frozenset({SCHEMA_TOML_FILENAME, CLAIMS_DIRECTORY, IDS_DIRECTORY, RESOURCES_DIRECTORY})
+    | _LAZY_DIRECTORIES
 )
 
 
@@ -113,6 +116,7 @@ class TransitionIntent(StrEnum):
     RELEASE = "release"
     ITEM_WRITE = "item_write"
     LANDING = "landing"
+    LANE_RECORD = "lane_record"
 
 
 # ref-store-cas.spec.md, CAS-06: one `intent:` trailer label per transition intent.
@@ -125,6 +129,7 @@ _TRANSITION_LABELS: dict[type[ClaimTransitionIntent], TransitionIntent] = {
     # A close commits as an item write; its live-claim check is a precondition of `apply`.
     ItemCloseIntent: TransitionIntent.ITEM_WRITE,
     LandingIntent: TransitionIntent.LANDING,
+    RunsWriteIntent: TransitionIntent.LANE_RECORD,
 }
 
 # `git ls-remote --exit-code` (git(1)): 2 is "no matching refs" -- the only
@@ -242,7 +247,11 @@ class GitPushTransport:
                 f"git push to the claim state store did not finish: {cause}"
             ) from error
         if result.exit_status != 0:
-            raise PushRejectedError(process.git_failure_detail(result))
+            raise PushRejectedError(git_failure_detail(result))
+
+
+git_failure_detail = process.git_failure_detail
+git_failure_detail_from_stderr = process.git_failure_detail_from_stderr
 
 
 def run_git(
@@ -282,7 +291,7 @@ def _git_dir(worktree: Path) -> Path:
     """
     result = run_git(worktree, ["rev-parse", "--absolute-git-dir"])
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise ClaimError(git_failure_detail(result))
     return Path(result.stdout.decode().strip())
 
 
@@ -300,7 +309,7 @@ def _is_ancestor(worktree: Path) -> lineage_stamp.IsAncestor:
         if result.exit_status == _MERGE_BASE_EXIT_NOT_ANCESTOR:
             return False
         if result.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(result)
+            detail = git_failure_detail_from_stderr(result)
             raise ClaimError(
                 f"cannot check whether {ancestor} is an ancestor of {descendant}: {detail}"
             )
@@ -323,69 +332,6 @@ def _stamp_after_landing(worktree: Path, commit: ObjectId) -> None:
         raise _lineage_break(verdict.previous, commit)
 
 
-# Field separator for the batched `git log` read below: %x09 is git's own
-# escape for a literal tab, unambiguous inside a `--format` string.
-_LOG_FORMAT = "%H%x09%cI"
-
-
-def _commit_history_read_failure(tip: ObjectId, result: process.CapturedResult) -> ClaimError:
-    """The one sentence the first-parent history walk below raises on a
-    failing `git log`, carrying git's own stderr forward."""
-    return ClaimError(
-        f"cannot read the commit history of {tip}: {process.git_failure_detail_from_stderr(result)}"
-    )
-
-
-def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, datetime]:
-    """Every commit reachable from `tip` by first-parent descent, mapped to
-    its committer date, in one `git log` call.
-
-    `refs/aco/state`'s own history is always linear by construction --
-    `commit_transition` never writes a merge, every retry parents its new
-    commit onto a freshly observed tip ("never a merge") -- so a
-    first-parent walk from `tip` reaches every commit the ref has ever held.
-    """
-    result = run_git(worktree, ["log", "--first-parent", f"--format={_LOG_FORMAT}", str(tip)])
-    if result.exit_status != 0:
-        raise _commit_history_read_failure(tip, result)
-    dates: dict[ObjectId, datetime] = {}
-    for line in result.stdout.decode().splitlines():
-        commit_hex, _, raw_date = line.partition("\t")
-        try:
-            parsed = datetime.fromisoformat(raw_date)
-        except ValueError as error:
-            raise ClaimError(f"git returned a malformed committer date for {commit_hex}") from error
-        dates[ObjectId(commit_hex)] = parsed.astimezone(UTC)
-    return dates
-
-
-def claim_ages(
-    *, worktree: Path, tip: ObjectId, claims: Iterable[ActiveClaim]
-) -> dict[str, datetime]:
-    """Each `claim`'s age -- its `opened_commit`'s committer date -- from one
-    walk of `tip`'s history, replacing a `merge-base` plus `log`
-    pair per claim.
-
-    Refuses with `StateLineageError` for a claim whose `opened_commit` the
-    walk never reaches (claim-record.spec.md, CLAIM-50): a claim's age display reads
-    real history, it never guesses across a lineage break.
-    """
-    claim_list = tuple(claims)
-    if not claim_list:
-        return {}
-    dates = _first_parent_commit_dates(worktree, tip)
-    ages: dict[str, datetime] = {}
-    for claim in claim_list:
-        try:
-            ages[claim.claim_id] = dates[claim.opened_commit]
-        except KeyError:
-            raise StateLineageError(
-                f"{claim.opened_commit} is not an ancestor of {tip}; the ref may "
-                "have been rewritten"
-            ) from None
-    return ages
-
-
 def ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
     """Probe `STATE_REF` on `remote` without fetching it.
 
@@ -402,7 +348,7 @@ def ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
         return None
     raise ClaimError(
         f"cannot reach {remote} {STATE_REF}: auth or transport failure "
-        f"(ls-remote exited {result.exit_status}): {process.git_failure_detail(result)}"
+        f"(ls-remote exited {result.exit_status}): {git_failure_detail(result)}"
     )
 
 
@@ -422,11 +368,11 @@ def _fetch_into_anchor(worktree: Path, remote: str) -> ObjectId:
     refspec = f"+{STATE_REF}:{_FETCH_ANCHOR_REF}"
     result = run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, refspec])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
     read = run_git(worktree, ["rev-parse", _FETCH_ANCHOR_REF])
     if read.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(read)
+        detail = git_failure_detail_from_stderr(read)
         raise ClaimError(f"cannot read the fetched tip at {_FETCH_ANCHOR_REF}: {detail}")
     return ObjectId(read.stdout.decode().strip())
 
@@ -448,14 +394,14 @@ def _fetch_ref_objects(worktree: Path, remote: str) -> None:
     """
     result = run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, STATE_REF])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
 
 
 def _tree_oid(worktree: Path, tip: ObjectId) -> ObjectId:
     result = run_git(worktree, ["rev-parse", f"{tip}^{{tree}}"])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise MalformedStateTreeError(f"cannot resolve the tree for {tip}: {detail}")
     return ObjectId(result.stdout.decode().strip())
 
@@ -498,7 +444,7 @@ def _list_tree(
     """
     listing = run_git(worktree, ["ls-tree", "-r", "-t", "-z", str(tree_ref)])
     if listing.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(listing)
+        detail = git_failure_detail_from_stderr(listing)
         raise MalformedStateTreeError(
             f"cannot list the {context} tree {tree_ref} at {tip}: {detail}"
         )
@@ -559,7 +505,7 @@ def _read_state_archive(
         command.extend(["--", *paths])
     result = run_git(worktree, command)
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise MalformedStateTreeError(f"cannot read the state tree at {tip}: {detail}")
     try:
         with tarfile.open(
@@ -666,7 +612,7 @@ def _parse_items_subtree(
     file (`_require_item_file`).
     Only an entry `protocol.item_id_of_filename` names an item is keyed;
     a foreign entry stays in the tree, carried over by every
-    write (`_patch_items_subtree`), and is the whole-board read's to refuse.
+    write (`_patch_keyed_subtree`), and is the whole-board read's to refuse.
     The `[record]` content grammar stays `items.py`'s.
     """
     if not present:
@@ -678,6 +624,23 @@ def _parse_items_subtree(
         if item_id is not None:
             items[item_id] = entry.oid
     return MappingProxyType(items)
+
+
+def _parse_runs_subtree(
+    entries: dict[str, _ListedEntry], *, present: bool, tip: ObjectId
+) -> Mapping[str, ObjectId]:
+    """`runs/`'s claim id -> blob oid map; every entry is a `<claim-id>.json` file, unread."""
+    if not present:
+        return MappingProxyType({})
+    runs: dict[str, ObjectId] = {}
+    for name, entry in _direct_children(entries, RUNS_DIRECTORY).items():
+        path = f"{RUNS_DIRECTORY}/{name}"
+        _require_file_entry(path, entry, tip, "is not a run file", suffix=RUN_FILE_SUFFIX)
+        claim_id = name.removesuffix(RUN_FILE_SUFFIX)
+        if CLAIM_ID_PATTERN.fullmatch(claim_id) is None:
+            raise MalformedStateTreeError(f"{path} at {tip} is not a run file")
+        runs[claim_id] = entry.oid
+    return MappingProxyType(runs)
 
 
 def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
@@ -705,7 +668,7 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
     if unknown:
         raise MalformedStateTreeError(f"state tree at {tip} has unknown entries: {sorted(unknown)}")
     archive = _read_state_archive(
-        worktree, tree_oid, tip=tip, paths=sorted(top_level.keys() - {ITEMS_DIRECTORY})
+        worktree, tree_oid, tip=tip, paths=sorted(top_level.keys() - _LAZY_DIRECTORIES)
     )
     parse_schema_toml(_read_schema_toml(top_level, archive, tip=tip), tip=tip)
     return ClaimState(
@@ -730,6 +693,11 @@ def _parse_state_tree(worktree: Path, tip: ObjectId) -> ClaimState:
         items=_parse_items_subtree(
             entries,
             present=_subtree_oid(top_level, ITEMS_DIRECTORY, tip=tip) is not None,
+            tip=tip,
+        ),
+        runs=_parse_runs_subtree(
+            entries,
+            present=_subtree_oid(top_level, RUNS_DIRECTORY, tip=tip) is not None,
             tip=tip,
         ),
     )
@@ -878,7 +846,7 @@ def _commit_tree(
         environment = {**os.environ, "GIT_AUTHOR_DATE": moment, "GIT_COMMITTER_DATE": moment}
     result = run_git(worktree, arguments, environment)
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise ClaimError(git_failure_detail(result))
     return ObjectId(result.stdout.decode().strip())
 
 
@@ -902,7 +870,7 @@ def _find_operation_id(
     range_argument = f"{since}..{until}" if since is not None else str(until)
     listing = run_git(worktree, ["log", "--format=%H", range_argument])
     if listing.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(listing)
+        detail = git_failure_detail_from_stderr(listing)
         raise ClaimError(
             f"cannot search {range_argument} for operation_id {operation_id}: {detail}"
         )
@@ -910,7 +878,7 @@ def _find_operation_id(
     for candidate in listing.stdout.decode().split():
         message = run_git(worktree, ["log", "-1", "--format=%B", candidate])
         if message.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(message)
+            detail = git_failure_detail_from_stderr(message)
             raise ClaimError(
                 f"cannot read commit {candidate} while searching for operation_id "
                 f"{operation_id}: {detail}"
@@ -1109,33 +1077,60 @@ def _reuse_or_write_ids_subtree(
     return _mktree(worktree, entries)
 
 
-def _patch_items_subtree(
+def _patch_keyed_subtree(
     worktree: Path,
     *,
     existing: _ExistingSubtree,
-    old_items: Mapping[str, ObjectId],
-    new_items: Mapping[str, ObjectId],
+    old_members: Mapping[str, ObjectId],
+    new_members: Mapping[str, ObjectId],
+    suffix: str,
 ) -> ObjectId | None:
-    """`items/`'s new subtree oid, or `None` while there is no `items/` at
-    all: this attempt's own `items/` children carried over byte
-    for byte -- name, mode, blob -- with only the ids whose oid changed
-    placed on top. A foreign entry (`protocol.item_id_of_filename` names no
-    item) is never renamed, merged, or dropped, and keeps `items/` alive on
-    its own. `existing` is read fresh from each attempt's tip, so a retry
-    that lost a race carries every other writer's already-landed id. An
-    item write already carries its blob's finished oid (hashed once by the
+    """The new subtree oid of an `items/`- or `runs/`-shaped directory (a key -> blob oid
+    mapping, each blob at `<key><suffix>`), or `None` while there is no such directory at all:
+    this attempt's own children carried over byte for byte -- name, mode, blob -- with only the
+    keys whose oid changed placed on top and the keys the write dropped left out. A foreign entry
+    is never renamed, merged, or dropped, and keeps the directory alive on its own. `existing` is
+    read fresh from each attempt's tip, so a retry that lost a race carries every other writer's
+    already-landed key. A write already carries its blob's finished oid (hashed once by the
     caller, before the retry loop), so there is never a blob to write here.
     """
-    removed = old_items.keys() - new_items.keys()
-    if removed:
-        raise ClaimError(f"a write never removes an item, yet it drops {sorted(removed)}")
-    written = {item_id: oid for item_id, oid in new_items.items() if old_items.get(item_id) != oid}
-    if not written:
+    removed = {f"{key}{suffix}" for key in old_members.keys() - new_members.keys()}
+    written = {key: oid for key, oid in new_members.items() if old_members.get(key) != oid}
+    if not written and not removed:
         return existing.oid
-    children = {name: _carried_entry(existing.children, name) for name in existing.children}
-    for item_id, oid in written.items():
-        children[item_filename(item_id)] = ("100644", "blob", oid, item_filename(item_id))
-    return _mktree(worktree, list(children.values()))
+    children = {
+        name: _carried_entry(existing.children, name)
+        for name in existing.children
+        if name not in removed
+    }
+    for key, oid in written.items():
+        children[f"{key}{suffix}"] = ("100644", "blob", oid, f"{key}{suffix}")
+    return _mktree(worktree, list(children.values())) if children else None
+
+
+def _keyed_subtrees(
+    worktree: Path, existing: dict[str, _ListedEntry], observed: ClaimState, new_state: ClaimState
+) -> dict[str, ObjectId | None]:
+    """The new `items/` and `runs/` subtree oids: a write never drops an item, and only a release
+    or a landing drops a claim's runs file."""
+    if dropped_items := observed.items.keys() - new_state.items.keys():
+        raise ClaimError(f"a write never removes an item, yet it drops {sorted(dropped_items)}")
+    return {
+        ITEMS_DIRECTORY: _patch_keyed_subtree(
+            worktree,
+            existing=_existing_subtree(existing, ITEMS_DIRECTORY),
+            old_members=observed.items,
+            new_members=new_state.items,
+            suffix=ITEM_FILENAME_SUFFIX,
+        ),
+        RUNS_DIRECTORY: _patch_keyed_subtree(
+            worktree,
+            existing=_existing_subtree(existing, RUNS_DIRECTORY),
+            old_members=observed.runs,
+            new_members=new_state.runs,
+            suffix=RUN_FILE_SUFFIX,
+        ),
+    }
 
 
 def _write_incremental_state_tree(
@@ -1160,14 +1155,8 @@ def _write_incremental_state_tree(
     assert observed.tip is not None  # noqa: S101 - commit_transition already refused a missing ref
     existing = _list_tree(worktree, observed.tip, tip=observed.tip, context="state")
     top_entries: list[_TreeEntry] = [_carried_entry(existing, SCHEMA_TOML_FILENAME)]
-    items_subtree = _patch_items_subtree(
-        worktree,
-        existing=_existing_subtree(existing, ITEMS_DIRECTORY),
-        old_items=observed.items,
-        new_items=new_state.items,
-    )
     subtrees = {
-        ITEMS_DIRECTORY: items_subtree,
+        **_keyed_subtrees(worktree, existing, observed, new_state),
         CLAIMS_DIRECTORY: _reuse_or_write_mapping_subtree(
             worktree,
             existing=_existing_subtree(existing, CLAIMS_DIRECTORY),
@@ -1412,7 +1401,7 @@ def list_worktrees(worktree: Path) -> tuple[Path, ...]:
     runs there."""
     result = run_git(worktree, ["worktree", "list", "--porcelain"])
     if result.exit_status != 0:
-        raise ClaimError(process.git_failure_detail(result))
+        raise ClaimError(git_failure_detail(result))
     return tuple(
         Path(line.removeprefix(_WORKTREE_LIST_PATH_PREFIX))
         for line in result.stdout.decode().splitlines()
@@ -1442,9 +1431,7 @@ def local_state_ref_exists(worktree: Path) -> bool:
         return True
     if result.exit_status == _SHOW_REF_EXIT_MISSING and not result.stdout and not result.stderr:
         return False
-    raise ClaimError(
-        f"cannot check {STATE_REF} in {worktree}: {process.git_failure_detail(result)}"
-    )
+    raise ClaimError(f"cannot check {STATE_REF} in {worktree}: {git_failure_detail(result)}")
 
 
 def _repair_after_failed_remote_delete(
@@ -1511,13 +1498,13 @@ def delete_state_ref(*, worktree: Path, remote: str, expected_remote_tip: Object
         result = run_git(worktree, ["push", remote, f"--force-with-lease={lease}", f":{STATE_REF}"])
         if result.exit_status != 0:
             _repair_after_failed_remote_delete(
-                worktree, remote, expected_remote_tip, process.git_failure_detail(result)
+                worktree, remote, expected_remote_tip, git_failure_detail(result)
             )
     if not local_state_ref_exists(worktree):
         return False
     result = run_git(worktree, ["update-ref", "-d", STATE_REF])
     if result.exit_status != 0:
-        detail = process.git_failure_detail_from_stderr(result)
+        detail = git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot delete local {STATE_REF}: {detail}")
     return True
 
@@ -1542,6 +1529,6 @@ def clear_lineage_stamps(*, worktree: Path) -> tuple[Path, ...]:
             lineage_stamp.remove(stamp_directory)
             result = run_git(path, ["update-ref", "-d", _FETCH_ANCHOR_REF])
         if result.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(result)
+            detail = git_failure_detail_from_stderr(result)
             raise ClaimError(f"cannot clear {_FETCH_ANCHOR_REF} in {path}: {detail}")
     return worktrees

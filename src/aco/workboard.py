@@ -13,7 +13,7 @@ from itertools import chain
 from pathlib import Path
 from typing import NoReturn, TypeGuard
 
-from . import items, protocol
+from . import items, protocol, wide_scope
 
 # The body-block codec: parsed, validated, and rendered in `body.py`, one layer
 # below this module. Every reader imports the names it needs from `body` directly;
@@ -2574,7 +2574,7 @@ def _nested_container_repair(
         # The board reads no tree, so only the path-count condition of the
         # width gate can be judged here.
         wide = occupied is not None and (
-            protocol.wide_scope_trip(
+            wide_scope.wide_scope_trip(
                 occupied, directories=(), covered_file_count=0, versioned_file_count=0
             )
             is not None

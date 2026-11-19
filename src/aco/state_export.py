@@ -103,8 +103,8 @@ def _delete_export_ref(worktree: Path) -> str | None:
     Catches `(ClaimError, OSError, ValueError)` rather than only
     `ClaimError`:
     `run_git` only wraps `ExecutableMissingError`/`ProcessTimedOutError`
-    into `ClaimError`, so a raw `OSError` from the git subprocess call inside `run_git`, its own
-    `subprocess.run` (a descriptor exhausted) would otherwise escape before
+    into `ClaimError`, so a raw `OSError` from the `subprocess.run` inside `run_git`
+    (a descriptor exhausted) would otherwise escape before
     the temporary file's own cleanup below ever runs, and
     `git_failure_detail_from_stderr`'s own `stderr.decode()` on the
     nonzero-exit branch can raise `UnicodeDecodeError` -- a `ValueError`

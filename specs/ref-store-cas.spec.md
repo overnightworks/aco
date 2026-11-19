@@ -35,7 +35,11 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | reset clears while a fetch or write holds the lock | — | — | CAS-77 |
 | ref previously observed, now absent | CAS-12 | CAS-12 | CAS-12 |
 | `schema.toml` malformed or unsupported | — | — | CAS-22..26, CAS-74 |
-| a subtree malformed | — | — | CAS-27..33 |
+| a subtree malformed | — | — | CAS-27..33, CAS-78 |
+| a runs write by a non-holder, over a changed file, or for no live claim | — | CAS-81, CAS-82 | — |
+| a runs write whose push is rejected | — | CAS-83 | — |
+| a release or a landing of a claim that has runs | — | CAS-84 | — |
+| a runs file of a claim id with no live claim | — | CAS-80 | CAS-79 |
 | a resource file malformed | — | — | CAS-34..36 |
 | an item write's `expected` is stale or `None` | — | CAS-19, CAS-20 | — |
 | a fresh child's parent changed since the command checked it | — | CAS-70..CAS-73 | — |
@@ -54,7 +58,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 - [ ] [CAS-03] A claim, rescope, release, or item write before `aco bootstrap` has created the ref refuses `the claim state ref does not exist yet; run bootstrap before claim, rescope, release, or item write`.
 - [ ] [CAS-04] An `ls-remote` exit code that is neither `0` nor `2` (auth/transport failure) refuses `cannot reach <remote> refs/aco/state: auth or transport failure (ls-remote exited <code>): <detail>`.
 - [ ] [CAS-05] A present ref whose own `fetch` fails refuses `cannot fetch <remote> refs/aco/state: <detail>`.
-- [ ] [CAS-06] Any transition's landed commit carries `operation_id: <uuid>`, `intent: claim|rescope|release|item_write|landing`, and `claim_id`, `item_id`, or a landing's `item_id`+`claim_id` (below).
+- [ ] [CAS-06] Any transition's landed commit carries `operation_id: <uuid>`, `intent: claim|rescope|handover|release|item_write|landing|lane_record`, and `claim_id`, `item_id`, or both on a landing (below).
 
   ```
   operation_id: <uuid>
@@ -121,7 +125,7 @@ attempts instead of a transition's `32`.
 - [ ] [CAS-19] An item write whose `expected` is `None` (must not exist yet) against an id another writer already created refuses `item '<id>' already exists`.
 - [ ] [CAS-20] An item write whose `expected` no longer matches the item's current stored oid refuses `item '<id>' was written since it was read (expected <oid>, found <oid-or-None>); re-read and retry`.
 - [ ] [CAS-21] Two item writes on distinct ids racing for the same tip both land (except CAS-51 and CAS-70): each attempt places its own id into the `items/` of the tip it read, so the other writer's id stays.
-- [ ] [CAS-61] A write carries every tree entry it does not write unchanged by name, mode and blob, foreign `items/` names included; `items/` stays while only such entries remain.
+- [ ] [CAS-61] A write carries every tree entry it does not write unchanged by name, mode and blob, foreign `items/` names and every `runs/` file included; `items/` stays while only such entries remain.
 - [ ] [CAS-51] An item write holding the whole `items/` it checked (`item edit --kind`) refuses `items/ was written since this write checked it; re-read and retry` once any other item changed.
 - [ ] [CAS-52] `item close` re-checks PIN-26 on every attempt: a claim that lands on the item between a rejected push and its retry refuses the close with PIN-26's sentence, the item left open.
 - [ ] [CAS-59] A `state-ref` claim re-checks on every attempt that its item is the blob its checks read open: a close or edit landed since refuses with CAS-20's sentence and writes no claim.
@@ -133,6 +137,13 @@ Under `storage = "github"`, parent validation, retyping, issue creation and sub-
 - [ ] [CAS-71] That blob advances only to the blob the command's own successful Task-to-Container retype wrote; another writer's parent blob never replaces it.
 - [ ] [CAS-72] A different or missing parent blob refuses with CAS-20's sentence naming the parent and writes no child.
 - [ ] [CAS-73] A write to another item that leaves the parent and the child id unchanged does not invalidate the parent check.
+
+## A runs write's own compare-and-swap
+
+- [ ] [CAS-81] A `lane_record` write replaces `runs/<claim-id>.json` of a live claim only for its holder and only while the file is still the blob its writer read (none yet, or its oid); it changes no claim.
+- [ ] [CAS-82] Another claim id refuses `claim id '<id>' has no active claim`, another agent the writer's holder sentence, a file written since the writer's stale sentence (LANREC-63, LANREC-59).
+- [ ] [CAS-83] A rejected push re-applies a runs write to the fresh tip, so another writer's unrelated commit does not lose it (CAS-13).
+- [ ] [CAS-84] A release and a landing remove the released claim's runs file in their own commit; `runs/` goes with its last file, and the runs files of other claim ids stay (LANREC-67).
 
 ## `schema.toml`
 
@@ -153,13 +164,16 @@ version field from the work-item body block's own `version = 1`
 (CLAIM-06..CLAIM-09, CLAIM-59..CLAIM-66); this section covers only the
 tree's structural shape before that content is ever parsed.
 
-- [ ] [CAS-27] A fetched tree carrying a top-level entry outside `schema.toml`, `claims`, `ids`, `resources`, `items` refuses `state tree at <tip> has unknown entries: ['extra.txt']`.
-- [ ] [CAS-28] A `claims`/`ids`/`resources`/`items` top-level entry that is not a directory refuses `<name> at <tip> is not a directory`.
+- [ ] [CAS-27] A fetched tree carrying a top-level entry outside `schema.toml`, `claims`, `ids`, `resources`, `items`, `runs` refuses `state tree at <tip> has unknown entries: ['extra.txt']`.
+- [ ] [CAS-28] A `claims`/`ids`/`resources`/`items`/`runs` top-level entry that is not a directory refuses `<name> at <tip> is not a directory`.
 - [ ] [CAS-29] A `claims/` entry that is not a `.toml` file (mode `100644` or `100755`), a symlink included, refuses `claims/<name> at <tip> is not a claim file`.
 - [ ] [CAS-30] An `ids/` entry that is not a bare, claim-id-shaped blob refuses `ids/<name> at <tip> is not a claim id`.
 - [ ] [CAS-31] A `resources/` entry that is not a `.toml` file (mode `100644` or `100755`), a symlink included, refuses `resources/<name> at <tip> is not a resource file`.
 - [ ] [CAS-32] An `items/` entry that is not a file (mode `100644` or `100755`), a symlink included, refuses `items/<name> at <tip> is not a file`.
 - [ ] [CAS-33] A state-tree content read whose own `git archive` invocation fails refuses `cannot read the state tree at <tip>: <detail>`.
+- [ ] [CAS-78] A `runs/` entry that is not a file (mode `100644` or `100755`, a symlink excluded) named `<claim-id>.json`, `<claim-id>` a claim id, refuses `runs/<name> at <tip> is not a run file`.
+- [ ] [CAS-79] The state read maps each claim id to its runs file's blob and reads no runs file's content, so the status archive excludes `runs/`.
+- [ ] [CAS-80] A runs file whose claim id holds no live claim is carried by every write unchanged and read by nothing.
 
 ## Resource records
 

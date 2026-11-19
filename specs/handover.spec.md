@@ -18,7 +18,7 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 
 | state \ trigger | `aco handover ITEM --from AGENT --reason TEXT` | `--json` |
 |---|---|---|
-| `AGENT` holds the item's claim | HANDOVER-01..HANDOVER-05 | HANDOVER-12 |
+| `AGENT` holds the item's claim | HANDOVER-01..HANDOVER-05, HANDOVER-15 | HANDOVER-12 |
 | the takeover already stands | HANDOVER-10 | HANDOVER-12 |
 | `AGENT` is not the holder, or this session already holds it | HANDOVER-06, HANDOVER-07 | HANDOVER-13 |
 | the item has no live claim | HANDOVER-08 | HANDOVER-13 |
@@ -31,6 +31,7 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 - [ ] [HANDOVER-03] That commit carries the trailers `intent: handover`, then `from: <agent>`, `to: <agent>` and `reason: <text>`, so the state ref's history keeps every takeover.
 - [ ] [HANDOVER-04] The item's `aco` block gains `handover = { from, to, reason, on }`, `on` today's UTC date, written before the claim moves and replacing an earlier one (see E-HANDOVER-01).
 - [ ] [HANDOVER-05] The new holder then lands, releases and rescopes the claim with no override and no `--agent` of the predecessor; the predecessor's next write refuses as a non-holder (see E-HANDOVER-02).
+- [ ] [HANDOVER-15] The claim's stored runs (LANREC-52) stay with the claim: the new holder begins and adds runs, and the previous holder's add refuses as a non-holder's (LANREC-61).
 - [ ] [HANDOVER-06] A `--from` that is not the holder refuses `<label> is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write (see E-HANDOVER-03).
 - [ ] [HANDOVER-07] A session that already holds the claim, with no recorded takeover of the same `--from` and `--reason`, refuses `this session already holds <label>`, exit `2`, before any write.
 - [ ] [HANDOVER-08] An item with no live claim refuses `issue <label> has no active build claim` (REL-09), exit `2`, before any write (see E-HANDOVER-03).

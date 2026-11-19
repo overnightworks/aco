@@ -90,11 +90,12 @@ layers = [
     "inbox",
     "progress",
     "lane_measure",
+    "lane_runs",
     "board_read | policy | report | lane_record",
     "repositories",
     "session",
     "ahead_of_caller",
-    "state_export",
+    "state_export | state_history | state_runs",
     "checkout | store",
     "github_probe",
     "github | state_board | github_search",
@@ -111,7 +112,7 @@ layers = [
     "lineage_stamp",
     "file_lock",
     "state_files",
-    "protocol | process | routing_line",
+    "protocol | process | routing_line | wide_scope",
     "toml_text",
 ]
 # `items` may import `body`, never the reverse.
