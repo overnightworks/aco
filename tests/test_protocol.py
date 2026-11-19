@@ -16,7 +16,7 @@ import pytest
 from board_fixtures import request, standing_active_claim
 from store_fixtures import STATE_WITH_TIP, claim_intent
 
-from aco import protocol, workboard
+from aco import protocol, state_files, workboard
 from aco.body import Storage
 from aco.protocol import (
     ClaimError,
@@ -113,7 +113,7 @@ def test_claim_scope_is_recorded_and_serialized_in_canonical_order() -> None:
     assert scope == ("docs/COORDINATION.md", "scripts/issue_claim.py")
     assert (
         'scope = ["docs/COORDINATION.md", "scripts/issue_claim.py"]'
-        in protocol.serialize_claim_toml(standing_active_claim(scope=scope))
+        in state_files.serialize_claim_toml(standing_active_claim(scope=scope))
     )
 
 
@@ -132,7 +132,7 @@ def test_serialize_claim_toml_escapes_control_characters_the_reader_accepts_back
     read back with) instead of producing TOML the reader refuses to parse."""
     agent = f"Grok sess-1 before{control_character}after"
 
-    decoded = tomllib.loads(protocol.serialize_claim_toml(standing_active_claim(agent=agent)))
+    decoded = tomllib.loads(state_files.serialize_claim_toml(standing_active_claim(agent=agent)))
 
     assert decoded["agent"] == agent
 

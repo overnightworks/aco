@@ -17,10 +17,9 @@ import threading
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import replace
-from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import Any, cast
 
 import pytest
 from cli_fixtures import (
@@ -39,6 +38,8 @@ from store_fixtures import (
     RaceOnceTransport,
     blob,
     claim_intent,
+    fail_git_subprocesses_carrying,
+    push_custom_tree,
     push_raw_state_tree,
     raw_tree,
     state_ref_listing,
@@ -47,7 +48,7 @@ from store_fixtures import (
 )
 
 from aco import cli as issue_claim
-from aco import github, lineage_stamp, process, protocol, store
+from aco import github, lineage_stamp, process, protocol, state_files, store
 
 # Syntactically valid but locally unresolvable object ids, for tests that
 # exercise a failure path where the actual value never reaches an assertion.
@@ -86,7 +87,7 @@ def _stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
 def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
     """Counts real git subprocess invocations by subcommand, patched at the
     `process` chokepoint both of `store`'s call shapes go through --
-    `_run_git` (`process.run_captured`) and `_run_git_with_input`
+    `run_git` (`process.run_captured`) and `_run_git_with_input`
     (`process.run_bounded_captured`) -- the proof that a transition's or a read's
     git-invocation count is independent of how many claims the state tree
     holds.
@@ -138,19 +139,6 @@ def _tree_entries(remote: Path, tip: str) -> dict[str, str]:
         )
         entries[name] = content.stdout
     return entries
-
-
-def _push_custom_tree(
-    remote: Path, worktree: Path, *, parent: str | None, files: dict[str, bytes]
-) -> str:
-    """Push an arbitrary tree onto `STATE_REF`, bypassing `store` entirely.
-
-    Test scaffolding for constructing malformed or rewritten remote states
-    that `store`'s own write path can never produce -- it never writes
-    anything but a well-formed `schema.toml`-only tree.
-    """
-    entries = [("100644", "blob", blob(worktree, content), name) for name, content in files.items()]
-    return push_raw_state_tree(remote, worktree, entries, successor_of=parent)
 
 
 class _AcceptThenRaiseTransport:
@@ -439,7 +427,7 @@ def test_peek_state_for_reset_reports_an_unreadable_schema_by_tip_and_version(
     schema this client does not speak, so the read yields its oid and
     version instead of refusing -- even when that schema's layout carries a
     top-level entry this client does not know."""
-    tip = _push_custom_tree(bare_remote, worktree, parent=None, files=files)
+    tip = push_custom_tree(bare_remote, worktree, parent=None, files=files)
 
     observed = store.peek_state_for_reset(worktree=worktree, remote=str(bare_remote))
 
@@ -572,7 +560,7 @@ def test_fetch_state_rejects_a_malformed_or_unsupported_tree(
     expected_error: type[Exception],
     match: str,
 ) -> None:
-    _push_custom_tree(bare_remote, worktree, parent=None, files=files)
+    push_custom_tree(bare_remote, worktree, parent=None, files=files)
 
     with pytest.raises(expected_error, match=match):
         store.fetch_state(worktree=worktree, remote=str(bare_remote))
@@ -587,7 +575,7 @@ def test_fetch_state_rejects_schema_version_one_without_stamping_its_lineage(
     reaches `lineage_stamp`, so a first, unsupported observation never
     poisons the lineage check a later, supported fetch relies on.
     """
-    _push_custom_tree(
+    push_custom_tree(
         bare_remote, worktree, parent=None, files={"schema.toml": _SCHEMA_TOML_VERSION_ONE}
     )
 
@@ -991,7 +979,7 @@ def test_lineage_error_when_the_ref_is_rewritten_without_this_worktrees_stamp_as
 ) -> None:
     store.bootstrap(worktree=worktree, remote=str(bare_remote))  # first observation, stamps it
 
-    _push_custom_tree(
+    push_custom_tree(
         bare_remote, worktree, parent=None, files={"schema.toml": b"version = 2\n"}
     )  # unrelated root commit: not a descendant of the stamped tip
 
@@ -1484,7 +1472,7 @@ def test_run_git_translates_process_failures_to_claim_error(
     monkeypatch.setattr(store.process, "run_captured", fake_run_captured)
 
     with pytest.raises(protocol.ClaimError):
-        store._run_git(worktree, ["status"])
+        store.run_git(worktree, ["status"])
 
 
 def test_git_dir_fails_loud_when_the_worktree_is_not_a_repository(tmp_path: Path) -> None:
@@ -1719,24 +1707,6 @@ def test_find_operation_id_fails_loud_when_the_range_is_unresolvable(worktree: P
         )
 
 
-def _fake_run_captured_failing_candidate_log(
-    real: Callable[[list[str]], process.CapturedResult],
-) -> Callable[[list[str]], process.CapturedResult]:
-    """Every real git subprocess runs except the per-candidate `git log -1`
-    inside `_find_operation_id`'s search -- distinguished from that
-    function's own outer `git log --format=%H` listing by the `-1` argument the inner read
-    alone carries."""
-
-    def fake(arguments: list[str]) -> process.CapturedResult:
-        if "log" in arguments and "-1" in arguments:
-            return process.CapturedResult(
-                exit_status=1, stdout=b"", stderr=b"simulated candidate read failure"
-            )
-        return real(arguments)
-
-    return fake
-
-
 def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
 ) -> None:
@@ -1748,10 +1718,10 @@ def test_push_retry_never_pushes_twice_when_a_candidates_own_message_read_fails(
     store.bootstrap(worktree=worktree, remote=str(bare_remote))
     observed = fresh_observation(worktree, bare_remote)
     transport = _AcceptThenRaiseTransport()
-    monkeypatch.setattr(
-        store.process,
-        "run_captured",
-        _fake_run_captured_failing_candidate_log(process.run_captured),
+    # Only the per-candidate `git log -1` inside `_find_operation_id`'s search
+    # fails, not its outer `git log --format=%H` listing.
+    fail_git_subprocesses_carrying(
+        monkeypatch, "log", "-1", stderr=b"simulated candidate read failure"
     )
 
     subject = store.TransitionSubject("claim issue 42")
@@ -3245,7 +3215,7 @@ def _push_seeded_state(bare_remote: Path, worktree: Path, count: int) -> protoco
             (
                 "100644",
                 "blob",
-                blob(worktree, protocol.serialize_claim_toml(claim).encode()),
+                blob(worktree, state_files.serialize_claim_toml(claim).encode()),
                 f"{key}.toml",
             )
             for key, claim in seeded.claims.items()
@@ -3530,14 +3500,12 @@ def test_parse_state_tree_fails_loud_on_malformed_archive_framing(
         store.fetch_state(worktree=worktree, remote=str(bare_remote))
 
 
-# --- `apply`, the claim-key codec, and the claim/resource TOML codecs ------
+# --- `apply` and the claim-key codec ----------------------------------------
 #
 # Pure logic: no git subprocess needed, so these
 # exercise `protocol.apply` and its codecs directly rather than through a
 # bare repository -- the thin git-transport integration layer above stays
 # reserved for what actually needs a real repository.
-
-_OTHER_TIP = protocol.ObjectId("b" * 40)
 
 
 def test_apply_claim_intent_adds_a_live_claim_and_consumes_its_id() -> None:
@@ -4090,121 +4058,6 @@ def test_parse_claim_key_accepts_an_issue_number_at_the_digit_bound() -> None:
     assert protocol.parse_claim_key(f"issue-{digits}") == protocol.IssueIdentity(int(digits))
 
 
-# --- `claims/<key>.toml` and `resources/<name>.toml` codecs ----------------
-
-
-def _sample_claim(
-    *,
-    scope: tuple[str, ...] = ("src/aco/store.py",),
-    resource: protocol.ResourceHold | None = None,
-    whole_reason: str | None = None,
-) -> protocol.ActiveClaim:
-    return protocol.ActiveClaim(
-        identity=protocol.IssueIdentity(42),
-        claim_id=protocol.ClaimId("a1"),
-        agent="Ada",
-        role="builder",
-        base=CLAIM_BASE,
-        branch="claude/issue-42-cut",
-        scope=scope,
-        opened_commit=TIP,
-        resource=resource,
-        whole_reason=whole_reason,
-    )
-
-
-def test_serialize_and_parse_claim_toml_round_trips_the_minimal_claim() -> None:
-    claim = _sample_claim()
-
-    parsed = protocol.parse_claim_toml(
-        protocol.serialize_claim_toml(claim), key="issue-42", tip=_OTHER_TIP
-    )
-
-    assert parsed == claim
-
-
-def test_serialize_and_parse_claim_toml_round_trips_resource_and_whole_reason() -> None:
-    claim = _sample_claim(
-        resource=protocol.ResourceHold("display", 2), whole_reason="repo-wide rename"
-    )
-
-    parsed = protocol.parse_claim_toml(
-        protocol.serialize_claim_toml(claim), key="issue-42", tip=_OTHER_TIP
-    )
-
-    assert parsed == claim
-
-
-def test_serialize_and_parse_claim_toml_round_trips_a_quote_in_a_scope_path() -> None:
-    claim = _sample_claim(scope=('weird "quoted" path.py',))
-
-    parsed = protocol.parse_claim_toml(
-        protocol.serialize_claim_toml(claim), key="issue-42", tip=_OTHER_TIP
-    )
-
-    assert parsed.scope == ('weird "quoted" path.py',)
-
-
-def test_parse_claim_toml_rejects_an_unknown_key() -> None:
-    content = protocol.serialize_claim_toml(_sample_claim()) + 'comment = "stray"\n'
-
-    with pytest.raises(protocol.MalformedStateTreeError, match="unknown keys"):
-        protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
-
-
-def test_parse_claim_toml_rejects_a_missing_required_key() -> None:
-    with pytest.raises(protocol.MalformedStateTreeError, match="is missing"):
-        protocol.parse_claim_toml('claim_id = "a1"\n', key="issue-42", tip=_OTHER_TIP)
-
-
-def test_parse_claim_toml_rejects_resource_value_without_resource_name() -> None:
-    content = protocol.serialize_claim_toml(_sample_claim()) + "resource_value = 3\n"
-
-    with pytest.raises(protocol.MalformedStateTreeError, match="resource_value without"):
-        protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
-
-
-def test_parse_claim_toml_rejects_a_malformed_commit_id() -> None:
-    content = protocol.serialize_claim_toml(_sample_claim()).replace(str(CLAIM_BASE), "not-a-sha")
-
-    with pytest.raises(protocol.MalformedStateTreeError, match="malformed commit id"):
-        protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
-
-
-def test_parse_claim_toml_rejects_malformed_toml() -> None:
-    with pytest.raises(protocol.MalformedStateTreeError, match="malformed claim file"):
-        protocol.parse_claim_toml("not = valid = toml\n", key="issue-42", tip=_OTHER_TIP)
-
-
-def test_serialize_and_parse_resource_toml_round_trips() -> None:
-    record = protocol.ResourceRecord(name="display", occupied=(1, 2, 5))
-
-    parsed = protocol.parse_resource_toml(
-        protocol.serialize_resource_toml(record), name="display", tip=_OTHER_TIP
-    )
-
-    assert parsed == record
-
-
-@pytest.mark.parametrize(
-    "content",
-    [
-        pytest.param('name = "display"\n', id="wrong-key"),
-        pytest.param("occupied = [1, 0]\n", id="non-positive-value"),
-        pytest.param('occupied = ["1"]\n', id="non-integer-value"),
-        pytest.param("occupied = 1\n", id="not-a-list"),
-    ],
-)
-def test_parse_resource_toml_rejects_a_malformed_record(content: str) -> None:
-    with pytest.raises(protocol.MalformedStateTreeError):
-        protocol.parse_resource_toml(content, name="display", tip=_OTHER_TIP)
-
-
-def test_parse_resource_toml_rejects_malformed_toml() -> None:
-    with pytest.raises(protocol.MalformedStateTreeError, match="malformed resource file"):
-        protocol.parse_resource_toml("not = valid = toml\n", name="display", tip=_OTHER_TIP)
-
-
 def test_claim_id_rejects_a_value_that_is_not_a_valid_claim_id() -> None:
     with pytest.raises(protocol.ClaimError, match="not a valid claim id"):
         protocol.ClaimId("not a claim id")
@@ -4231,55 +4084,6 @@ def test_apply_rescope_intent_can_set_a_new_whole_reason() -> None:
     rescoped = protocol.apply(claimed, rescope)
 
     assert rescoped.claims["issue-42"].whole_reason == "repo-wide rename"
-
-
-def _minimal_claim_toml_fields(**overrides: str) -> dict[str, str]:
-    fields = {
-        "claim_id": '"a1"',
-        "agent": '"Ada"',
-        "role": '"builder"',
-        "base": f'"{CLAIM_BASE}"',
-        "branch": '"claude/issue-42-cut"',
-        "scope": '["README.md"]',
-        "opened_commit": f'"{TIP}"',
-    }
-    fields.update(overrides)
-    return fields
-
-
-def _claim_toml_content(**overrides: str) -> str:
-    fields = _minimal_claim_toml_fields(**overrides)
-    return "\n".join(f"{key} = {value}" for key, value in fields.items()) + "\n"
-
-
-@pytest.mark.parametrize(
-    ("overrides", "match"),
-    [
-        pytest.param({"agent": "123"}, "must be non-empty text", id="agent-not-text"),
-        pytest.param({"agent": '""'}, "must be non-empty text", id="agent-empty"),
-        pytest.param({"scope": "[]"}, "non-empty list of text", id="scope-empty"),
-        pytest.param({"scope": "[1]"}, "non-empty list of text", id="scope-not-text"),
-        pytest.param({"claim_id": '"not valid!"'}, "invalid claim id", id="claim-id-invalid"),
-    ],
-)
-def test_parse_claim_toml_rejects_a_malformed_field(overrides: dict[str, str], match: str) -> None:
-    content = _claim_toml_content(**overrides)
-    with pytest.raises(protocol.MalformedStateTreeError, match=match):
-        protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
-
-
-def test_parse_claim_toml_rejects_a_non_positive_resource_value() -> None:
-    content = _claim_toml_content() + 'resource_name = "display"\nresource_value = 0\n'
-
-    with pytest.raises(protocol.MalformedStateTreeError, match="positive integer"):
-        protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
-
-
-def test_parse_claim_toml_rejects_a_non_text_whole_reason() -> None:
-    content = _claim_toml_content() + "whole_reason = 3\n"
-
-    with pytest.raises(protocol.MalformedStateTreeError, match="must be text"):
-        protocol.parse_claim_toml(content, key="issue-42", tip=_OTHER_TIP)
 
 
 @pytest.mark.parametrize("read_state", [store.fetch_state, store.bootstrap])
@@ -4328,520 +4132,6 @@ def test_local_state_ref_exists_for_reset_fails_loud_on_a_git_failure_other_than
 
     with pytest.raises(protocol.ClaimError, match="cannot check"):
         store.local_state_ref_exists(worktree)
-
-
-@pytest.mark.parametrize(
-    "shared_state_ref_before_export",
-    ["absent", "pointed-at-a-different-tip"],
-)
-def test_export_state_bundle_writes_a_verifiable_bundle_and_never_touches_the_shared_ref(
-    bare_remote: Path, worktree: Path, tmp_path: Path, shared_state_ref_before_export: str
-) -> None:
-    """Bundles the private `EXPORT_BUNDLE_REF`, never the shared
-    `STATE_REF`. The previous
-    implementation pointed `STATE_REF` at `tip` to give the bundle a name --
-    `refs/aco/state` is visible from every linked worktree of a repository,
-    so a concurrent reset elsewhere could repoint or delete it between that
-    write and the lease-guarded remote delete that follows, racing the
-    bundle onto whatever tip it found rather than the one the caller
-    leased, and a failed export left it mutated with no restore of its
-    previous value. Whatever `STATE_REF` holds locally beforehand --
-    nothing, or a foreign tip set by something else entirely -- must
-    survive byte-for-byte, and the bundle must still carry exactly the
-    leased `tip` regardless."""
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    foreign_tip = None
-    if shared_state_ref_before_export == "pointed-at-a-different-tip":
-        foreign_tip = _push_custom_tree(
-            bare_remote,
-            worktree,
-            parent=tip,
-            files={store.SCHEMA_TOML_FILENAME: protocol.serialize_empty_schema_toml().encode()},
-        )
-        real_git(worktree, "update-ref", store.STATE_REF, foreign_tip)
-    destination = tmp_path / "export" / "state.bundle"
-    destination.parent.mkdir()
-
-    returned = store.export_state_bundle(worktree=worktree, tip=tip, destination=destination)
-
-    assert returned == destination
-    real_git(worktree, "bundle", "verify", str(destination))
-    heads = real_git(worktree, "bundle", "list-heads", str(destination)).stdout
-    assert heads.strip() == f"{tip} {store.EXPORT_BUNDLE_REF}"
-    if foreign_tip is None:
-        assert not store.local_state_ref_exists(worktree)
-    else:
-        assert real_git(worktree, "rev-parse", store.STATE_REF).stdout.strip() == foreign_tip
-    assert (
-        store._run_git(
-            worktree, ["show-ref", "--verify", "--quiet", store.EXPORT_BUNDLE_REF]
-        ).exit_status
-        != 0
-    )
-    assert not list(destination.parent.glob(f".{destination.name}.*"))
-
-
-def test_export_state_bundle_refuses_to_overwrite_an_existing_destination(
-    bare_remote: Path, worktree: Path, tmp_path: Path
-) -> None:
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    destination = tmp_path / "state.bundle"
-    destination.write_bytes(b"an earlier export")
-
-    with pytest.raises(protocol.ClaimError, match="already exists"):
-        store.export_state_bundle(worktree=worktree, tip=tip, destination=destination)
-
-    assert destination.read_bytes() == b"an earlier export"
-    # The temporary file the bundle was written to must not survive a refused publish either.
-    assert not list(destination.parent.glob(f".{destination.name}.*"))
-
-
-def _break_export_via_an_unwritable_destination_directory(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path, tmp_path: Path
-) -> tuple[protocol.ObjectId, Path, Callable[[], None]]:
-    tip = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
-    assert tip is not None
-    readonly_dir = tmp_path / "readonly"
-    readonly_dir.mkdir()
-    readonly_dir.chmod(0o500)
-    return tip, readonly_dir / "state.bundle", lambda: readonly_dir.chmod(0o700)
-
-
-def _break_export_via_a_failed_bundle_create(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path, tmp_path: Path
-) -> tuple[protocol.ObjectId, Path, Callable[[], None]]:
-    """The subprocess step between the claimed temporary file and its
-    publish -- `git bundle create - EXPORT_BUNDLE_REF` -- can fail on its
-    own even though the preceding `update-ref` already proved `tip`
-    reachable; the claimed temporary file must be removed rather than left
-    behind empty, and `destination` itself must never come to exist at all."""
-    tip = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
-    assert tip is not None
-    real_run_captured = process.run_captured
-
-    def fake_run_captured(arguments: list[str]) -> process.CapturedResult:
-        if "bundle" in arguments and "create" in arguments:
-            return process.CapturedResult(
-                exit_status=1, stdout=b"", stderr=b"simulated bundle create failure"
-            )
-        return real_run_captured(arguments)
-
-    monkeypatch.setattr(store.process, "run_captured", fake_run_captured)
-    return tip, tmp_path / "state.bundle", lambda: None
-
-
-def _break_export_via_a_tip_this_worktree_never_received(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path, tmp_path: Path
-) -> tuple[protocol.ObjectId, Path, Callable[[], None]]:
-    """Pointing `EXPORT_BUNDLE_REF` at `tip` is `export_state_bundle`'s own
-    validation that `tip`'s objects actually reached this worktree --
-    `update-ref` itself refuses a tip git has never seen, so a caller
-    cannot silently bundle the wrong state."""
-    return _PLACEHOLDER_TIP, tmp_path / "state.bundle", lambda: None
-
-
-def _break_export_via_a_cross_device_link_failure(
-    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path, tmp_path: Path
-) -> tuple[protocol.ObjectId, Path, Callable[[], None]]:
-    """`os.link`'s no-clobber semantics (`FileExistsError`) are not its only
-    failure mode: publishing across a filesystem boundary raises
-    `OSError(errno.EXDEV, ...)` instead, a path CI's 100 % line-coverage
-    gate found unexercised.
-    Patched at `store.os.link`, the module boundary `_write_and_publish_bundle`
-    calls through, rather than reimplementing a real cross-device mount."""
-    tip = store.fetch_state(worktree=worktree, remote=str(bare_remote)).tip
-    assert tip is not None
-
-    def fake_link(source: Path, link_name: Path) -> None:
-        raise OSError(errno.EXDEV, "Invalid cross-device link")
-
-    monkeypatch.setattr(store.os, "link", fake_link)
-    return tip, tmp_path / "state.bundle", lambda: None
-
-
-class _ExportFailureCase(NamedTuple):
-    """One row of `test_export_state_bundle_fails_loud_and_leaves_no_trace`.
-
-    `cause_fragment` is `None` for a row whose break point raises loud
-    without a `from` chain of its own (the write/publish path never chains,
-    only `export_state_bundle`'s own pre-write steps do) -- `None` skips
-    the `__cause__` assertion rather than asserting it is unset, since this
-    family does not otherwise pin that fact for rows it was not asked to."""
-
-    id: str
-    arrange: Callable[
-        [pytest.MonkeyPatch, Path, Path, Path], tuple[protocol.ObjectId, Path, Callable[[], None]]
-    ]
-    cause_fragment: str | None
-
-
-@pytest.mark.parametrize(
-    "case",
-    [
-        _ExportFailureCase(
-            "unwritable-directory", _break_export_via_an_unwritable_destination_directory, None
-        ),
-        _ExportFailureCase("bundle-create-fails", _break_export_via_a_failed_bundle_create, None),
-        _ExportFailureCase(
-            "unreachable-tip", _break_export_via_a_tip_this_worktree_never_received, None
-        ),
-        _ExportFailureCase(
-            "cross-device-link",
-            _break_export_via_a_cross_device_link_failure,
-            "Invalid cross-device link",
-        ),
-    ],
-    ids=lambda case: case.id,
-)
-def test_export_state_bundle_fails_loud_and_leaves_no_trace(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    case: _ExportFailureCase,
-) -> None:
-    store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    tip, destination, restore = case.arrange(monkeypatch, bare_remote, worktree, tmp_path)
-
-    try:
-        with pytest.raises(protocol.ClaimError, match="cannot export") as excinfo:
-            store.export_state_bundle(worktree=worktree, tip=tip, destination=destination)
-    finally:
-        restore()
-
-    message = str(excinfo.value)
-    assert str(tip) in message
-    assert str(destination) in message
-    if case.cause_fragment is not None:
-        assert excinfo.value.__cause__ is not None
-        assert case.cause_fragment in str(excinfo.value.__cause__)
-
-    assert not destination.exists()
-    assert not list(destination.parent.glob(f".{destination.name}.*"))
-
-
-def _fail_temporary_unlink(
-    monkeypatch: pytest.MonkeyPatch, destination: Path, attempted: list[Path]
-) -> None:
-    """Fail `Path.unlink` for exactly the temporary file
-    `_write_and_publish_bundle` claims for `destination` (the
-    `tempfile.mkstemp` prefix its own docstring names), leaving every other
-    `unlink` call -- including this test's own leftover cleanup once it has
-    restored the real function -- untouched. Records the intercepted path in
-    `attempted`: an observable stand-in for "the unlink was attempted" that
-    counting fake calls would not be."""
-    real_unlink = Path.unlink
-
-    def fake_unlink(self: Path, missing_ok: bool = False) -> None:
-        if self.name.startswith(f".{destination.name}."):
-            attempted.append(self)
-            raise OSError("simulated temporary-file cleanup failure")
-        real_unlink(self, missing_ok=missing_ok)
-
-    monkeypatch.setattr(Path, "unlink", fake_unlink)
-
-
-class _RefDeletionFailure(Enum):
-    """The three independent ways `_delete_export_ref`'s guard must survive an injected
-    `update-ref -d EXPORT_BUNDLE_REF` failure: a nonzero exit matching a
-    real `git update-ref` refusal, a raised `OSError` matching an
-    invocation that never reached git at all, and a nonzero exit whose
-    stderr is not valid UTF-8, matching a `.decode()` failure."""
-
-    EXITS_NONZERO = "exits-nonzero"
-    RAISES = "raises"
-    RETURNS_INVALID_UTF8_STDERR = "returns-invalid-utf8-stderr"
-
-
-def _fail_export_ref_deletion(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    fail_bundle_create: bool,
-    ref_deletion_failure: _RefDeletionFailure,
-) -> None:
-    """Patch `process.run_captured` so the bundle-create subprocess and the
-    `EXPORT_BUNDLE_REF` cleanup fail the way each row of the parametrized
-    cleanup-independence family below needs. Every other invocation,
-    including the real `update-ref` that points `EXPORT_BUNDLE_REF` at
-    `tip`, runs for real."""
-    real_run_captured = process.run_captured
-
-    def fake_run_captured(arguments: list[str]) -> process.CapturedResult:
-        if fail_bundle_create and "bundle" in arguments and "create" in arguments:
-            return process.CapturedResult(
-                exit_status=1, stdout=b"", stderr=b"simulated bundle create failure"
-            )
-        if arguments[-3:] == ["update-ref", "-d", store.EXPORT_BUNDLE_REF]:
-            if ref_deletion_failure is _RefDeletionFailure.RAISES:
-                raise OSError("simulated ref-deletion invocation failure")
-            if ref_deletion_failure is _RefDeletionFailure.RETURNS_INVALID_UTF8_STDERR:
-                return process.CapturedResult(
-                    exit_status=1, stdout=b"", stderr=b"\xff\xfe not valid utf-8"
-                )
-            return process.CapturedResult(
-                exit_status=1, stdout=b"", stderr=b"simulated ref cleanup failure"
-            )
-        return real_run_captured(arguments)
-
-    monkeypatch.setattr(store.process, "run_captured", fake_run_captured)
-
-
-def _verify_and_remove_the_leftover_export_ref(worktree: Path) -> None:
-    """`EXPORT_BUNDLE_REF` genuinely exists after a cleanup row whose ref
-    deletion was made to fail: confirm that before removing it for real, so
-    a future regression that quietly drops the real `update-ref` call
-    cannot pass this test by accident."""
-    assert (
-        store._run_git(
-            worktree, ["show-ref", "--verify", "--quiet", store.EXPORT_BUNDLE_REF]
-        ).exit_status
-        == 0
-    )
-    store._run_git(worktree, ["update-ref", "-d", store.EXPORT_BUNDLE_REF])
-
-
-class _CleanupFailureCase(NamedTuple):
-    """One row of the export-cleanup-independence test family below.
-
-    `arrange` sets up `tip`/`destination` and whichever of the two cleanup
-    steps (or the primary write/publish) this row breaks, returning the
-    call's `tip` and `destination`. `error_match` filters the outer
-    `pytest.raises`; `None` skips the filter for a row whose distinguishing
-    text lives only in the body. `cause_fragment` is `None` for a row with
-    no primary error (a successful publish whose cleanup still fails).
-    `destination_exists_after` and `destination_bytes_after` say what should
-    remain at `destination` -- `verify_bundle` additionally asks for a real
-    `git bundle verify` where `destination` is a genuine publish rather than
-    an untouched pre-existing file. `temp_leftover_expected` says whether the
-    temporary file should remain; `postcheck` runs after the real
-    `process.run_captured`/`Path.unlink` are restored, for a row that leaves
-    a real git-level leftover of its own (a ref cleanup failure) rather than
-    only a filesystem one.
-    """
-
-    id: str
-    arrange: Callable[
-        [pytest.MonkeyPatch, Path, Path, Path, list[Path]], tuple[protocol.ObjectId, Path]
-    ]
-    error_match: str | None
-    message_fragments: tuple[str, ...]
-    cause_fragment: str | None
-    destination_exists_after: bool
-    destination_bytes_after: bytes | None
-    verify_bundle: bool
-    temp_leftover_expected: bool
-    postcheck: Callable[[Path], None]
-
-
-def _arrange_successful_publish_with_a_failed_temp_unlink(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    attempted_unlinks: list[Path],
-) -> tuple[protocol.ObjectId, Path]:
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    destination = tmp_path / "export" / "state.bundle"
-    destination.parent.mkdir()
-    _fail_temporary_unlink(monkeypatch, destination, attempted_unlinks)
-    return tip, destination
-
-
-def _arrange_a_failed_bundle_create_with_a_failed_ref_cleanup(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    attempted_unlinks: list[Path],
-) -> tuple[protocol.ObjectId, Path]:
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    destination = tmp_path / "export" / "state.bundle"
-    destination.parent.mkdir()
-    _fail_export_ref_deletion(
-        monkeypatch,
-        fail_bundle_create=True,
-        ref_deletion_failure=_RefDeletionFailure.EXITS_NONZERO,
-    )
-    return tip, destination
-
-
-def _arrange_a_successful_publish_with_invalid_utf8_ref_cleanup_stderr(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    attempted_unlinks: list[Path],
-) -> tuple[protocol.ObjectId, Path]:
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    destination = tmp_path / "export" / "state.bundle"
-    destination.parent.mkdir()
-    _fail_export_ref_deletion(
-        monkeypatch,
-        fail_bundle_create=False,
-        ref_deletion_failure=_RefDeletionFailure.RETURNS_INVALID_UTF8_STDERR,
-    )
-    return tip, destination
-
-
-def _arrange_a_refused_publish_with_a_failed_temp_unlink(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    attempted_unlinks: list[Path],
-) -> tuple[protocol.ObjectId, Path]:
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    destination = tmp_path / "state.bundle"
-    destination.write_bytes(b"an earlier export")
-    _fail_temporary_unlink(monkeypatch, destination, attempted_unlinks)
-    return tip, destination
-
-
-def _arrange_a_failed_bundle_create_with_both_cleanup_steps_failing(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    attempted_unlinks: list[Path],
-) -> tuple[protocol.ObjectId, Path]:
-    tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
-    store.fetch_state(worktree=worktree, remote=str(bare_remote))
-    destination = tmp_path / "export" / "state.bundle"
-    destination.parent.mkdir()
-    _fail_export_ref_deletion(
-        monkeypatch, fail_bundle_create=True, ref_deletion_failure=_RefDeletionFailure.RAISES
-    )
-    _fail_temporary_unlink(monkeypatch, destination, attempted_unlinks)
-    return tip, destination
-
-
-@pytest.mark.parametrize(
-    "case",
-    [
-        _CleanupFailureCase(
-            id="successful-publish-temp-unlink-fails",
-            arrange=_arrange_successful_publish_with_a_failed_temp_unlink,
-            error_match="could not remove the now-redundant temporary",
-            message_fragments=(),
-            cause_fragment=None,
-            destination_exists_after=True,
-            destination_bytes_after=None,
-            verify_bundle=True,
-            temp_leftover_expected=True,
-            postcheck=lambda worktree: None,
-        ),
-        _CleanupFailureCase(
-            id="bundle-create-fails-and-ref-cleanup-exits-nonzero",
-            arrange=_arrange_a_failed_bundle_create_with_a_failed_ref_cleanup,
-            error_match=None,
-            message_fragments=(
-                "simulated bundle create failure",
-                store.EXPORT_BUNDLE_REF,
-                "simulated ref cleanup failure",
-            ),
-            cause_fragment="simulated bundle create failure",
-            destination_exists_after=False,
-            destination_bytes_after=None,
-            verify_bundle=False,
-            temp_leftover_expected=False,
-            postcheck=_verify_and_remove_the_leftover_export_ref,
-        ),
-        _CleanupFailureCase(
-            id="successful-publish-ref-cleanup-stderr-is-invalid-utf8",
-            arrange=_arrange_a_successful_publish_with_invalid_utf8_ref_cleanup_stderr,
-            error_match="could not remove the temporary export ref",
-            message_fragments=(store.EXPORT_BUNDLE_REF, "can't decode"),
-            cause_fragment=None,
-            destination_exists_after=True,
-            destination_bytes_after=None,
-            verify_bundle=True,
-            temp_leftover_expected=False,
-            postcheck=_verify_and_remove_the_leftover_export_ref,
-        ),
-        _CleanupFailureCase(
-            id="refused-publish-temp-unlink-fails",
-            arrange=_arrange_a_refused_publish_with_a_failed_temp_unlink,
-            error_match="already exists",
-            message_fragments=("simulated temporary-file cleanup failure",),
-            cause_fragment="already exists",
-            destination_exists_after=True,
-            destination_bytes_after=b"an earlier export",
-            verify_bundle=False,
-            temp_leftover_expected=True,
-            postcheck=lambda worktree: None,
-        ),
-        _CleanupFailureCase(
-            id="bundle-create-fails-and-both-cleanup-steps-fail",
-            arrange=_arrange_a_failed_bundle_create_with_both_cleanup_steps_failing,
-            error_match=None,
-            message_fragments=(
-                "simulated bundle create failure",
-                store.EXPORT_BUNDLE_REF,
-                "simulated ref-deletion invocation failure",
-                "simulated temporary-file cleanup failure",
-            ),
-            cause_fragment="simulated bundle create failure",
-            destination_exists_after=False,
-            destination_bytes_after=None,
-            verify_bundle=False,
-            temp_leftover_expected=True,
-            postcheck=_verify_and_remove_the_leftover_export_ref,
-        ),
-    ],
-    ids=lambda case: case.id,
-)
-def test_export_state_bundle_names_every_uncleaned_leftover_and_preserves_the_original_cause(
-    monkeypatch: pytest.MonkeyPatch,
-    bare_remote: Path,
-    worktree: Path,
-    tmp_path: Path,
-    case: _CleanupFailureCase,
-) -> None:
-    """The two cleanup steps `_clear_export_artifacts` runs -- clearing
-    `EXPORT_BUNDLE_REF` and removing the temporary file -- are independent
-    of each other and of whatever exception type each raises: whichever one fails,
-    the other is still attempted, the raised error names every artifact
-    that is actually left behind together with its own failure, and it is
-    chained to the write/publish failure that preceded it when there was
-    one -- never silently dropped in favour of a cleanup failure, and never
-    silently dropping a cleanup failure in favour of it."""
-    attempted_unlinks: list[Path] = []
-    tip, destination = case.arrange(monkeypatch, bare_remote, worktree, tmp_path, attempted_unlinks)
-
-    with pytest.raises(protocol.ClaimError, match=case.error_match) as excinfo:
-        store.export_state_bundle(worktree=worktree, tip=tip, destination=destination)
-
-    message = str(excinfo.value)
-    for fragment in case.message_fragments:
-        assert fragment in message
-    if case.cause_fragment is None:
-        assert excinfo.value.__cause__ is None
-    else:
-        assert excinfo.value.__cause__ is not None
-        assert case.cause_fragment in str(excinfo.value.__cause__)
-    assert destination.exists() == case.destination_exists_after
-    if case.destination_bytes_after is not None:
-        assert destination.read_bytes() == case.destination_bytes_after
-
-    monkeypatch.undo()  # restore the real process.run_captured/Path.unlink before cleanup below
-
-    if case.temp_leftover_expected:
-        assert attempted_unlinks, "the temporary file's own unlink must still be attempted"
-        assert str(attempted_unlinks[0]) in message
-        leftover = list(destination.parent.glob(f".{destination.name}.*"))
-        assert leftover
-        for stray in leftover:
-            stray.unlink()
-    else:
-        assert not list(destination.parent.glob(f".{destination.name}.*"))
-    if case.verify_bundle:
-        real_git(worktree, "bundle", "verify", str(destination))
-
-    case.postcheck(worktree)
 
 
 @pytest.mark.parametrize(
@@ -4904,7 +4194,7 @@ def test_delete_state_ref_refuses_a_stale_lease_and_leaves_everything_intact(
     real_git(worktree, "update-ref", store.STATE_REF, stale_tip)
     # The remote moves on after `stale_tip` was read but before the lease-guarded
     # delete runs -- the exact race `--force-with-lease` exists to catch.
-    _push_custom_tree(
+    push_custom_tree(
         bare_remote,
         worktree,
         parent=stale_tip,
@@ -4976,7 +4266,7 @@ def test_delete_state_ref_repair_never_recommends_a_manual_lease(
     instruction, worded for an unchanged remote."""
     stale_tip = store.bootstrap(worktree=worktree, remote=str(bare_remote))
     if remote_moved:
-        _push_custom_tree(
+        push_custom_tree(
             bare_remote,
             worktree,
             parent=stale_tip,

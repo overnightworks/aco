@@ -410,7 +410,7 @@ def _git_failure_detail(stderr: bytes, stdout: bytes, *, errors: str = "strict")
     `errors` defaults to strict, matching `git_failure_detail`'s and
     `git_failure_detail_from_stderr`'s long-standing contract: invalid UTF-8
     in git's own stderr raises `UnicodeDecodeError` rather than silently
-    replacing it, since `store._delete_export_ref` relies on
+    replacing it, since `state_export._delete_export_ref` relies on
     that raise reaching its own `(ClaimError, OSError, ValueError)` catch
     and carrying the decode failure itself into the leftover description it
     returns. `git_failure_detail_lossy` opts into `errors="replace"`
