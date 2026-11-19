@@ -713,14 +713,17 @@ def test_json_add_reports_a_fresh_entry_as_added_and_a_repeat_as_already_added(
 
 
 def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: LANREC-57, LANREC-63, LANREC-69."""
+    """Spec: LANREC-57, LANREC-63, LANREC-66, LANREC-69."""
     unbegun = world.run(capsys, *add_arguments(world), "--json")
     stranger = world.run(
         capsys, *begin_arguments(world, FIRST_RUN, "--agent", OTHER_AGENT, "--json")
     )
+    refused_file = world.record_file(version=2)
+    unreadable = world.run(capsys, *add_arguments(world, file=refused_file), "--json")
 
     assert_json_refusal_object(unbegun.stderr, unbegun.stdout, reason="precondition_failed")
     assert_json_refusal_object(stranger.stderr, stranger.stdout, reason="precondition_failed")
+    assert_json_refusal_object(unreadable.stderr, unreadable.stdout, reason="precondition_failed")
 
 
 def test_stored_runs_that_changed_since_the_command_read_them_refuse_as_a_transient_refusal(

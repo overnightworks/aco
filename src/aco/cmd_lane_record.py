@@ -267,7 +267,10 @@ def _begin(parsed: argparse.Namespace, context: RunContext) -> int:
 
 def _add(parsed: argparse.Namespace, context: RunContext) -> int:
     agent = _session_agent(parsed)
-    record = read_record_file(parsed.file)
+    try:
+        record = read_record_file(parsed.file)
+    except protocol.ClaimUnavailableError as error:
+        raise lane_runs.RunsRefusedError(str(error)) from error
     lane_runs.require_ran_stages_run(record, parsed.ran)
     opened = _open_runs(parsed, context, lane_runs.RunsAction.ADD, agent)
     added = lane_runs.RunAdded(parsed.end_tip, parsed.ran, record)
