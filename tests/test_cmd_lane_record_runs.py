@@ -676,6 +676,19 @@ def test_a_missing_agent_identity_refuses_before_any_write(
     assert world.state_tip() == tip
 
 
+def test_a_missing_agent_identity_is_refused_before_the_record_file_is_read(
+    world: World, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: LANREC-70."""
+    monkeypatch.delenv("ACO_AGENT")
+    unreadable = world.scratch / "absent.json"
+
+    refused = world.run(capsys, *add_arguments(world, file=unreadable))
+
+    assert refused.status == 2
+    assert "agent identity is required" in refused.stderr
+
+
 def test_json_begin_reports_a_fresh_run_as_begun_and_a_repeat_as_already_begun(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:

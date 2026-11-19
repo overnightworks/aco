@@ -130,7 +130,7 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         "add", help="store the lane record of a begun run with its claim, as its holder"
     )
     _add_run_arguments(add)
-    add.add_argument("record", metavar="FILE", type=read_record_file, help="the lane record file")
+    add.add_argument("file", metavar="FILE", help="the lane record file")
     add.add_argument("--end-tip", required=True, type=_tip, help="the commit the run ended at")
     add.add_argument(
         "--ran",
@@ -171,12 +171,19 @@ class _ClaimRuns:
         )
 
 
-def _open_runs(
-    parsed: argparse.Namespace, context: RunContext, action: lane_runs.RunsAction
-) -> _ClaimRuns:
-    """The runs of the item's claim, for the session that holds it; any other refuses."""
+def _session_agent(parsed: argparse.Namespace) -> str:
+    """The acting agent's name; a command with none refuses before it reads anything."""
     try:
-        agent = checkout.resolved_agent(parsed.agent)
+        return checkout.resolved_agent(parsed.agent)
+    except protocol.ClaimError as error:
+        raise lane_runs.RunsRefusedError(str(error)) from error
+
+
+def _open_runs(
+    parsed: argparse.Namespace, context: RunContext, action: lane_runs.RunsAction, agent: str
+) -> _ClaimRuns:
+    """The runs of the item's claim, for the session `agent` that holds it; any other refuses."""
+    try:
         storage = context.config.storage
         label = workboard.item_label(parsed.item, storage)
         claim = workboard.selected_store_claim(
@@ -227,7 +234,7 @@ def _follows(opened: _ClaimRuns, start_tip: str | None) -> bool:
 
 
 def _begin(parsed: argparse.Namespace, context: RunContext) -> int:
-    opened = _open_runs(parsed, context, lane_runs.RunsAction.BEGIN)
+    opened = _open_runs(parsed, context, lane_runs.RunsAction.BEGIN, _session_agent(parsed))
     merged = lane_runs.begin(
         opened.runs,
         run=parsed.run,
@@ -249,9 +256,11 @@ def _begin(parsed: argparse.Namespace, context: RunContext) -> int:
 
 
 def _add(parsed: argparse.Namespace, context: RunContext) -> int:
-    lane_runs.require_ran_stages_run(parsed.record, parsed.ran)
-    opened = _open_runs(parsed, context, lane_runs.RunsAction.ADD)
-    added = lane_runs.RunAdded(parsed.end_tip, parsed.ran, parsed.record)
+    agent = _session_agent(parsed)
+    record = read_record_file(parsed.file)
+    lane_runs.require_ran_stages_run(record, parsed.ran)
+    opened = _open_runs(parsed, context, lane_runs.RunsAction.ADD, agent)
+    added = lane_runs.RunAdded(parsed.end_tip, parsed.ran, record)
     merged = lane_runs.add(opened.runs, run=parsed.run, added=added, label=opened.label)
     if merged.changed:
         opened.write(merged.runs, run=parsed.run)
