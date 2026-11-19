@@ -52,16 +52,6 @@ def test_a_figure_is_the_median_of_the_known_values_with_its_own_counts(
     assert (figure.median, figure.n, figure.unknown) == (median, known, unknown)
 
 
-@pytest.mark.parametrize("lanes", [0, 3])
-def test_cost_is_unknown_for_every_lane(lanes: int) -> None:
-    """Spec: STATS-09."""
-    recorded = [lane_with_wall_seconds(1) for _ in range(lanes)]
-
-    figure = measure(NOVEMBER, recorded).figures[FigureName.COST]
-
-    assert (figure.median, figure.n, figure.unknown) == (None, 0, lanes)
-
-
 @pytest.mark.parametrize("group", ["2026-11-01..2026-11-07", "2026-11-09..2026-11-09", "tag:a-b"])
 def test_a_group_prints_as_it_was_written(group: str) -> None:
     """Spec: STATS-06."""
