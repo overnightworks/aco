@@ -1,0 +1,8 @@
+claim_id = "5953c1ba52ef413abeb802169173791b"
+agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
+role = "builder"
+base = "cbcc5f704014016cedfbe8754bc6cb64d4cfcf7d"
+branch = "claude/issue-986-offset-moves"
+scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco/claim_conflicts.py", "src/aco/cmd_land.py", "src/aco/cmd_land_merge.py", "src/aco/cmd_release.py", "src/aco/cmd_status.py", "src/aco/landed_worktree.py", "src/aco/protocol.py", "tests"]
+opened_commit = "5bc25965f33b150ce853a6f2fad8ff7f2b9cd433"
+whole_reason = "Three moves that free room for the same two later slices and share one baseline update."
