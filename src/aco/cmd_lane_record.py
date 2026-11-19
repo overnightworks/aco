@@ -87,7 +87,7 @@ def _tip(value: str) -> str:
 
 
 class _StagesAction(argparse.Action):
-    """`--ran`: each stage that ran, once."""
+    """`--ran`: each stage that ran, once, all after one occurrence of the flag."""
 
     def __call__(
         self,
@@ -96,6 +96,8 @@ class _StagesAction(argparse.Action):
         values: str | Sequence[str] | None,
         option_string: str | None = None,
     ) -> None:
+        if getattr(namespace, self.dest, None) is not None:
+            raise argparse.ArgumentError(self, "is given once, followed by every stage that ran")
         stages = tuple(RoutingStage(stage) for stage in values or ())
         repeated = next((stage for stage in stages if stages.count(stage) > 1), None)
         if repeated is not None:

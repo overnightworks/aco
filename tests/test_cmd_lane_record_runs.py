@@ -632,18 +632,29 @@ def test_an_add_without_a_stage_or_with_an_unknown_stage_is_a_usage_refusal(
     assert "usage:" in unknown.stderr
 
 
-def test_a_stage_named_twice_is_a_usage_refusal(
-    world: World, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("stages", "flags"),
+    [
+        pytest.param((RoutingStage.BUILD, RoutingStage.BUILD), (), id="a-stage-twice-in-one-ran"),
+        pytest.param((RoutingStage.BUILD,), ("--ran", "build"), id="a-stage-in-two-rans"),
+        pytest.param((RoutingStage.BUILD,), ("--ran", "review"), id="two-rans-naming-two-stages"),
+    ],
+)
+def test_a_stage_named_twice_or_a_second_ran_is_a_usage_refusal_and_writes_nothing(
+    world: World,
+    capsys: pytest.CaptureFixture[str],
+    stages: tuple[RoutingStage, ...],
+    flags: tuple[str, ...],
 ) -> None:
     """Spec: LANREC-58."""
     world.run(capsys, *begin_arguments(world))
+    tip = world.state_tip()
 
-    refused = world.run(
-        capsys, *add_arguments(world, stages=(RoutingStage.BUILD, RoutingStage.BUILD))
-    )
+    refused = world.run(capsys, *add_arguments(world, stages=stages, flags=flags))
 
     assert refused.status == 2
-    assert "build" in refused.stderr
+    assert "usage:" in refused.stderr
+    assert world.state_tip() == tip
 
 
 @pytest.mark.parametrize("command", ["begin", "add"])
