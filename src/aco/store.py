@@ -88,6 +88,8 @@ RESOURCES_DIRECTORY = "resources"
 ITEMS_DIRECTORY = "items"
 SCHEMA_TOML_FILENAME = "schema.toml"
 TOML_SUFFIX = ".toml"
+git_failure_detail = process.git_failure_detail
+git_failure_detail_from_stderr = process.git_failure_detail_from_stderr
 # Tree entry names travel as git's raw bytes (`-z`);
 # `surrogateescape` lets a name that is not UTF-8 survive the round trip
 # from `_list_tree` back into `_mktree` byte for byte.
@@ -243,7 +245,7 @@ class GitPushTransport:
             raise PushRejectedError(process.git_failure_detail(result))
 
 
-def _run_git(
+def run_git(
     worktree: Path, arguments: list[str], environment: dict[str, str] | None = None
 ) -> process.CapturedResult:
     try:
@@ -278,7 +280,7 @@ def _git_dir(worktree: Path) -> Path:
     is exactly what keeps the lineage stamp below from colliding across
     worktrees that share one repository.
     """
-    result = _run_git(worktree, ["rev-parse", "--absolute-git-dir"])
+    result = run_git(worktree, ["rev-parse", "--absolute-git-dir"])
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     return Path(result.stdout.decode().strip())
@@ -294,7 +296,7 @@ def _is_ancestor(worktree: Path) -> lineage_stamp.IsAncestor:
     other nonzero exit is a git failure (CAS-48)."""
 
     def is_ancestor(ancestor: ObjectId, descendant: ObjectId) -> bool:
-        result = _run_git(worktree, ["merge-base", "--is-ancestor", str(ancestor), str(descendant)])
+        result = run_git(worktree, ["merge-base", "--is-ancestor", str(ancestor), str(descendant)])
         if result.exit_status == _MERGE_BASE_EXIT_NOT_ANCESTOR:
             return False
         if result.exit_status != 0:
@@ -343,7 +345,7 @@ def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, 
     commit onto a freshly observed tip ("never a merge") -- so a
     first-parent walk from `tip` reaches every commit the ref has ever held.
     """
-    result = _run_git(worktree, ["log", "--first-parent", f"--format={_LOG_FORMAT}", str(tip)])
+    result = run_git(worktree, ["log", "--first-parent", f"--format={_LOG_FORMAT}", str(tip)])
     if result.exit_status != 0:
         raise _commit_history_read_failure(tip, result)
     dates: dict[ObjectId, datetime] = {}
@@ -392,7 +394,7 @@ def ls_remote_state(worktree: Path, remote: str) -> ObjectId | None:
     git might use -- is an auth or transport failure and must fail loud
     instead of being mistaken for emptiness.
     """
-    result = _run_git(worktree, ["ls-remote", "--exit-code", remote, STATE_REF])
+    result = run_git(worktree, ["ls-remote", "--exit-code", remote, STATE_REF])
     if result.exit_status == 0:
         oid, _, _ref = result.stdout.decode().splitlines()[0].partition("\t")
         return ObjectId(oid)
@@ -418,11 +420,11 @@ def _fetch_into_anchor(worktree: Path, remote: str) -> ObjectId:
     side effect aco wants from this fetch.
     """
     refspec = f"+{STATE_REF}:{_FETCH_ANCHOR_REF}"
-    result = _run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, refspec])
+    result = run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, refspec])
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
-    read = _run_git(worktree, ["rev-parse", _FETCH_ANCHOR_REF])
+    read = run_git(worktree, ["rev-parse", _FETCH_ANCHOR_REF])
     if read.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(read)
         raise ClaimError(f"cannot read the fetched tip at {_FETCH_ANCHOR_REF}: {detail}")
@@ -444,14 +446,14 @@ def _fetch_ref_objects(worktree: Path, remote: str) -> None:
     auto-following into the shared local `refs/tags/*` namespace -- the
     write-nothing contract it must keep.
     """
-    result = _run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, STATE_REF])
+    result = run_git(worktree, ["fetch", *_STATE_FETCH_OPTIONS, remote, STATE_REF])
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot fetch {remote} {STATE_REF}: {detail}")
 
 
 def _tree_oid(worktree: Path, tip: ObjectId) -> ObjectId:
-    result = _run_git(worktree, ["rev-parse", f"{tip}^{{tree}}"])
+    result = run_git(worktree, ["rev-parse", f"{tip}^{{tree}}"])
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise MalformedStateTreeError(f"cannot resolve the tree for {tip}: {detail}")
@@ -494,7 +496,7 @@ def _list_tree(
     quotes a non-ASCII or tab-bearing name, and the quoted path matched no
     directory prefix, so such an entry vanished from every read and write.
     """
-    listing = _run_git(worktree, ["ls-tree", "-r", "-t", "-z", str(tree_ref)])
+    listing = run_git(worktree, ["ls-tree", "-r", "-t", "-z", str(tree_ref)])
     if listing.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(listing)
         raise MalformedStateTreeError(
@@ -555,7 +557,7 @@ def _read_state_archive(
     command = ["archive", "--format=tar", str(tree_oid)]
     if paths is not None:
         command.extend(["--", *paths])
-    result = _run_git(worktree, command)
+    result = run_git(worktree, command)
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise MalformedStateTreeError(f"cannot read the state tree at {tip}: {detail}")
@@ -874,7 +876,7 @@ def _commit_tree(
     if committed_at is not None:
         moment = f"@{committed_at} +0000"
         environment = {**os.environ, "GIT_AUTHOR_DATE": moment, "GIT_COMMITTER_DATE": moment}
-    result = _run_git(worktree, arguments, environment)
+    result = run_git(worktree, arguments, environment)
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     return ObjectId(result.stdout.decode().strip())
@@ -898,7 +900,7 @@ def _find_operation_id(
     reserved for a candidate whose message was actually read.
     """
     range_argument = f"{since}..{until}" if since is not None else str(until)
-    listing = _run_git(worktree, ["log", "--format=%H", range_argument])
+    listing = run_git(worktree, ["log", "--format=%H", range_argument])
     if listing.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(listing)
         raise ClaimError(
@@ -906,7 +908,7 @@ def _find_operation_id(
         )
     needle = f"operation_id: {operation_id}"
     for candidate in listing.stdout.decode().split():
-        message = _run_git(worktree, ["log", "-1", "--format=%B", candidate])
+        message = run_git(worktree, ["log", "-1", "--format=%B", candidate])
         if message.exit_status != 0:
             detail = process.git_failure_detail_from_stderr(message)
             raise ClaimError(
@@ -1408,7 +1410,7 @@ def list_worktrees(worktree: Path) -> tuple[Path, ...]:
     full set -- a lineage stamp or fetch anchor left behind in even one
     linked worktree survives the reset and trips the next `fetch_state` it
     runs there."""
-    result = _run_git(worktree, ["worktree", "list", "--porcelain"])
+    result = run_git(worktree, ["worktree", "list", "--porcelain"])
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     return tuple(
@@ -1435,7 +1437,7 @@ def local_state_ref_exists(worktree: Path) -> bool:
     `delete_state_ref`, the reset step right after export, deletes it only
     when this is true.
     """
-    result = _run_git(worktree, ["show-ref", "--verify", "--quiet", STATE_REF])
+    result = run_git(worktree, ["show-ref", "--verify", "--quiet", STATE_REF])
     if result.exit_status == 0:
         return True
     if result.exit_status == _SHOW_REF_EXIT_MISSING and not result.stdout and not result.stderr:
@@ -1506,16 +1508,14 @@ def delete_state_ref(*, worktree: Path, remote: str, expected_remote_tip: Object
     """
     if expected_remote_tip is not None:
         lease = f"{STATE_REF}:{expected_remote_tip}"
-        result = _run_git(
-            worktree, ["push", remote, f"--force-with-lease={lease}", f":{STATE_REF}"]
-        )
+        result = run_git(worktree, ["push", remote, f"--force-with-lease={lease}", f":{STATE_REF}"])
         if result.exit_status != 0:
             _repair_after_failed_remote_delete(
                 worktree, remote, expected_remote_tip, process.git_failure_detail(result)
             )
     if not local_state_ref_exists(worktree):
         return False
-    result = _run_git(worktree, ["update-ref", "-d", STATE_REF])
+    result = run_git(worktree, ["update-ref", "-d", STATE_REF])
     if result.exit_status != 0:
         detail = process.git_failure_detail_from_stderr(result)
         raise ClaimError(f"cannot delete local {STATE_REF}: {detail}")
@@ -1540,7 +1540,7 @@ def clear_lineage_stamps(*, worktree: Path) -> tuple[Path, ...]:
         stamp_directory = _stamp_directory(path)
         with lineage_stamp.locked(stamp_directory):
             lineage_stamp.remove(stamp_directory)
-            result = _run_git(path, ["update-ref", "-d", _FETCH_ANCHOR_REF])
+            result = run_git(path, ["update-ref", "-d", _FETCH_ANCHOR_REF])
         if result.exit_status != 0:
             detail = process.git_failure_detail_from_stderr(result)
             raise ClaimError(f"cannot clear {_FETCH_ANCHOR_REF} in {path}: {detail}")

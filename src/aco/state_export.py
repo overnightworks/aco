@@ -11,9 +11,8 @@ import tempfile
 from contextlib import suppress
 from pathlib import Path
 
-from . import process
 from .protocol import ClaimError, ObjectId
-from .store import STATE_REF, _run_git
+from .store import STATE_REF, git_failure_detail, git_failure_detail_from_stderr, run_git
 
 # `export_state_bundle` points this at the leased tip and bundles it:
 # Using the shared `STATE_REF` would let a concurrent reset in another
@@ -50,13 +49,13 @@ def _write_bundle_to_descriptor(
     failure, by the `except` clause here.
     """
     try:
-        update = _run_git(worktree, ["update-ref", EXPORT_BUNDLE_REF, str(tip)])
+        update = run_git(worktree, ["update-ref", EXPORT_BUNDLE_REF, str(tip)])
         if update.exit_status != 0:
-            detail = process.git_failure_detail_from_stderr(update)
+            detail = git_failure_detail_from_stderr(update)
             raise _export_failure(tip, destination, detail)
-        result = _run_git(worktree, ["bundle", "create", "-", EXPORT_BUNDLE_REF])
+        result = run_git(worktree, ["bundle", "create", "-", EXPORT_BUNDLE_REF])
         if result.exit_status != 0:
-            raise _export_failure(tip, destination, process.git_failure_detail(result))
+            raise _export_failure(tip, destination, git_failure_detail(result))
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(result.stdout)
     except BaseException:
@@ -103,11 +102,11 @@ def _delete_export_ref(worktree: Path) -> str | None:
 
     Catches `(ClaimError, OSError, ValueError)` rather than only
     `ClaimError`:
-    `_run_git` only wraps `ExecutableMissingError`/`ProcessTimedOutError`
-    into `ClaimError`, so a raw `OSError` from `process.run_git`'s own
+    `run_git` only wraps `ExecutableMissingError`/`ProcessTimedOutError`
+    into `ClaimError`, so a raw `OSError` from the git subprocess call inside `run_git`, its own
     `subprocess.run` (a descriptor exhausted) would otherwise escape before
     the temporary file's own cleanup below ever runs, and
-    `process.git_failure_detail_from_stderr`'s own `stderr.decode()` on the
+    `git_failure_detail_from_stderr`'s own `stderr.decode()` on the
     nonzero-exit branch can raise `UnicodeDecodeError` -- a `ValueError`
     subclass -- on invalid UTF-8 in git's own stderr. This is the concrete
     failure family that can actually reach this call, not a stand-in for
@@ -115,9 +114,9 @@ def _delete_export_ref(worktree: Path) -> str | None:
     verbatim into the leftover description `_clear_export_artifacts` returns
     and, from there, into the raised `ClaimError` and its `__cause__`."""
     try:
-        result = _run_git(worktree, ["update-ref", "-d", EXPORT_BUNDLE_REF])
+        result = run_git(worktree, ["update-ref", "-d", EXPORT_BUNDLE_REF])
         if result.exit_status != 0:
-            return process.git_failure_detail_from_stderr(result)
+            return git_failure_detail_from_stderr(result)
     except (ClaimError, OSError, ValueError) as error:
         return str(error)
     return None

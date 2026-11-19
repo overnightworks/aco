@@ -87,7 +87,7 @@ def _stub_board_config_tracked(monkeypatch: pytest.MonkeyPatch) -> None:
 def git_call_spy(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
     """Counts real git subprocess invocations by subcommand, patched at the
     `process` chokepoint both of `store`'s call shapes go through --
-    `_run_git` (`process.run_captured`) and `_run_git_with_input`
+    `run_git` (`process.run_captured`) and `_run_git_with_input`
     (`process.run_bounded_captured`) -- the proof that a transition's or a read's
     git-invocation count is independent of how many claims the state tree
     holds.
@@ -1472,7 +1472,7 @@ def test_run_git_translates_process_failures_to_claim_error(
     monkeypatch.setattr(store.process, "run_captured", fake_run_captured)
 
     with pytest.raises(protocol.ClaimError):
-        store._run_git(worktree, ["status"])
+        store.run_git(worktree, ["status"])
 
 
 def test_git_dir_fails_loud_when_the_worktree_is_not_a_repository(tmp_path: Path) -> None:

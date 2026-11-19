@@ -14,12 +14,6 @@ item = "#665"
 date = 2026-11-06
 reason = "the contract forbade items to import aco.metrics, a module that no longer exists"
 
-[[gate.loosened]]
-what = 'import contract "Only the gh and git owners run commands" ignores aco.state_export -> aco.process'
-item = "#976"
-date = 2026-11-19
-reason = "the bundle export moves out of aco.store with the git failure-detail readers it already called, so the module that owns the export becomes a process caller"
-
 [[root.allow]]
 entry = "frontend/"
 reason = "the web client, built apart from the Python package"

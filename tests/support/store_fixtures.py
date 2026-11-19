@@ -97,7 +97,7 @@ def lineage_observation(repository: Path) -> tuple[protocol.ObjectId | None, str
     per-worktree values a reset dry run, a live-claim refusal, or a failed
     export must leave byte-identical to whatever `fetch_state` last wrote."""
     stamp = lineage_stamp.read(store._stamp_directory(repository))
-    anchor = store._run_git(repository, ["rev-parse", store._FETCH_ANCHOR_REF])
+    anchor = store.run_git(repository, ["rev-parse", store._FETCH_ANCHOR_REF])
     return stamp, anchor.stdout.decode().strip() if anchor.exit_status == 0 else None
 
 

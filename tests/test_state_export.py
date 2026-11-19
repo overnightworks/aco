@@ -70,7 +70,7 @@ def test_export_state_bundle_writes_a_verifiable_bundle_and_never_touches_the_sh
     else:
         assert real_git(worktree, "rev-parse", store.STATE_REF).stdout.strip() == foreign_tip
     assert (
-        store._run_git(
+        store.run_git(
             worktree, ["show-ref", "--verify", "--quiet", state_export.EXPORT_BUNDLE_REF]
         ).exit_status
         != 0
@@ -282,12 +282,12 @@ def _verify_and_remove_the_leftover_export_ref(worktree: Path) -> None:
     a future regression that quietly drops the real `update-ref` call
     cannot pass this test by accident."""
     assert (
-        store._run_git(
+        store.run_git(
             worktree, ["show-ref", "--verify", "--quiet", state_export.EXPORT_BUNDLE_REF]
         ).exit_status
         == 0
     )
-    store._run_git(worktree, ["update-ref", "-d", state_export.EXPORT_BUNDLE_REF])
+    store.run_git(worktree, ["update-ref", "-d", state_export.EXPORT_BUNDLE_REF])
 
 
 class _CleanupFailureCase(NamedTuple):

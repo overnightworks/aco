@@ -249,7 +249,6 @@ ignore_imports = [
     "aco.github -> aco.process",
     "aco.checkout -> aco.process",
     "aco.store -> aco.process",
-    "aco.state_export -> aco.process",
 ]
 
 [tool.pyright]
