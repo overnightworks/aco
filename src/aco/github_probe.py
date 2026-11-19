@@ -5,7 +5,7 @@ non-zero on the 304 that means unchanged."""
 import re
 from collections.abc import Callable
 
-from . import forge, github
+from . import forge, github_failure
 
 type ResponseRunner = Callable[..., tuple[str, int]]
 """Runs the `gh` command line it is given for the stated `purpose` and answers
@@ -57,7 +57,7 @@ class GitHubBoardProbe:
         if status == _NOT_MODIFIED and token is not None:
             return forge.ProbeAnswer(changed=False, token=token)
         if status != _CHANGED:
-            raise github.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
+            raise github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
         etag = _etag(lines)
         if etag is None:
             raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned no ETag")

@@ -15,6 +15,7 @@ from urllib.parse import quote
 from . import (
     forge,
     github_actions,
+    github_failure,
     github_issue_payload,
     github_merge_queue,
     github_pull_requests,
@@ -63,14 +64,6 @@ MALFORMED_CLOSED_ISSUE = "GitHub returned a malformed closed issue"
 # A refusal still needs one name to print, so an unnamed non-passing verdict
 # prints this stand-in rather than reading as "no checks" and passing silently.
 EXTERNAL_STATUS_FALLBACK_NAME = "external status checks"
-# For `HTTP 5xx`, gh's combined output names the status
-# code but never its class, so any 5xx is matched by digit rather than by an
-# enumerated list of codes that would need to grow with the API.
-_HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
-# gh words a DNS failure `error connecting to <host>` and any other connect failure `dial tcp`.
-_TRANSIENT_PATTERN = re.compile(
-    _HTTP_SERVER_ERROR_PATTERN.pattern + r"|connection reset|timeout|error connecting to|dial tcp"
-)
 # `merge_landing`'s own signals, none a 4xx `nonzero_exit_failure` classifies.
 # GitHub's REST reference for the merge endpoint: 409 "if sha was provided and
 # pull request head did not match", 405 "if merge cannot be performed" -- a
@@ -209,22 +202,6 @@ def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeErro
     raise AssertionError(f"unhandled process failure type: {type(error).__name__}")
 
 
-def nonzero_exit_failure(decoded: str, return_code: int, purpose: str) -> forge.ForgeError:
-    """Classify a nonzero `gh` exit from its decoded combined output.
-
-    `gh`'s own exit code never carries the HTTP status, so this reads the
-    same prose a human would; the fallback stays an unclassified `ForgeError`
-    rather than guessing at retry safety.
-    """
-    if "HTTP 404" in decoded:
-        return forge.ForgeNotFoundError(decoded)
-    if "HTTP 401" in decoded or "HTTP 403" in decoded:
-        return forge.ForgePermissionDeniedError(decoded)
-    if _TRANSIENT_PATTERN.search(decoded):
-        return forge.ForgeTransientError(decoded)
-    return forge.ForgeError(decoded or f"{purpose} failed with exit {return_code}")
-
-
 def response_command(
     command: list[str], *, purpose: str, input_data: bytes | None = None
 ) -> tuple[str, int]:
@@ -247,7 +224,7 @@ def response_command(
 def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
     decoded, exit_status = response_command(command, purpose=purpose, input_data=input_data)
     if exit_status != 0:
-        raise nonzero_exit_failure(decoded, exit_status, purpose)
+        raise github_failure.nonzero_exit_failure(decoded, exit_status, purpose)
     return decoded
 
 
@@ -759,7 +736,7 @@ class GitHubForge:
                 if _MERGE_IN_PROGRESS_MESSAGE in text.casefold():
                     raise forge.ForgeMergeInProgressError(text) from error
                 raise forge.ForgeMergeRefusedError(text) from error
-            if _HTTP_SERVER_ERROR_PATTERN.search(text):
+            if github_failure.HTTP_SERVER_ERROR_PATTERN.search(text):
                 raise forge.ForgeMergeUnansweredError(text) from error
             raise
         values = self._json_lines(raw, "merge result")
