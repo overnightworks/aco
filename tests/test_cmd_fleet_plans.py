@@ -9,7 +9,6 @@ import pytest
 from aco_board_fixtures import board_checkout
 from board_forge import BoardForge
 from cli_fixtures import CliRun, run_cli
-from discovery_fixtures import configure_root, isolate_config_file
 from option_cards import open_option_entry
 
 from aco import session, workboard
@@ -17,24 +16,12 @@ from aco import session, workboard
 _MARK = workboard.FLEET_PLAN_LABEL
 
 
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture
-def root(tmp_path: Path, config_file: Path) -> Path:
-    return configure_root(tmp_path, config_file)
+pytestmark = pytest.mark.usefixtures("config_file", "isolated_global_git_config")
 
 
 @pytest.fixture(autouse=True)
 def board_forge_context(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(session, "run_context", board_forge.run_context)
-
-
-@pytest.fixture(autouse=True)
-def _empty_global_git_config(isolated_global_git_config: Path) -> None:
-    """Real git reads an empty global configuration."""
 
 
 def _put(

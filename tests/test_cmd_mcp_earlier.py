@@ -9,36 +9,13 @@ from typing import Any
 import board_forge
 import pytest
 from aco_board_fixtures import board_checkout
-from discovery_fixtures import configure_root, isolate_config_file, repository_with_card
-from mcp_lines import call_line, serve_mcp
+from discovery_fixtures import repository_with_card
+from mcp_lines import ask_line, call_line, serve_mcp
 from option_cards import ask_card, open_option_entry
 
 from aco import forge
 
-
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture
-def root(tmp_path: Path, config_file: Path) -> Path:
-    return configure_root(tmp_path, config_file)
-
-
-@pytest.fixture(autouse=True)
-def _empty_global_git_config(isolated_global_git_config: Path) -> None:
-    """Real git reads an empty global configuration."""
-
-
-@pytest.fixture
-def here(root: Path) -> board_forge.BoardForge:
-    return repository_with_card(root / "here", 1, "Here")
-
-
-def _ask_line(request_id: int) -> str:
-    card = ask_card(question="Soll der Take danach markiert bleiben?")
-    return call_line(request_id, "ask", {"repository": "board-forge/here", "item": 1, **card})
+pytestmark = pytest.mark.usefixtures("config_file", "isolated_global_git_config")
 
 
 def _ruled_entry(**changes: object) -> dict[str, object]:
@@ -65,7 +42,7 @@ def test_a_ruled_line_of_the_same_area_from_another_repository_and_a_closed_item
     index = board_forge.search_index()
     index.include(here, elsewhere)
 
-    [answer] = serve_mcp(monkeypatch, _ask_line(1))
+    [answer] = serve_mcp(monkeypatch, ask_line(1))
 
     structured = answer["result"]["structuredContent"]
     assert (answer["result"]["isError"], structured["written"]) == (False, True)
@@ -86,7 +63,7 @@ def test_an_area_without_a_ruling_shows_no_earlier_line(
     here.put_item(4, board_forge.item_body(_ruled_entry(area="Andere")), title="Anders")
     board_forge.search_index().include(here)
 
-    [answer] = serve_mcp(monkeypatch, _ask_line(1))
+    [answer] = serve_mcp(monkeypatch, ask_line(1))
 
     structured = answer["result"]["structuredContent"]
     assert (structured["earlier"], structured["earlier_more"]) == ([], 0)
@@ -121,7 +98,7 @@ def test_a_ruled_line_of_a_non_member_or_of_an_untracked_repository_is_left_out(
     """Spec: MCP-60."""
     board_forge.search_index().include(arrange(root, tmp_path / "outside"))
 
-    [answer] = serve_mcp(monkeypatch, _ask_line(1))
+    [answer] = serve_mcp(monkeypatch, ask_line(1))
 
     assert _earlier(answer) == []
 
@@ -153,7 +130,7 @@ def test_the_same_card_asked_again_shows_the_same_earlier_lines(
     elsewhere.put_item(3, board_forge.item_body(_ruled_entry()), title="Dort")
     board_forge.search_index().include(elsewhere)
 
-    [asked, again] = serve_mcp(monkeypatch, _ask_line(1), _ask_line(2))
+    [asked, again] = serve_mcp(monkeypatch, ask_line(1), ask_line(2))
 
     assert asked["result"]["structuredContent"]["written"] is True
     assert again["result"]["structuredContent"]["written"] is False
@@ -218,6 +195,6 @@ def test_the_search_runs_after_the_items_lock_is_released(
 
     monkeypatch.setattr(board_forge.SearchIndex, "search", witnessed)
 
-    serve_mcp(monkeypatch, _ask_line(1))
+    serve_mcp(monkeypatch, ask_line(1))
 
     assert lock_held_at_searches == [False]

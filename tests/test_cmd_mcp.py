@@ -7,7 +7,7 @@ import os
 import select
 import subprocess
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date
@@ -23,16 +23,10 @@ from board_fixtures import (
     searchless,
 )
 from cli_fixtures import run_cli
-from discovery_fixtures import (
-    configure_root,
-    isolate_config_file,
-    repository_with_card,
-    unreadable_checkout,
-    write_config,
-)
+from discovery_fixtures import repository_with_card, unreadable_checkout, write_config
 from github_fixtures import FakeForge, serve_forge
-from mcp_lines import Script, call_line
-from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
+from mcp_lines import Script, ask_line, call_line, run_mcp
+from option_cards import GOLDEN_CARD_HASH, open_option_entry
 
 from aco import body_fence, cli, expectations, forge, repositories, session
 from aco.board.aco_source import AcoSource
@@ -45,19 +39,7 @@ _CHILD_PROGRAM = (
 )
 
 
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture
-def root(tmp_path: Path, config_file: Path) -> Path:
-    return configure_root(tmp_path, config_file)
-
-
-@pytest.fixture(autouse=True)
-def _empty_global_git_config(isolated_global_git_config: Path) -> None:
-    """Real git in the child reads an empty global configuration."""
+pytestmark = pytest.mark.usefixtures("config_file", "isolated_global_git_config")
 
 
 @dataclass
@@ -165,27 +147,8 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
     assert (exit_code, rest, stderr) == (0, "", "")
 
 
-def _ask_line(request_id: int, repository: str = "board-forge/here", item: int = 1) -> str:
-    card = ask_card(question="Soll der Take danach markiert bleiben?")
-    arguments = {"repository": repository, "item": item, **card}
-    return call_line(request_id, "ask", arguments)
-
-
 def _arrive(root: Path) -> None:
     repository_with_card(root / "arrived", 1, "Arrived")
-
-
-def _serve_in_process(
-    monkeypatch: pytest.MonkeyPatch, *steps: str | bytes | Callable[[], None]
-) -> tuple[int, list[dict[str, Any]]]:
-    """`aco mcp` through its entry point over the board's test forge: the exit
-    code and every answer line."""
-    replies = io.StringIO()
-    monkeypatch.setattr(session, "run_context", board_forge.run_context)
-    monkeypatch.setattr(sys, "stdin", Script(*steps))
-    monkeypatch.setattr(sys, "stdout", replies)
-    exit_code = cli.main(["mcp"])
-    return exit_code, [json.loads(line) for line in replies.getvalue().splitlines()]
 
 
 def test_every_call_scans_afresh_and_a_refusal_is_a_tool_error_the_next_call_recovers_from(
@@ -194,7 +157,7 @@ def test_every_call_scans_afresh_and_a_refusal_is_a_tool_error_the_next_call_rec
     config_text = config_file.read_text(encoding="utf-8")
     config_file.unlink()
 
-    exit_code, answers = _serve_in_process(
+    exit_code, answers = run_mcp(
         monkeypatch,
         "",
         json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}),
@@ -220,7 +183,7 @@ def test_a_root_holding_only_unreadable_directories_is_a_tool_error_naming_the_r
 ) -> None:
     (root / "broken" / ".git").mkdir(parents=True)
 
-    _, [answer] = _serve_in_process(monkeypatch, call_line(1))
+    _, [answer] = run_mcp(monkeypatch, call_line(1))
 
     result = answer["result"]
     assert result["isError"] is True
@@ -234,7 +197,7 @@ def test_a_root_holding_only_unreadable_directories_is_a_tool_error_naming_the_r
 def test_a_line_the_parser_cannot_handle_is_answered_and_the_next_request_still_is(
     bad_line: bytes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    exit_code, [bad, ping] = _serve_in_process(
+    exit_code, [bad, ping] = run_mcp(
         monkeypatch, bad_line, json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"})
     )
 
@@ -247,7 +210,7 @@ def test_a_repository_whose_read_fails_is_listed_as_unavailable_beside_the_other
     repository_with_card(root / "good", 1, "Good")
     repository_with_card(root / "broken", 2, "Broken").fail_listing("the forge is down")
 
-    _, [answer] = _serve_in_process(monkeypatch, call_line(1))
+    _, [answer] = run_mcp(monkeypatch, call_line(1))
 
     assert [
         (entry["repository"], entry.get("unavailable"))
@@ -305,9 +268,7 @@ def test_an_asked_card_shows_in_the_inbox_read_and_is_stored_once(
 ) -> None:
     here = repository_with_card(root / "here", 1, "Here")
 
-    _, [asked, repeated, inbox] = _serve_in_process(
-        monkeypatch, _ask_line(1), _ask_line(2), call_line(3)
-    )
+    _, [asked, repeated, inbox] = run_mcp(monkeypatch, ask_line(1), ask_line(2), call_line(3))
 
     written, again = asked["result"], repeated["result"]
     line = written["structuredContent"]["line"]
@@ -325,18 +286,16 @@ def test_an_asked_card_shows_in_the_inbox_read_and_is_stored_once(
 
 
 @pytest.mark.parametrize(
-    ("ask_line", "sentence"),
+    ("asked", "sentence"),
     [
-        pytest.param(_ask_line(1, repository="board-forge/nowhere"), "no repository", id="unknown"),
-        pytest.param(_ask_line(1, item=9), "9", id="missing-item"),
+        pytest.param(ask_line(1, repository="board-forge/nowhere"), "no repository", id="unknown"),
+        pytest.param(ask_line(1, item=9), "9", id="missing-item"),
     ],
 )
 def test_a_card_for_an_undiscovered_repository_or_item_is_a_tool_error_that_writes_nothing(
-    ask_line: str, sentence: str, root: Path, monkeypatch: pytest.MonkeyPatch
+    asked: str, sentence: str, here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    here = repository_with_card(root / "here", 1, "Here")
-
-    _, [answer] = _serve_in_process(monkeypatch, ask_line)
+    _, [answer] = run_mcp(monkeypatch, asked)
 
     result = answer["result"]
     assert result["isError"] is True
@@ -407,17 +366,12 @@ def test_an_unwritable_lock_directory_is_a_tool_error_that_writes_nothing(
     blocker.write_text("a file, not a directory", encoding="utf-8")
     monkeypatch.setenv("XDG_STATE_HOME", str(blocker))
 
-    _, [answer] = _serve_in_process(monkeypatch, _ask_line(1))
+    _, [answer] = run_mcp(monkeypatch, ask_line(1))
 
     result = answer["result"]
     assert result["isError"] is True
     assert "cannot lock the item" in result["content"][0]["text"]
     assert here.body_writes() == []
-
-
-@pytest.fixture
-def here(root: Path) -> board_forge.BoardForge:
-    return repository_with_card(root / "here", 1, "Here")
 
 
 def _record_line(request_id: int = 1, /, **changes: object) -> str:
@@ -450,7 +404,7 @@ def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_lin
 
     monkeypatch.setattr(board_forge.BoardForge, "update_item_body", witnessed)
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+    _, [answer] = run_mcp(monkeypatch, _record_line())
 
     result = answer["result"]
     [entry] = here.stored_entries(1)
@@ -492,9 +446,7 @@ def test_a_chat_answer_is_one_write_in_the_items_turn_that_answers_the_ruled_lin
 def test_an_answer_in_the_operators_words_is_stored_verbatim_and_reads_back_equal(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, words: str
 ) -> None:
-    _, [answer, inbox] = _serve_in_process(
-        monkeypatch, _record_line(option=None, other=words), call_line(2)
-    )
+    _, [answer, inbox] = run_mcp(monkeypatch, _record_line(option=None, other=words), call_line(2))
 
     [entry] = here.stored_entries(1)
     fences = body_fence.walk_fences(here.stored_body(1)).fences
@@ -513,7 +465,7 @@ def test_a_chat_answer_binds_like_a_board_ruling(
 ) -> None:
     unruled = here.stored_body(1)
     with monkeypatch.context() as served:
-        _, [inbox_before, _, inbox_after] = _serve_in_process(
+        _, [inbox_before, _, inbox_after] = run_mcp(
             served, call_line(1), _record_line(2), call_line(3)
         )
     ruled = here.stored_body(1)
@@ -543,9 +495,7 @@ def test_a_chat_answer_binds_like_a_board_ruling(
 def test_a_repeat_is_refused_and_writes_nothing(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _, [first, repeated] = _serve_in_process(
-        monkeypatch, _record_line(1), _record_line(2, option="B")
-    )
+    _, [first, repeated] = run_mcp(monkeypatch, _record_line(1), _record_line(2, option="B"))
 
     assert first["result"]["isError"] is False
     assert repeated["result"]["isError"] is True
@@ -563,7 +513,7 @@ def test_a_closed_item_and_an_item_a_non_member_wrote_are_ruled(
     else:
         here.put_item(1, here.stored_body(1), author_is_member=False)
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+    _, [answer] = run_mcp(monkeypatch, _record_line())
 
     assert answer["result"]["isError"] is False
     assert here.stored_entries(1)[0]["ruling"] == "A"
@@ -575,7 +525,7 @@ def test_a_line_with_its_head_is_ruled_and_loses_its_returned_keys(
     returned = _stored_item(returned_on=date(2026, 10, 2), returned_note="unklar")
     here.put_item(1, board_forge.item_body(returned))
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+    _, [answer] = run_mcp(monkeypatch, _record_line())
 
     [entry] = here.stored_entries(1)
     assert answer["result"]["isError"] is False
@@ -615,7 +565,7 @@ def test_a_refusal_of_the_ruling_is_a_tool_error_with_its_sentence_and_writes_no
 ) -> None:
     here.put_item(1, board_forge.item_body(*stored))
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line(**changes))
+    _, [answer] = run_mcp(monkeypatch, _record_line(**changes))
 
     result = answer["result"]
     assert result["isError"] is True
@@ -628,7 +578,7 @@ def test_a_malformed_body_is_a_tool_error_that_writes_nothing(
 ) -> None:
     here.put_item(1, "no block in this body")
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+    _, [answer] = run_mcp(monkeypatch, _record_line())
 
     assert answer["result"]["isError"] is True
     assert "no aco block" in answer["result"]["content"][0]["text"]
@@ -638,7 +588,7 @@ def test_a_malformed_body_is_a_tool_error_that_writes_nothing(
 def test_an_undiscovered_repository_is_a_tool_error_that_writes_nothing(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _, [answer] = _serve_in_process(monkeypatch, _record_line(repository="board-forge/nowhere"))
+    _, [answer] = run_mcp(monkeypatch, _record_line(repository="board-forge/nowhere"))
 
     result = answer["result"]
     assert result["isError"] is True
@@ -652,7 +602,7 @@ def test_a_repository_whose_checkout_cannot_be_read_is_a_tool_error_naming_the_c
     broken = unreadable_checkout(root / "broken", "https://github.com/board-forge/broken")
     [unavailable] = repositories.discover(root).unavailable
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line(repository="board-forge/broken"))
+    _, [answer] = run_mcp(monkeypatch, _record_line(repository="board-forge/broken"))
 
     result = answer["result"]
     assert result["isError"] is True
@@ -683,7 +633,7 @@ def test_the_body_write_checks_answer_passes_through_as_the_calls_error(
 ) -> None:
     here.answer_next_write(check_answer)
 
-    _, [answer] = _serve_in_process(monkeypatch, _record_line())
+    _, [answer] = run_mcp(monkeypatch, _record_line())
 
     result = answer["result"]
     assert result["isError"] is True
@@ -695,9 +645,9 @@ def test_a_chat_answer_touches_the_items_signal_and_an_ask_does_not(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Spec: MCP-56, WAIT-12 -- `record_answer` signals the ruling it wrote."""
-    _serve_in_process(monkeypatch, _ask_line(1))
+    run_mcp(monkeypatch, ask_line(1))
     asked = board_forge.item_signals(tmp_path)
 
-    _serve_in_process(monkeypatch, _record_line())
+    run_mcp(monkeypatch, _record_line())
 
     assert (asked, len(board_forge.item_signals(tmp_path))) == ([], 1)

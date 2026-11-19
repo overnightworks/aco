@@ -9,6 +9,7 @@ from typing import Any
 
 import board_forge
 import pytest
+from option_cards import ask_card
 
 from aco import cli, session
 
@@ -42,13 +43,27 @@ def call_line(
     )
 
 
-def serve_mcp(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
-    """Every answer line `aco mcp` writes for `lines`, run through `cli.main(["mcp"])`
-    over the board's test forge, which must end with exit code 0."""
+def ask_line(request_id: int, repository: str = "board-forge/here", item: int = 1) -> str:
+    card = ask_card(question="Soll der Take danach markiert bleiben?")
+    return call_line(request_id, "ask", {"repository": repository, "item": item, **card})
+
+
+def run_mcp(
+    monkeypatch: pytest.MonkeyPatch, *steps: str | bytes | Callable[[], None]
+) -> tuple[int, list[dict[str, Any]]]:
+    """The exit code and every answer line of `cli.main(["mcp"])` over the board's
+    test forge, reading `steps` as its standard input."""
     replies = io.StringIO()
     with monkeypatch.context() as served:
         served.setattr(session, "run_context", board_forge.run_context)
-        served.setattr(sys, "stdin", Script(*lines))
+        served.setattr(sys, "stdin", Script(*steps))
         served.setattr(sys, "stdout", replies)
-        assert cli.main(["mcp"]) == 0
-    return [json.loads(line) for line in replies.getvalue().splitlines()]
+        exit_code = cli.main(["mcp"])
+    return exit_code, [json.loads(line) for line in replies.getvalue().splitlines()]
+
+
+def serve_mcp(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
+    """Every answer line `aco mcp` writes for `lines`, which must end with exit code 0."""
+    exit_code, replies = run_mcp(monkeypatch, *lines)
+    assert exit_code == 0
+    return replies
