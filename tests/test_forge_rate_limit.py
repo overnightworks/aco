@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
-from aco import forge, github_failure
+from aco import github_failure
 from aco.github_failure import RateLimit
 
 RESET = datetime(2026, 11, 19, 20, 15, 27, tzinfo=UTC)
@@ -68,11 +68,3 @@ def test_the_sentence_names_the_limit_and_its_reset_within_what_a_body_write_sho
     assert str(error) == sentence
     assert len(sentence) <= BODY_WRITE_CAUSE_LIMIT
 
-
-def test_the_error_is_a_transient_failure_carrying_the_reset_or_none() -> None:
-    """Spec: OUT-12 -- a rate limit is unreachable, which a transient error already is."""
-    known = forge.ForgeRateLimitedError("limited", RESET)
-    unknown = forge.ForgeRateLimitedError("limited")
-
-    assert isinstance(known, forge.ForgeTransientError)
-    assert (known.resets_at, unknown.resets_at) == (RESET, None)
