@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from aco_board_fixtures import board_checkout
+from board_fixtures import write_repository_config
 from board_forge import BoardForge, item_body
 from cli_fixtures import push_repository_trunk, real_git, track_board_config
 from option_cards import open_option_entry
@@ -57,4 +58,15 @@ def discovered_checkout(
     real_git(directory, "remote", "add", "origin", remote_url)
     track_board_config(directory, board_config)
     push_repository_trunk(directory, "origin")
+    return directory
+
+
+def unreadable_checkout(directory: Path, remote_url: str) -> Path:
+    """A checkout at `directory` whose `origin` is `remote_url` and whose tracked
+    board configuration holds an unknown key, so a scan lists it as unavailable."""
+    directory.mkdir(parents=True)
+    real_git(directory, "init", "--quiet")
+    real_git(directory, "remote", "add", "origin", remote_url)
+    write_repository_config(directory, 'unknown_key = "x"\n')
+    real_git(directory, "add", ".aco/board.toml")
     return directory

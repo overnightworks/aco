@@ -21,20 +21,20 @@ from board_fixtures import (
     board_issue,
     complete_contract,
     searchless,
-    write_repository_config,
 )
-from cli_fixtures import real_git, run_cli
+from cli_fixtures import run_cli
 from discovery_fixtures import (
     configure_root,
     isolate_config_file,
     repository_with_card,
+    unreadable_checkout,
     write_config,
 )
 from github_fixtures import FakeForge, serve_forge
 from mcp_lines import Script, call_line
 from option_cards import GOLDEN_CARD_HASH, ask_card, open_option_entry
 
-from aco import body_fence, cli, expectations, forge, repositories, session, workboard
+from aco import body_fence, cli, expectations, forge, repositories, session
 from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
@@ -649,12 +649,7 @@ def test_an_undiscovered_repository_is_a_tool_error_that_writes_nothing(
 def test_a_repository_whose_checkout_cannot_be_read_is_a_tool_error_naming_the_checkout(
     here: board_forge.BoardForge, root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    broken = root / "broken"
-    broken.mkdir()
-    real_git(broken, "init", "--quiet")
-    real_git(broken, "remote", "add", "origin", "https://github.com/board-forge/broken")
-    write_repository_config(broken, 'unknown_key = "x"\n')
-    real_git(broken, "add", workboard.CONFIG_PATH.as_posix())
+    broken = unreadable_checkout(root / "broken", "https://github.com/board-forge/broken")
     [unavailable] = repositories.discover(root).unavailable
 
     _, [answer] = _serve_in_process(monkeypatch, _record_line(repository="board-forge/broken"))

@@ -6,14 +6,19 @@ import json
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, complete_contract, write_repository_config
+from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import make_stand_in
-from cli_fixtures import init_bare_repository, real_git, run_cli
-from discovery_fixtures import configure_root, discovered_checkout, isolate_config_file
+from cli_fixtures import init_bare_repository, run_cli
+from discovery_fixtures import (
+    configure_root,
+    discovered_checkout,
+    isolate_config_file,
+    unreadable_checkout,
+)
 from github_fixtures import FakeForge
 from store_fixtures import path_without_gh, push_item_tree, state_ref_listing, state_ref_tip
 
-from aco import forge, github, repositories, workboard
+from aco import forge, github, repositories
 
 OTHER = "example/other"
 OTHER_URL = f"https://github.com/{OTHER}"
@@ -146,12 +151,7 @@ def test_item_new_in_a_repository_whose_checkout_cannot_be_read_refuses_naming_t
     """Spec: ITEM-78. The refusal names the label, the checkout's directory and
     the stored defect; under `--json` it is ITEM-25's precondition_failed."""
     discovered_checkout(root / "kept", "https://github.com/example/kept", other_bare, "")
-    broken = root / "broken"
-    broken.mkdir()
-    real_git(broken, "init", "--quiet")
-    real_git(broken, "remote", "add", "origin", OTHER_URL)
-    write_repository_config(broken, 'unknown_key = "x"\n')
-    real_git(broken, "add", workboard.CONFIG_PATH.as_posix())
+    broken = unreadable_checkout(root / "broken", OTHER_URL)
     [unavailable] = repositories.discover(root).unavailable
 
     result = run_cli(
