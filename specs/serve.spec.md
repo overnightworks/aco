@@ -632,7 +632,7 @@ stored block: no `wait`, no `[step]`, now = The operator answered "Decide." on t
 
 ### E-ABRD-26 -- the lines after the URL
 
-Setup: a root holding one checkout; a browser loads the page, then the API is called once without the token and once with it
+Setup: a root holding one checkout; `/api/board` is called once with the token only in the query and once with the header token
 
 ```console
 $ aco serve
