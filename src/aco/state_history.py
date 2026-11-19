@@ -8,8 +8,9 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from . import process
 from .protocol import ActiveClaim, ClaimError, ObjectId, StateLineageError
-from .store import process, run_git
+from .store import run_git
 
 # Field separator for the batched `git log` read below: %x09 is git's own
 # escape for a literal tab, unambiguous inside a `--format` string.
