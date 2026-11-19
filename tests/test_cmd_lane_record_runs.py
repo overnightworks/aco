@@ -204,7 +204,7 @@ def test_the_commits_name_the_run_and_carry_no_lane_trailer_so_stats_counts_no_l
     begin_message = world.commit_message()
     added = world.run(capsys, *add_arguments(world))
     add_message = world.commit_message()
-    stats = world.run(capsys, "stats", "2000-01-01..2100-01-01", "tag:unused", "--json")
+    stats = run_cli(["stats", "2000-01-01..2100-01-01", "tag:unused", "--json"], capsys)
 
     assert (begun.status, added.status) == (0, 0)
     for message in (begin_message, add_message):
@@ -752,3 +752,32 @@ def test_stored_runs_that_changed_since_the_command_read_them_refuse_as_a_transi
     stored = world.stored_runs()
     assert stored is not None
     assert [entry.run for entry in stored.runs] == ["run-x"]
+
+
+@pytest.mark.parametrize("command", ["begin", "add"])
+def test_stored_runs_that_are_not_the_stored_shape_refuse_and_write_nothing(
+    world: World, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    """Spec: LANREC-62."""
+    claim = world.claim()
+    world.commit_state(
+        protocol.RunsWriteIntent(
+            claim_id=claim.claim_id,
+            agent="Ada",
+            expected=None,
+            new_oid=store.hash_blob(world.directory, b"not json"),
+            operation_id="op-malformed",
+            holder_refusal="{}".format,
+            stale_refusal="never reached",
+        )
+    )
+    tip = world.state_tip()
+    arguments = begin_arguments(world) if command == "begin" else add_arguments(world)
+
+    refused = world.run(capsys, *arguments)
+
+    assert refused.status == 2
+    assert refused.stderr == (
+        f"ERROR: the stored runs of {world.label} cannot be used: not valid JSON\n"
+    )
+    assert world.state_tip() == tip

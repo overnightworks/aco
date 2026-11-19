@@ -2,15 +2,42 @@
 # ruff: noqa: T201 - the lane-record command writes its result line to stdout
 
 import argparse
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+from enum import StrEnum
+from functools import partial
 from pathlib import Path
 
-from . import lane_record, protocol, report, usage
+from . import checkout, lane_record, lane_runs, protocol, report, store, usage, workboard
+from .routing_line import RoutingStage
 from .session import RunContext
 
 _INVALID = "lane record {foreign} is invalid: {defect}"
 # A value the file states is cut to this, so the refusal keeps its own words and the file's path
 # keeps room on one bounded line.
 _STATED_VALUE_LENGTH_LIMIT = 40
+_COMMIT_SUBJECT = "lane-record"
+_RUN_TRAILER = "run"
+
+
+class _RunsReason(StrEnum):
+    """`aco lane-record begin` and `add`'s own `--json` `reason` vocabulary
+    (`specs/lane-record.spec.md`): `begun`, `already_begun`, `added` and `already_added` are the
+    successes; `precondition_failed` is a claim, a holder or a stored run that does not allow
+    the command, every other refusal `unavailable`."""
+
+    BEGUN = "begun"
+    ALREADY_BEGUN = "already_begun"
+    ADDED = "added"
+    ALREADY_ADDED = "already_added"
+    PRECONDITION_FAILED = "precondition_failed"
+    UNAVAILABLE = "unavailable"
+
+
+_REFUSAL_REASONS: report.RefusalReasons[_RunsReason] = (
+    (lane_runs.RunsRefusedError, _RunsReason.PRECONDITION_FAILED),
+)
 
 
 def read_record_file(path_text: str) -> lane_record.LaneRecordFile:
@@ -44,16 +71,210 @@ def add_record_argument(command: argparse.ArgumentParser, *, writes: str) -> Non
     )
 
 
+def _run_id(value: str) -> str:
+    if lane_runs.RUN_ID_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not a run id: 1 to 128 letters, digits, '.', '_' or '-', "
+            "starting with a letter or digit"
+        )
+    return value
+
+
+def _tip(value: str) -> str:
+    if lane_runs.TIP_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a full 40-digit lowercase commit sha")
+    return value
+
+
+class _StagesAction(argparse.Action):
+    """`--ran`: each stage that ran, once."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[str] | None,
+        option_string: str | None = None,
+    ) -> None:
+        stages = tuple(RoutingStage(stage) for stage in values or ())
+        repeated = next((stage for stage in stages if stages.count(stage) > 1), None)
+        if repeated is not None:
+            raise argparse.ArgumentError(self, f"the stage {repeated} is named twice")
+        setattr(namespace, self.dest, stages)
+
+
+def _add_run_arguments(command: argparse.ArgumentParser) -> None:
+    command.add_argument("item", type=workboard.parse_item_reference, help="the claimed item")
+    command.add_argument("--run", required=True, type=_run_id, help="the run's id")
+    command.add_argument("--agent", help="the acting agent's name; it must hold the claim")
+    report.add_json_flag(command)
+
+
 def add_parser(commands: usage.Subcommands, name: str) -> None:
-    command = commands.add_parser(name, help="check a lane record file, read-only")
+    command = commands.add_parser(
+        name, help="check a lane record file, or store a run of a claimed lane with its claim"
+    )
     command.subcommands = usage.Subcommands(command, "lane_record_command")
     check = command.subcommands.add_parser(
         "check", help="say whether FILE is a valid lane record file, and why not"
     )
     check.add_argument("file", metavar="FILE", help="the lane record file to check")
+    begin = command.subcommands.add_parser(
+        "begin", help="mark a run of a claimed item, as its holder"
+    )
+    _add_run_arguments(begin)
+    begin.add_argument("--start-tip", type=_tip, help="the commit the run starts from")
+    add = command.subcommands.add_parser(
+        "add", help="store the lane record of a begun run with its claim, as its holder"
+    )
+    _add_run_arguments(add)
+    add.add_argument("record", metavar="FILE", type=read_record_file, help="the lane record file")
+    add.add_argument("--end-tip", required=True, type=_tip, help="the commit the run ended at")
+    add.add_argument(
+        "--ran",
+        required=True,
+        nargs="+",
+        action=_StagesAction,
+        choices=[str(stage) for stage in lane_runs.RAN_STAGES],
+        help="each stage the run ran, once",
+    )
 
 
-def run(parsed: argparse.Namespace, _context: RunContext) -> int:
+@dataclass(frozen=True)
+class _ClaimRuns:
+    """The runs a claim holds as one begin or add read them, and the write that replaces them."""
+
+    context: RunContext
+    claim: protocol.ActiveClaim
+    agent: str
+    action: lane_runs.RunsAction
+    label: str
+    runs: lane_runs.RunsFile
+    stored: protocol.ObjectId | None
+
+    def write(self, runs: lane_runs.RunsFile, *, run: str) -> None:
+        intent = protocol.RunsWriteIntent(
+            claim_id=self.claim.claim_id,
+            agent=self.agent,
+            expected=self.stored,
+            new_oid=store.hash_blob(self.context.toplevel, lane_runs.serialize_runs(runs)),
+            operation_id=uuid.uuid4().hex,
+            holder_refusal=lane_runs.holder_refusal(self.action, self.label, session=self.agent),
+            stale_refusal=lane_runs.stale_refusal(self.label),
+        )
+        subject = store.transition_subject(_COMMIT_SUBJECT, self.claim.identity, self.claim.branch)
+        self.context.transition(
+            replace(subject, trailers=(f"{_RUN_TRAILER}: {run}",)),
+            intent,
+        )
+
+
+def _open_runs(
+    parsed: argparse.Namespace, context: RunContext, action: lane_runs.RunsAction
+) -> _ClaimRuns:
+    """The runs of the item's claim, for the session that holds it; any other refuses."""
+    try:
+        agent = checkout.resolved_agent(parsed.agent)
+        storage = context.config.storage
+        label = workboard.item_label(parsed.item, storage)
+        claim = workboard.selected_store_claim(
+            context.observation, protocol.IssueIdentity(parsed.item), None, None, storage
+        )
+    except protocol.ClaimError as error:
+        raise lane_runs.RunsRefusedError(str(error)) from error
+    if claim.agent != agent:
+        raise lane_runs.RunsRefusedError(
+            lane_runs.holder_refusal(action, label, session=agent)(claim.agent)
+        )
+    stored = context.observation.runs.get(claim.claim_id)
+    return _ClaimRuns(
+        context, claim, agent, action, label, _stored_runs(context, stored, label), stored
+    )
+
+
+def _stored_runs(
+    context: RunContext, stored: protocol.ObjectId | None, label: str
+) -> lane_runs.RunsFile:
+    if stored is None:
+        return lane_runs.RunsFile()
+    try:
+        return lane_runs.parse_runs(store.read_runs_file(context.toplevel, stored))
+    except lane_runs.RunsFileError as error:
+        raise protocol.ClaimUnavailableError(
+            f"the stored runs of {label} cannot be used: {error}"
+        ) from error
+
+
+def _descends(directory: Path, ancestor: str, tip: str) -> bool:
+    """Whether `ancestor` is `tip` or one of its ancestors; a commit git cannot read is none."""
+    try:
+        checkout.git_output(["merge-base", "--is-ancestor", ancestor, tip], directory=directory)
+    except checkout.GitExitError:
+        return False
+    return True
+
+
+def _follows(opened: _ClaimRuns, start_tip: str | None) -> bool:
+    earlier_end = lane_runs.end_tip_to_follow(opened.runs)
+    descends = (
+        earlier_end is not None
+        and start_tip is not None
+        and _descends(opened.context.toplevel, earlier_end, start_tip)
+    )
+    return lane_runs.follows(opened.runs.newest(), start_tip, descends=descends)
+
+
+def _begin(parsed: argparse.Namespace, context: RunContext) -> int:
+    opened = _open_runs(parsed, context, lane_runs.RunsAction.BEGIN)
+    merged = lane_runs.begin(
+        opened.runs,
+        run=parsed.run,
+        start_tip=parsed.start_tip,
+        follows=_follows(opened, parsed.start_tip),
+        label=opened.label,
+    )
+    if merged.changed:
+        opened.write(merged.runs, run=parsed.run)
+    entry = merged.runs.entry(parsed.run)
+    assert entry is not None  # noqa: S101 - a begin stores the run or finds it stored
+    if parsed.json:
+        reason = _RunsReason.BEGUN if merged.changed else _RunsReason.ALREADY_BEGUN
+        report.emit_json(True, reason, item=parsed.item, run=entry.run, follows=entry.follows)
+    else:
+        verb = "BEGAN" if merged.changed else "ALREADY BEGUN"
+        print(f"{verb} run {parsed.run} of {opened.label}")
+    return 0
+
+
+def _add(parsed: argparse.Namespace, context: RunContext) -> int:
+    lane_runs.require_ran_stages_run(parsed.record, parsed.ran)
+    opened = _open_runs(parsed, context, lane_runs.RunsAction.ADD)
+    added = lane_runs.RunAdded(parsed.end_tip, parsed.ran, parsed.record)
+    merged = lane_runs.add(opened.runs, run=parsed.run, added=added, label=opened.label)
+    if merged.changed:
+        opened.write(merged.runs, run=parsed.run)
+    stored = merged.runs.added_count()
+    if parsed.json:
+        reason = _RunsReason.ADDED if merged.changed else _RunsReason.ALREADY_ADDED
+        report.emit_json(True, reason, item=parsed.item, run=parsed.run, stored=stored)
+    else:
+        verb = "ADDED" if merged.changed else "ALREADY ADDED"
+        print(f"{verb} run {parsed.run} to {opened.label}: {stored} stored")
+    return 0
+
+
+_RUNS_COMMANDS = {"begin": _begin, "add": _add}
+
+
+def run(parsed: argparse.Namespace, context: RunContext) -> int:
+    work = _RUNS_COMMANDS.get(parsed.lane_record_command)
+    if work is not None:
+        return report.refusing_by_type(
+            partial(work, parsed, context),
+            _REFUSAL_REASONS,
+            _RunsReason.UNAVAILABLE,
+            as_json=parsed.json,
+        )
     read_record_file(parsed.file)
     print(f"lane record {protocol.terminal_text(parsed.file)} is valid")
     return 0
