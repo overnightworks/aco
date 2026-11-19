@@ -1,0 +1,8 @@
+claim_id = "0c15aedd4ee7427494dfc88f506a28d2"
+agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
+role = "builder"
+base = "cbcc5f704014016cedfbe8754bc6cb64d4cfcf7d"
+branch = "claude/issue-987-lane-record-show"
+scope = ["README.md", "specs/lane-record.spec.md", "src/aco/cmd_lane_record.py", "src/aco/lane_record.py", "src/aco/lane_runs.py", "tests"]
+opened_commit = "d04e432e7b03df6797f78a97c690f13c19f59ce9"
+whole_reason = "The read command, the pure rule it prints and their spec lines are one contract that lands together."
