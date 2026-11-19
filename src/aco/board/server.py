@@ -38,6 +38,7 @@ from .ports import DecisionResult
 
 LOOPBACK_HOST = "127.0.0.1"
 TOKEN_FIELD = "t"  # noqa: S105 - names the query field that carries the token and holds no secret
+_TRACEPARENT_HEADER = "traceparent"
 TOKEN_HEADER = "X-Board-Token"  # noqa: S105 - names the header that carries the token and holds no secret
 PAGE_PATH = "/"
 API_PREFIX = "/api/"
@@ -225,6 +226,14 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
             except _ClientDisconnectedError:
                 self.close_connection = True
 
+    def _trace_headers(self) -> list[tuple[str, str]]:
+        """Only `traceparent`: OpenTelemetry's warning for a malformed
+        `tracestate` member names the member, and the board writes no header
+        value."""
+        return [
+            (_TRACEPARENT_HEADER, value) for value in self.headers.get_all(_TRACEPARENT_HEADER, [])
+        ]
+
     def _request_line(self, headers: Iterable[tuple[str, str]] = ()) -> RequestLine:
         """The line of the request being answered; the first call opens it.
         `headers` only carry the trace context."""
@@ -291,7 +300,7 @@ class _BoardRequestHandler(BaseHTTPRequestHandler):
         if not super().parse_request():
             return False
         # Opened before the path is read, so a path `urlsplit` refuses still ends in a line.
-        line = self._request_line(self.headers.items())
+        line = self._request_line(self._trace_headers())
         path = urlsplit(self.path).path
         route = _route_template(path)
         if route is not None:

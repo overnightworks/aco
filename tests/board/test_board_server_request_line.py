@@ -155,6 +155,12 @@ def test_no_line_holds_the_token_a_path_a_query_or_a_header_value(
         + b"tracestate: vendor="
         + secret_marker
         + b"\r\n\r\n",
+        b"GET /"
+        + _HEADERS
+        + b"traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01\r\n"
+        + b"tracestate: "
+        + secret_marker
+        + b"\r\n\r\n",
     ]
 
     for request in requests:
