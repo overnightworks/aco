@@ -281,25 +281,27 @@ def test_a_repeated_add_changes_nothing_and_says_so(
 
 
 @pytest.mark.parametrize(
-    "other",
+    ("end_tip", "stages", "file_changes"),
     [
-        pytest.param({"end_tip": OTHER_TIP}, id="end-tip"),
-        pytest.param({"stages": (RoutingStage.BUILD,)}, id="stages"),
-        pytest.param({"file_changes": {"risk": "other"}}, id="record"),
+        pytest.param(OTHER_TIP, STAGES_RAN, {}, id="end-tip"),
+        pytest.param(END_TIP, (RoutingStage.BUILD,), {}, id="stages"),
+        pytest.param(END_TIP, STAGES_RAN, {"risk": "other"}, id="record"),
     ],
 )
 def test_another_entry_under_an_added_run_id_refuses_and_writes_nothing(
-    world: World, capsys: pytest.CaptureFixture[str], other: dict[str, object]
+    world: World,
+    capsys: pytest.CaptureFixture[str],
+    end_tip: str,
+    stages: tuple[RoutingStage, ...],
+    file_changes: dict[str, object],
 ) -> None:
     """Spec: LANREC-56."""
     world.run(capsys, *begin_arguments(world))
     world.run(capsys, *add_arguments(world))
     tip = world.state_tip()
-    changes = other.get("file_changes")
-    file = world.record_file(**changes) if isinstance(changes, dict) else None
-    keywords = {key: value for key, value in other.items() if key != "file_changes"}
+    file = world.record_file(**file_changes)
 
-    refused = world.run(capsys, *add_arguments(world, file=file, **keywords))  # type: ignore[arg-type]
+    refused = world.run(capsys, *add_arguments(world, file=file, end_tip=end_tip, stages=stages))
 
     assert refused.status == 2
     assert f"run {FIRST_RUN} of {world.label}" in refused.stderr
@@ -658,7 +660,7 @@ def test_a_stage_named_twice_or_a_second_ran_is_a_usage_refusal_and_writes_nothi
 
 
 @pytest.mark.parametrize("command", ["begin", "add"])
-def test_a_missing_agent_identity_refuses_before_any_write(
+def test_a_missing_agent_identity_refuses_before_the_record_file_is_read_and_writes_nothing(
     world: World,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -667,26 +669,16 @@ def test_a_missing_agent_identity_refuses_before_any_write(
     """Spec: LANREC-70."""
     monkeypatch.delenv("ACO_AGENT")
     tip = world.state_tip()
-    arguments = begin_arguments(world) if command == "begin" else add_arguments(world)
+    unreadable = world.scratch / "absent.json"
+    arguments = (
+        begin_arguments(world) if command == "begin" else add_arguments(world, file=unreadable)
+    )
 
     refused = world.run(capsys, *arguments)
 
     assert refused.status == 2
     assert "agent identity is required" in refused.stderr
     assert world.state_tip() == tip
-
-
-def test_a_missing_agent_identity_is_refused_before_the_record_file_is_read(
-    world: World, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Spec: LANREC-70."""
-    monkeypatch.delenv("ACO_AGENT")
-    unreadable = world.scratch / "absent.json"
-
-    refused = world.run(capsys, *add_arguments(world, file=unreadable))
-
-    assert refused.status == 2
-    assert "agent identity is required" in refused.stderr
 
 
 def test_json_begin_reports_a_fresh_run_as_begun_and_a_repeat_as_already_begun(
