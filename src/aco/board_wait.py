@@ -299,20 +299,30 @@ class _BoardWatch:
         probed = probe_due(now, self._schedule)
         if probed:
             self._schedule = replace(self._schedule, last_probe=now)
-            if not held:
-                self._pending = self._probe_the_forge() or self._pending
-            self._probe_the_state_ref()
-        if not held:
-            end = self._reread_items(moved) if moved else None
-            if end is not None:
-                return end
-            if self._read_due(now, self._schedule.retry_after):
-                return self._read(now)
-            probed, moved = probed or bool(moved), []
-        owed = bool(moved) or self._read_due(now, retry_after=0.0)
-        if probed and not owed:
+            self._probe(held)
+        if held:
+            return None
+        end = self._reread_items(moved) if moved else None
+        if end is not None:
+            return end
+        if self._read_due(now, self._schedule.retry_after):
+            return self._read(now)
+        if probed or moved:
             self._failures.end()
         return None
+
+    def _probe(self, held: bool) -> None:
+        """The state ref is asked at every probe, the forge only outside a hold; the forge's
+        refusal does not skip the state ref."""
+        refused: forge.ForgeTransientError | None = None
+        if not held:
+            try:
+                self._pending = self._probe_the_forge() or self._pending
+            except forge.ForgeTransientError as failure:
+                refused = failure
+        self._probe_the_state_ref()
+        if refused is not None:
+            raise refused
 
     def _read_due(self, now: float, retry_after: float) -> bool:
         return read_due(

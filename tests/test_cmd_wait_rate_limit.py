@@ -199,16 +199,39 @@ class TestTheBareWait:
         )
         assert (world.probe.asked_at, world.client.read_at) == (asked_at, read_at)
 
+    @pytest.mark.parametrize(
+        ("refused_until", "asked_at", "read_at"),
+        [
+            pytest.param(
+                60.0 + RETRY_AT_THE_RESET,
+                [0.0, 0.0, 60.0, 60.0 + RETRY_AT_THE_RESET],
+                [0.0, 60.0 + RETRY_AT_THE_RESET],
+                id="lifted-at-the-reset",
+            ),
+            pytest.param(
+                60.0 + 2 * RETRY_AT_THE_RESET,
+                [0.0, 0.0, 60.0, 60.0 + RETRY_AT_THE_RESET, 60.0 + 2 * RETRY_AT_THE_RESET],
+                [0.0, 60.0 + 2 * RETRY_AT_THE_RESET],
+                id="refused-again-after-the-reset",
+            ),
+        ],
+    )
     def test_a_rate_limit_while_it_waits_holds_the_probe_and_the_read_until_the_reset(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        refused_until: float,
+        asked_at: list[float],
+        read_at: list[float],
     ) -> None:
         """Spec: WAIT-22 -- the board changed during the limit; nothing is asked before the
-        reset, and the read that follows names the action."""
-        first_refused, lifted = 60.0, 60.0 + RETRY_AT_THE_RESET
+        reset, a refusal after it is no new run of failures, and the read that follows names
+        the action."""
+        first_refused = 60.0
         world = serve_board(
             monkeypatch,
             issues=(waiting_card(),),
-            probe_failing=failing_in((first_refused, lifted, LIMIT)),
+            probe_failing=failing_in((first_refused, refused_until, LIMIT)),
         )
         world.ticks.afterwards[int(first_refused / cmd_wait.SIGNAL_POLL_SECONDS)] = (
             a_board_that_gains_an_action(world)
@@ -219,10 +242,7 @@ class TestTheBareWait:
             ACTIONABLE,
             f"{BOARD_WARNING}{SENTENCE}\n",
         )
-        assert (world.probe.asked_at, world.client.read_at) == (
-            [0.0, 0.0, first_refused, lifted],
-            [0.0, lifted],
-        )
+        assert (world.probe.asked_at, world.client.read_at) == (asked_at, read_at)
 
     def test_the_retry_time_counts_from_the_end_of_the_call_that_was_refused(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -251,6 +271,29 @@ class TestTheBareWait:
         asked_after_the_refusal = world.probe.asked_at[3:]
         assert asked_after_the_refusal
         assert min(asked_after_the_refusal) >= RETRY_AT_THE_RESET
+
+    def test_the_state_ref_is_asked_at_every_probe_while_the_forge_refuses_without_a_reset(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: WAIT-22 -- the limit holds the questions to GitHub; the state ref goes on."""
+        refused_until = 5 * board_wait.PROBE_SECONDS
+        world = serve_board(
+            monkeypatch,
+            issues=(waiting_card(),),
+            probe_failing=failing_in((60.0, refused_until, LIMIT_WITHOUT_A_RESET)),
+        )
+        world.ticks.afterwards[1] = a_board_that_gains_an_action(world)
+        asked_at: list[float] = []
+        reachable = store.ls_remote_state
+
+        def ls_remote(worktree: Path, remote: str) -> protocol.ObjectId | None:
+            asked_at.append(world.ticks.now)
+            return reachable(worktree, remote)
+
+        monkeypatch.setattr(store, "ls_remote_state", ls_remote)
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stdout) == (0, ACTIONABLE)
+        assert set(asked_at) == {60.0 * minute for minute in range(6)}
 
     def test_a_run_of_failures_that_met_another_failure_first_warns_again_for_a_rate_limit(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

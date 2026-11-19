@@ -67,4 +67,3 @@ def test_the_sentence_names_the_limit_and_its_reset_within_what_a_body_write_sho
 
     assert str(error) == sentence
     assert len(sentence) <= BODY_WRITE_CAUSE_LIMIT
-
