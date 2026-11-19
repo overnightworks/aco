@@ -9,17 +9,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .protocol import ActiveClaim, ClaimError, ObjectId, StateLineageError
-from .store import git_failure_detail_from_stderr, run_git
+from .store import process, run_git
 
 # Field separator for the batched `git log` read below: %x09 is git's own
 # escape for a literal tab, unambiguous inside a `--format` string.
 _LOG_FORMAT = "%H%x09%cI"
 
 
-def _commit_history_read_failure(tip: ObjectId, stderr_detail: str) -> ClaimError:
+def _commit_history_read_failure(tip: ObjectId, result: process.CapturedResult) -> ClaimError:
     """The one sentence the first-parent history walk below raises on a
     failing `git log`, carrying git's own stderr forward."""
-    return ClaimError(f"cannot read the commit history of {tip}: {stderr_detail}")
+    return ClaimError(
+        f"cannot read the commit history of {tip}: {process.git_failure_detail_from_stderr(result)}"
+    )
 
 
 def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, datetime]:
@@ -33,7 +35,7 @@ def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, 
     """
     result = run_git(worktree, ["log", "--first-parent", f"--format={_LOG_FORMAT}", str(tip)])
     if result.exit_status != 0:
-        raise _commit_history_read_failure(tip, git_failure_detail_from_stderr(result))
+        raise _commit_history_read_failure(tip, result)
     dates: dict[ObjectId, datetime] = {}
     for line in result.stdout.decode().splitlines():
         commit_hex, _, raw_date = line.partition("\t")
