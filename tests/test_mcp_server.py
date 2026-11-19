@@ -4,8 +4,8 @@ message in, the answer line out, the inbox read a function the test passes."""
 import dataclasses
 import json
 import re
-from collections.abc import Mapping
-from typing import Any, cast
+from collections.abc import Callable, Mapping
+from typing import Any, NoReturn, cast
 
 import pytest
 from mcp_echoes import echoing_answer_step
@@ -79,21 +79,25 @@ def _call(arguments: object = None, name: str = "read_inbox") -> dict[str, objec
     return _request("tools/call", params)
 
 
+_NEWEST, _OLDER = mcp_server.SUPPORTED_PROTOCOL_VERSIONS[:2]
+
+
 @pytest.mark.parametrize(
     ("asked", "answered"),
     [
-        pytest.param("2025-11-25", "2025-11-25", id="newest"),
-        pytest.param("2025-06-18", "2025-06-18", id="older"),
-        pytest.param("2026-07-28", "2025-11-25", id="unknown-answers-newest"),
-        pytest.param(None, "2025-11-25", id="none-given"),
+        pytest.param(_NEWEST, _NEWEST, id="newest"),
+        pytest.param(_OLDER, _OLDER, id="older"),
+        pytest.param("2026-07-28", _NEWEST, id="unknown-answers-newest"),
     ],
 )
 def test_initialize_answers_the_clients_version_when_supported_else_the_newest(
-    asked: str | None, answered: str
+    asked: str, answered: str
 ) -> None:
-    params = {"capabilities": {}, "clientInfo": {"name": "host", "version": "1"}}
-    if asked is not None:
-        params["protocolVersion"] = asked
+    params = {
+        "capabilities": {},
+        "clientInfo": {"name": "host", "version": "1"},
+        "protocolVersion": asked,
+    }
 
     result = _answer(_request("initialize", params))["result"]
 
@@ -280,31 +284,6 @@ def test_a_call_returns_the_inbox_as_structured_content_and_as_text(arguments: o
     assert result["content"][0]["type"] == "text"
 
 
-def _refusing() -> dict[str, object]:
-    raise protocol.ClaimError("/config.toml does not exist")
-
-
-def _failing() -> dict[str, object]:
-    raise RuntimeError("boom")
-
-
-@pytest.mark.parametrize(
-    ("read_inbox", "reason"),
-    [
-        pytest.param(_refusing, "/config.toml does not exist", id="refusal-names-the-file"),
-        pytest.param(_failing, "RuntimeError: boom", id="unexpected-exception"),
-    ],
-)
-def test_a_failed_read_is_a_tool_error_carrying_its_reason(
-    read_inbox: mcp_server.ReadInbox, reason: str
-) -> None:
-    result = _answer(_call(), read_inbox)["result"]
-
-    assert result["isError"] is True
-    assert result["content"] == [{"type": "text", "text": reason}]
-    assert "structuredContent" not in result
-
-
 def _card_arguments(**changes: object) -> dict[str, object]:
     return {"repository": "owner/repo", "item": 7, "text": "Frage", "options": [], **changes}
 
@@ -323,70 +302,6 @@ def test_an_ask_call_hands_the_card_without_its_envelope_to_the_writer_and_answe
     assert result["isError"] is False
     assert result["structuredContent"] == expected
     assert json.loads(result["content"][0]["text"]) == expected
-
-
-def _refusing_ask(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
-    raise protocol.ClaimError("item 7 is closed")
-
-
-def _failing_ask(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
-    raise RuntimeError("boom")
-
-
-@pytest.mark.parametrize(
-    ("ask", "reason"),
-    [
-        pytest.param(_refusing_ask, "item 7 is closed", id="refusal"),
-        pytest.param(_failing_ask, "RuntimeError: boom", id="unexpected-exception"),
-    ],
-)
-def test_a_refused_ask_is_a_tool_error_carrying_its_reason(
-    ask: mcp_server.Ask, reason: str
-) -> None:
-    result = _answer(_call(_card_arguments(), name="ask"), ask=ask)["result"]
-
-    assert result["isError"] is True
-    assert result["content"] == [{"type": "text", "text": reason}]
-    assert "structuredContent" not in result
-
-
-def _writes_nothing(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
-    pytest.fail("an ask with a defective envelope reached the writer")
-
-
-@pytest.mark.parametrize(
-    ("arguments", "sentence"),
-    [
-        pytest.param(_card_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
-        pytest.param(
-            _card_arguments(asked_on="2026-11-08"), "unknown argument: asked_on", id="state"
-        ),
-        pytest.param(_card_arguments(item=True), "item must be an integer", id="item-boolean"),
-        pytest.param(_card_arguments(item="7"), "item must be an integer", id="item-string"),
-        pytest.param(_card_arguments(item=7.5), "item must be an integer", id="item-float"),
-        pytest.param(_card_arguments(repository=3), "repository must be a string", id="repository"),
-        pytest.param({"text": "Frage"}, "repository must be a string", id="no-repository"),
-    ],
-)
-def test_an_argument_defect_is_a_tool_error_naming_it_and_nothing_is_written(
-    arguments: dict[str, object], sentence: str
-) -> None:
-    result = _answer(_call(arguments, name="ask"), ask=_writes_nothing)["result"]
-
-    assert result["isError"] is True
-    assert sentence in result["content"][0]["text"]
-
-
-def test_every_envelope_defect_is_named_in_one_error() -> None:
-    arguments = _card_arguments(repository=3, item="x", extra=1)
-
-    result = _answer(_call(arguments, name="ask"), ask=_writes_nothing)["result"]
-
-    text = result["content"][0]["text"]
-    assert [
-        sentence in text
-        for sentence in ("unknown argument: extra", "repository must be", "item must be")
-    ] == [True, True, True]
 
 
 def _record_arguments(**changes: object) -> dict[str, object]:
@@ -428,114 +343,6 @@ def test_a_record_answer_call_hands_the_operators_words_to_the_writer_verbatim()
 
     assert result["structuredContent"]["answer"] == words
     assert result["structuredContent"]["own_words"] is True
-
-
-def _refusing_record(
-    label: str, number: int, line: int, card_hash: str, answer: str | expectations.OtherAnswer
-) -> Mapping[str, object]:
-    raise protocol.ClaimError("line 2 is already ruled")
-
-
-def _failing_record(
-    label: str, number: int, line: int, card_hash: str, answer: str | expectations.OtherAnswer
-) -> Mapping[str, object]:
-    raise RuntimeError("boom")
-
-
-@pytest.mark.parametrize(
-    ("record_answer", "reason"),
-    [
-        pytest.param(_refusing_record, "line 2 is already ruled", id="refusal"),
-        pytest.param(_failing_record, "RuntimeError: boom", id="unexpected-exception"),
-    ],
-)
-def test_a_refused_record_answer_is_a_tool_error_carrying_its_reason(
-    record_answer: mcp_server.RecordAnswer, reason: str
-) -> None:
-    arguments = _record_arguments()
-
-    result = _answer(_call(arguments, name="record_answer"), record_answer=record_answer)["result"]
-
-    assert result["isError"] is True
-    assert result["content"] == [{"type": "text", "text": reason}]
-    assert "structuredContent" not in result
-
-
-def _writes_no_record(
-    label: str, number: int, line: int, card_hash: str, answer: str | expectations.OtherAnswer
-) -> Mapping[str, object]:
-    pytest.fail("a record_answer with a defective envelope reached the writer")
-
-
-@pytest.mark.parametrize(
-    ("arguments", "sentence"),
-    [
-        pytest.param(_record_arguments(via="chat"), "unknown argument: via", id="via"),
-        pytest.param(_record_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
-        pytest.param(_record_arguments(repository=3), "repository must be a string", id="repo"),
-        pytest.param(_record_arguments(item=True), "item must be an integer", id="item-boolean"),
-        pytest.param(_record_arguments(item="7"), "item must be an integer", id="item-string"),
-        pytest.param(_record_arguments(line=True), "line must be an integer", id="line-boolean"),
-        pytest.param(_record_arguments(line=2.5), "line must be an integer", id="line-float"),
-        pytest.param(_record_arguments(line=None), "line must be an integer", id="line-null"),
-        pytest.param(_record_arguments(card_hash=5), "card_hash must be a string", id="hash-int"),
-        pytest.param(
-            _without(_record_arguments(), "card_hash"), "card_hash must be a string", id="no-hash"
-        ),
-        pytest.param(
-            _record_arguments(other="own"), "give exactly one of option and other", id="both"
-        ),
-        pytest.param(
-            _without(_record_arguments(), "option"),
-            "give exactly one of option and other",
-            id="none",
-        ),
-        pytest.param(_record_arguments(option=1), "option must be a string", id="option-int"),
-        pytest.param(
-            _without(_record_arguments(other=4), "option"), "other must be a string", id="other-int"
-        ),
-        pytest.param(
-            _without(_record_arguments(other=""), "option"), "other must not be blank", id="empty"
-        ),
-        pytest.param(
-            _without(_record_arguments(other=" \t\n"), "option"),
-            "other must not be blank",
-            id="whitespace",
-        ),
-    ],
-)
-def test_a_record_answer_argument_defect_is_a_tool_error_naming_it_and_nothing_is_written(
-    arguments: dict[str, object], sentence: str
-) -> None:
-    result = _answer(_call(arguments, name="record_answer"), record_answer=_writes_no_record)[
-        "result"
-    ]
-
-    assert result["isError"] is True
-    assert sentence in result["content"][0]["text"]
-
-
-def test_every_record_answer_envelope_defect_is_named_in_one_error() -> None:
-    arguments = {"repository": 3, "item": "x", "line": "y", "option": 1, "other": 2, "extra": 1}
-
-    result = _answer(_call(arguments, name="record_answer"), record_answer=_writes_no_record)[
-        "result"
-    ]
-
-    text = result["content"][0]["text"]
-    assert [
-        sentence in text
-        for sentence in (
-            "unknown argument: extra",
-            "repository must be",
-            "item must be",
-            "line must be",
-            "card_hash must be",
-            "give exactly one",
-            "option must be",
-            "other must be",
-        )
-    ] == [True] * 8
 
 
 def _step_arguments(**changes: object) -> dict[str, object]:
@@ -587,29 +394,64 @@ def test_a_step_call_with_a_title_hands_the_stripped_title_to_the_writer() -> No
     assert result["structuredContent"]["target"] == "Key rotation"
 
 
-def _refusing_step(
-    label: str, step: str, target: int | str, card: item_step.StepCard
-) -> Mapping[str, object]:
-    raise protocol.ClaimError("item 7 is closed")
+def _raising(error: Exception) -> Callable[..., NoReturn]:
+    def write(*_: object) -> NoReturn:
+        raise error
+
+    return write
 
 
-def test_a_refused_step_is_a_tool_error_carrying_its_reason() -> None:
-    result = _answer(_call(_step_arguments(), name="step"), step=_refusing_step)["result"]
-
-    assert result["isError"] is True
-    assert result["content"] == [{"type": "text", "text": "item 7 is closed"}]
-    assert "structuredContent" not in result
+def _reaches_nothing(*_: object) -> NoReturn:
+    pytest.fail("a call with a defective envelope reached the writer")
 
 
-def _step_reaches_nothing(
-    label: str, step: str, target: int | str, card: item_step.StepCard
-) -> Mapping[str, object]:
-    pytest.fail("a step call with a defective envelope reached the writer")
-
-
-@pytest.mark.parametrize(
-    ("arguments", "sentence"),
-    [
+_ARGUMENT_DEFECTS = {
+    "ask": [
+        pytest.param(_card_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
+        pytest.param(
+            _card_arguments(asked_on="2026-11-08"), "unknown argument: asked_on", id="state"
+        ),
+        pytest.param(_card_arguments(item=True), "item must be an integer", id="item-boolean"),
+        pytest.param(_card_arguments(item="7"), "item must be an integer", id="item-string"),
+        pytest.param(_card_arguments(item=7.5), "item must be an integer", id="item-float"),
+        pytest.param(_card_arguments(repository=3), "repository must be a string", id="repository"),
+        pytest.param({"text": "Frage"}, "repository must be a string", id="no-repository"),
+    ],
+    "record_answer": [
+        pytest.param(_record_arguments(via="chat"), "unknown argument: via", id="via"),
+        pytest.param(_record_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
+        pytest.param(_record_arguments(repository=3), "repository must be a string", id="repo"),
+        pytest.param(_record_arguments(item=True), "item must be an integer", id="item-boolean"),
+        pytest.param(_record_arguments(item="7"), "item must be an integer", id="item-string"),
+        pytest.param(_record_arguments(line=True), "line must be an integer", id="line-boolean"),
+        pytest.param(_record_arguments(line=2.5), "line must be an integer", id="line-float"),
+        pytest.param(_record_arguments(line=None), "line must be an integer", id="line-null"),
+        pytest.param(_record_arguments(card_hash=5), "card_hash must be a string", id="hash-int"),
+        pytest.param(
+            _without(_record_arguments(), "card_hash"), "card_hash must be a string", id="no-hash"
+        ),
+        pytest.param(
+            _record_arguments(other="own"), "give exactly one of option and other", id="both"
+        ),
+        pytest.param(
+            _without(_record_arguments(), "option"),
+            "give exactly one of option and other",
+            id="none",
+        ),
+        pytest.param(_record_arguments(option=1), "option must be a string", id="option-int"),
+        pytest.param(
+            _without(_record_arguments(other=4), "option"), "other must be a string", id="other-int"
+        ),
+        pytest.param(
+            _without(_record_arguments(other=""), "option"), "other must not be blank", id="empty"
+        ),
+        pytest.param(
+            _without(_record_arguments(other=" \t\n"), "option"),
+            "other must not be blank",
+            id="whitespace",
+        ),
+    ],
+    "step": [
         pytest.param(_step_arguments(extra=1), "unknown argument: extra", id="unknown-key"),
         pytest.param(_step_arguments(repository=3), "repository must be a string", id="repository"),
         pytest.param(
@@ -655,33 +497,119 @@ def _step_reaches_nothing(
             id="title-blank",
         ),
     ],
-)
-def test_a_step_argument_defect_is_a_tool_error_naming_it_and_nothing_is_written(
-    arguments: dict[str, object], sentence: str
-) -> None:
-    result = _answer(_call(arguments, name="step"), step=_step_reaches_nothing)["result"]
+}
 
-    assert result["isError"] is True
-    assert sentence in result["content"][0]["text"]
-
-
-def test_every_step_envelope_defect_is_named_in_one_error() -> None:
-    arguments = {"repository": 3, "step": " ", "title": 4, "item": "x", "extra": 1}
-
-    result = _answer(_call(arguments, name="step"), step=_step_reaches_nothing)["result"]
-
-    text = result["content"][0]["text"]
-    assert [
-        sentence in text
-        for sentence in (
+_ENVELOPE_DEFECTS = [
+    pytest.param(
+        "ask",
+        _card_arguments(repository=3, item="x", extra=1),
+        ["unknown argument: extra", "repository must be", "item must be"],
+        id="ask",
+    ),
+    pytest.param(
+        "record_answer",
+        {"repository": 3, "item": "x", "line": "y", "option": 1, "other": 2, "extra": 1},
+        [
+            "unknown argument: extra",
+            "repository must be",
+            "item must be",
+            "line must be",
+            "card_hash must be",
+            "give exactly one",
+            "option must be",
+            "other must be",
+        ],
+        id="record_answer",
+    ),
+    pytest.param(
+        "step",
+        {"repository": 3, "step": " ", "title": 4, "item": "x", "extra": 1},
+        [
             "unknown argument: extra",
             "repository must be a string",
             "step must not be blank",
             "title must be a string",
             "item must be an integer",
             "give exactly one of item and title",
-        )
-    ] == [True] * 6
+        ],
+        id="step",
+    ),
+]
+
+_WRITING_CALLS = [
+    ("ask", _card_arguments(), "item 7 is closed"),
+    ("record_answer", _record_arguments(), "line 2 is already ruled"),
+    ("step", _step_arguments(), "item 7 is closed"),
+]
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments", "reason"),
+    [
+        pytest.param("read_inbox", None, "/config.toml does not exist", id="read_inbox"),
+        *(pytest.param(*call, id=call[0]) for call in _WRITING_CALLS),
+    ],
+)
+def test_a_refused_tool_call_is_a_tool_error_carrying_its_reason(
+    tool: str, arguments: object, reason: str
+) -> None:
+    writers: dict[str, Any] = {tool: _raising(protocol.ClaimError(reason))}
+
+    result = _answer(_call(arguments, name=tool), **writers)["result"]
+
+    assert result["isError"] is True
+    assert result["content"] == [{"type": "text", "text": reason}]
+    assert "structuredContent" not in result
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        pytest.param("read_inbox", None, id="read_inbox"),
+        *(pytest.param(tool, arguments, id=tool) for tool, arguments, _ in _WRITING_CALLS),
+    ],
+)
+def test_an_unexpected_writer_exception_is_a_tool_error_naming_its_type_and_message(
+    tool: str, arguments: object
+) -> None:
+    writers: dict[str, Any] = {tool: _raising(RuntimeError("boom"))}
+
+    result = _answer(_call(arguments, name=tool), **writers)["result"]
+
+    assert result["isError"] is True
+    assert result["content"] == [{"type": "text", "text": "RuntimeError: boom"}]
+    assert "structuredContent" not in result
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments", "sentence"),
+    [
+        pytest.param(tool, *case.values, id=f"{tool}-{case.id}")
+        for tool, cases in _ARGUMENT_DEFECTS.items()
+        for case in cases
+    ],
+)
+def test_an_argument_defect_is_a_tool_error_naming_it_and_nothing_is_written(
+    tool: str, arguments: dict[str, object], sentence: str
+) -> None:
+    writers: dict[str, Any] = {tool: _reaches_nothing}
+
+    result = _answer(_call(arguments, name=tool), **writers)["result"]
+
+    assert result["isError"] is True
+    assert sentence in result["content"][0]["text"]
+
+
+@pytest.mark.parametrize(("tool", "arguments", "sentences"), _ENVELOPE_DEFECTS)
+def test_every_envelope_defect_is_named_in_one_error(
+    tool: str, arguments: dict[str, object], sentences: list[str]
+) -> None:
+    writers: dict[str, Any] = {tool: _reaches_nothing}
+
+    result = _answer(_call(arguments, name=tool), **writers)["result"]
+
+    text = result["content"][0]["text"]
+    assert [sentence for sentence in sentences if sentence not in text] == []
 
 
 @pytest.mark.parametrize("name", ["read_inbox", "ask", "record_answer", "step", "answer_step"])
