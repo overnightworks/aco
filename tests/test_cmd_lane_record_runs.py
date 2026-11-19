@@ -251,7 +251,7 @@ def test_a_begin_of_a_begun_run_with_another_start_tip_refuses_and_writes_nothin
 def test_a_begin_after_the_runs_add_refuses(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-53."""
+    """Spec: LANREC-64."""
     world.run(capsys, *begin_arguments(world))
     world.run(capsys, *add_arguments(world))
     tip = world.state_tip()
@@ -322,7 +322,7 @@ def test_an_add_of_a_run_that_was_not_begun_refuses_naming_the_begin_command(
 def test_an_add_whose_ran_stage_is_none_in_the_file_refuses_contradicting_it(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-55."""
+    """Spec: LANREC-66."""
     world.run(capsys, *begin_arguments(world))
 
     refused = world.run(
@@ -336,7 +336,7 @@ def test_an_add_whose_ran_stage_is_none_in_the_file_refuses_contradicting_it(
 def test_an_add_of_a_file_that_check_refuses_refuses_with_the_same_sentence(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-55, LANREC-31."""
+    """Spec: LANREC-66, LANREC-31."""
     world.run(capsys, *begin_arguments(world))
     file = world.record_file(version=2)
     checked = run_cli(["lane-record", "check", str(file)], capsys)
@@ -350,7 +350,7 @@ def test_an_add_of_a_file_that_check_refuses_refuses_with_the_same_sentence(
 def test_a_non_holder_is_refused_a_begin_and_an_add_naming_the_holder_and_itself(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-52, LANREC-55, E-LANREC-13."""
+    """Spec: LANREC-63, E-LANREC-13."""
     world.run(capsys, *begin_arguments(world))
     tip = world.state_tip()
 
@@ -372,7 +372,7 @@ def test_a_non_holder_is_refused_a_begin_and_an_add_naming_the_holder_and_itself
 def test_an_unclaimed_item_refuses_with_the_release_commands_sentence(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-52, LANREC-55."""
+    """Spec: LANREC-68."""
     claim = world.claim()
     world.commit_state(
         protocol.ReleaseIntent(
@@ -395,7 +395,7 @@ def test_an_unclaimed_item_refuses_with_the_release_commands_sentence(
 def test_stored_runs_survive_a_handover_and_only_the_new_holder_may_add(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-61, HANDOVER-02."""
+    """Spec: LANREC-61, HANDOVER-15."""
     world.run(capsys, *begin_arguments(world))
     claim = world.claim()
     before = world.stored_runs()
@@ -447,7 +447,7 @@ def test_stored_runs_survive_a_rescope(world: World, capsys: pytest.CaptureFixtu
 def test_a_release_removes_the_runs_file_in_its_own_commit_and_a_reclaim_starts_empty(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-61, REL-04."""
+    """Spec: LANREC-67, REL-68."""
     world.run(capsys, *begin_arguments(world))
     world.run(capsys, *add_arguments(world))
     claim = world.claim()
@@ -537,7 +537,7 @@ def test_the_first_run_follows_only_without_a_start_tip(
     first_flags: tuple[str, ...],
     first_follows: bool,
 ) -> None:
-    """Spec: LANREC-54."""
+    """Spec: LANREC-54, LANREC-65."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN, *first_flags))
 
     stored = world.stored_runs()
@@ -549,7 +549,7 @@ def test_the_first_run_follows_only_without_a_start_tip(
 def test_a_run_after_one_that_has_no_end_tip_yet_does_not_follow(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-54."""
+    """Spec: LANREC-65."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     head = real_git(world.directory, "rev-parse", "HEAD").stdout.strip()
 
@@ -563,7 +563,7 @@ def test_a_run_after_one_that_has_no_end_tip_yet_does_not_follow(
 def test_a_run_after_an_unreadable_end_tip_does_not_follow(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-54."""
+    """Spec: LANREC-65."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     world.run(capsys, *add_arguments(world, FIRST_RUN, end_tip="e" * 40))
     head = real_git(world.directory, "rev-parse", "HEAD").stdout.strip()
@@ -598,19 +598,19 @@ def test_a_begin_flag_off_the_grammar_is_a_usage_refusal(
 
 
 @pytest.mark.parametrize(
-    "replacement",
+    "end_tip",
     [
-        pytest.param({"end_tip": "abc"}, id="end-tip-too-short"),
-        pytest.param({"end_tip": "G" * 40}, id="end-tip-not-hexadecimal"),
+        pytest.param("abc", id="end-tip-too-short"),
+        pytest.param("G" * 40, id="end-tip-not-hexadecimal"),
     ],
 )
 def test_an_add_tip_off_the_grammar_is_a_usage_refusal(
-    world: World, capsys: pytest.CaptureFixture[str], replacement: dict[str, str]
+    world: World, capsys: pytest.CaptureFixture[str], end_tip: str
 ) -> None:
     """Spec: LANREC-58."""
     world.run(capsys, *begin_arguments(world))
 
-    refused = world.run(capsys, *add_arguments(world, **replacement))
+    refused = world.run(capsys, *add_arguments(world, end_tip=end_tip))
 
     assert refused.status == 2
     assert "usage:" in refused.stderr
@@ -653,7 +653,7 @@ def test_a_missing_agent_identity_refuses_before_any_write(
     monkeypatch: pytest.MonkeyPatch,
     command: str,
 ) -> None:
-    """Spec: LANREC-52, LANREC-55."""
+    """Spec: LANREC-70."""
     monkeypatch.delenv("ACO_AGENT")
     tip = world.state_tip()
     arguments = begin_arguments(world) if command == "begin" else add_arguments(world)
@@ -668,7 +668,7 @@ def test_a_missing_agent_identity_refuses_before_any_write(
 def test_json_begin_reports_a_fresh_run_as_begun_and_a_repeat_as_already_begun(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-52, LANREC-53."""
+    """Spec: LANREC-52, LANREC-53, LANREC-69."""
     fresh = world.run(capsys, *begin_arguments(world), "--json")
     repeated = world.run(capsys, *begin_arguments(world), "--json")
 
@@ -683,7 +683,7 @@ def test_json_begin_reports_a_fresh_run_as_begun_and_a_repeat_as_already_begun(
 def test_json_add_reports_a_fresh_entry_as_added_and_a_repeat_as_already_added(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-55, LANREC-56."""
+    """Spec: LANREC-55, LANREC-56, LANREC-69."""
     world.run(capsys, *begin_arguments(world))
 
     fresh = world.run(capsys, *add_arguments(world), "--json")
@@ -697,7 +697,7 @@ def test_json_add_reports_a_fresh_entry_as_added_and_a_repeat_as_already_added(
 
 
 def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: LANREC-52, LANREC-57."""
+    """Spec: LANREC-57, LANREC-63, LANREC-69."""
     unbegun = world.run(capsys, *add_arguments(world), "--json")
     stranger = world.run(
         capsys, *begin_arguments(world, FIRST_RUN, "--agent", OTHER_AGENT, "--json")
@@ -710,7 +710,7 @@ def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFix
 def test_stored_runs_that_changed_since_the_command_read_them_refuse_as_a_transient_refusal(
     world: World, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: LANREC-59."""
+    """Spec: LANREC-59, LANREC-69."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     claim = world.claim()
     stored_before = store.fetch_state(worktree=world.directory, remote="origin").runs[

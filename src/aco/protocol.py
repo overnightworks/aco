@@ -24,7 +24,7 @@ ISSUELESS_LANE_BRANCH_PREFIXES = ("docs/", "fix/")
 CLAIM_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 # `aco-` plus six lowercase hex characters:
 # a short random id, never a counter, never reused. An item
-# lives at exactly this id plus `.md` under `items/` (`item_filename`), so a
+# lives at exactly this id plus `.md` under `items/` (`ITEM_FILENAME_SUFFIX`), so a
 # rename of the file is the only way its id ever changes.
 ITEM_ID_PATTERN = re.compile(r"aco-[0-9a-f]{6}")
 ITEM_FILENAME_SUFFIX = ".md"
@@ -857,11 +857,6 @@ def parse_claim_key(key: str) -> ClaimIdentity:
 # reads back item blobs by it, `items` and `workboard` read ids by it. Every
 # other `items/` entry is foreign -- neither an item nor this codec's to
 # rename.
-
-
-def item_filename(item_id: str) -> str:
-    """The `items/` entry name item `item_id` lives at."""
-    return f"{item_id}{ITEM_FILENAME_SUFFIX}"
 
 
 def item_id_of_filename(filename: str) -> str | None:

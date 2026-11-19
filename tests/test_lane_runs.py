@@ -187,9 +187,10 @@ def test_a_runs_file_that_is_not_exactly_the_stored_shape_is_refused(
 ) -> None:
     content = valid_runs_object()
     damage(content)
+    damaged = json.dumps(content).encode()
 
     with pytest.raises(lane_runs.RunsFileError):
-        lane_runs.parse_runs(json.dumps(content).encode())
+        lane_runs.parse_runs(damaged)
 
 
 @pytest.mark.parametrize(
@@ -314,8 +315,11 @@ def test_an_add_stores_the_record_on_the_begun_entry() -> None:
 
 
 def test_an_add_of_a_run_that_was_not_begun_is_refused_naming_the_begin_command() -> None:
+    runs = runs_of(a_run("run-1"))
+    added = an_added_run()
+
     with pytest.raises(lane_runs.RunsRefusedError) as refusal:
-        lane_runs.add(runs_of(a_run("run-1")), run="run-2", added=an_added_run(), label=LABEL)
+        lane_runs.add(runs, run="run-2", added=added, label=LABEL)
 
     assert str(refusal.value) == ("run run-2 of #42 was not begun; run aco lane-record begin first")
 

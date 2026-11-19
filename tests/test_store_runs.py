@@ -1,7 +1,7 @@
 """The `runs/` directory of `refs/aco/state` on real git against a real bare remote: which entries
 the tree reader accepts, which it refuses, that no other transition drops or rewrites a runs
 file, that the status archive never reads its content, and that a release and a landing remove
-the claim's file in their own commit (`specs/ref-store-cas.spec.md`)."""
+the claim's file in their own commit (CAS-06, CAS-27, CAS-28, CAS-61, CAS-78..CAS-84)."""
 
 import re
 from pathlib import Path

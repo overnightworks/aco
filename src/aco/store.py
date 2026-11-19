@@ -86,8 +86,7 @@ RESOURCES_DIRECTORY = "resources"
 # structure is folded into `ClaimState.items` for free from the same
 # recursive `ls-tree`; only the byte content stays excluded.
 ITEMS_DIRECTORY = "items"
-# `runs/<claim-id>.json`: the runs of each live claim, lane data like `items/`, so its content is
-# excluded from the state read and only its claim id -> blob oid structure is folded in.
+# `runs/<claim-id>.json`: a claim's runs, lane data read lazily like `items/`.
 RUNS_DIRECTORY = "runs"
 RUN_FILE_SUFFIX = ".json"
 SCHEMA_TOML_FILENAME = "schema.toml"
@@ -100,7 +99,6 @@ _TREE_NAME_ERRORS = "surrogateescape"
 # git's two file modes: a symlink (120000) also lists as a blob, yet
 # `git archive` yields no file for it, so the mode decides.
 _FILE_MODES = frozenset({"100644", "100755"})
-# The directories whose content the state read never fetches.
 _LAZY_DIRECTORIES = frozenset({ITEMS_DIRECTORY, RUNS_DIRECTORY})
 _STATE_TOP_LEVEL_NAMES = (
     frozenset({SCHEMA_TOML_FILENAME, CLAIMS_DIRECTORY, IDS_DIRECTORY, RESOURCES_DIRECTORY})
@@ -631,8 +629,7 @@ def _parse_items_subtree(
 def _parse_runs_subtree(
     entries: dict[str, _ListedEntry], *, present: bool, tip: ObjectId
 ) -> Mapping[str, ObjectId]:
-    """`runs/`'s claim id -> blob oid mapping: every entry must be a file named
-    `<claim-id>.json`, whether or not a live claim holds that id; the content stays unread."""
+    """`runs/`'s claim id -> blob oid map; every entry is a `<claim-id>.json` file, unread."""
     if not present:
         return MappingProxyType({})
     runs: dict[str, ObjectId] = {}
@@ -1121,6 +1118,31 @@ def _patch_keyed_subtree(
     return _mktree(worktree, list(children.values())) if children else None
 
 
+def _keyed_subtrees(
+    worktree: Path, existing: dict[str, _ListedEntry], observed: ClaimState, new_state: ClaimState
+) -> dict[str, ObjectId | None]:
+    """The new `items/` and `runs/` subtree oids: a write never drops an item, and only a release
+    or a landing drops a claim's runs file."""
+    if dropped_items := observed.items.keys() - new_state.items.keys():
+        raise ClaimError(f"a write never removes an item, yet it drops {sorted(dropped_items)}")
+    return {
+        ITEMS_DIRECTORY: _patch_keyed_subtree(
+            worktree,
+            existing=_existing_subtree(existing, ITEMS_DIRECTORY),
+            old_members=observed.items,
+            new_members=new_state.items,
+            suffix=ITEM_FILENAME_SUFFIX,
+        ),
+        RUNS_DIRECTORY: _patch_keyed_subtree(
+            worktree,
+            existing=_existing_subtree(existing, RUNS_DIRECTORY),
+            old_members=observed.runs,
+            new_members=new_state.runs,
+            suffix=RUN_FILE_SUFFIX,
+        ),
+    }
+
+
 def _write_incremental_state_tree(
     worktree: Path, *, observed: ClaimState, new_state: ClaimState
 ) -> ObjectId:
@@ -1143,23 +1165,8 @@ def _write_incremental_state_tree(
     assert observed.tip is not None  # noqa: S101 - commit_transition already refused a missing ref
     existing = _list_tree(worktree, observed.tip, tip=observed.tip, context="state")
     top_entries: list[_TreeEntry] = [_carried_entry(existing, SCHEMA_TOML_FILENAME)]
-    if dropped_items := observed.items.keys() - new_state.items.keys():
-        raise ClaimError(f"a write never removes an item, yet it drops {sorted(dropped_items)}")
     subtrees = {
-        ITEMS_DIRECTORY: _patch_keyed_subtree(
-            worktree,
-            existing=_existing_subtree(existing, ITEMS_DIRECTORY),
-            old_members=observed.items,
-            new_members=new_state.items,
-            suffix=ITEM_FILENAME_SUFFIX,
-        ),
-        RUNS_DIRECTORY: _patch_keyed_subtree(
-            worktree,
-            existing=_existing_subtree(existing, RUNS_DIRECTORY),
-            old_members=observed.runs,
-            new_members=new_state.runs,
-            suffix=RUN_FILE_SUFFIX,
-        ),
+        **_keyed_subtrees(worktree, existing, observed, new_state),
         CLAIMS_DIRECTORY: _reuse_or_write_mapping_subtree(
             worktree,
             existing=_existing_subtree(existing, CLAIMS_DIRECTORY),

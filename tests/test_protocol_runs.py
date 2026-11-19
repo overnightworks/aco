@@ -1,6 +1,6 @@
 """`protocol.apply` of the stored runs: the write intent's rules (a live claim, its holder, the
 runs file the writer read) and what the release, the landing, the handover and the rescope do
-to a claim's runs file (`specs/ref-store-cas.spec.md`, `specs/lane-record.spec.md`)."""
+to a claim's runs file (CAS-81..CAS-84, LANREC-61, LANREC-67, HANDOVER-15, REL-68)."""
 
 from dataclasses import replace
 from functools import partial
@@ -84,13 +84,19 @@ def test_a_write_changes_no_claim() -> None:
 
 
 def test_a_write_for_a_claim_id_that_holds_no_live_claim_is_refused() -> None:
+    state = claimed_state()
+    intent = runs_intent(claim_id=OTHER_CLAIM_ID)
+
     with pytest.raises(protocol.ClaimUnavailableError, match="has no active claim"):
-        protocol.apply(claimed_state(), runs_intent(claim_id=OTHER_CLAIM_ID))
+        protocol.apply(state, intent)
 
 
 def test_a_write_by_another_agent_is_refused_with_the_intents_holder_sentence() -> None:
+    state = claimed_state()
+    intent = runs_intent(agent="Bea")
+
     with pytest.raises(protocol.ClaimUnavailableError) as refusal:
-        protocol.apply(claimed_state(), runs_intent(agent="Bea"))
+        protocol.apply(state, intent)
 
     assert str(refusal.value) == holder_sentence("Bea", "Ada")
 
@@ -110,8 +116,10 @@ def test_a_write_over_runs_that_changed_since_they_were_read_is_refused(
     if stored is not None:
         state = replace(state, runs={CLAIM_ID: stored})
 
+    intent = runs_intent(expected=expected, new_oid=THIRD_OID)
+
     with pytest.raises(protocol.ClaimUnavailableError) as refusal:
-        protocol.apply(state, runs_intent(expected=expected, new_oid=THIRD_OID))
+        protocol.apply(state, intent)
 
     assert str(refusal.value) == STALE_SENTENCE
 
@@ -186,8 +194,10 @@ def test_the_previous_holder_is_refused_after_a_handover() -> None:
     )
     handed_over = protocol.apply(with_runs(), handover)
 
+    intent = runs_intent(agent="Ada", expected=FIRST_OID)
+
     with pytest.raises(protocol.ClaimUnavailableError) as refusal:
-        protocol.apply(handed_over, runs_intent(agent="Ada", expected=FIRST_OID))
+        protocol.apply(handed_over, intent)
 
     assert str(refusal.value) == holder_sentence("Ada", "Bea")
 
