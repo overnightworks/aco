@@ -151,8 +151,8 @@ instead.
 - [ ] [REL-21] `--abandoned` never resolves the forge, reads the board, or prints `freed`/`next`/`hint` (LAND-39); its `--json` object carries neither key.
 - [ ] [REL-22] A `--merged` release whose post-commit board read fails prints LAND-38's `hint:` line, on stdout in text or stderr with `--json`; `freed`/`next` omitted (LAND-50) (see E-REL-06).
 - [ ] [REL-24] A release refusal past the parser (every ID but REL-01) prints `specs/output.spec.md`'s envelope, `reason` `precondition_failed`, exit `2`; REL-06..08 through OUT-05 (see E-REL-07).
-- [ ] [REL-64] A release that releases a claim writes `specs/lane-record.spec.md`'s record on its own release commit; a figure it cannot compute is left out and changes neither output nor exit status (LANREC-21).
-- [ ] [REL-67] `--abandoned REASON --record <file>` writes the file's record, not REASON's routing figures; `--record` with `--merged` refuses before any write (LANREC-41); with neither, REL-01 refuses.
+- [ ] [REL-64] A release writes `specs/lane-record.spec.md`'s record on its own release commit, from the claim's stored runs when it has any (LANREC-90); a figure it cannot compute is left out (LANREC-21).
+- [ ] [REL-67] Without stored runs, `--abandoned REASON --record <file>` writes the file's record, not REASON's routing figures; with stored runs it refuses (LANREC-91); with `--merged` it refuses (LANREC-41).
 - [ ] [REL-68] A release or a landing of a claim with stored runs (LANREC-52) removes the claim's runs file in the release's own commit, and `runs/` with the last file (LANREC-67, CAS-84).
 
 ## `--merged`'s own worktree/branch cleanup

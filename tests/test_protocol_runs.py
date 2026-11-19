@@ -1,6 +1,6 @@
 """`protocol.apply` of the stored runs: the write intent's rules (a live claim, its holder, the
 runs file the writer read) and what the release, the landing, the handover and the rescope do
-to a claim's runs file (CAS-81..CAS-84, LANREC-61, LANREC-67, HANDOVER-15, REL-68)."""
+to a claim's runs file (CAS-81..CAS-85, LANREC-61, LANREC-67, LANREC-92, HANDOVER-15, REL-68)."""
 
 from dataclasses import replace
 from functools import partial
