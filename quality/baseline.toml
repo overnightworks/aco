@@ -19,9 +19,9 @@
 "src/aco/cmd_claim.py" = 1132
 "src/aco/cmd_release.py" = 875
 "src/aco/github.py" = 1262
-"src/aco/protocol.py" = 1836
+"src/aco/protocol.py" = 1667
 "src/aco/state_board.py" = 922
-"src/aco/store.py" = 1739
+"src/aco/store.py" = 1547
 "src/aco/workboard.py" = 2782
 "tests/support/cli_fixtures.py" = 888
 "tests/test_board.py" = 3582
@@ -35,7 +35,7 @@
 "tests/test_cmd_reset.py" = 950
 "tests/test_github.py" = 2473
 "tests/test_state_board.py" = 5898
-"tests/test_store.py" = 5103
+"tests/test_store.py" = 4393
 
 [function_lines."src/aco/board_read.py"]
 "build_board" = 80

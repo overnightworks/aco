@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 
-from . import body, checkout, protocol, store, workboard
+from . import body, checkout, protocol, state_export, store, workboard
 from .session import RunContext
 
 # A short, still-practically-unique prefix of an `ObjectId`'s 40 hex
@@ -67,12 +67,12 @@ def _reset_bundle_name(repository: str, today: date, tip: protocol.ObjectId) -> 
 
 
 def _reset_restore_command(destination: Path) -> str:
-    """`store.export_state_bundle` bundles `store.EXPORT_BUNDLE_REF`, never the
+    """`state_export.export_state_bundle` bundles `state_export.EXPORT_BUNDLE_REF`, never the
     shared `store.STATE_REF` -- the bundle's own head therefore carries that name (`git bundle
     list-heads` shows it), and the fetch renames it to `STATE_REF` on the
     way in.
     """
-    return f"git fetch {destination} {store.EXPORT_BUNDLE_REF}:{store.STATE_REF}"
+    return f"git fetch {destination} {state_export.EXPORT_BUNDLE_REF}:{store.STATE_REF}"
 
 
 @dataclass(frozen=True)
@@ -228,7 +228,7 @@ def _execute_reset(*, worktree: Path, remote: str, plan: _ResetPlan) -> None:
     (rejected, or the lease gone stale) raises with the local ref left
     exactly as it was, and whatever export ran left on disk."""
     if plan.export_target is not None:
-        store.export_state_bundle(
+        state_export.export_state_bundle(
             worktree=worktree,
             tip=plan.export_target.tip,
             destination=plan.export_target.destination,
