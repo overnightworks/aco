@@ -165,9 +165,21 @@ url = urllib.parse.urljoin('$served_url'.split('#', 1)[0], '/assets/fonts/oswald
 with urllib.request.urlopen(url, timeout=5) as response:
     sys.exit(0 if response.status == 200 and response.headers.get('Content-Type') == 'font/woff2' else 1)
 "
-kill "$serve_pid" 2>/dev/null || true
-serve_pid=""
 echo "aco serve answers a house font as font/woff2 over HTTP"
+
+# SIGTERM ends serving cleanly, so the log holds the answered requests' lines
+# and the stop line; a process the signal killed would fail `wait`.
+kill "$serve_pid"
+wait "$serve_pid"
+serve_pid=""
+for event in request.ended server_process.finished; do
+    if ! grep -q "\"event\": \"$event\"" "$serve_log"; then
+        echo "ERROR: aco serve's log holds no $event line; log:" >&2
+        cat "$serve_log" >&2
+        exit 1
+    fi
+done
+echo "aco serve logs its request lines and ends on SIGTERM"
 
 # The installed tool answers the MCP handshake and lists its tool over stdio;
 # end of input ends the process, so nothing here is killed.

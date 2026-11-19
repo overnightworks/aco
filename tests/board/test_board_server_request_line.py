@@ -1,7 +1,7 @@
-"""The board's request line (specs/serve.spec.md, "Logging"): every answered
-request writes one logline `request.ended` through the real server, with no
-secret, path or header value on any line, and an exception writes its one
-failure line under the request's trace."""
+"""The board's request line, driven through the real server: every answered request
+writes one `request.ended` (ABRD-180, ABRD-181), no line holds a secret, a path or a
+header value (ABRD-182), an exception writes its one failure line under the request's
+trace (ABRD-183) and a browser that leaves mid-answer writes none (ABRD-184)."""
 
 import threading
 from collections.abc import Callable
