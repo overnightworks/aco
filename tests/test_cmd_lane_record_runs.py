@@ -485,7 +485,7 @@ def test_json_add_reports_a_fresh_entry_as_added_and_a_repeat_as_already_added(
 
 
 def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFixture[str]) -> None:
-    """Spec: LANREC-57, LANREC-63, LANREC-66, LANREC-69."""
+    """Spec: LANREC-57, LANREC-63, LANREC-66, LANREC-89."""
     unbegun = world.run(capsys, *add_arguments(world), "--json")
     stranger = world.run(
         capsys, *begin_arguments(world, FIRST_RUN, "--agent", OTHER_AGENT, "--json")
@@ -501,7 +501,7 @@ def test_json_refusals_name_their_reason(world: World, capsys: pytest.CaptureFix
 def test_stored_runs_that_changed_since_the_command_read_them_refuse_as_a_transient_refusal(
     world: World, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: LANREC-59, LANREC-69."""
+    """Spec: LANREC-59, LANREC-89."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     claim = world.claim()
     stored_before = store.fetch_state(worktree=world.directory, remote="origin").runs[
@@ -578,7 +578,7 @@ def test_stored_runs_that_are_not_the_stored_shape_refuse_and_write_nothing(
 def test_a_non_holder_is_refused_as_one_before_the_stored_runs_are_read(
     world: World, capsys: pytest.CaptureFixture[str], command: str
 ) -> None:
-    """Spec: LANREC-63, LANREC-69."""
+    """Spec: LANREC-63, LANREC-89."""
     world.commit_state(
         protocol.RunsWriteIntent(
             claim_id=world.claim().claim_id,

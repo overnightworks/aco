@@ -528,7 +528,7 @@ def test_each_record_line_stands_under_its_run_and_the_lane_record_closes_the_te
 def test_an_item_without_a_live_claim_refuses_as_a_release_does(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-87, REL-09."""
+    """Spec: LANREC-87, LANREC-89, REL-09."""
     released = world.run(capsys, "release", world.item, "--abandoned", "stopped for the day")
     assert released.status == 0, released.stderr
 
@@ -583,7 +583,7 @@ def test_stored_runs_that_cannot_be_used_refuse_as_unavailable(
     readable: bool,
     defect: str,
 ) -> None:
-    """Spec: LANREC-87, LANREC-62."""
+    """Spec: LANREC-87, LANREC-89, LANREC-62."""
     stored_runs = store.hash_blob(world.directory, b"not json")
     world.commit_state(
         protocol.RunsWriteIntent(
