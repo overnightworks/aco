@@ -161,7 +161,6 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  files: median 3, n 2, unknown 0",
         "  added: median 70, n 2, unknown 0",
         "  deleted: median 12.5, n 2, unknown 0",
-        "  cost: median unknown, n 0, unknown 2",
         "  build: sonnet-5.5/high 2, unknown 0",
         "  fix: none 1, unknown 1",
         "  review: opus-5.5/medium 2, unknown 0",
@@ -176,7 +175,6 @@ def test_the_text_compares_two_groups_figure_by_figure(
         "  files: median unknown, n 0, unknown 1",
         "  added: median unknown, n 0, unknown 1",
         "  deleted: median unknown, n 0, unknown 1",
-        "  cost: median unknown, n 0, unknown 1",
         "  build: opus-5.5/high 1, unknown 0",
         "  fix: unknown 1",
         "  review: unknown 1",
@@ -210,7 +208,6 @@ def test_json_carries_the_same_figures_under_the_shared_envelope(
             "files": {"median": None, "n": 0, "unknown": 1},
             "added": {"median": None, "n": 0, "unknown": 1},
             "deleted": {"median": None, "n": 0, "unknown": 1},
-            "cost": {"median": None, "n": 0, "unknown": 1},
         },
         "stages": {
             "build": {"choices": {"opus-5.5/high": 1}, "unknown": 0},

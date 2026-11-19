@@ -79,7 +79,6 @@ class FigureName(StrEnum):
     FILES = "files"
     ADDED = "added"
     DELETED = "deleted"
-    COST = "cost"
 
 
 @dataclass(frozen=True)
@@ -174,13 +173,11 @@ _READ_FIGURE: Mapping[FigureName, Callable[[LaneRecord], int | None]] = {
 
 
 def measure(group: LaneGroup, lanes: Iterable[RecordedLane]) -> SideStats:
-    """The figures of the `lanes` that `group` selects. Cost has no source, so it is unknown for
-    every lane."""
+    """The figures of the `lanes` that `group` selects."""
     records = [lane.record for lane in lanes if selects(group, lane)]
     figures = {
         name: _figure([read(record) for record in records]) for name, read in _READ_FIGURE.items()
     }
-    figures[FigureName.COST] = _figure([None] * len(records))
     return SideStats(
         group=group,
         lanes=len(records),

@@ -9,9 +9,7 @@ only what no spec owns.
 aco coordinates agents working in one repository. Claims live in git, work
 items live on the forge, and the commands join the two. It runs no lease or
 coordination server; the state ref is the serialization point. An agent
-host can start `aco mcp` for one session to read the operator's inbox, to
-put a decision card on an item, to record the operator's chat answer on one and to
-mark a step only the operator can take.
+host can start `aco mcp` for one session (`specs/mcp.spec.md`).
 
 ```mermaid
 flowchart LR
@@ -76,29 +74,20 @@ flowchart LR
   label. An item's contract is one fenced TOML block, specified in
   `specs/body-block.spec.md`.
 - The **forge port** (`forge.py`) is the seam most commands use to reach a
-  forge. Its error types are `ForgeNotFoundError`,
-  `ForgePermissionDeniedError`, `ForgeTransientError` and the rest of its
-  family. An adapter that cannot do an operation raises
-  `ForgeUnsupportedError`. The one capability a caller
-  branches on is `BoardSource.lists_pull_requests`. GitHub is the only forge
-  adapter; the state-ref item store implements the same port. The seam is not
-  exclusive: `cmd_land` depends on `GitHubForge` for the whole landing,
-  `cmd_item`, `cmd_item_edit` and `cmd_item_common` on `StateRefBoard` and
-  `cmd_release` on both, so another forge needs its own contract for them
-  before it can attach (the module docstring of `forge.py`).
+  forge; its errors are typed, so no caller matches error text, and an adapter
+  that cannot do an operation raises `ForgeUnsupportedError`. GitHub is the only forge adapter; the state-ref item
+  store implements the same port. The seam is not exclusive: `cmd_land` depends
+  on `GitHubForge` for the whole landing, `cmd_item`, `cmd_item_edit` and
+  `cmd_item_common` on `StateRefBoard` and `cmd_release` on both, so another
+  forge needs its own contract for them before it can attach (the module
+  docstring of `forge.py`).
 - The **ruling search** (`forge.RulingSearch`) is a port of its own, because it
-  spans owners where the reader is bound to one repository: one query in, every
-  page of the forge's hits and whether the result is complete out. Its GitHub
-  adapter (`github_search.py`) takes the command runner of `github.py`. The
-  `ask` tool of `aco mcp` builds the query and keeps the ruled lines from the
-  hits with the pure `earlier_rulings.py`; the search runs once the item's turn
-  has ended.
+  spans owners where the reader is bound to one repository. The `ask` tool of
+  `aco mcp` filters its hits with the pure `earlier_rulings.py`.
 - The **board probe** (`forge.BoardProbe`) is a third port of its own: whether an
   issue, or a repository's newest one, changed since an opaque token. Its GitHub
-  adapter (`github_probe.py`) takes the response runner of `github.py`, sends the
-  token as `If-None-Match` and reads the status line, because `gh` exits
-  non-zero on the 304 that means unchanged.
-  `aco wait` without an item asks it.
+  adapter (`github_probe.py`) reads the status line itself, because `gh` exits
+  non-zero on the 304 that means unchanged. `aco wait` without an item asks it.
 
 ## Runtime View
 
@@ -127,7 +116,7 @@ sequenceDiagram
 aco is a CLI installed per machine (the README owns installation); every
 machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
-operator starts with `aco serve`; it is not a service and keeps no
+operator starts with `aco serve`, by hand or by a unit the operator keeps; it keeps no
 coordination state of its own, only its access token file; the root it scans
 comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
 kind of process: an agent host starts it over stdio for one session and it ends
@@ -145,95 +134,64 @@ paths, LAND-71 and LAND-87). The `record_answer` tool of `aco mcp` takes the
 agent's word that the operator spoke and checks nothing of it. Against anyone
 else the forge's permissions enforce who may write, and its edit history
 records afterward what was written; neither stops an agent acting under the
-operator's own identity. Claimants need push rights to the canonical remote. The board adds its own boundary, described in
-`specs/serve.spec.md`. A card reaches it only from an item a member of the
-repository wrote (GitHub's `OWNER`, `MEMBER` or `COLLABORATOR` author
-association; an item whose association is unknown counts as a stranger's; a
-state-ref item counts as a member's, since only a writer of the state ref can
-create one): in a public repository a stranger can open an issue carrying a
-card. `inbox.py` owns that per-repository read; `aco rulings` and `aco next`
-stay unfiltered. `aco mcp` lists only the lines of those items that wait on the
-operator and, from the same listing, the items of the same members whose block's
-`wait` names the operator, with that wait's step. Its `ask` tool is a write boundary of its own: one option line per
-call, into an open item a member wrote, in any repository discovery finds, in
-that item's turn. Its `record_answer` tool rules one line per call in that
-turn, as `aco rule` does, so it refuses neither a closed item nor a
-non-member's: the card's hash binds the answer to what the agent read. Its
-`step` tool writes one item's `wait.operator` and its `[step]` table (purpose,
-actions, expected, answer) in that turn, leaving its `next`, refusing a closed item and a
-non-member's, or opens one item, and sets the label `needs-operator`, the GitHub view of that wait, through the
-forge port's `add_label`; it never clears the wait or removes the label (`specs/mcp.spec.md`).
-Its `ask` tool also reads, through the forge's search across the owners of the
-repositories discovery finds, the lines the operator ruled in the card's area,
-and keeps only those on items a member of a found repository wrote. It shows
-them and applies none; a line from a private repository can reach a head
-working in a public one, as the inbox already allows.
+operator's own identity. Claimants need push rights to the canonical remote.
+The board adds its own boundary (`specs/serve.spec.md`): a card reaches it only
+from an item a member of the repository wrote (GitHub's `OWNER`, `MEMBER` or
+`COLLABORATOR` author association; an unknown association counts as a
+stranger's; a state-ref item counts as a member's, since only a writer of the
+state ref can create one), because in a public repository a stranger can open an
+issue carrying a card. `inbox.py` owns that per-repository read; `aco rulings`
+and `aco next` stay unfiltered. `aco mcp` and `aco fleet-plans` read the same
+listing and keep no state. The write tools of `aco mcp` and the
+board's step answer each write one line or wait in the item's turn
+(`specs/mcp.spec.md`, `specs/serve.spec.md`); `record_answer` refuses neither a
+closed item nor a non-member's, because the card's hash binds the answer to what
+the agent read. The ruling search of `ask` shows earlier rulings and applies
+none; a line from a private repository can reach a head working in a public one,
+as the inbox already allows.
 
-The board's step answer, `POST /api/step`, is a write boundary beside its card decision: behind the
-board token and the same body limits, in the item's turn, it clears the item's operator wait and `[step]`,
-writes the outcome into `now` and removes the label `needs-operator` through the forge port's
-`remove_label` (`specs/serve.spec.md`).
-
-`aco fleet-plans` reads that same listing for the open items of members labelled `fleet-plan`, across every repository discovery finds, and keeps no state of its own (`specs/fleet-plans.spec.md`).
-
-`aco stats` compares two groups of lanes by the records on the state ref's release commits: `lane_record.py` owns the trailer keys and reads them back, the pure `lane_measure.py` computes the figures, and the command writes nothing and asks no forge (`specs/stats.spec.md`).
+`aco stats` compares two groups of lanes by the records on the state ref's
+release commits; it writes nothing and asks no forge
+(`specs/stats.spec.md`).
 
 ### The per-item turn
 
-Every write of an item's body runs under
-one per-item lock (`decide.item_lock`):
-an exclusive `flock` (`file_lock`, shared with the lineage stamp) on one file per
-item under aco's state directory (`repositories.state_directory`), named by a
-digest of the forge repository id and the item number. `decide.turn` is that lock
-plus the fresh read, then one write; `aco rule`, `aco withdraw`, the board's
-decision and step answer, `aco item edit` (a whole body against `--base`, or `--size/--whole`),
-`aco rescope` and `aco handover` (each through its claim
-transition) and the `ask`, `record_answer`, `step` and `answer_step` tools of `aco mcp` write inside it. `aco cut` takes the lock alone, from before its first
-forge use through its container write, because it judges from the open-board
-listing, not the item read. Every one of these writes the body through
-`decide.write_item_body`, the one writer, which skips a body equal to the text it
-replaces and hands the port that text, except a whole-body `aco item edit` under
-`state-ref`, which calls the board's `update_item_body` directly and always writes. A writer
-that finds the lock held prints
-one line to stderr and waits. Writers on this machine therefore never overwrite each other's
-bodies. A whole-body `aco item edit` also names the hash `aco item show --json` printed
-(`--base`) and compares it with a fresh read under the lock, so a head writing from a stale
-copy is refused, never merged. GitHub's REST API has no conditional body write, so a hand edit
-or another machine between that read and the write is not prevented, and a write past aco
-(`gh issue edit`, a browser tab) is not seen. After each GitHub write the adapter reads the item's newest two
-edit revisions and raises a typed answer when its write was overwritten, kept over
-an unread change, or cannot be verified. Every `--json` writer answers it with the
-check's sentence and `overwritten` (with `kept`) or `not_verified`, through one owner in
-`report`; `cut` wraps the sentence in its own and `adopt` states its own; the board shows `failed`. The history is read once, right after the write, so a hand
-edit saved after that read over an older copy still overwrites the write unseen. Under `state-ref` the store's
-compare-and-swap also refuses a write from a stale snapshot, which `aco item edit` reports as
-`stale` like a changed hash. The board keeps its own in-process turn for its shutdown drain
-(`specs/serve.spec.md`).
+Most writes of an item's body run under one per-item lock
+(`decide.item_lock`): an exclusive `flock` (`file_lock`) on one file per item
+under aco's state directory, named by a digest of the forge repository id and
+the item number. `decide.turn` is that lock plus the fresh read, then one write;
+the item and claim commands, `aco mcp` tools and the board write under the lock
+through `decide.write_item_body`, the one writer, except a whole-body `aco item edit`
+under `state-ref`, which calls the board directly. `aco adopt` and the land
+queue write through the forge writer, unlocked. A writer that finds
+the lock held prints one line to stderr and waits, so writers here never
+overwrite each other's bodies. A whole-body `aco item edit` also compares
+the hash it names (`--base`) with a fresh read under the lock, so a stale copy is
+refused, never merged.
+
+GitHub's REST API has no conditional body write, so a hand edit or another
+machine between read and write is not prevented, and a write past aco
+(`gh issue edit`, a browser tab) is not seen. After each GitHub write the
+adapter reads the item's newest two edit revisions and raises a typed answer
+when its write was overwritten, kept over an unread change, or cannot be
+verified; an edit saved after that read overwrites unseen. Under
+`state-ref` the store's compare-and-swap refuses a write from a stale snapshot.
 
 ### The ruling signal
 
 `decide.rule` and `decide.withdraw`, the one write of a ruled, returned or
-withdrawn line for `aco rule`, `aco withdraw`, the board and `record_answer`,
-touch one file per item under aco's state directory after the verified write,
-named by the same digest as the item's lock (`decide.item_signal_path`). A
-session that asked a card starts `aco wait` in the background: it reads the item
-once, then watches only that file's modification time and reads the item again
-when it moves, and a slow read every ten minutes catches a line changed outside
-aco. The command ends when a named line is no longer open, which wakes the
-session. The signal carries no content, names no asker and never fails a write
+withdrawn line, touch one signal file per item after the verified write, named
+by the same digest as the item's lock (`decide.item_signal_path`). `aco wait`
+watches that file's modification time instead of polling the item; the signal
+carries no content, names no asker and never fails a write
 (`specs/wait.spec.md`).
 
-An idle head starts `aco wait` without an item and watches its own board
+An idle head's `aco wait` without an item watches its own board
 (`board_wait.py`); no service stands behind it, because one head waits per
-repository and a service would save no request. The same signal files, one per
-item with a line that waits on the operator, wake it about two seconds after a
-ruling: only the item whose signal moved is read again. A cheap check decides when
-to read the rest: every minute the state
+repository and a service would save no request. The signal files wake it within
+seconds of a ruling, and a cheap check decides when to read the rest: the state
 ref's tip and, under GitHub storage, one conditional request (`BoardProbe`) for
-the repository's newest updated issue and for each open blocker in another
-repository. A full read runs on a change, every hour and on the day of the
-earliest `until` date. The reads alone decide: the command ends when `aco next`
-would name an action or a line that waited on the operator stopped waiting.
+the newest updated issue and for each open blocker elsewhere.
 
 ### Proof strategy
 
@@ -253,10 +211,8 @@ but not grow.
   store, the block's `[record]` table is that owner
   (`specs/storage-pin.spec.md`). The `Parent:` line `aco cut` writes is a
   recovery marker (`specs/cut.spec.md`, `specs/body-block.spec.md`).
-- Forge errors are typed, so no caller matches error text.
-- The state ref advances by a plain fast-forward push. A push already accepts
-  fast-forwards and rejects the rest, which is the serialization needed; a
-  matching `--force-with-lease` can replace history, so it is not used.
+- The state ref advances by a plain fast-forward push: a push already accepts
+  fast-forwards and rejects the rest, which is the serialization needed.
 - A claim's holder changes only through `aco handover`, which records the takeover on
   the item and in the transition's commit trailers.
 - A released claim is absent from the tree and readable at the parent commit.
@@ -265,9 +221,8 @@ but not grow.
 - A resource is allocated in the same commit as the claim that requests it, so
   two lanes racing for it serialize on the one ref. No cross-key invariant
   rests on a server capability.
-- The storage pin is read from configuration and never chosen at run time from
-  forge capabilities, so a forge plan change cannot silently move a fact's
-  owner without a migration.
+- The storage pin is read from configuration, never from forge capabilities
+  (`specs/storage-pin.spec.md`).
 - Wide-scope thresholds are protocol constants, not configuration, so two
   fleets in one repository cannot disagree on what "too wide" means.
 - `.aco/board.toml` gains a setting only when that setting has a caller,
@@ -275,13 +230,11 @@ but not grow.
 - The board (`aco serve`, `src/aco/board/`, `frontend/`) is the operator's
   decision surface: his questions, from every repository under one root
   (`repositories.py`, `specs/serve.spec.md` ABRD-14), in use and growing.
-  Its Progress view is derived from the same listing, each top-level
-  container's sub-issue list and the trunk's `Work-Item:` trailers:
-  `progress.py` counts each container's closed, landed, waiting and planned
-  work (ABRD-131); it keeps no state and adds no store. The same read prices
-  the lanes left from the lane records on the state ref's tip, one `ls-remote`
-  and object fetch per repository inside its parallel read (`inbox.py`); a
-  failed state read leaves only the ranges unknown.
+  Its Progress view counts each top-level container's closed, landed, waiting
+  and planned work from the same listing and the trunk's `Work-Item:` trailers
+  (`progress.py`, ABRD-131), keeping no state; the lanes left are priced from
+  the state ref's lane records (`inbox.py`), and a failed read leaves only the
+  ranges unknown.
 - The state-ref item store is kept, unused today, for a repository without a
   forge (`specs/storage-pin.spec.md`). Every change to `session`, `store` and
   the item commands still carries both storage paths. It is known and
@@ -289,41 +242,33 @@ but not grow.
 
 ## Not chosen
 
-- Per-item claim comments: the comment API has no conditional write, so two
-  agents can both post and neither loses, and a lane without an issue has no
-  comment to hold. Reopens if the forge's comment API gains a conditional
-  write.
-- The assignee as the lock: it has no compare-and-swap and names a forge
-  account, not the agent and session holding the claim. Reopens if a forge
-  offers an atomic assignee swap that identifies the session.
-- Projects v2 fields: no demonstrated compare-and-swap, an added
-  synchronisation step, and it ties the claim's compare-and-swap, a pure git
-  push today, to a forge API. Reopens if a forge field offers a verified
-  compare-and-swap.
-- One ref per key plus a resources ref: a resource-holding claim would have
-  its hold and its number in two owners that can disagree, and one transition
-  over both needs `git push --atomic` across refs. Reopens when that is
-  verified on the forge.
-- `--force-with-lease` for advancing the state ref: it opens a history-loss
-  path. Reopens if a lease can be made to reject non-fast-forward updates.
-- A second history ref: the parent commit already holds the history. Reopens
-  if a reader needs history that the parent chain cannot give.
+- Per-item claim comments: no conditional comment write, and a lane without
+  an issue has none to hold. Reopens if the comment API gains one.
+- The assignee as the lock: no compare-and-swap, and it names an account, not
+  the session. Reopens if a forge swap names the session atomically.
+- Projects v2 fields: no demonstrated compare-and-swap, and they tie the claim's
+  git push to a forge API. Reopens on a verified forge compare-and-swap.
+- One ref per key plus a resources ref: hold and number would sit in two
+  owners. Reopens when `git push --atomic` across refs is verified.
+- `--force-with-lease` for the state ref: it opens a history-loss path. Reopens
+  if a lease can reject non-fast-forward updates.
+- A second history ref: the parent commit already holds the history. Reopens if
+  a reader needs history the parent chain lacks.
 - Runtime capability selection of the storage owner: a forge plan change would
-  silently move a fact's owner without a migration. Reopens if the move gets a
-  migration that runs with it.
-- Renaming `.aco/board.toml`: it costs a migration to buy a better name.
-  Reopens when a migration is needed anyway.
-- Deleting the board: it would remove the operator's decision surface the
-  vision names. Reopens when the operator decides to drop it.
-- Deleting the state-ref item store: a repository without a forge would need
-  a rebuild. Reopens when the operator decides to drop it.
+  move a fact's owner silently. Reopens with a migration that runs alongside.
+- Renaming `.aco/board.toml`: a migration to buy a better name. Reopens when a
+  migration is needed anyway.
+- Deleting the board: it removes the operator's decision surface. Reopens when
+  the operator drops it.
+- Deleting the state-ref item store: a repository without a forge would need a
+  rebuild. Reopens when the operator drops it.
 
 ## Risks and Technical Debt
 
 - Two storage paths are carried by `session`, `store` and
   the item commands (see Constraints and reasons).
-- The forge seam is not exclusive: landing, item and release depend on
-  concrete adapters, so a second forge is more than one adapter.
+- The forge seam is not exclusive (see Building Block View): a second forge is
+  more than one adapter.
 - GitHub access goes through the `gh` CLI, whose output and permissions aco
   does not control; errors are typed at the adapter, not prevented.
 - Trust is cooperative; see Trust above.
