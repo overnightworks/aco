@@ -23,7 +23,7 @@ from github_fixtures import FakeForge, serve_forge
 from option_cards import decide, group_body, ruled_card
 from wait_fixtures import ITEM, Ticks, install, open_reference, reads_of, serve_item
 
-from aco import board_wait, cmd_wait, forge, protocol, store, workboard
+from aco import board_wait, cmd_wait, forge, protocol, session, store, workboard
 
 OTHER = 50
 RESET_IN = timedelta(minutes=30)
@@ -223,6 +223,34 @@ class TestTheBareWait:
             [0.0, 0.0, first_refused, lifted],
             [0.0, lifted],
         )
+
+    def test_the_retry_time_counts_from_the_end_of_the_call_that_was_refused(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: WAIT-22 -- a refusal that took 90 seconds to come lifts no earlier than the
+        reset, which is asked of the wall clock as it stood when the call ended."""
+        first_refused, call_seconds = 60.0, 90.0
+        world = serve_board(monkeypatch, issues=(waiting_card(),))
+        frozen = session.run_context
+
+        def run_context(repo: forge.RepositoryId | None) -> session.RunContext:
+            context = frozen(repo)
+            context.now = lambda: FROZEN_CLI_NOW + timedelta(seconds=world.ticks.now)
+            return context
+
+        def refusing_slowly(now: float) -> forge.ForgeError | None:
+            if now == first_refused:
+                world.ticks.now += call_seconds
+            return LIMIT if first_refused <= now < RETRY_AT_THE_RESET else None
+
+        monkeypatch.setattr(session, "run_context", run_context)
+        world.probe.failing = refusing_slowly
+        world.ticks.afterwards[1] = a_board_that_gains_an_action(world)
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stdout) == (0, ACTIONABLE)
+        asked_after_the_refusal = world.probe.asked_at[3:]
+        assert asked_after_the_refusal
+        assert min(asked_after_the_refusal) >= RETRY_AT_THE_RESET
 
     def test_a_run_of_failures_that_met_another_failure_first_warns_again_for_a_rate_limit(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

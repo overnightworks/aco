@@ -287,11 +287,10 @@ class _BoardWatch:
 
     def tick(self) -> BoardEnd | None:
         """What one pause brings; a transient failure is said once per run of failures."""
-        now = self._clock.now()
         try:
-            return self._tick(now)
+            return self._tick(self._clock.now())
         except forge.ForgeTransientError as failure:
-            self._fail(failure, now)
+            self._fail(failure, self._clock.now())
             return None
 
     def _tick(self, now: float) -> BoardEnd | None:
