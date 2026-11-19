@@ -48,7 +48,9 @@ def claimed_state() -> protocol.ClaimState:
     return protocol.apply(STATE_WITH_TIP, claim_intent())
 
 
-def landing_intent() -> protocol.LandingIntent:
+def landing_intent(
+    expected_runs: protocol.ObjectId | None = None,
+) -> protocol.LandingIntent:
     return protocol.LandingIntent(
         item_id=ITEM_ID,
         item_expected=ITEM_OID,
@@ -58,6 +60,31 @@ def landing_intent() -> protocol.LandingIntent:
         role="builder",
         outcome=protocol.LandedRelease(LANDED_COMMIT),
         operation_id="op-landing",
+        expected_runs=expected_runs,
+    )
+
+
+def release_intent(expected_runs: protocol.ObjectId | None = None) -> protocol.ReleaseIntent:
+    return protocol.ReleaseIntent(
+        claim_id=CLAIM_ID,
+        agent="Ada",
+        role="builder",
+        outcome=protocol.AbandonedRelease("stopped"),
+        operation_id="op-release",
+        expected_runs=expected_runs,
+    )
+
+
+def release_or_landing(
+    kind: str, expected_runs: protocol.ObjectId | None
+) -> protocol.ReleaseIntent | protocol.LandingIntent:
+    return release_intent(expected_runs) if kind == "release" else landing_intent(expected_runs)
+
+
+def stale_runs_sentence(label: str) -> str:
+    return (
+        f"the stored runs of {label} were written since this command read them; "
+        "run the same command again"
     )
 
 
@@ -137,15 +164,7 @@ def with_runs() -> protocol.ClaimState:
 
 
 def test_a_release_drops_the_runs_file_of_the_released_claim_only() -> None:
-    release = protocol.ReleaseIntent(
-        claim_id=CLAIM_ID,
-        agent="Ada",
-        role="builder",
-        outcome=protocol.AbandonedRelease("stopped"),
-        operation_id="op-release",
-    )
-
-    released = protocol.apply(with_runs(), release)
+    released = protocol.apply(with_runs(), release_intent(FIRST_OID))
 
     assert dict(released.runs) == {OTHER_CLAIM_ID: SECOND_OID}
     assert CLAIM_ID not in {claim.claim_id for claim in released.claims.values()}
@@ -154,24 +173,95 @@ def test_a_release_drops_the_runs_file_of_the_released_claim_only() -> None:
 def test_a_landing_drops_the_runs_file_of_the_landed_claim_only() -> None:
     state = replace(with_runs(), items={ITEM_ID: ITEM_OID})
 
-    landed = protocol.apply(state, landing_intent())
+    landed = protocol.apply(state, landing_intent(FIRST_OID))
 
     assert dict(landed.runs) == {OTHER_CLAIM_ID: SECOND_OID}
 
 
 def test_a_release_of_a_claim_with_no_runs_file_leaves_the_runs_as_they_are() -> None:
     state = replace(claimed_state(), runs={OTHER_CLAIM_ID: SECOND_OID})
-    release = protocol.ReleaseIntent(
-        claim_id=CLAIM_ID,
-        agent="Ada",
-        role="builder",
-        outcome=protocol.AbandonedRelease("stopped"),
-        operation_id="op-release",
-    )
 
-    released = protocol.apply(state, release)
+    released = protocol.apply(state, release_intent())
 
     assert dict(released.runs) == {OTHER_CLAIM_ID: SECOND_OID}
+
+
+@pytest.mark.parametrize("kind", ["release", "landing"])
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        pytest.param(SECOND_OID, FIRST_OID, id="the-runs-file-changed"),
+        pytest.param(FIRST_OID, None, id="a-runs-file-appeared"),
+        pytest.param(None, FIRST_OID, id="the-runs-file-vanished"),
+    ],
+)
+def test_a_release_or_landing_over_runs_that_differ_from_those_it_read_is_refused(
+    kind: str, stored: protocol.ObjectId | None, expected: protocol.ObjectId | None
+) -> None:
+    state = replace(claimed_state(), items={ITEM_ID: ITEM_OID}, runs={})
+    if stored is not None:
+        state = replace(state, runs={CLAIM_ID: stored})
+    intent = release_or_landing(kind, expected)
+
+    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
+        protocol.apply(state, intent)
+
+    assert str(refusal.value) == stale_runs_sentence("#42")
+
+
+@pytest.mark.parametrize("kind", ["release", "landing"])
+def test_a_refused_release_or_landing_names_the_item_in_the_form_its_caller_asks_for(
+    kind: str,
+) -> None:
+    state = replace(claimed_state(), items={ITEM_ID: ITEM_OID}, runs={CLAIM_ID: SECOND_OID})
+    intent = release_or_landing(kind, FIRST_OID)
+
+    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
+        protocol.apply(state, intent)
+
+    assert refusal.value.named(lambda number: f"aco-{number:06d}") == stale_runs_sentence(
+        "aco-000042"
+    )
+
+
+@pytest.mark.parametrize("kind", ["release", "landing"])
+def test_a_refused_release_or_landing_of_a_lane_claim_names_its_claim_id(kind: str) -> None:
+    lane = claim_intent(identity=protocol.LaneIdentity(), branch="docs/tidy-readme")
+    state = replace(
+        protocol.apply(STATE_WITH_TIP, lane),
+        items={ITEM_ID: ITEM_OID},
+        runs={CLAIM_ID: SECOND_OID},
+    )
+    intent = release_or_landing(kind, FIRST_OID)
+
+    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
+        protocol.apply(state, intent)
+
+    assert refusal.value.named(lambda number: f"aco-{number:06d}") == stale_runs_sentence(CLAIM_ID)
+
+
+@pytest.mark.parametrize("kind", ["release", "landing"])
+def test_a_release_or_landing_that_expects_no_runs_file_refuses_a_claim_that_has_one(
+    kind: str,
+) -> None:
+    state = replace(with_runs(), items={ITEM_ID: ITEM_OID})
+    intent = release_or_landing(kind, None)
+
+    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
+        protocol.apply(state, intent)
+
+    assert str(refusal.value) == stale_runs_sentence("#42")
+
+
+@pytest.mark.parametrize("kind", ["release", "landing"])
+def test_a_write_to_another_claims_runs_file_is_applied_over(kind: str) -> None:
+    runs = {CLAIM_ID: FIRST_OID, OTHER_CLAIM_ID: THIRD_OID}
+    state = replace(claimed_state(), items={ITEM_ID: ITEM_OID}, runs=runs)
+    intent = release_or_landing(kind, FIRST_OID)
+
+    applied = protocol.apply(state, intent)
+
+    assert dict(applied.runs) == {OTHER_CLAIM_ID: THIRD_OID}
 
 
 def test_a_handover_keeps_the_runs_file_and_the_new_holder_may_write() -> None:
@@ -214,3 +304,10 @@ def test_a_rescope_keeps_the_runs_file() -> None:
     rescoped = protocol.apply(with_runs(), rescope)
 
     assert dict(rescoped.runs) == dict(with_runs().runs)
+
+
+def test_the_stale_runs_sentence_names_the_item_and_the_command_to_run_again() -> None:
+    assert protocol.stale_runs_sentence("#42") == (
+        "the stored runs of #42 were written since this command read them; "
+        "run the same command again"
+    )

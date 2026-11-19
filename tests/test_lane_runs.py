@@ -375,10 +375,3 @@ def test_the_holder_refusal_names_the_action_the_item_and_both_agents() -> None:
 
     assert begin == "only the holder may begin a run of #42 (holder='Ada', this session='Bea')"
     assert add == "only the holder may add a run to #42 (holder='Ada', this session='Bea')"
-
-
-def test_the_stale_refusal_names_the_item_and_the_command_to_run_again() -> None:
-    assert lane_runs.stale_refusal(LABEL) == (
-        "the stored runs of #42 were written since this command read them; "
-        "run the same command again"
-    )
