@@ -8,6 +8,9 @@ updates:
     directory: /
     schedule:
       interval: daily
+    ignore:
+      # Dependabot looks the name up on PyPI, where it is not published.
+      - dependency-name: "overnightworks-*"
   - package-ecosystem: npm
     directory: /frontend
     schedule:

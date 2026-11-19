@@ -10,13 +10,20 @@ readme = "README.md"
 requires-python = ">=3.14,<3.15"
 license = "MIT"
 authors = [{name = "aco contributors"}]
-dependencies = []
+# The git tag is the pin: uv does not check a wheel URL's sha256 fragment on a
+# tool install, and tags are never moved (logline's README, Install).
+dependencies = [
+    "overnightworks-logline @ git+https://github.com/overnightworks/logline@v1.5.0",
+]
 
 [project.scripts]
 aco = "aco.cli:main"
 
 [tool.hatch.version]
 path = "src/aco/__init__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 # The board's built assets are committed under src/aco/board/static/ so a
 # Python-only install needs no Node; scripts/package_smoke.sh proves they ship.
