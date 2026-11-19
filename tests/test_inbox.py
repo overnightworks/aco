@@ -174,6 +174,51 @@ def test_the_read_lists_each_repository_in_discovery_order_and_names_the_failed_
     ]
 
 
+def _discovery_with_unavailable(
+    tmp_path: Path, *unavailable: repositories.UnavailableCheckout
+) -> repositories.Discovery:
+    return repositories.Discovery(
+        tmp_path, (_repository("owner/kept", tmp_path / "kept"),), tuple(unavailable)
+    )
+
+
+def test_a_label_an_unavailable_checkout_carries_is_refused_naming_its_directory_and_reason(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "broken"
+    discovery = _discovery_with_unavailable(
+        tmp_path, repositories.UnavailableCheckout(directory, "cannot be read", "owner/broken")
+    )
+
+    with pytest.raises(inbox.UnreadableRepositoryError) as refusal:
+        inbox.context_in_checkout_of(discovery, "owner/broken")
+
+    assert str(refusal.value) == "repository owner/broken is unreadable: " + (
+        f"{directory}: cannot be read"
+    )
+
+
+@pytest.mark.parametrize(
+    "unavailable",
+    [
+        pytest.param(
+            repositories.UnavailableCheckout(Path("broken"), "cannot be read", "owner/other"),
+            id="another-label",
+        ),
+        pytest.param(repositories.UnavailableCheckout(Path("broken"), "no remote"), id="no-label"),
+    ],
+)
+def test_a_label_no_unavailable_checkout_carries_keeps_the_not_found_refusal(
+    tmp_path: Path, unavailable: repositories.UnavailableCheckout
+) -> None:
+    discovery = _discovery_with_unavailable(tmp_path, unavailable)
+
+    with pytest.raises(inbox.RepositoryNotFoundError) as refusal:
+        inbox.context_in_checkout_of(discovery, "owner/broken")
+
+    assert str(refusal.value) == "no repository owner/broken found"
+
+
 def test_the_repositories_are_read_concurrently_and_listed_in_discovery_order(
     tmp_path: Path,
 ) -> None:

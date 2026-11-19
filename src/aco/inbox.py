@@ -273,12 +273,25 @@ class RepositoryNotFoundError(protocol.ClaimError):
         super().__init__(f"no repository {label} found")
 
 
+class UnreadableRepositoryError(protocol.ClaimError):
+    """The checkout of the repository exists but could not be read."""
+
+    def __init__(self, label: str, checkout: repositories.UnavailableCheckout) -> None:
+        super().__init__(
+            f"repository {label} is unreadable: {checkout.directory}: {checkout.reason}"
+        )
+
+
 def context_in_checkout_of(discovery: repositories.Discovery, label: str) -> session.RunContext:
     """The run context in the checkout of the repository `label` of `discovery`,
     with no `--repo` of its own, so the checkout's own remote is the target;
-    refused when `discovery` has no repository of that label."""
+    refused when `discovery` has no repository of that label, naming the
+    checkout and its defect when one that could not be read carries it."""
     found = {repository.label: repository for repository in discovery.repositories}
     if label not in found:
+        for unreadable in discovery.unavailable:
+            if unreadable.label == label:
+                raise UnreadableRepositoryError(label, unreadable)
         raise RepositoryNotFoundError(label)
     return session.run_context(None).for_directory(found[label].directory)
 

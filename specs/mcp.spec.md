@@ -251,7 +251,7 @@ Setup: `owner/a` holds item `#7`, closed
 < {"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"item 7 is closed; a card on it would show nowhere"}],"isError":true}}
 ```
 
-An item a non-member wrote answers `item 7 was not written by a member; its cards are not listed`, a repository the scan did not find `no repository owner/x found; read_inbox lists them`.
+An item a non-member wrote answers `item 7 was not written by a member; its cards are not listed`, a repository the scan did not find `no repository owner/x found; read_inbox lists them`, and one whose checkout the scan found but could not read `repository owner/x is unreadable: <directory>: <reason>`.
 
 ### E-MCP-07 -- a card value of the wrong type
 

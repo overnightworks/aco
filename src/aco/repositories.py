@@ -43,6 +43,8 @@ class Repository:
 class UnavailableCheckout:
     directory: Path
     reason: str
+    label: str | None = None
+    """The forge repository `origin` names, `None` where that URL cannot be read."""
 
 
 @dataclass(frozen=True)
@@ -109,7 +111,7 @@ def discover(root: Path) -> Discovery:
         try:
             repository = _tracking_repository(directory)
         except (protocol.ClaimError, OSError) as error:
-            unavailable.append(UnavailableCheckout(directory, str(error)))
+            unavailable.append(UnavailableCheckout(directory, str(error), _origin_label(directory)))
             continue
         if repository is not None:
             winners.setdefault(repository.label, repository)
@@ -119,6 +121,17 @@ def discover(root: Path) -> Discovery:
     return Discovery(
         root, repositories, tuple(sorted(unavailable, key=lambda entry: entry.directory))
     )
+
+
+def _origin_label(directory: Path) -> str | None:
+    """The repository path `directory`'s `origin` URL names, read without the
+    board configuration, or None when the URL cannot be read."""
+    try:
+        return checkout.parse_remote_location(
+            checkout.remote_url("origin", directory=directory)
+        ).path
+    except protocol.ClaimError, OSError:
+        return None
 
 
 def _checkout_directories(root: Path) -> tuple[list[Path], list[UnavailableCheckout]]:
