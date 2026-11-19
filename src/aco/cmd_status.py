@@ -10,6 +10,7 @@ from enum import StrEnum
 from . import (
     board_read,
     body,
+    claim_conflicts,
     protocol,
     report,
     workboard,
@@ -25,20 +26,20 @@ from .session import (
 
 def _status_claims(
     claims: tuple[protocol.ActiveClaim, ...], issue: int | None
-) -> tuple[tuple[protocol.ActiveClaim, ...], protocol.ClaimConflictIndex]:
+) -> tuple[tuple[protocol.ActiveClaim, ...], claim_conflicts.ClaimConflictIndex]:
     selected = tuple(
         claim
         for claim in claims
         if issue is None
         or (isinstance(claim.identity, protocol.IssueIdentity) and claim.identity.issue == issue)
     )
-    index = protocol.claim_conflict_index(claims)
+    index = claim_conflicts.claim_conflict_index(claims)
     if not selected:
         return (), index
     related_ids = (
         {claim.claim_id for claim in claims}
         if issue is None
-        else protocol.related_claim_ids(index, selected)
+        else claim_conflicts.related_claim_ids(index, selected)
     )
     related = tuple(claim for claim in claims if claim.claim_id in related_ids)
     return related, index
@@ -76,7 +77,7 @@ class _ClaimReportContext:
     beside the pre-existing `index` never pushes a caller past PLR0913's
     five-argument ceiling."""
 
-    index: protocol.ClaimConflictIndex
+    index: claim_conflicts.ClaimConflictIndex
     storage: body.Storage
 
 
@@ -100,7 +101,7 @@ def _print_claim_status_lines(
     if claim.whole_reason is not None:
         print(f"  whole: {protocol.terminal_text(claim.whole_reason)}")
     note = _overlap_note(
-        claims_by_id, protocol.overlap_peer_ids(context.index, claim), context.storage
+        claims_by_id, claim_conflicts.overlap_peer_ids(context.index, claim), context.storage
     )
     if note is not None:
         print(f"  {note}")
@@ -159,7 +160,7 @@ class _StatusReason(StrEnum):
 def _status_claim_json(
     claim: protocol.ActiveClaim,
     claims_by_id: Mapping[str, protocol.ActiveClaim],
-    index: protocol.ClaimConflictIndex,
+    index: claim_conflicts.ClaimConflictIndex,
     ages: Mapping[str, datetime],
     observed_at: datetime,
 ) -> dict[str, object]:
@@ -168,7 +169,7 @@ def _status_claim_json(
         **protocol.claim_identity_fields(claim),
         **protocol.resource_fields(claim.resource),
         **({"whole": claim.whole_reason} if claim.whole_reason is not None else {}),
-        "overlaps": _overlap_subjects(claims_by_id, protocol.overlap_peer_ids(index, claim)),
+        "overlaps": _overlap_subjects(claims_by_id, claim_conflicts.overlap_peer_ids(index, claim)),
         "state": "CONFLICT" if claim.claim_id in index.conflict_ids else "CLAIMED",
         "age": age,
         "old": old,
