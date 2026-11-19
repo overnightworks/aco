@@ -1,8 +1,0 @@
-claim_id = "78becad088d94b638a0c7bd24c05805b"
-agent = "Claude d782812d-8c75-4574-a173-3bbfdf043cc7"
-role = "builder"
-base = "bd00de4623c66592436279ffe03a81bc2900f9b9"
-branch = "claude/issue-983-rate-limit-transient"
-scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/brief.spec.md", "specs/land.spec.md", "specs/output.spec.md", "specs/wait.spec.md", "src/aco/board_wait.py", "src/aco/cmd_land.py", "src/aco/cmd_wait.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_body_write.py", "src/aco/github_failure.py", "src/aco/github_probe.py", "tests/support", "tests/test_board_read_graphql_exhausted.py", "tests/test_cmd_brief.py", "tests/test_cmd_land_read_failure.py", "tests/test_cmd_wait_rate_limit.py", "tests/test_forge_rate_limit.py", "tests/test_github_body_write.py", "tests/test_github_failure.py", "tests/test_github_failure_reset.py"]
-opened_commit = "0860bec12f3abca6cfad1f4af6811d6e46909d2b"
-whole_reason = "The error type, its classification, the reset read and the consumers' sentences are one behaviour that is only true together."
