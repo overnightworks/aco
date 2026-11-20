@@ -95,6 +95,43 @@ def test_a_label_the_issue_does_not_hold_counts_as_removed() -> None:
     client.remove_label(484, _LABEL)
 
 
+def _issue_line(number: int, *, pull_request: bool = False) -> str:
+    return json.dumps(
+        {
+            "number": number,
+            "title": f"Issue {number}",
+            "labels": [_LABEL],
+            "body": f"audited through {'a' * 40}",
+            "createdAt": "2026-11-01T00:00:00Z",
+            "updatedAt": "2026-11-01T00:00:00Z",
+            "isPullRequest": pull_request,
+            "kind": None,
+            "authorAssociation": "MEMBER",
+            "childrenClosed": None,
+            "childrenTotal": None,
+            "blockedByCount": 0,
+        }
+    )
+
+
+def test_labelled_issues_come_from_one_request_for_the_quoted_label_in_any_state(
+    requests: list[tuple[list[str], bytes | None]],
+) -> None:
+    client = _forge_answering(
+        "\n".join([_issue_line(7), _issue_line(8, pull_request=True)]), requests
+    )
+
+    found = client.newest_labelled_issues("audit tests")
+
+    assert ([issue.number for issue in found], [arguments[1] for arguments, _ in requests]) == (
+        [7],
+        [
+            f"repos/{REPOSITORY}/issues?state=all&labels=audit%20tests"
+            "&sort=created&direction=desc&per_page=100&page=1"
+        ],
+    )
+
+
 def test_a_refused_label_removal_stays_a_failure() -> None:
     def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         raise forge.ForgePermissionDeniedError("gh: Resource not accessible (HTTP 403)")
