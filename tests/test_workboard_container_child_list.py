@@ -117,7 +117,7 @@ def test_next_names_a_container_closable_whose_summary_lags_its_closed_children(
 
     assert (result.status, result.stdout.splitlines()[0]) == (
         0,
-        f"close_container #{CONTAINER}: 2/2 children closed, no Next work",
+        f"close_container #{CONTAINER}: 2/2 children closed, no uncut row",
     )
 
 

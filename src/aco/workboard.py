@@ -11,7 +11,7 @@ from enum import StrEnum
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import NoReturn, TypeGuard
+from typing import NoReturn
 
 from . import items, protocol, recurring_audit, wide_scope
 
@@ -587,9 +587,8 @@ class BoardItem:
     score: int
     actionable: bool
     actionable_reason: str | None
-    # Whether the operator's ruling, not an agent, frees this item,
-    # decided once by `_waits_on_operator`: `next` names it under
-    # `waiting on operator:` and never cuts or checks such a container.
+    # Whether only the operator's ruling frees this item, decided once by
+    # `_waits_on_operator`: `next` names it under `waiting on operator:`, never cuts it.
     waits_on_operator: bool
     # `actionable_reason` as `next`'s text prints it under `SKIPPED`:
     # through `protocol.terminal_text`. The prose itself, a cut slice's title
@@ -608,6 +607,11 @@ class BoardItem:
     # that names no top-level scope yet but still cuts one from a row, so
     # `_buildable` reads both rather than `scope` alone.
     has_slices: bool
+
+    @property
+    def is_waiting(self) -> bool:
+        """Whether a `wait` still holds this item, an operator's one included."""
+        return self.wait is not None
 
 
 @dataclass(frozen=True)
@@ -1218,20 +1222,6 @@ def _single_concrete_next(value: str | None) -> bool:
     return len(lines) == 1 and lines[0].casefold() not in {"tbd", "todo", "unknown"}
 
 
-# A container's `Next` line has its own small set of "nothing left"
-# spellings -- German and English, ASCII only. `check`'s last-child rule and
-# `next`'s cut_slice/check_container/close_container split both read a
-# `Next` line the same way. `""` belongs to it because a fresh skeleton writes `next = ""` and
-# that value stays the empty string (never mapped to `None`, so CONTRACT
-# still shows the key).
-_NO_FURTHER_WORK_VALUES = frozenset({"keiner", "keine", "nichts", "none", "-", ""})
-
-
-def has_further_work(next_line: str | None) -> TypeGuard[str]:
-    """Whether a container's own `Next` line still names work to dispatch."""
-    return next_line is not None and next_line.casefold() not in _NO_FURTHER_WORK_VALUES
-
-
 def _claim_by_issue(
     claims: tuple[protocol.ScopedClaim, ...],
 ) -> dict[int, protocol.ScopedClaim]:
@@ -1618,9 +1608,7 @@ def _board_item(
     childless_verdict = (
         None
         if container_progress is None or container_progress.open_count
-        else _childless_container_verdict(
-            parsed.slices, contract.next, context.nesting_parents.get(issue.number)
-        )
+        else _childless_container_verdict(parsed.slices, context.nesting_parents.get(issue.number))
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
@@ -1866,45 +1854,27 @@ class WorkItemAction:
 class CutSliceAction:
     """`container` has no open child and a still-undispatched `[[slice]]`
     row: that row is the typed statement that there is something to cut, and
-    is the only thing this action ever fires on. `next_step` is
-    the container's own words (its `Next` line when it still names work,
-    else the row's own title) for the human-readable action line;
-    `cut_title` is the title the printed `cut` gives the child -- always the
-    first uncut row's title, the entry `cut` without `--row` links and names
-    the child after. The two agree only when the `Next` line
-    names no work of its own. A container with no uncut row is never a
-    `CutSliceAction`, however much prose its `Next` line still carries: that
-    prose is not a slice title."""
+    is the only thing this action ever fires on. `cut_title` is the first uncut
+    row's title, the entry `cut` without `--row` links and names the child after,
+    and the title the action line prints. A container with no uncut row is never
+    a `CutSliceAction`, however much prose its `Next` line carries."""
 
     container: BoardItem
     container_progress: ContainerProgress
-    next_step: str
     cut_title: str
 
 
 @dataclass(frozen=True)
 class CloseContainerAction:
-    """`container` has no open child, no uncut slice row, and a `Next` line
-    naming no further work: nothing speaks against closing it, and no
+    """`container` has no open child and no uncut slice row: whatever its
+    `Next` line or an open blocker says, nothing is left to cut, and no
     command is ever proposed for it."""
 
     container: BoardItem
     container_progress: ContainerProgress
 
 
-@dataclass(frozen=True)
-class CheckContainerAction:
-    """`container` has no open child and no uncut slice row, but its own
-    `Next` line (`next_step`) still names work: closing it could close open
-    work, and that sentence is not a slice title to cut either, so `next` names it for a
-    `done_when` check and nothing more."""
-
-    container: BoardItem
-    container_progress: ContainerProgress
-    next_step: str
-
-
-NextAction = WorkItemAction | CutSliceAction | CloseContainerAction | CheckContainerAction
+NextAction = WorkItemAction | CutSliceAction | CloseContainerAction
 
 
 def _uncut_by_container(board: Board) -> dict[int, UncutSlices]:
@@ -1969,23 +1939,19 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
     and `zero_cost_closes` all walk this one sequence instead of each
     re-deriving it, so the three stay in agreement by construction.
 
-    Yields a row that is either an actionable non-container
-    (`WorkItemAction`; a container is never actionable, so this branch never
-    fires for one) or a container with no open child (`CutSliceAction` when
-    its block still carries an undispatched `[[slice]]` row, else
-    `CheckContainerAction` when its own `Next` line still names work and
-    `CloseContainerAction` when it names none; an empty slice table is the
-    typed statement that there is nothing to cut).
+    Yields a row that is either an actionable non-container (`WorkItemAction`; a
+    container is never actionable, so this branch never fires for one) or a container
+    with no open child (`CutSliceAction` when its block still carries an undispatched
+    `[[slice]]` row, else `CloseContainerAction`: an empty slice table is the typed
+    statement that there is nothing to cut, whatever its `Next` line says).
     "No open child" here is read from the sub-issue list, the one source of a
-    container's children, so it means every created child has closed. Every other row -- blocked,
-    claimed, incomplete, or a container still holding an open child -- is
-    skipped, never blocking a later qualifying row.
+    container's children, so it means every created child has closed. Every other
+    row -- blocked, claimed, incomplete, or a container still holding an open child --
+    is skipped, never blocking a later qualifying row.
 
-    Whichever branch carries a command, it never carries `--row`:
-    `cut` without `--row` accepts every container a `CutSliceAction` names
-    here, linking its first undispatched slice. `CloseContainerAction` and
-    `CheckContainerAction` never carry a command at all -- inventing one from
-    prose that is not a slice title would be a guess.
+    Whichever branch carries a command, it never carries `--row`: `cut` without
+    `--row` accepts every container a `CutSliceAction` names here, linking its first
+    undispatched slice. `CloseContainerAction` never carries a command at all.
 
     A `MALFORMED` container is skipped here exactly like one still
     holding an open child: its own finding already surfaces through
@@ -2010,17 +1976,20 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
 def next_action(board: Board) -> NextAction | None:
     """The one action `next` recommends: the board's own top qualifying row
     -- the first of `_qualifying_actions`, whose docstring names what
-    qualifies and why."""
-    return next(_qualifying_actions(board), None)
+    qualifies and why, bar a waiting container: it stays under `close:`
+    (`zero_cost_closes`) and is never named first."""
+    for action in _qualifying_actions(board):
+        if not (isinstance(action, CloseContainerAction) and action.container.is_waiting):
+            return action
+    return None
 
 
 def _action_scope(
     action: NextAction, uncut_by_container: Mapping[int, UncutSlices]
 ) -> tuple[str, ...] | None:
-    """The scope one `NextAction` occupies for `parallel_set`: a work item's
-    own `scope` or a cut proposal's first uncut row scope; `()` for a close or
-    check, a zero-cost action against no paths; `None` when the action names
-    no scope of its own."""
+    """The scope one `NextAction` occupies for `parallel_set`: a work item's own
+    `scope` or a cut proposal's first uncut row scope; `()` for a close (a zero-cost
+    action against no paths); `None` when the action names no scope of its own."""
     if isinstance(action, WorkItemAction):
         return action.scope
     if isinstance(action, CutSliceAction):
@@ -2069,8 +2038,8 @@ def parallel_set(
     board: Board, live_claims: tuple[protocol.ScopedClaim, ...], action: NextAction | None
 ) -> ParallelSet:
     """Every further free item `next`'s first `action` can run alongside right
-    now, none held back for an overlap. A close or check action and a
-    `board.recovery` item (`zero_cost_closes`' own domain) are skipped outright."""
+    now, none held back for an overlap. A close action and a `board.recovery` item
+    (`zero_cost_closes`' own domain) are skipped outright."""
     if action is None:
         return ParallelSet((), (), False)
     uncut_by_container = _uncut_by_container(board)
@@ -2087,7 +2056,7 @@ def parallel_set(
     candidates: list[ParallelCandidate] = []
     scope_unknown: list[int] = []
     for candidate in _qualifying_actions(board):
-        if isinstance(candidate, CloseContainerAction | CheckContainerAction):
+        if isinstance(candidate, CloseContainerAction):
             continue
         number = next_action_item(candidate).number
         if number == first_number or number in recovery_numbers:
@@ -2127,12 +2096,10 @@ def ideas(board: Board) -> tuple[int, ...]:
 
 def zero_cost_closes(board: Board) -> tuple[int, ...]:
     """Every item `next` can close for free right now, regardless of which
-    row ranks first: every childless container
-    with no undispatched `[[slice]]` row and no further `Next` work --
-    `_qualifying_actions`'s own `CloseContainerAction` rows, never a
-    `CheckContainerAction`, not only the board's top-ranked one --
-    union every landed-but-open item (`board.recovery`), in first-seen
-    order. Neither needs a claim first."""
+    row ranks first: every childless container with no undispatched `[[slice]]` row
+    (`_qualifying_actions`'s `CloseContainerAction` rows, not only the top-ranked one)
+    union every landed-but-open item (`board.recovery`), in first-seen order. Neither
+    needs a claim first."""
     closable_containers = (
         action.container.number
         for action in _qualifying_actions(board)
@@ -2152,17 +2119,13 @@ def closable_container_number(
     parent: ParentIssue, children: ChildList, storage: Storage
 ) -> int | None:
     """The container `release --merged`/`item close` should name as freshly
-    closable once one of its children just landed: `parent`'s
-    own kind, `children`'s open count, its own undispatched `[[slice]]`
-    rows, and its own `Next` line decide it exactly like
-    `_qualifying_actions`'s own `CloseContainerAction` branch -- a
-    non-container parent, one still holding another open child, one with an
-    uncut row, or one whose `Next` line still names work (a
-    container between two slices) is never named.
-    Whether a parent relation exists at all is the caller's own read
-    (`ParentIssue | None`, forge-specific); this function only ever decides
-    once one is given, never re-checking a state its one caller already
-    ruled out.
+    closable once one of its children just landed: `parent`'s own kind,
+    `children`'s open count and its own undispatched `[[slice]]` rows decide it exactly
+    like `_qualifying_actions`'s `CloseContainerAction` branch -- a non-container
+    parent, one still holding another open child, or one with an uncut row is never
+    named. Whether a parent relation exists at all is the caller's own read
+    (`ParentIssue | None`, forge-specific); this function only ever decides once one
+    is given, never re-checking a state its one caller already ruled out.
     """
     if parent.kind is not ItemKind.CONTAINER:
         return None
@@ -2181,20 +2144,16 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
     """The action a childless container qualifies for, read off its one `childless_verdict`, or
     `None` to skip it: a non-`VALID` body names its own finding elsewhere and is never guessed
     through, a `NestedRepairVerdict` names its repair under `SKIPPED`, not a `cut` that `cut`
-    refuses, a container waiting on the operator or on a `wait` is only ever closed, never cut
-    or checked, and an open blocker bars the check (NEXT-47). An idea container is none of these."""
+    refuses, and a container waiting on the operator or on a `wait` is only ever closed, never
+    cut. An idea container is none of these."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
-    if (item.waits_on_operator or item.wait is not None) and not isinstance(verdict, CloseVerdict):
+    if item.is_waiting and not isinstance(verdict, CloseVerdict):
         return None
     match verdict:
         case CutVerdict(title=cut_title):
-            next_line = item.contract.next
-            next_step = next_line if has_further_work(next_line) else cut_title
-            return CutSliceAction(item, container, next_step, cut_title)
-        case CheckVerdict(next_step=step) if not _check_barred(verdict, bool(item.open_blockers)):
-            return CheckContainerAction(item, container, step)
+            return CutSliceAction(item, container, cut_title)
         case CloseVerdict():
             return CloseContainerAction(item, container)
         case _:
@@ -2396,12 +2355,6 @@ class _ActionabilityFacts:
     held_container_reason: str | None = None
 
 
-# `next`'s own words for a childless container whose `Next` line still names
-# work: its `check_container` line and its `SKIPPED` reason,
-# never a close.
-CHECK_DONE_WHEN = "no open children; check done_when"
-
-
 @dataclass(frozen=True)
 class CutVerdict:
     """A container with no open child whose uncut row `cut` accepts, that
@@ -2431,28 +2384,18 @@ class UnprintableRowVerdict:
 
 
 @dataclass(frozen=True)
-class CheckVerdict:
-    """No uncut row, but the container's own `Next` line, `next_step`, still
-    names work: a `done_when` check, never a close."""
-
-    next_step: str
-
-
-@dataclass(frozen=True)
 class CloseVerdict:
-    """No uncut row and no further `Next` work: nothing speaks against
-    closing the container."""
+    """No uncut row: nothing is left to cut, so the container is closable
+    whatever its `Next` line, an open blocker or a `wait` says."""
 
 
 # What a container with no open child is up for, each verdict
 # carrying the data its own answer needs.
-ChildlessContainerVerdict = (
-    CutVerdict | NestedRepairVerdict | UnprintableRowVerdict | CheckVerdict | CloseVerdict
-)
+ChildlessContainerVerdict = CutVerdict | NestedRepairVerdict | UnprintableRowVerdict | CloseVerdict
 
 
 def _childless_container_verdict(
-    slices: tuple[SliceRow, ...], next_line: str | None, nesting_parent: IssueReference | None
+    slices: tuple[SliceRow, ...], nesting_parent: IssueReference | None
 ) -> ChildlessContainerVerdict:
     """The one decider for a container with no open child:
     `next`'s action, its `SKIPPED` reason, and `release --merged`'s
@@ -2461,8 +2404,7 @@ def _childless_container_verdict(
     container is itself a child, which `cut` refuses (CUT-03), so only a
     repair helps, or the row's title or `done_when` holds a line break or
     control character no printed one-line advice or `cut` can carry;
-    with no row left, a `Next` line still naming work asks for a
-    `done_when` check, and only one naming none is closable."""
+    with no row left the container is closable."""
     if nesting_parent is not None and slices:
         return NestedRepairVerdict(nesting_parent)
     if slices:
@@ -2471,18 +2413,15 @@ def _childless_container_verdict(
         if unprintable_key is not None:
             return UnprintableRowVerdict(first.index, unprintable_key)
         return CutVerdict(first.title)
-    if has_further_work(next_line):
-        return CheckVerdict(next_line)
     return CloseVerdict()
 
 
 class ParentCompletion(StrEnum):
     """What a parent's own body says about closing it together with its last
-    open child (LAND-21..23, LAND-79): an uncut `[[slice]]` row forbids it,
-    a `Next` line still naming work permits it, and neither requires it."""
+    open child (LAND-21, LAND-22, LAND-79): an uncut `[[slice]]` row forbids
+    it, and no row requires it."""
 
     REQUIRED = "required"
-    PERMITTED = "permitted"
     FORBIDDEN = "forbidden"
 
 
@@ -2490,11 +2429,9 @@ def parent_completion(parsed: ParsedBody) -> ParentCompletion:
     """The completion of a parent whose last open child just landed, read off
     `_childless_container_verdict` so a landing and `next` agree on what
     still counts as work."""
-    verdict = _childless_container_verdict(parsed.slices, parsed.contract.next, nesting_parent=None)
+    verdict = _childless_container_verdict(parsed.slices, nesting_parent=None)
     if isinstance(verdict, CloseVerdict):
         return ParentCompletion.REQUIRED
-    if isinstance(verdict, CheckVerdict):
-        return ParentCompletion.PERMITTED
     return ParentCompletion.FORBIDDEN
 
 
@@ -2518,10 +2455,6 @@ def childless_containers_with_uncut_rows(
     )
 
 
-def _check_barred(verdict: ChildlessContainerVerdict | None, blocked: bool) -> bool:
-    return isinstance(verdict, CheckVerdict) and blocked
-
-
 def _childless_container_reason(
     number: int,
     verdict: ChildlessContainerVerdict | None,
@@ -2540,8 +2473,6 @@ def _childless_container_reason(
                 f"slice row {row} {key} holds a line break or control character; "
                 "make it one printable line"
             )
-        case CheckVerdict():
-            return CHECK_DONE_WHEN
         case NestedRepairVerdict(nesting_parent=nesting_parent):
             return _nested_container_repair(number, nesting_parent, parsed, storage)
         case _:
@@ -2610,7 +2541,7 @@ def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:
 
 def _waits_on_operator(facts: _ActionabilityFacts) -> bool:
     """Whether only the operator's ruling frees this item: its `wait` names the
-    operator, on a readable container, which `next` then never cuts or checks, or
+    operator, on a readable container, which `next` then never cuts, or
     on any other readable item while unclaimed -- a claimed one names the step as
     its `waiting:` reason instead. The label `NEEDS_OPERATOR_LABEL` is a view of
     that wait and decides nothing. An idea waits on no ruling: `next` lists it apart."""
@@ -2631,8 +2562,7 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        blocked = bool(facts.open_blockers)
-        if facts.wait is not None or _check_barred(facts.childless_verdict, blocked):
+        if facts.wait is not None:
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
@@ -2684,7 +2614,7 @@ def claim_age_suffix(opened_at: datetime, now: datetime) -> str:
 def next_action_item(action: NextAction) -> BoardItem:
     """The `BoardItem` `action` targets, whichever action kind it is -- a
     plain claim target for `WorkItemAction`, the container itself for
-    `CutSliceAction`/`CheckContainerAction`/`CloseContainerAction`."""
+    `CutSliceAction`/`CloseContainerAction`."""
     return action.item if isinstance(action, WorkItemAction) else action.container
 
 

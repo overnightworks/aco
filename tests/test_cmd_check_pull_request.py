@@ -4,7 +4,13 @@ from dataclasses import replace
 from typing import NoReturn
 
 import pytest
-from board_fixtures import REPOSITORY, block_body, complete_contract, slice_entries
+from board_fixtures import (
+    OPERATOR_WAIT,
+    REPOSITORY,
+    block_body,
+    complete_contract,
+    slice_entries,
+)
 from check_pull_request_fixtures import (
     LANE_BRANCH,
     LANE_WORLD,
@@ -510,19 +516,9 @@ NOT_A_CONTAINER = (
     f"has parent {PARENT} of kind {{}}, which is not a container; only a container holds children"
 )
 ONE_UNCUT_ROW = slice_entries("Scheibe 1")
-STALE_NEXT_PROSE = "\n\n## Next\nnichts\n"
-NEXT_IN_BLOCK = block_body(
-    'version = 1\nnow = "N"\nnext = "Cut the next slice."\ndone_when = "D"\n'
-)
 
 
 PARENT_ACCEPTANCES = {
-    "last-child-parent-next-names-work": accepted_with_parent(
-        WORK_ITEM_BODY, ParentWorld(complete_contract("Cut the next slice."))
-    ),
-    "last-child-parent-next-read-from-the-block-not-prose": accepted_with_parent(
-        WORK_ITEM_BODY, ParentWorld(NEXT_IN_BLOCK + STALE_NEXT_PROSE)
-    ),
     "last-child-with-an-uncut-row-leaves-the-parent-open": accepted_with_parent(
         WORK_ITEM_BODY, ParentWorld(complete_contract("keiner", slice=ONE_UNCUT_ROW))
     ),
@@ -531,6 +527,9 @@ PARENT_ACCEPTANCES = {
     ),
     "closing-the-completed-parent": accepted_with_parent(
         CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner", now="Epic."))
+    ),
+    "closing-a-parent-that-waits-on-the-operator": accepted_with_parent(
+        CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner", wait=OPERATOR_WAIT))
     ),
     "closed-children-do-not-keep-the-parent-open": accepted_with_parent(
         CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner"), closed_children=2)
@@ -555,6 +554,14 @@ PARENT_ACCEPTANCES = {
 PARENT_CLOSING_REFUSALS = {
     "last-child-must-close-the-parent": refused_with_parent(
         WORK_ITEM_BODY, CLOSE_PARENT_TOO, ParentWorld(complete_contract("keiner"))
+    ),
+    "last-child-must-close-the-parent-whose-next-names-work": refused_with_parent(
+        WORK_ITEM_BODY, CLOSE_PARENT_TOO, ParentWorld(complete_contract("Cut the next slice."))
+    ),
+    "last-child-must-close-the-parent-that-waits-on-the-operator": refused_with_parent(
+        WORK_ITEM_BODY,
+        CLOSE_PARENT_TOO,
+        ParentWorld(complete_contract("Cut the next slice.", wait=OPERATOR_WAIT)),
     ),
     "other-children-and-no-next-line": refused_with_parent(
         WORK_ITEM_BODY,
@@ -656,7 +663,7 @@ PARENT_REFUSALS = {
 def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-21, LAND-22, LAND-23, LAND-25, LAND-28, LAND-86, CHECK-01"""
+    """Spec: LAND-21, LAND-22, LAND-25, LAND-28, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
