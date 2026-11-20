@@ -92,10 +92,15 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - a run that began with another failure prints the warning once more when it meets the rate limit
   - a later failure without a reset never moves that time earlier; a moved signal causes no read before it; the state ref's own check goes on
   - the first read of the board stays owed to that time; the item's own first read answers before WAIT-04 and WAIT-05 apply
-- [ ] [WAIT-23] `aco wait` without an item also ends, exit `0`, when a recurring audit of `.aco/board.toml` is due as `aco next` names it (NEXT-62); an audit that is not due or unavailable (NEXT-67) does not end it (see E-WAIT-10).
+- [ ] [WAIT-23] `aco wait` without an item also ends, exit `0`, when a recurring audit of `.aco/board.toml` is due as `aco next` names it (NEXT-62; see E-WAIT-10).
+  - an audit that is not due or unavailable (NEXT-67) does not end it
   - `aco wait ITEM --line N` is unchanged.
-- [ ] [WAIT-24] Each board read lists an entry's anchor (NEXT-65) only when the newest trunk landing's commit or the day differs from the last complete listing's; the due audits stay under that key. A listing with an unavailable audit is not kept, so the next read lists again; without an `audit` entry nothing is listed.
-- [ ] [WAIT-25] It prints `AUDIT <name>` per due audit, in entry order, before `ACTIONABLE` and `CHANGED`. `--json` always carries `"audits": [<name>, …]` last, `[]` when none is due, and prints `reason: "audit_due"` when an audit is due and no action is named (see E-WAIT-10).
+- [ ] [WAIT-24] Each board read lists an entry's anchor (NEXT-65) only when the newest trunk landing's commit or the day differs from the last complete listing's.
+  - the due audits stay under that key
+  - a listing with an unavailable audit is not kept, so the next read lists again; without an `audit` entry nothing is listed
+- [ ] [WAIT-25] It prints `AUDIT <name>` per due audit, in entry order, before `ACTIONABLE` and `CHANGED` (see E-WAIT-10).
+  - `--json` always carries `"audits": [<name>, …]` last, `[]` when none is due
+  - `--json` prints `reason: "audit_due"` when an audit is due and no action is named
   - `lines` follows WAIT-16 under every reason, so a due audit beside changed lines and no action prints `AUDIT` before `CHANGED`, with `reason: "audit_due"` and the `lines`; without an `audit` entry the output is WAIT-15's and WAIT-16's with the empty `audits` key only.
 
 `reason`, by which refusal fired:
