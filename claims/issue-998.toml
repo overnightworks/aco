@@ -3,6 +3,6 @@ agent = "Claude deb862cb-0966-452b-a001-fbf8c7b46d71"
 role = "builder"
 base = "f56c85f6e9693631752bbcb02e198c58e19c9d2e"
 branch = "claude/issue-998-next-names-due-audit"
-scope = [".aco/board.toml", "README.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/next.spec.md", "specs/storage-pin.spec.md", "src/aco/board_read.py", "src/aco/cmd_next.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/recurring_audit.py", "src/aco/session.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests"]
+scope = [".aco/board.toml", "README.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/next.spec.md", "specs/storage-pin.spec.md", "src/aco/board_read.py", "src/aco/cmd_next.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/recurring_audit.py", "src/aco/session.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/test_cli.py", "tests/test_cmd_next_ahead_of_caller.py", "tests/test_cmd_next_ahead_of_caller_state_ref.py", "tests/test_cmd_next_recurring_audit.py", "tests/test_cmd_next_recurring_audit_state_ref.py", "tests/test_forge.py", "tests/test_github.py", "tests/test_github_labels.py", "tests/test_recurring_audit.py", "tests/test_state_board.py", "tests/test_state_board_labels.py"]
 opened_commit = "9ef31ee27c4e00b5c011e7fb5d208084323dc430"
 whole_reason = "The entry, its listing under both storages and its printed line are one capability that is not true in parts."
