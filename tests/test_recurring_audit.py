@@ -2,10 +2,12 @@
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
-from aco import recurring_audit
+from aco import recurring_audit, workboard
+from aco.protocol import ClaimError
 from aco.recurring_audit import Reason
 
 TODAY = date(2026, 11, 20)
@@ -140,3 +142,121 @@ def test_anchor_is_the_newest_issues_last_audited_through_line(scenario: AnchorS
 
     actual = None if found is None else (found.issue, found.named)
     assert actual == scenario.expected
+
+
+CONFIG_PATH = Path("/repo/.aco/board.toml")
+VALID_ENTRY = 'name = "tests"\nlabel = "audit-tests"\nlandings = 50\ndays = 7\nrun = "run it"\n'
+
+
+def entry_without(key: str) -> str:
+    return "".join(line + "\n" for line in VALID_ENTRY.splitlines() if not line.startswith(key))
+
+
+def entry_with(key: str, value: str) -> str:
+    return entry_without(key) + f"{key} = {value}\n"
+
+
+def test_configuration_without_an_audit_entry_has_none() -> None:
+    """PIN-58: aco has no default entry."""
+    assert workboard.parse_config("", CONFIG_PATH).audit == ()
+
+
+def test_configuration_reads_every_entry_as_written() -> None:
+    """PIN-58."""
+    second = VALID_ENTRY.replace("tests", "other").replace("50", "9")
+
+    parsed = workboard.parse_config(f"[[audit]]\n{VALID_ENTRY}[[audit]]\n{second}", CONFIG_PATH)
+
+    assert [
+        (entry.name, entry.label, entry.landings, entry.days, entry.run) for entry in parsed.audit
+    ] == [
+        ("tests", "audit-tests", 50, 7, "run it"),
+        ("other", "audit-other", 9, 7, "run it"),
+    ]
+
+
+REFUSALS = {
+    "PIN-58 a table": ("audit = {name = 'x'}\n", "audit must be an array of tables"),
+    "PIN-58 plain values": ("audit = [1]\n", "audit must be an array of tables"),
+    "PIN-59 unknown key": (
+        f"[[audit]]\n{VALID_ENTRY}every = 3\n",
+        "audit entry 1 has unknown key every",
+    ),
+    "PIN-59 unknown key escaped": (
+        f'[[audit]]\n{VALID_ENTRY}"a\\u202eb" = 3\n',
+        "audit entry 1 has unknown key a\\u202eb",
+    ),
+    "PIN-59 missing keys": (
+        f"[[audit]]\n{entry_without('days')}",
+        "audit entry 1 is missing days",
+    ),
+    "PIN-60 empty name": (
+        f"[[audit]]\n{entry_with('name', '""')}",
+        "audit entry 1 name must be a unique non-empty name",
+    ),
+    "PIN-60 padded name": (
+        f"[[audit]]\n{entry_with('name', '" tests"')}",
+        "audit entry 1 name must be a unique non-empty name",
+    ),
+    "PIN-60 name with a control": (
+        f"[[audit]]\n{entry_with('name', '"te\\u001bsts"')}",
+        "audit entry 1 name must be a unique non-empty name",
+    ),
+    "PIN-60 repeated name": (
+        f"[[audit]]\n{VALID_ENTRY}[[audit]]\n{entry_with('label', '"audit-two"')}",
+        "audit entry 2 name must be a unique non-empty name",
+    ),
+    "PIN-60 label with a comma": (
+        f"[[audit]]\n{entry_with('label', '"a,b"')}",
+        "audit entry 1 label must be a unique non-empty label without a comma",
+    ),
+    "PIN-60 padded label": (
+        f"[[audit]]\n{entry_with('label', '"audit "')}",
+        "audit entry 1 label must be a unique non-empty label without a comma",
+    ),
+    "PIN-60 repeated label": (
+        f"[[audit]]\n{VALID_ENTRY}[[audit]]\n{entry_with('name', '"two"')}",
+        "audit entry 2 label must be a unique non-empty label without a comma",
+    ),
+    "PIN-61 landings zero": (
+        f"[[audit]]\n{entry_with('landings', '0')}",
+        "audit entry 1 landings must be a positive integer up to 5000",
+    ),
+    "PIN-61 landings past the walk": (
+        f"[[audit]]\n{entry_with('landings', '5001')}",
+        "audit entry 1 landings must be a positive integer up to 5000",
+    ),
+    "PIN-61 landings bool": (
+        f"[[audit]]\n{entry_with('landings', 'true')}",
+        "audit entry 1 landings must be a positive integer up to 5000",
+    ),
+    "PIN-61 days negative": (
+        f"[[audit]]\n{entry_with('days', '-1')}",
+        "audit entry 1 days must be a positive integer",
+    ),
+    "PIN-61 days text": (
+        f"[[audit]]\n{entry_with('days', '"7"')}",
+        "audit entry 1 days must be a positive integer",
+    ),
+    "PIN-62 empty run": (
+        f"[[audit]]\n{entry_with('run', '""')}",
+        "audit entry 1 run must be non-empty text",
+    ),
+    "PIN-62 blank run": (
+        f"[[audit]]\n{entry_with('run', '"  "')}",
+        "audit entry 1 run must be non-empty text",
+    ),
+    "PIN-62 run is no text": (
+        f"[[audit]]\n{entry_with('run', '3')}",
+        "audit entry 1 run must be non-empty text",
+    ),
+}
+
+
+@pytest.mark.parametrize(("text", "refusal"), REFUSALS.values(), ids=REFUSALS.keys())
+def test_configuration_refuses_each_malformed_audit_entry(text: str, refusal: str) -> None:
+    """PIN-58, PIN-59, PIN-60, PIN-61, PIN-62."""
+    with pytest.raises(ClaimError) as refused:
+        workboard.parse_config(text, CONFIG_PATH)
+
+    assert str(refused.value) == f"board configuration {CONFIG_PATH} {refusal}"

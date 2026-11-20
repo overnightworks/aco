@@ -13,7 +13,7 @@ from itertools import chain
 from pathlib import Path
 from typing import NoReturn, TypeGuard
 
-from . import items, protocol, wide_scope
+from . import items, protocol, recurring_audit, wide_scope
 
 # The body-block codec: parsed, validated, and rendered in `body.py`, one layer
 # below this module. Every reader imports the names it needs from `body` directly;
@@ -514,9 +514,8 @@ class BoardConfig:
     # import refusal is phrased in its terms. The store takes it from every
     # caller, so this default is its one owner.
     canonical_remote: str = DEFAULT_CANONICAL_REMOTE
-    # Which adapter owns this repository's board and item data:
-    # `RunContext.repository_id` resolves the one the pin names, never
-    # guessed from the remote's own host; `github` is the default.
+    # Which adapter owns this repository's board and item data: the pin's, never
+    # guessed from the remote's own host.
     storage: Storage = Storage.GITHUB
     # Repository files, and directories (an entry ending `/`), a lane may
     # change beyond its scope: registries that follow every code change
@@ -524,12 +523,12 @@ class BoardConfig:
     # know in advance whether it will need one. Only the trunk's committed
     # copy is read (`session.trunk_lane_shared_reading`).
     lane_shared: tuple[str, ...] = ()
-    # The repository's own history convention for `aco land`:
-    # a forge may allow several methods while the repository keeps one, so
-    # a pin here beats the forge's allowed methods; `None` asks the forge.
+    # The repository's own history convention for `aco land`: a forge may allow several
+    # methods while the repository keeps one, so a pin here beats the forge's allowed ones.
     merge_method: MergeMethod | None = None
     dependency_paths: tuple[str, ...] = ()
     production_paths: tuple[str, ...] = ()
+    audit: tuple[recurring_audit.RecurringAudit, ...] = ()
 
     def covers_dependency_path(self, path: str) -> bool:
         return any(repository_path_entry_covers(entry, path) for entry in self.dependency_paths)
@@ -786,6 +785,7 @@ def parse_config(text: str, path: Path) -> BoardConfig:
         lane_shared=_validated_repository_paths(raw, path, "lane_shared"),
         dependency_paths=_validated_repository_paths(raw, path, "dependency_paths"),
         production_paths=_validated_repository_paths(raw, path, "production_paths"),
+        audit=recurring_audit.parse_entries(raw.get("audit"), path),
     )
 
 

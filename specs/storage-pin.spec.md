@@ -24,6 +24,7 @@ reaches `ERROR: <sentence>` on stderr, exit `2`, unless noted otherwise.
 | `lane_shared` is no list of unique paths inside the repository | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | PIN-38, PIN-39 | — |
 | dependency paths configured or invalid | PIN-44..48 | PIN-44..48 | PIN-44..48 | PIN-44..48 | — |
 | production paths configured or invalid | PIN-54..56 | PIN-54..56 | PIN-54..56 | PIN-54..56 | — |
+| a recurring audit entry absent or invalid | PIN-58..62 | PIN-58..62 | PIN-58..62 | PIN-58..62 | — |
 | `idea_label` absent or invalid | PIN-49 | PIN-49 | PIN-49 | PIN-49 | — |
 | `canonical_remote` absent or invalid | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | PIN-50, PIN-51 | — |
 | `storage = "github"`, the canonical remote still names a repository GitHub has renamed | PIN-52 | PIN-52 | PIN-52 | PIN-52 | — |
@@ -105,6 +106,13 @@ them.
 - [ ] [PIN-55] A `production_paths` value that is no list of unique strings refuses `board configuration <path> production_paths must be a list of unique repository paths`.
 - [ ] [PIN-56] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> production_paths entry '<entry>' is not a canonical path inside the repository`.
 - [ ] [PIN-57] `item new` alone resolves a `--repo` naming another discovered repository to that checkout, under either storage, so PIN-04 and PIN-53 judge its own remote (ITEM-67).
+- [ ] [PIN-58] `<path>` may hold `[[audit]]` tables with `name`, `label`, `landings`, `days`, `run`; an `audit` that is no array of tables refuses `board configuration <path> audit must be an array of tables`.
+- [ ] [PIN-59] An entry with another key refuses `<entry> has unknown key <keys>`, one missing a key `<entry> is missing <keys>`.
+- [ ] [PIN-60] A `name` that is not plain refuses `<entry> name must be a unique non-empty name`, a `label` that is not plain `<entry> label must be a unique non-empty label without a comma`.
+- [ ] [PIN-61] `landings` outside 1 to 5000 or `days` below 1 refuses `<entry> landings must be a positive integer up to 5000` (see E-PIN-43) or `<entry> days must be a positive integer`; a boolean is no integer.
+- [ ] [PIN-62] A `run` that is no text with a visible character refuses `<entry> run must be non-empty text`.
+
+In PIN-59..62 `<entry>` is `board configuration <path> audit entry <i>`, `<i>` counting from 1. A `name` or `label` is plain when it is non-empty, unpadded, free of display controls and no other entry's; a label is also free of commas.
 
 ## `storage = "state-ref"` is forge-free
 
@@ -300,6 +308,16 @@ Setup: bare-remote, `origin` set to `git@github.com:overnightworks/agent-provide
 ```console
 $ aco start 437
 2> ERROR: GitHub renamed overnightworks/agent-providers to overnightworks/agent-runtime; point the canonical remote at overnightworks/agent-runtime
+exit 2
+```
+
+### E-PIN-43 — an audit entry whose landings exceed the trunk walk
+
+Setup: bare-remote checkout at `/repo`, `.aco/board.toml` tracked with one `[[audit]]` table whose `landings = 5001`
+
+```console
+$ aco next
+2> ERROR: board configuration /repo/.aco/board.toml audit entry 1 landings must be a positive integer up to 5000
 exit 2
 ```
 

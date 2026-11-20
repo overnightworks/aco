@@ -5,11 +5,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol
 
 from . import protocol
 
 ANCHOR_LINE_PREFIX = "audited through "
+# The depth of the trunk walk an anchor is searched in.
+MAX_LANDINGS = 5000
+_ENTRY_KEYS = ("name", "label", "landings", "days", "run")
 
 
 class Reason(StrEnum):
@@ -80,6 +84,78 @@ class Finding:
     @property
     def is_due(self) -> bool:
         return self.reason is not Reason.UNAVAILABLE
+
+
+def _refusal(path: Path, index: int, sentence: str) -> protocol.ClaimError:
+    return protocol.ClaimError(f"board configuration {path} audit entry {index} {sentence}")
+
+
+def _unique_text(value: object, taken: set[str]) -> str | None:
+    """`value` when it is non-empty text without surrounding space or a display
+    control that `taken` does not hold."""
+    if (
+        isinstance(value, str)
+        and value
+        and value.strip() == value
+        and not any(protocol.is_display_control(character) for character in value)
+        and value not in taken
+    ):
+        return value
+    return None
+
+
+def _count(value: object, maximum: int | None) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return value if maximum is None or value <= maximum else None
+
+
+def _parse_entry(
+    table: dict[str, object], index: int, path: Path, names: set[str], labels: set[str]
+) -> RecurringAudit:
+    unknown = sorted(set(table) - set(_ENTRY_KEYS))
+    if unknown:
+        named = protocol.terminal_text(", ".join(unknown))
+        raise _refusal(path, index, f"has unknown key {named}")
+    missing = [key for key in _ENTRY_KEYS if key not in table]
+    if missing:
+        raise _refusal(path, index, f"is missing {', '.join(missing)}")
+    name = _unique_text(table["name"], names)
+    if name is None:
+        raise _refusal(path, index, "name must be a unique non-empty name")
+    label = _unique_text(table["label"], labels)
+    if label is None or "," in label:
+        raise _refusal(path, index, "label must be a unique non-empty label without a comma")
+    landings = _count(table["landings"], MAX_LANDINGS)
+    if landings is None:
+        raise _refusal(path, index, f"landings must be a positive integer up to {MAX_LANDINGS}")
+    days = _count(table["days"], None)
+    if days is None:
+        raise _refusal(path, index, "days must be a positive integer")
+    run = table["run"]
+    if not isinstance(run, str) or not run.strip():
+        raise _refusal(path, index, "run must be non-empty text")
+    return RecurringAudit(name, label, landings, days, run)
+
+
+def parse_entries(raw: object, path: Path) -> tuple[RecurringAudit, ...]:
+    """The entries of the configuration's `audit` value, `None` when absent;
+    the first malformed one refuses by its position, counted from 1."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or not all(isinstance(table, dict) for table in raw):
+        raise protocol.ClaimError(f"board configuration {path} audit must be an array of tables")
+    entries: list[RecurringAudit] = []
+    for index, table in enumerate(raw, start=1):
+        entry = _parse_entry(
+            table,
+            index,
+            path,
+            {entry.name for entry in entries},
+            {entry.label for entry in entries},
+        )
+        entries.append(entry)
+    return tuple(entries)
 
 
 def unavailable(entry: RecurringAudit, sentence: str) -> Finding:
