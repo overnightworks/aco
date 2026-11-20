@@ -2722,6 +2722,7 @@ class TestCliStateRefForge:
         assert parse_body(child_body, storage=Storage.STATE_REF).contract.now == (
             f"Cut from {CONTAINER_ID}"
         )
+        assert f'parent = "{CONTAINER_ID}"' in child_body
 
     def _cut_child_scope(
         self, worktree: Path, bare_remote: Path, capsys: pytest.CaptureFixture[str]
