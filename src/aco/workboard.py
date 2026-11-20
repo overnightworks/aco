@@ -609,6 +609,11 @@ class BoardItem:
     # `_buildable` reads both rather than `scope` alone.
     has_slices: bool
 
+    @property
+    def is_waiting(self) -> bool:
+        """Whether a `wait` still holds this item, an operator's one included."""
+        return self.wait is not None
+
 
 @dataclass(frozen=True)
 class Board:
@@ -1982,10 +1987,7 @@ def next_action(board: Board) -> NextAction | None:
         (
             action
             for action in _qualifying_actions(board)
-            if not (
-                isinstance(action, CloseContainerAction)
-                and (action.container.waits_on_operator or action.container.wait is not None)
-            )
+            if not (isinstance(action, CloseContainerAction) and action.container.is_waiting)
         ),
         None,
     )
@@ -2160,7 +2162,7 @@ def _container_next_action(item: BoardItem, container: ContainerProgress) -> Nex
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
-    if (item.waits_on_operator or item.wait is not None) and not isinstance(verdict, CloseVerdict):
+    if item.is_waiting and not isinstance(verdict, CloseVerdict):
         return None
     match verdict:
         case CutVerdict(title=cut_title):
