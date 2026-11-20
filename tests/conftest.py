@@ -5,14 +5,18 @@ than one module asks for by name -- plus `git_call_spy`, the git call counter tw
 modules share, and `github_world`, the GitHub-checkout
 world check many modules share; everything else stays local to its test
 module. The one exception is registration: `cli_fixtures`, `adoption_world`,
-`release_cleanup_world`, `check_pull_request_fixtures` and `lane_record_runs_world` are
-loaded as pytest plugins (`pytest_plugins` below).
+`release_cleanup_world`, `check_pull_request_fixtures`, `lane_record_runs_world`,
+`discovery_fixtures`, `wait_fixtures` and `audit_world` are loaded as pytest plugins
+(`pytest_plugins` below).
 `cli_fixtures` gives every test module its `bare_remote` and `worktree` fixtures
 by name, and its autouse `_isolate_agent_identity` applies to every test;
 `adoption_world` gives every module its `world` fixture, and
 `release_cleanup_world` gives the release cleanup modules their `cleanup_check`;
 `check_pull_request_fixtures` gives the `aco check <pr>` tests their `check_pull_request`;
-`lane_record_runs_world` gives the `aco lane-record begin` and `add` tests their world.
+`lane_record_runs_world` gives the `aco lane-record begin` and `add` tests their world;
+`discovery_fixtures` gives the modules that run aco over a configured root their
+`config_file`, `root` and `here`; `wait_fixtures` gives the `aco wait` board tests their
+`frozen_wait_world`.
 """
 
 from collections import Counter
@@ -33,6 +37,8 @@ pytest_plugins = [
     "release_cleanup_world",
     "check_pull_request_fixtures",
     "lane_record_runs_world",
+    "discovery_fixtures",
+    "wait_fixtures",
     "audit_world",
 ]
 

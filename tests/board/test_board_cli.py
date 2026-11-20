@@ -24,13 +24,7 @@ from aco_board_fixtures import (
     RecordedPort,
     wait_for_request_handlers,
 )
-from discovery_fixtures import (
-    configure_root,
-    isolate_config_file,
-    isolated_xdg_file,
-    repository_with_card,
-    write_config,
-)
+from discovery_fixtures import isolated_xdg_file, repository_with_card, write_config
 from logline.testing import configured
 
 import aco
@@ -129,17 +123,7 @@ def board_token_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return isolated_xdg_file(tmp_path, monkeypatch, "XDG_STATE_HOME", "aco", "board-token")
 
 
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Keep every serve run off the operator's real config file; the file
-    itself is absent until a test writes it."""
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture
-def root(tmp_path: Path, config_file: Path) -> Path:
-    """The configured root, an existing empty directory."""
-    return configure_root(tmp_path, config_file)
+pytestmark = pytest.mark.usefixtures("config_file")
 
 
 def _repos_by_name(board: BoardClient) -> dict[str, dict[str, Any]]:

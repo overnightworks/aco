@@ -3,13 +3,11 @@ the board's test forge: an answer given in chat takes the writer of the board's
 `POST /api/step`, and a step that changed, an item without one or an answer the step does
 not ask for is refused with nothing written."""
 
-from pathlib import Path
 from typing import Any
 
 import board_forge
 import pytest
 from board_fixtures import OPERATOR_WAIT, complete_contract
-from discovery_fixtures import configure_root, isolate_config_file, repository_with_card
 from mcp_lines import call_line, serve_mcp
 
 from aco import body, workboard
@@ -28,20 +26,7 @@ _WRITES = (
 )
 
 
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture(autouse=True)
-def _empty_global_git_config(isolated_global_git_config: Path) -> None:
-    """Real git reads an empty global configuration."""
-
-
-@pytest.fixture
-def here(tmp_path: Path, config_file: Path) -> board_forge.BoardForge:
-    root = configure_root(tmp_path, config_file)
-    return repository_with_card(root / "here", 1, "Here")
+pytestmark = pytest.mark.usefixtures("config_file", "isolated_global_git_config")
 
 
 def _put_step(here: board_forge.BoardForge, table: dict[str, str] = _YES_NO_STEP) -> None:
@@ -95,7 +80,6 @@ def test_a_chat_answer_clears_the_wait_and_the_step_writes_now_and_keeps_the_ite
     arguments: dict[str, object],
     outcome: str,
 ) -> None:
-    """#859 line 5: Fehlgeschlagen with a note keeps the wait cleared, the item open."""
     _put_step(here, table)
     before = body.locate_block(here.stored_body(1)).data
 

@@ -21,7 +21,7 @@ from board_fixtures import (
     holding_for_the_operator,
     serve_board_probe,
 )
-from cli_fixtures import FROZEN_CLI_NOW, freeze_cli_now, real_git, run_cli, set_git_identity
+from cli_fixtures import FROZEN_CLI_NOW, real_git, run_cli, set_git_identity
 from cli_fixtures import track_board_config as pin_board_config
 from github_fixtures import FakeForge, serve_forge
 from option_cards import card, decide, open_option_entry, ruled_card
@@ -33,13 +33,13 @@ from store_fixtures import (
     publish_claims_from_a_second_clone,
     push_item_tree,
 )
-from wait_fixtures import ITEM, install, open_reference
+from wait_fixtures import ITEM, OTHER_ITEM, card_issue, free_item, install, open_reference
 
 from aco import board_wait, cmd_wait, forge, protocol, session, store, workboard
 from aco.body import BLOCK_FENCE_INFO, render_block
 
 FOREIGN = "other/repo"
-BLOCKED = 50
+BLOCKED = OTHER_ITEM
 ACTIONABLE_AFTER_THE_BLOCKER = f"ACTIONABLE #{BLOCKED}\n"
 POLLS_PER_PROBE = int(board_wait.PROBE_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
 POLLS_PER_HOUR = int(board_wait.FULL_READ_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
@@ -107,18 +107,7 @@ def group_body(*cards: str) -> str:
     return holding_for_the_operator(open_group_body(*cards))
 
 
-def card_issue(raw: str) -> workboard.Issue:
-    """Item 7 holding open cards in a body that waits on the operator."""
-    return board_issue(ITEM, "Karte", raw)
-
-
-def free_item() -> workboard.Issue:
-    return board_issue(BLOCKED, "Alpha", complete_contract(f"Claim #{BLOCKED}."))
-
-
-@pytest.fixture(autouse=True)
-def _world(monkeypatch: pytest.MonkeyPatch, github_world: Path) -> None:
-    freeze_cli_now(monkeypatch)
+pytestmark = pytest.mark.usefixtures("frozen_wait_world")
 
 
 @pytest.fixture
@@ -668,6 +657,7 @@ class TestUnderStateRef:
     @pytest.fixture(autouse=True)
     def _state_ref_world(
         self,
+        frozen_wait_world: None,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
         bare_remote: Path,

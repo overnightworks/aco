@@ -7,11 +7,10 @@ from datetime import date, timedelta
 
 import pytest
 from audit_world import LABEL, NAME, World, entry_toml
-from board_fixtures import board_issue, complete_contract
 from cli_fixtures import FROZEN_CLI_NOW, run_cli
-from wait_fixtures import FIRST_PAUSE_AFTER_THE_READ, Ticks, install
+from wait_fixtures import FIRST_PAUSE_AFTER_THE_READ, OTHER_ITEM, Ticks, free_item, install
 
-from aco import board_wait, cmd_wait, forge, protocol, session, workboard
+from aco import board_wait, cmd_wait, forge, protocol, session
 
 POLLS_PER_HOUR = int(board_wait.FULL_READ_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
 
@@ -51,10 +50,6 @@ def world(audit_world: World) -> World:
     return audit_world
 
 
-def free_item() -> workboard.Issue:
-    return board_issue(11, "Top work", complete_contract("Claim #11."))
-
-
 def move_today(monkeypatch: pytest.MonkeyPatch) -> Callable[[date], None]:
     """Makes the command's `today` the one the returned function last set."""
     today = [FROZEN_CLI_NOW.date()]
@@ -92,7 +87,7 @@ def test_the_anchor_is_not_listed_again_while_the_trunk_tip_and_the_day_stand(
     result = run_cli(["wait"], capsys)
 
     assert (result.stdout, len(ticks.pauses), world.own.labelled_listings) == (
-        "ACTIONABLE #11\n",
+        f"ACTIONABLE #{OTHER_ITEM}\n",
         POLLS_PER_HOUR,
         [LABEL],
     )

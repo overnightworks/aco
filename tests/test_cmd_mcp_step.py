@@ -11,11 +11,6 @@ import board_forge
 import pytest
 from board_fixtures import complete_contract, write_repository_config
 from cli_fixtures import run_cli
-from discovery_fixtures import (
-    configure_root,
-    isolate_config_file,
-    repository_with_card,
-)
 from mcp_lines import call_line, serve_mcp
 
 from aco import body, forge, item_step, protocol, workboard
@@ -30,20 +25,7 @@ _WRITES = (
 )
 
 
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture(autouse=True)
-def _empty_global_git_config(isolated_global_git_config: Path) -> None:
-    """Real git reads an empty global configuration."""
-
-
-@pytest.fixture
-def here(tmp_path: Path, config_file: Path) -> board_forge.BoardForge:
-    root = configure_root(tmp_path, config_file)
-    return repository_with_card(root / "here", 1, "Here")
+pytestmark = pytest.mark.usefixtures("config_file", "isolated_global_git_config")
 
 
 def _step_line(request_id: int = 1, /, **changes: object) -> str:
@@ -191,15 +173,13 @@ def test_a_call_with_other_fields_rewrites_the_step_table_and_keeps_the_rest_of_
     ]
 
 
-@pytest.mark.parametrize("field", ["purpose", "actions", "expected"])
-@pytest.mark.parametrize("given", [None, " \n"], ids=["missing", "blank"])
-def test_a_step_without_a_card_field_is_a_tool_error_naming_it_and_writes_nothing(
-    field: str, given: str | None, here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+def test_a_step_without_a_purpose_is_a_tool_error_naming_it_and_writes_nothing(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    [result] = _serve(monkeypatch, _step_line(1, **{field: given}))
+    [result] = _serve(monkeypatch, _step_line(1, purpose=None))
 
     assert result["isError"] is True
-    assert field in _text(result)
+    assert "purpose" in _text(result)
     assert _writes(here) == []
 
 

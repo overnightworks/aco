@@ -48,6 +48,21 @@ def repository_with_card(directory: Path, item: int, title: str) -> BoardForge:
     return checkout
 
 
+@pytest.fixture
+def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    return isolate_config_file(tmp_path, monkeypatch)
+
+
+@pytest.fixture
+def root(tmp_path: Path, config_file: Path) -> Path:
+    return configure_root(tmp_path, config_file)
+
+
+@pytest.fixture
+def here(root: Path) -> BoardForge:
+    return repository_with_card(root / "here", 1, "Here")
+
+
 def discovered_checkout(
     directory: Path, remote_url: str, bare_remote: Path, board_config: str
 ) -> Path:

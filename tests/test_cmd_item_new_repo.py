@@ -9,12 +9,7 @@ import pytest
 from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import make_stand_in
 from cli_fixtures import init_bare_repository, run_cli
-from discovery_fixtures import (
-    configure_root,
-    discovered_checkout,
-    isolate_config_file,
-    unreadable_checkout,
-)
+from discovery_fixtures import discovered_checkout, unreadable_checkout
 from github_fixtures import FakeForge
 from store_fixtures import path_without_gh, push_item_tree, state_ref_listing, state_ref_tip
 
@@ -26,14 +21,7 @@ STATE_REF_CONFIG = 'storage = "state-ref"\n'
 BODY = complete_contract("Ship it.")
 
 
-@pytest.fixture(autouse=True)
-def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    return isolate_config_file(tmp_path, monkeypatch)
-
-
-@pytest.fixture
-def root(tmp_path: Path, config_file: Path) -> Path:
-    return configure_root(tmp_path, config_file)
+pytestmark = pytest.mark.usefixtures("config_file")
 
 
 @pytest.fixture
