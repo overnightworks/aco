@@ -319,6 +319,22 @@ def test_a_landing_with_stored_runs_and_a_record_file_refuses_before_any_merge(
     assert runs_files_in_state(landing) == 1
 
 
+def test_a_landing_whose_stored_runs_file_holds_no_run_takes_the_record_file_as_today(
+    landing: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-98 -- a claim whose runs file holds no run stores no runs, so it is judged
+    by the record file."""
+    store_runs(landing, b'{"version": 1, "runs": []}')
+    record = write_lane_record_file(
+        tmp_path, lane_record_object(verdicts=[verdict("approve", landing.head, "gate")])
+    )
+
+    result = run_cli(["land", "12", "--head", landing.head, "--record", str(record)], capsys)
+
+    assert (result.status, result.stderr) == (0, "")
+    assert "lane_test: sonnet-5.5/medium" in routing_trailers_of(landing.remote)
+
+
 @pytest.mark.parametrize(
     ("content", "defect"),
     [
