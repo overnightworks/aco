@@ -470,7 +470,7 @@ def test_a_chat_answer_binds_like_a_board_ruling(
         )
     ruled = here.stored_body(1)
     serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(1, "Here", unruled),)))
-    next_before = run_cli(["next"], capsys).expect_success()
+    next_before = run_cli(["next"], capsys).stdout
     serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(1, "Here", ruled),)))
     rulings = json.loads(run_cli(["rulings", "--json"], capsys).expect_success())
     shown = json.loads(run_cli(["board", "--json"], capsys).expect_success())["items"][0]
@@ -488,8 +488,8 @@ def test_a_chat_answer_binds_like_a_board_ruling(
     decided = decision_line.decision
     assert decided is not None
     assert (decided.answer, decided.via.value) == ("A", "chat")
-    assert "expectations unruled" in next_before
-    assert "expectations unruled" not in next_after
+    assert "waiting on operator: #1" in next_before
+    assert "waiting on operator: #1" not in next_after
 
 
 def test_a_repeat_is_refused_and_writes_nothing(

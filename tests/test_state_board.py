@@ -51,7 +51,7 @@ from cli_fixtures import (
 )
 from github_fixtures import FakeForge
 from item_base import CURRENT_BASE, edit_item, edit_with_base, with_current_base
-from option_cards import decide, open_option_entry
+from option_cards import decide, open_option_entry, returned_option_entry
 from store_fixtures import (
     item_record,
     path_without_gh,
@@ -171,7 +171,7 @@ _CHILD_A_PROJECTION = _Projection(
     "Build slice A.",
     "Ship slice A.",
     "Slice A is merged.",
-    expectations=(open_option_entry(EXPECTATION_TEXT),),
+    expectations=(returned_option_entry(EXPECTATION_TEXT),),
 )
 _CHILD_B_PROJECTION = _Projection("Build slice B.", "Ship slice B.", "Slice B is merged.")
 
@@ -476,7 +476,7 @@ _RULABLE_PROJECTION = _Projection(
     "Land it.",
     "Done.",
     expectations=(
-        open_option_entry(),
+        returned_option_entry(),
         open_option_entry("A second, still-open question?"),
     ),
 )

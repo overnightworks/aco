@@ -231,26 +231,20 @@ class ParsedBody:
     expectation_progress: ExpectationProgress
     ruling_date: date | None
     wait: ItemWait | None
-    # The block's own top-level `scope = [...]`, exactly the
-    # canonical (sorted, deduplicated) tuple `protocol.valid_scope` returns
-    # -- the same function a live claim's own scope passes through, so the
-    # two stay comparable regardless of typed order. `None` when the block
-    # carries no `scope` key at all, never for an empty one
-    # (`_block_scope_defects` refuses that before this projection is ever
-    # built).
+    # The block's own top-level `scope`, in the canonical tuple `protocol.valid_scope`
+    # returns (the one a live claim's scope passes through), so the two compare
+    # regardless of typed order. `None` when the block has no `scope` key.
     scope: tuple[str, ...] | None
     slices: tuple[SliceRow, ...]
     read_state: BodyReadState
+    cards_wait_on_operator: bool = False
     # The block's own top-level `size`; absent means "no estimate", never a default class.
     size: Size | None = None
-    # The block's own top-level `whole` reason, or `None` when
-    # the item names none -- `claim`/`start`'s own fallback for `--whole`
-    # when the call itself names none, read here rather than re-parsed at
-    # each call site.
+    # The block's own top-level `whole` reason, `claim`/`start`'s fallback for
+    # `--whole`; `None` when the item names none.
     whole: str | None = None
-    # The validated `[record]` table, or `None` for every body
-    # parsed under `Storage.GITHUB` and every state-ref body without one --
-    # `items.py` is the one reader that ever looks at this field.
+    # The validated `[record]` table; `None` under `Storage.GITHUB` and for a
+    # state-ref body without one. `items.py` is its one reader.
     record: Mapping[str, object] | None = None
 
 
@@ -263,10 +257,9 @@ def _line_without_ending(raw_line: str) -> str:
 
 
 def first_line(body: str) -> str:
-    """`body`'s first line with its ending stripped, whether the body uses
-    LF or CRLF -- a GitHub GET returns CRLF (`_line_ending` above), so a
-    caller comparing against a fixed marker line must not split on a bare
-    `"\\n"`."""
+    """`body`'s first line with its ending stripped, under LF or CRLF -- a GitHub
+    GET returns CRLF, so a caller comparing a fixed marker line must not split on
+    a bare `"\\n"`."""
     lines = body.splitlines(keepends=True)
     return _line_without_ending(lines[0]) if lines else ""
 
@@ -606,6 +599,12 @@ def _block_expectation_progress(expectations: list[dict[str, object]]) -> Expect
     )
 
 
+def _block_cards_wait_on_operator(expectations: list[dict[str, object]]) -> bool:
+    """Some line is open and none of the open lines went back to its head."""
+    open_lines = list(filter(expectation_grammar.is_open_line, expectations))
+    return bool(open_lines) and not any(expectation_grammar.RETURNED_ON in e for e in open_lines)
+
+
 def _block_ruling_date(expectations: list[dict[str, object]]) -> date | None:
     ruled_dates = [
         entry["ruled_on"]
@@ -664,6 +663,7 @@ def _valid_block_parsed_body(data: dict[str, object], storage: Storage) -> Parse
         scope=_canonical_scope(data["scope"]) if "scope" in data else None,
         slices=_block_slices(data),
         read_state=BodyReadState.VALID,
+        cards_wait_on_operator=_block_cards_wait_on_operator(expectations),
         size=Size(data["size"]) if "size" in data else None,
         whole=cast(str, data["whole"]) if "whole" in data else None,
         record=cast("Mapping[str, object] | None", record),

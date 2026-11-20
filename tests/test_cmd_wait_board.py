@@ -24,7 +24,7 @@ from board_fixtures import (
 from cli_fixtures import FROZEN_CLI_NOW, real_git, run_cli, set_git_identity
 from cli_fixtures import track_board_config as pin_board_config
 from github_fixtures import FakeForge, serve_forge
-from option_cards import card, decide, open_option_entry, ruled_card
+from option_cards import card, decide, item_body, open_option_entry, ruled_card
 from option_cards import group_body as open_group_body
 from store_fixtures import (
     claim_intent,
@@ -256,6 +256,31 @@ class TestWaitingOnTheBoard:
         result = run_cli(["wait"], capsys)
         assert (result.status, result.stdout) == (0, ACTIONABLE_AFTER_THE_BLOCKER)
         assert len(ticks.pauses) == POLLS_PER_HOUR
+
+    def test_an_item_whose_only_open_line_is_unreturned_keeps_it_waiting_until_the_line_is_ruled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        probe: FakeBoardProbe,
+    ) -> None:
+        """Spec: WAIT-26, NEXT-70 -- such an item is no action; ruling its line ends the wait."""
+        raw = item_body(card())
+        client = serve_forge(
+            monkeypatch,
+            FakeForge(
+                board_issues=(card_issue(raw),), issue_references={ITEM: open_reference(raw)}
+            ),
+        )
+        ticks = install(monkeypatch, lambda: 0)
+
+        def rule_the_line() -> None:
+            rule_through_aco(client, capsys)
+
+        ticks.afterwards[3] = rule_the_line
+        result = run_cli(["wait"], capsys)
+        assert (result.status, result.stderr) == (0, "")
+        assert CHANGED_LINE.fullmatch(result.stdout)
+        assert len(ticks.pauses) == 3
 
     def test_a_state_ref_moved_by_another_session_is_read_at_the_next_probe(
         self,
