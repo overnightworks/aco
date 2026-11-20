@@ -1,8 +1,0 @@
-claim_id = "f06da6b7fb5a4946917b75c1e7cf0777"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "9d8d837071f0b684901fa2d59f6c9ef766a7b943"
-branch = "claude/issue-1012-wait-open-cards"
-scope = ["quality/baseline.toml", "specs/next.spec.md", "specs/wait.spec.md", "src/aco/body.py", "src/aco/workboard.py", "tests/support/option_cards.py", "tests/test_cli.py", "tests/test_cmd_claim_out_of_order.py", "tests/test_cmd_mcp.py", "tests/test_cmd_next_open_cards.py", "tests/test_cmd_rule_other.py", "tests/test_cmd_wait_board.py", "tests/test_expectations_withdrawn.py", "tests/test_state_board.py"]
-opened_commit = "10ef2efebc69cceaf228fa9bbf061223d69961bc"
-whole_reason = "One behaviour, one decider fact with its spec and tests; the two specs and the wait and next tests must move together."
