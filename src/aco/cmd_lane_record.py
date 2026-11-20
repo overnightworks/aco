@@ -16,7 +16,6 @@ from . import (
     lane_runs,
     protocol,
     report,
-    state_runs,
     store,
     usage,
     workboard,
@@ -237,12 +236,7 @@ def _stored_runs(context: RunContext, live: _LiveClaim) -> lane_runs.RunsFile:
     """The runs stored with `live`, none when it stores none; unusable ones are unavailable."""
     if live.stored is None:
         return lane_runs.RunsFile()
-    try:
-        return lane_runs.parse_runs(state_runs.read_runs_file(context.toplevel, live.stored))
-    except (lane_runs.RunsFileError, protocol.ClaimError) as error:
-        raise protocol.ClaimUnavailableError(
-            f"the stored runs of {live.label} cannot be used: {error}"
-        ) from error
+    return lane_runs.read_stored_runs(context.toplevel, live.stored, live.label)
 
 
 def _descends(directory: Path, ancestor: str, tip: str) -> bool:

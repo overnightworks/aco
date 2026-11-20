@@ -20,6 +20,7 @@ from . import (
     lane_record,
     policy,
     protocol,
+    release_record,
     report,
     store,
     workboard,
@@ -273,10 +274,8 @@ def _land_preflight(
     shape, its head's board configuration against this checkout's own
     (LANDCMD-22..24), then the named item's live open state --
     LANDCMD-08 before claim validation --
-    then `claims_provider`,
-    the one step that reads `refs/aco/state` locally, so a pull request this
-    preflight would refuse on GitHub's own answers alone never pays for that
-    read at all, and finally this session's own authorization against the
+    then `claims_provider`, the local read of `refs/aco/state` (`run` read it before, for the
+    stored runs), and finally this session's own authorization against the
     exact claim just proven to exist (`cmd_release.authorize_releaser`, `release`'s
     own claimant/coordinator-override check): a
     claim held by another agent or role refuses here, before the merge,
@@ -603,19 +602,16 @@ def _land_print_released_notes(client: github.GitHubForge, merge_sha: str, tople
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`aco land <pr>`: preflight every ruled precondition
-    read-only, merge with a pinned head sha and a commit message this tool
-    composes itself (or, where the target branch requires the merge queue, queue the pull
-    request pinned to that head and wait for the queue to merge it), delete the merged
-    branch, fast-forward this checkout's own default branch, then run the existing
-    `release --merged` path unchanged. A pull request `landing` already finds merged -- a resumed
-    run after an earlier step failed -- skips preflight and the merge
-    itself entirely: `merge_landing` never runs twice for the same pull
-    request. `--coordinator-override`'s own role and `--record`'s verdict are validated
-    here, at entry, once the repository root and board.toml are read and before that
-    fresh/rerun split and any forge read: a rerun skips
-    `_land_preflight` entirely, so a check placed only there left a rerun free to delete the
-    branch and fast-forward -- and `cmd_release.release_transition` free to close the item."""
+    """`aco land <pr>`: preflight every ruled precondition read-only, merge with a pinned head
+    sha and a commit message this tool composes itself (or, where the target branch requires the
+    merge queue, queue the pull request pinned to that head and wait for the queue to merge it),
+    delete the merged branch, fast-forward this checkout's own default branch, then run the
+    existing `release --merged` path unchanged. A pull request `landing` already finds merged --
+    a resumed run -- skips preflight and the merge itself: `merge_landing` never runs twice.
+    What judges the lane is checked here, before that fresh/rerun split, since a rerun skips
+    `_land_preflight` and a check placed only there left it free to delete the branch and close
+    the item: `--coordinator-override`'s role and `--record`'s verdict at entry, then the stored
+    runs of the claims on the pull request's head branch, once that branch is read."""
     if parsed.head is None:
         raise protocol.ClaimUnavailableError(_LAND_HEAD_REQUIRED_REFUSAL)
     if context.config.storage is not body.Storage.GITHUB:
@@ -625,6 +621,10 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     lane_record.require_landable_record(parsed.record, parsed.head)
     client = cast(github.GitHubForge, context.forge)
     detail = _land_read_head_checked(client, parsed.pull_request, client.repository.path)
+    observed = _land_peek_claims(context)
+    release_record.require_landable_runs(
+        context.toplevel, observed, detail.source_branch, parsed.record, parsed.head
+    )
     # A rerun's own preflight never ran, so it verified no classification:
     # `_land_release_routing` reads the merge commit's own trailer instead.
     classification: workboard.Classification | None = None

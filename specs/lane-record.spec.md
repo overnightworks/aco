@@ -5,7 +5,7 @@ it went: trailers on the release commit of `refs/aco/state`, so a later reader c
 compare process experiments. This file owns those trailer keys and values, the
 lane record file their routing figures are read from (LANREC-30..LANREC-46), the runs a lane
 stores with its claim, what `aco lane-record show` prints of them and the record a release
-computes from them (LANREC-52..LANREC-96), the `Routing:` line grammar they are read from where
+computes from them (LANREC-52..LANREC-98), the `Routing:` line grammar they are read from where
 neither a file nor stored runs are given, and what a figure that cannot be computed does. `specs/release.spec.md` owns the release itself,
 `specs/land.spec.md` the landing, `specs/storage-pin.spec.md` the `production_paths` key
 (PIN-54..PIN-56), and `specs/ref-store-cas.spec.md` the trailers every transition carries
@@ -33,6 +33,7 @@ last verdict judged and `<reviewed>` the `--head` value of `aco land`.
 | `aco lane-record show <item>` | LANREC-71..LANREC-89 | LANREC-71..LANREC-89 |
 | stored runs and a handover, a rescope, a release or a landing | LANREC-61, LANREC-67 | LANREC-61, LANREC-67 |
 | a release of a claim with stored runs | LANREC-90..LANREC-96 | LANREC-90..LANREC-96 |
+| a landing of a claim with stored runs | LANREC-97, LANREC-98 | — |
 | a figure read back from a release commit | LANREC-51 | LANREC-51 |
 | a figure that cannot be computed | LANREC-21 | LANREC-21 |
 | a malformed `production_paths` | LANREC-22 | LANREC-22 |
@@ -96,7 +97,7 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - [ ] [LANREC-49] A stage's misses above its blocking refuses `misses.<stage> exceeds blocking.<stage>`, through LANREC-31 (E-LANREC-11).
 - [ ] [LANREC-38] `aco land <n> --head <reviewed> --record <file>` refuses `the lane record's last verdict judged <full>, not the reviewed <reviewed>`, exit `2`, unless `<full>` starts with `<reviewed>`.
 - [ ] [LANREC-39] A record that states no verdict refuses `the lane record states no review or gate verdict, so it judged no head to land`, exit `2`.
-- [ ] [LANREC-40] LANREC-31 refuses at the argument parse; LANREC-38, LANREC-39 and LANREC-44 after the repository root and board.toml are read; all before any merge or write, on a rerun too (E-LANREC-04).
+- [ ] [LANREC-40] LANREC-31 refuses at the argument parse; LANREC-38, 39 and 44 once the root and board.toml are read, LANREC-97 and 98 after LANDCMD-50; all before any merge or write, a rerun too (E-LANREC-04).
 - [ ] [LANREC-41] Without stored runs, `aco release --abandoned <reason> --record <file>` writes the file's record; `--merged` refuses `--record applies to --abandoned only`, exit `2`; neither, REL-01 (E-LANREC-05).
 - [ ] [LANREC-42] With `--record` and without stored runs, LANREC-11 and LANREC-12 hold the file's figures, `lane_fix_rounds` and `lane_blocking` summed over the finding stages; no routing line is read.
 - [ ] [LANREC-43] A file also writes `lane_risk`, then `lane_fix_rounds_<stage>` and `lane_blocking_<stage>` for `review`, `gate`, `ci` and `test`, each a whole number; an omitted `risk` has no line.
@@ -166,6 +167,11 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 - [ ] [LANREC-94] A lane with a lost run (a begun run without a record, or one that does not follow) writes the stage lines its rules know and `lane_risk`, and no count, total, misses or experiment line (E-LANREC-19).
 - [ ] [LANREC-95] `lane_fix_rounds` and `lane_blocking` sum the four per-stage figures, each clamped at `999` before the sum and the sum not; a total is unknown where a per-stage figure is.
 - [ ] [LANREC-96] A release refuses in this order: `--merged` with `--record` (LANREC-41), the missing claim (REL-09), the releaser's authorization, LANREC-91, then LANREC-92 at the push.
+
+## Landing with stored runs
+
+- [ ] [LANREC-97] `aco land` judges the verdicts of the stored runs in run order, the last stored one where the newest run has none, as LANREC-38, 39 and 44 judge a file's; an unreadable file refuses as LANREC-62.
+- [ ] [LANREC-98] With stored runs and `--record <file>` `aco land` refuses as LANREC-91; both refusals come after LANDCMD-50 and before any merge, on every path, and leave a queued pull request queued (E-LANREC-20).
 
 ## Failure
 
@@ -470,3 +476,15 @@ lane_build: sonnet-5.5/high
 lane_review: opus-5.5/medium
 lane_land: haiku-5.5/low
 ```
+
+### E-LANREC-20 — a land with stored runs and a record file refuses before it merges
+
+Setup: as E-LANREC-18, pull request `#12` open with every check green on the claim's branch, its head `<head>`, `lane-record.json` approving `<head>`
+
+```console
+$ aco land 12 --head <head> --record lane-record.json
+ERROR: #42 has stored runs, so aco computes its record from them; drop --record
+exit 2
+```
+
+Nothing is merged, enqueued or deleted: the pull request stays open or queued, the branch and the claim stand and the runs file is unchanged. The same land of a merged pull request refuses the same way; its way out is `aco release 42 --merged 12`, then `aco land 12 --head <head>` again, which judges nothing once no live claim is left.

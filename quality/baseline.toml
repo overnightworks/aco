@@ -49,7 +49,7 @@
 "_adopt_existing_child" = 67
 
 [function_lines."src/aco/cmd_land.py"]
-"_land_preflight" = 72
+"_land_preflight" = 70
 
 [function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 94

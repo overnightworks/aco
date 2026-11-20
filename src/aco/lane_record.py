@@ -721,13 +721,19 @@ def require_landable_record(record: LaneRecordFile | None, reviewed: str) -> Non
     """Refuse a landing whose lane record file judged another commit than `reviewed` (a full
     sha or a prefix of one), or whose last verdict is not an approval: nothing is merged or
     written for it. A landing without a record file has nothing to compare."""
-    if record is None:
-        return
-    if not record.verdicts:
+    if record is not None:
+        require_landable_verdicts(record.verdicts, reviewed)
+
+
+def require_landable_verdicts(verdicts: tuple[JudgedVerdict, ...], reviewed: str) -> None:
+    """Refuse a landing whose last verdict, in run order, judged another commit than `reviewed`
+    or is not an approval, or that has no verdict at all: the verdicts of a record file and of
+    stored runs are judged alike."""
+    if not verdicts:
         raise protocol.ClaimUnavailableError(
             "the lane record states no review or gate verdict, so it judged no head to land"
         )
-    last = record.verdicts[-1]
+    last = verdicts[-1]
     if not last.sha.startswith(reviewed):
         raise protocol.ClaimUnavailableError(
             f"the lane record's last verdict judged {last.sha}, not the reviewed {reviewed}"

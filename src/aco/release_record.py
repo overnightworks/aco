@@ -3,6 +3,7 @@
 
 import dataclasses
 from dataclasses import dataclass
+from pathlib import Path
 from typing import NamedTuple
 
 from . import body, forge, lane_record, lane_runs, protocol, state_runs, store
@@ -88,6 +89,13 @@ def _stated_figures(
     routing line is read); both refuse."""
     if stored is None:
         return None if record_file is None else record_file.figures()
+    _refuse_record_file_beside_runs(claim, record_file)
+    return stored
+
+
+def _refuse_record_file_beside_runs(
+    claim: protocol.ActiveClaim, record_file: lane_record.LaneRecordFile | None
+) -> None:
     if record_file is not None:
         raise protocol.ClaimUnavailableError(
             naming=lambda item_label: (
@@ -95,7 +103,28 @@ def _stated_figures(
                 "so aco computes its record from them; drop --record"
             )
         )
-    return stored
+
+
+def require_landable_runs(
+    toplevel: Path,
+    observed: protocol.ClaimState,
+    branch: str,
+    record_file: lane_record.LaneRecordFile | None,
+    reviewed: str,
+) -> None:
+    """Refuse a landing of `branch` before it merges anything when a live claim on it stores
+    runs that cannot be read (LANREC-62), runs beside `--record` (LANREC-91), or runs whose last
+    verdict is none, not on `reviewed` or no approval; a claim without runs judges nothing here
+    (`specs/lane-record.spec.md`, "Landing with stored runs")."""
+    for claim in protocol.claims_on_branch(observed.claims, branch):
+        blob = observed.runs.get(claim.claim_id)
+        if blob is None:
+            continue
+        label = protocol.claim_label(claim, protocol.forge_item_label)
+        runs = lane_runs.read_stored_runs(toplevel, blob, label)
+        if runs.holds_runs():
+            _refuse_record_file_beside_runs(claim, record_file)
+            lane_record.require_landable_verdicts(lane_runs.lane_figures(runs).verdicts, reviewed)
 
 
 def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:
