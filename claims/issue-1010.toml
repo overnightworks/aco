@@ -3,6 +3,6 @@ agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
 role = "builder"
 base = "3c72ef4203e4e4890138d7ea504e66318f4e5df8"
 branch = "claude/issue-1010-nested-container-cut"
-scope = ["quality/baseline.toml", "specs/cut.spec.md", "specs/item.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/cmd_cut.py", "src/aco/cmd_item_edit.py", "src/aco/workboard.py", "tests/test_board_read_parent_closable.py", "tests/test_cli.py", "tests/test_cmd_cut.py", "tests/test_cmd_land_nested_container.py", "tests/test_cmd_next_pull_advice.py", "tests/test_state_board.py", "tests/test_workboard_container_child_list.py"]
+scope = ["quality/baseline.toml", "specs/cut.spec.md", "specs/item.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/cmd_cut.py", "src/aco/cmd_item_edit.py", "src/aco/workboard.py", "tests/test_board_read_parent_closable.py", "tests/test_cli.py", "tests/test_cmd_cut.py", "tests/test_cmd_land_nested_container.py", "tests/test_cmd_next_pull_advice.py", "tests/test_state_board.py", "tests/test_state_board_item_reference.py", "tests/test_workboard_container_child_list.py"]
 opened_commit = "e8ed3d7a52fbfb83573e063673d0b22bc85e4830"
 whole_reason = "One ruled behaviour, mostly deletion across the cut and next deciders with their specs and tests; they must land together."
