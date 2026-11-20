@@ -235,8 +235,7 @@ _ITEM_EDIT_KIND_COMMAND = "item edit --kind"
 def _cmd_item_edit_kind(parsed: argparse.Namespace, context: RunContext) -> int:
     """`aco item edit ITEM --kind task|container`: the one
     retype a person runs, over the `ForgeWriter.set_item_kind` both storages
-    implement -- the repair `next` names for a nested container with one
-    uncut row. Reads no stdin, and refuses a body piped or redirected there
+    implement. Reads no stdin, and refuses a body piped or redirected there
     before any write, so it is never silently dropped.
     A container with an open child stays one, since a Task never has
     children to claim through. Every refusal reports through the shared

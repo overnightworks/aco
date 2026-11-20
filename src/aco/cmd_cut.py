@@ -50,15 +50,7 @@ def _cut_target(
     board_read.require_readable_item(
         client, next((issue for issue in open_issues if issue.number == number), None)
     )
-    target = open_container(open_issues, number, storage)
-    parent = client.parent_issue(number)
-    if parent is not None:
-        parent_label = workboard.relation_label(parent.reference, storage)
-        raise protocol.ClaimUnavailableError(
-            f"{workboard.item_label(number, storage)} is itself a child of {parent_label}; "
-            "nested containers are not supported"
-        )
-    return target
+    return open_container(open_issues, number, storage)
 
 
 @dataclass(frozen=True)

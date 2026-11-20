@@ -1,5 +1,6 @@
-"""Where `aco next` advises `claim` and where `start`, and the claim it advises for a nested
-container's one row, run as printed, on real checkouts. The forge is the only fake."""
+"""Where `aco next` advises `claim` and where `start`, the cut it proposes for a nested
+container's row, and the claim it advises for a one-row item, run as printed, on real checkouts.
+The forge is the only fake."""
 
 from collections.abc import Callable
 from dataclasses import replace
@@ -136,7 +137,7 @@ def serve_nested_container(monkeypatch: pytest.MonkeyPatch, nested: Issue) -> Fa
         pytest.param(("docs/top.md",), "aco claim 299", id="own-top-level-scope"),
     ],
 )
-def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
+def test_next_proposes_a_nested_rows_cut_and_names_a_one_row_items_exact_scope(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     github_clone: Path,
@@ -145,7 +146,7 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     top_level_scope: tuple[str, ...] | None,
     expected_claim: str,
 ) -> None:
-    """Spec: NEXT-03, NEXT-27, NEXT-29, NEXT-16."""
+    """Spec: NEXT-03, NEXT-27, NEXT-30, NEXT-71, NEXT-16."""
     assert_github_world(github_clone, bare_remote)
     publish_claims_from_a_second_clone(github_clone, bare_remote, ())
     lane = lane_worktree(github_clone, NESTED_LANE_BRANCH)
@@ -155,8 +156,6 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     served = serve_nested_container(monkeypatch, nested)
 
     before_retype = run_cli(["next"], capsys)
-    assert before_retype.status == 3, before_retype.stderr
-    repair = before_retype.stdout.split(f"\n#{NESTED}: ", 1)[1].splitlines()[0]
     retyped = replace(nested, kind=body.ItemKind.TASK, children_closed=None, children_total=None)
     served.board_issues = (retyped,)
     served.issue_references[NESTED] = forge.ItemReference(
@@ -168,11 +167,13 @@ def test_next_names_a_nested_rows_exact_scope_and_that_claim_runs_as_printed(
     bash_status, claim_arguments = arguments_bash_hands_aco(run_line, tmp_path)
     claimed = run_cli(claim_arguments, capsys)
 
-    assert repair.split(" and claim it with ", 1)[1] == f"{expected_claim} --out-of-order <reason>"
+    assert before_retype.stdout.startswith(
+        f"cut_slice #{NESTED}: Scheibe Z\nNext: aco cut {NESTED}\n"
+    )
     assert run_line == expected_claim
     assert "\nparallel: none\nscope unknown: none\n" in after_retype.stdout
     assert (before_retype.status, after_retype.status, bash_status, claimed.status) == (
-        3,
+        0,
         0,
         0,
         0,

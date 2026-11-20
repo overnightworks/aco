@@ -401,31 +401,10 @@ def no_twin(
                 ("--title", "Slice A"),
             ),
         ),
-        *rendered(
-            "itself-a-child",
-            refused(
-                "#79 is itself a child of example/agent-coordination#1; "
-                "nested containers are not supported",
-                "precondition_failed",
-                (
-                    container_issue(
-                        79, MINIMAL_BLOCK_TOML + SLICE_ROW.format(1, "Slice A", 'done_when = "D"\n')
-                    ),
-                ),
-                ("--title", "Slice A"),
-                parents={
-                    79: ParentIssue(
-                        IssueReference("example/agent-coordination", 1),
-                        "",
-                        body.ItemKind.CONTAINER,
-                    )
-                },
-            ),
-        ),
     ],
 )
-def test_cut_requires_an_open_top_level_container(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-01, CUT-02, CUT-03, CUT-33, OUT-05, OUT-06, E-CUT-01."""
+def test_cut_requires_an_open_container(case: CutCase, cut_check: CutCheck) -> None:
+    """Spec: CUT-01, CUT-02, CUT-33, OUT-05, OUT-06, E-CUT-01."""
     cut_check(case)
 
 
@@ -700,10 +679,30 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
                 {},
             ),
         ),
+        *rendered(
+            "container-with-a-parent",
+            replace(
+                cut(
+                    ONE_ROW,
+                    ("--title", "Slice A"),
+                    1,
+                    "Slice A",
+                    CHILD_BODY.format("D", ""),
+                    ROW_REMOVED,
+                ),
+                parents={
+                    79: ParentIssue(
+                        IssueReference("example/agent-coordination", 1),
+                        "",
+                        body.ItemKind.CONTAINER,
+                    )
+                },
+            ),
+        ),
     ],
 )
 def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-06, CUT-10, CUT-11, CUT-12, CUT-24, CUT-25, CUT-37, E-CUT-02, E-CUT-04."""
+    """Spec: CUT-06, CUT-10, CUT-11, CUT-12, CUT-24, CUT-25, CUT-37, CUT-48, E-CUT-02, E-CUT-04."""
     cut_check(case)
 
 

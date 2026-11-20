@@ -265,15 +265,6 @@ def build_board(
         children = _fetch_children(client, container_numbers)
         open_pull_request_rows = open_pull_requests.result()
         merged_pull_request_rows = merged_pull_requests.result()
-    # The same forge relation `cmd_cut._cut_target` refuses a nested container on,
-    # so `next` never proposes a `cut` that `cut` refuses.
-    nesting_parents = {
-        number: parent.reference
-        for number in workboard.childless_containers_with_uncut_rows(
-            issues, children, config.storage
-        )
-        if (parent := client.parent_issue(number)) is not None
-    }
     if landing is None:
         dependencies = fetch_validated_dependencies(client, issues)
         trunk_ref = context.trunk_ref
@@ -302,7 +293,6 @@ def build_board(
             trunk_landings=tuple(landing.committed_at for landing in trunk_landings),
             trunk_landing_items=trunk_landing_items(trunk_landings),
             children=children,
-            nesting_parents=nesting_parents,
             dependencies=dependencies,
             requests=client.requests,
             reopened_at=reopened_at,

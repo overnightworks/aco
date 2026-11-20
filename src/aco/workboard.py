@@ -4,7 +4,7 @@ import re
 import shlex
 import tomllib
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
@@ -13,7 +13,7 @@ from itertools import chain
 from pathlib import Path
 from typing import NoReturn
 
-from . import items, protocol, recurring_audit, wide_scope
+from . import items, protocol, recurring_audit
 
 # The body-block codec: parsed, validated, and rendered in `body.py`, one layer
 # below this module. Every reader imports the names it needs from `body` directly;
@@ -1486,7 +1486,6 @@ class _BoardBuildContext:
     trunk_landings: tuple[datetime, ...]
     container_progress: dict[int, ContainerProgress]
     child_container: dict[int, int]
-    nesting_parents: Mapping[int, IssueReference]
     repository: str
     unreadable_numbers: frozenset[int]
     today: date
@@ -1608,7 +1607,7 @@ def _board_item(
     childless_verdict = (
         None
         if container_progress is None or container_progress.open_count
-        else _childless_container_verdict(parsed.slices, context.nesting_parents.get(issue.number))
+        else _childless_container_verdict(parsed.slices)
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
@@ -1626,7 +1625,7 @@ def _board_item(
             contract.defects[0] if parsed.read_state is BodyReadState.MALFORMED else None
         ),
         childless_container_reason=_childless_container_reason(
-            issue.number, childless_verdict, parsed, config.storage
+            issue.number, childless_verdict, config.storage
         ),
         childless_verdict=childless_verdict,
         held_container_reason=_held_children_reason(
@@ -1695,10 +1694,6 @@ class BoardBuildInputs:
     # `trunk_landings` carries only timestamps, for ruling-freshness.
     trunk_landing_items: tuple[TrunkLandingItem, ...] = ()
     children: Mapping[int, ChildList] = field(default_factory=dict)
-    # The forge parent of each `childless_containers_with_uncut_rows` container
-    # that has one, read through the `parent_issue` relation `cut` refuses a
-    # nested container on (CUT-03), whatever that parent's type or state.
-    nesting_parents: Mapping[int, IssueReference] = field(default_factory=dict)
     dependencies: Mapping[int, tuple[IssueDependency, ...]] = field(default_factory=dict)
     requests: int = 0
     # Each declared open item's last reopen, `None` when never reopened.
@@ -1769,7 +1764,6 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         trunk_landings=inputs.trunk_landings,
         container_progress=container_progress,
         child_container=child_container,
-        nesting_parents=inputs.nesting_parents,
         repository=repository,
         unreadable_numbers=frozenset(
             issue.number for issue in issues if issue.unreadable is not None
@@ -1844,7 +1838,7 @@ def highest_scored_actionable(board: Board) -> BoardItem | None:
 class WorkItemAction:
     """Claim `item` -- `next`'s target. `scope` is the paths that
     claim occupies: the item's own top-level `scope`, else its one
-    `[[slice]]` row's -- the row a retyped nested container keeps -- else `None`, unknown."""
+    `[[slice]]` row's, else `None`, unknown."""
 
     item: BoardItem
     scope: tuple[str, ...] | None
@@ -1885,8 +1879,7 @@ def _work_item_scope(
     own_scope: tuple[str, ...] | None, rows: tuple[SliceRow, ...]
 ) -> tuple[str, ...] | None:
     """The paths a claim on a work item occupies: its own
-    top-level `scope`, else its one `[[slice]]` row's -- the row a retyped
-    nested container keeps -- else `None`, unknown."""
+    top-level `scope`, else its one `[[slice]]` row's, else `None`, unknown."""
     if own_scope is not None:
         return own_scope
     return rows[0].scope if len(rows) == 1 else None
@@ -1918,8 +1911,7 @@ class PullScope:
 
 def work_item_claim_command(number: int, storage: Storage, pull: PullScope) -> str:
     """The one `claim` advice for work item `number` (NEXT-03),
-    scoped by `pull` -- so a nested container's pre-retype advice and
-    `next`'s `Run:` line after the retype name the same claim."""
+    scoped by `pull`."""
     arguments = ("claim", item_argument(number, storage))
     return _pull_command(arguments, pull.advised_paths(), pull.placeholders())
 
@@ -2134,17 +2126,15 @@ def closable_container_number(
     parsed = parse_body(parent.body, storage=storage)
     if parsed.read_state is not BodyReadState.VALID:
         return None
-    # Nesting only ever splits a cut from a nested repair and never reaches
-    # a close, so this close test needs no read of `parent`'s own parent.
+    # Only a close is judged here, so this test needs no read of `parent`'s own parent.
     required = parent_completion(parsed) is ParentCompletion.REQUIRED
     return parent.reference.number if required else None
 
 
 def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
     """The action a childless container qualifies for, read off its one `childless_verdict`, or
-    `None` to skip it: a non-`VALID` body names its own finding elsewhere, a `NestedRepairVerdict`
-    its repair under `SKIPPED`, and a container waiting on the operator, on a `wait` or on an
-    open blocker is only ever closed, never cut."""
+    `None` to skip it: a non-`VALID` body names its own finding elsewhere, and a container
+    waiting on the operator, on a `wait` or on an open blocker is only ever closed, never cut."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
@@ -2228,14 +2218,6 @@ def names_no_item(number: int, storage: Storage) -> bool:
     return storage is Storage.STATE_REF and not items.is_item_number(number)
 
 
-def relation_label(reference: IssueReference, storage: Storage) -> str:
-    """How a forge relation's other end (a parent, say) is named: always
-    the qualified `owner/repo#n` under `storage = GITHUB`, where such a
-    relation may cross repositories, and `item_label`'s own id under
-    `STATE_REF`, whose relations never leave the one store."""
-    return _storage_item_name(reference.number, storage, str(reference))
-
-
 def item_argument(number: int, storage: Storage) -> str:
     """`number` as a bare item reference -- a printed command's positional
     argument or a string-typed `--json` field: the bare number
@@ -2259,7 +2241,6 @@ def item_json_reference(number: int, storage: Storage) -> int | str:
 # quoting rather than becoming one quoted `'<paths>'` argument.
 SCOPE_PLACEHOLDER = "--scope <paths>"
 WHOLE_PLACEHOLDER = "--whole <reason>"
-OUT_OF_ORDER_PLACEHOLDER = "--out-of-order <reason>"
 
 
 @dataclass(frozen=True)
@@ -2363,14 +2344,6 @@ class CutVerdict:
 
 
 @dataclass(frozen=True)
-class NestedRepairVerdict:
-    """An uncut row `cut` refuses (CUT-03): the container is a child of
-    `nesting_parent`, so only a repair naming that parent helps."""
-
-    nesting_parent: IssueReference
-
-
-@dataclass(frozen=True)
 class UnprintableRowVerdict:
     """The first uncut row, the one `cut` links, has a one-line field, `key`,
     holding a line break or another control character: a `cut` command naming its title would spread
@@ -2390,22 +2363,17 @@ class CloseVerdict:
 
 # What a container with no open child is up for, each verdict
 # carrying the data its own answer needs.
-ChildlessContainerVerdict = CutVerdict | NestedRepairVerdict | UnprintableRowVerdict | CloseVerdict
+ChildlessContainerVerdict = CutVerdict | UnprintableRowVerdict | CloseVerdict
 
 
-def _childless_container_verdict(
-    slices: tuple[SliceRow, ...], nesting_parent: IssueReference | None
-) -> ChildlessContainerVerdict:
+def _childless_container_verdict(slices: tuple[SliceRow, ...]) -> ChildlessContainerVerdict:
     """The one decider for a container with no open child:
     `next`'s action, its `SKIPPED` reason, and `release --merged`'s
     closable parent all read this answer rather than re-deriving it. An
-    uncut `[[slice]]` row is the only thing to cut -- unless the
-    container is itself a child, which `cut` refuses (CUT-03), so only a
-    repair helps, or the row's title or `done_when` holds a line break or
-    control character no printed one-line advice or `cut` can carry;
-    with no row left the container is closable."""
-    if nesting_parent is not None and slices:
-        return NestedRepairVerdict(nesting_parent)
+    uncut `[[slice]]` row is the only thing to cut -- unless the row's
+    title or `done_when` holds a line break or control character no printed
+    one-line advice or `cut` can carry; with no row left the container is
+    closable."""
     if slices:
         first = slices[0]
         unprintable_key = unprintable_slice_line_key(first)
@@ -2428,36 +2396,15 @@ def parent_completion(parsed: ParsedBody) -> ParentCompletion:
     """The completion of a parent whose last open child just landed, read off
     `_childless_container_verdict` so a landing and `next` agree on what
     still counts as work."""
-    verdict = _childless_container_verdict(parsed.slices, nesting_parent=None)
+    verdict = _childless_container_verdict(parsed.slices)
     if isinstance(verdict, CloseVerdict):
         return ParentCompletion.REQUIRED
     return ParentCompletion.FORBIDDEN
 
 
-def childless_containers_with_uncut_rows(
-    issues: Iterable[Issue],
-    children: Mapping[int, ChildList],
-    storage: Storage,
-) -> tuple[int, ...]:
-    """The containers whose forge parent can change their verdict:
-    no open child and an uncut `[[slice]]` row, the only shape
-    `_childless_container_verdict` reads `nesting_parent` for. The caller
-    reads just these parents and hands them back as
-    `BoardBuildInputs.nesting_parents`."""
-    return tuple(
-        issue.number
-        for issue in issues
-        if issue.kind is ItemKind.CONTAINER
-        and issue.children_total is not None
-        and not _open_children(children.get(issue.number, ()))
-        and parse_body(issue.body, storage=storage).slices
-    )
-
-
 def _childless_container_reason(
     number: int,
     verdict: ChildlessContainerVerdict | None,
-    parsed: ParsedBody,
     storage: Storage,
 ) -> str | None:
     """What container `number`, with no open child, is up for when `SKIPPED`
@@ -2472,8 +2419,6 @@ def _childless_container_reason(
                 f"slice row {row} {key} holds a line break or control character; "
                 "make it one printable line"
             )
-        case NestedRepairVerdict(nesting_parent=nesting_parent):
-            return _nested_container_repair(number, nesting_parent, parsed, storage)
         case _:
             return None
 
@@ -2483,43 +2428,6 @@ def _cut_slice_reason(number: int, storage: Storage, title: str) -> str:
     `next`'s first action: its first uncut row `title`, quoted
     by `_quoted_prose`, and the `cut` that row takes."""
     return f"cut slice {_quoted_prose(title)}; run {cut_command(number, storage)}"
-
-
-def _nested_container_repair(
-    number: int,
-    nesting_parent: IssueReference,
-    parsed: ParsedBody,
-    storage: Storage,
-) -> str:
-    """The repair container `number` needs when it is itself a child of
-    `nesting_parent` and still carries uncut `[[slice]]` rows:
-    `cut` refuses it, so `next` never proposes one and names this instead --
-    for its one row, the `item edit --kind task` both storages run (ITEM-47)
-    and the claim `work_item_claim_command` names for the task it becomes, out of order since a
-    `SKIPPED` item is never `next`'s first action; for more rows, their move up to that
-    parent, named the way `cut`'s own refusal names it."""
-    if len(parsed.slices) == 1:
-        retype = advice_command("item", "edit", item_argument(number, storage), "--kind", "task")
-        occupied = _work_item_scope(parsed.scope, parsed.slices)
-        # The board reads no tree, so only the path-count condition of the
-        # width gate can be judged here.
-        wide = occupied is not None and (
-            wide_scope.wide_scope_trip(
-                occupied, directories=(), covered_file_count=0, versioned_file_count=0
-            )
-            is not None
-        )
-        claim = work_item_claim_command(
-            number, storage, PullScope(parsed.scope, occupied, parsed.whole, wide)
-        )
-        return (
-            f"nested container, which cut refuses; run {retype} "
-            f"and claim it with {claim} {OUT_OF_ORDER_PLACEHOLDER}"
-        )
-    return (
-        "nested container, which cut refuses; move its slice rows to "
-        f"{relation_label(nesting_parent, storage)}"
-    )
 
 
 def _claim_or_completeness_reason(facts: _ActionabilityFacts) -> str | None:

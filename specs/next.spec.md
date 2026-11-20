@@ -50,7 +50,7 @@ other printable space are text.
 | a container whose only open child is in another repository | NEXT-60 | NEXT-14 |
 | a second cuttable container behind the top action | NEXT-34 | NEXT-14 |
 | a childless container with an uncut row has an open blocker | NEXT-69 | NEXT-14 |
-| that container is itself a child of another item | NEXT-25, NEXT-29, NEXT-33 | NEXT-14 |
+| that container is itself a child of another item | NEXT-71 | NEXT-14 |
 | a childless container has no uncut row | NEXT-07 | NEXT-13 |
 | that same container has an open blocker | NEXT-07 | NEXT-13 |
 | a landed-but-open item exists | LAND-53 (cited) | NEXT-14 |
@@ -94,7 +94,7 @@ other printable space are text.
 - [ ] [NEXT-42] A scope `claim` calls wide here (four paths, or a directory such as `src`) and no body `whole` ends `Run:` with `--whole <reason>`; with `whole` set, it is left out (E-NEXT-14).
 - [ ] [NEXT-37] Text shows each display control in a title, `Next`, slice title or `SKIPPED` reason as its escape: `a\x1b[2J` prints as typed; TAB, NBSP and `Größe` as is; `--json` unchanged but BODY-68.
 - [ ] [NEXT-03] An item naming its own top-level `scope` drops `--scope` from `Run:`; a scopeless item's `Run:` ends `--scope <paths>` and gains a further `scope unknown` line (see E-NEXT-02).
-- [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths -- a retyped nested container (NEXT-29) -- instead prints `--scope=<path>` per path of that row, with no `scope unknown`.
+- [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths -- instead prints `--scope=<path>` per path of that row, with no `scope unknown`.
 - [ ] [NEXT-04] A still-proposed item that is pulled (NEXT-70 holds the others) adds `expectations unruled: refine before the pull`, a stale ruling `ruled <n> landings ago: refine again at the pull`, never both.
 - [ ] [NEXT-48] A withdrawn line (BODY-104) never adds `expectations unruled` and never dates a ruling; an item of only withdrawn lines adds neither NEXT-04 hint.
 - [ ] [NEXT-23] A scopeless, sliceless item still qualifies as this action (`scope unknown`, NEXT-03); `claim`/`start`'s own precedence check reads a narrower rule (`specs/claim.spec.md` CLM-23).
@@ -110,9 +110,8 @@ other printable space are text.
 - NEXT-06 (retired).
 - [ ] [NEXT-07] A childless container without an uncut row prints `close_container <label>: <closed>/<total> children closed, no uncut row` (BOARD-58), whatever its `Next`, blocker or `wait` (E-NEXT-04).
 - [ ] [NEXT-69] A childless container with an uncut `[[slice]]` row and an open blocker never gets `cut_slice`; `SKIPPED` reads `blocked by <ref>`; the next cuttable item comes first (E-NEXT-20).
-- [ ] [NEXT-25] A childless container with an uncut row that is a child of any item -- any type, open or closed, any repository -- never gets `cut_slice` (CUT-03); `SKIPPED` names its repair (E-NEXT-09).
-- [ ] [NEXT-29] That repair for one row claims as the retyped item's `Run:` will (NEXT-03): bare with a top-level `scope`, else `--scope=<path>` per row path, else `--scope <paths>` (E-NEXT-09).
-- [ ] [NEXT-33] Every claim a `SKIPPED` reason names ends `--out-of-order <reason>`, since a skipped item is never the first action; `<reason>`, like `<paths>`, is for the agent to fill in.
+- NEXT-25, NEXT-29, NEXT-33 (retired).
+- [ ] [NEXT-71] A childless container with an uncut row that is itself a child of another item gets `cut_slice` like any other (NEXT-05; CUT-48), whatever that parent's type, state or repository (E-NEXT-22).
 
 ## `RECOVERY` and `SKIPPED`
 
@@ -334,28 +333,6 @@ $ aco --repo acme/items next --json
 {"ok": false, "reason": "invalid_usage", "message": "--repo is meaningless under storage = state-ref"}
 exit 2
 ```
-
-### E-NEXT-09 — a nested container's uncut row, never a `cut` that `cut` refuses
-
-Setup: bare-remote, fake `gh`, container `#298` with one open child, the container `#299`; `#299` has no open child and one `[[slice]]` row titled `Scheibe Z` with `scope = ["docs/z.md"]`
-
-```console
-$ aco next
-No actionable item.
-parallel: none
-scope unknown: none
-close: none
-
-SKIPPED
-#298: container; claim a child
-#299: nested container, which cut refuses; run aco item edit 299 --kind task and claim it with aco claim 299 --scope=docs/z.md --out-of-order <reason>
-exit 3
-$ aco cut 299 --title "Scheibe Z"
-2> ERROR: #299 is itself a child of example/agent-coordination#298; nested containers are not supported
-exit 2
-```
-
-The named `item edit --kind task` runs under either storage (ITEM-47), `#299` printed as the id the storage takes back; the named claim then claims the row's paths past any higher-ranked free item (NEXT-33), and once retyped `next`'s own `Run:` line names that same claim without `--out-of-order <reason>` (NEXT-30). A container naming its own top-level `scope` ends the reason `claim it with aco claim 299 --out-of-order <reason>` instead, the claim that derives that scope (NEXT-03); a row without a `scope` of its own, under a container without one, ends it `claim it with aco claim 299 --scope <paths> --out-of-order <reason>`. With two or more uncut rows, the `SKIPPED` reason reads `nested container, which cut refuses; move its slice rows to example/agent-coordination#298`, the parent named as `cut`'s refusal names it. The same holds when `#298` is a Feature or Task, closed, or in another repository: `next` reads the parent relation `cut` refuses on.
 
 ### E-NEXT-10 — a second cuttable container, and row fields holding a line break or control character
 
@@ -583,5 +560,22 @@ scope unknown
 parallel: unknown (first action names no scope)
 close: none
 waiting on operator: #7
+exit 0
+```
+
+### E-NEXT-22 — a nested container's uncut row
+
+Setup: bare-remote, fake `gh`, container `#298` with one open child, the container `#299`, a child of `#298`; `#299` has no open child and one `[[slice]]` row titled `Scheibe Z`
+
+```console
+$ aco next
+cut_slice #299: Scheibe Z
+Next: aco cut 299
+parallel: none
+scope unknown: none
+close: none
+
+SKIPPED
+#298: container; claim a child
 exit 0
 ```

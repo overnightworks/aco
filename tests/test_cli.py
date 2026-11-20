@@ -4521,68 +4521,48 @@ def test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_contain
         assert client.created_children[0][0] == item.number
 
 
+_NESTED_CUT_FIRST = "cut_slice #299: Scheibe Y\nNext: aco cut 299\n"
+_NESTED_CUT_BEHIND_THE_PARENT = '\n#299: cut slice "Scheibe Y"; run aco cut 299\n'
+
+
 @pytest.mark.parametrize(
-    ("parent_kind", "parent_open", "parent_repository", "slice_titles", "repair"),
+    ("parent_kind", "parent_open", "parent_repository", "advice"),
     [
         pytest.param(
-            body.ItemKind.CONTAINER,
-            True,
-            REPOSITORY,
-            ("Scheibe Z",),
-            "nested container, which cut refuses; run aco item edit 299 --kind task and "
-            "claim it with aco claim 299 --scope <paths> --out-of-order <reason>",
-            id="open_container_parent_one_scopeless_row_names_the_task_repair",
-        ),
-        pytest.param(
-            body.ItemKind.CONTAINER,
-            True,
-            REPOSITORY,
-            ("Scheibe Y", "Scheibe Z"),
-            f"nested container, which cut refuses; move its slice rows to {REPOSITORY}#298",
-            id="several_rows_name_the_move_to_the_parent",
+            body.ItemKind.CONTAINER, True, REPOSITORY, _NESTED_CUT_FIRST, id="open_container_parent"
         ),
         pytest.param(
             body.ItemKind.FEATURE,
             True,
             REPOSITORY,
-            ("Scheibe Y", "Scheibe Z"),
-            f"nested container, which cut refuses; move its slice rows to {REPOSITORY}#298",
-            id="feature_parent",
+            _NESTED_CUT_BEHIND_THE_PARENT,
+            id="feature_parent_ranks_first",
         ),
         pytest.param(
-            body.ItemKind.CONTAINER,
-            False,
-            REPOSITORY,
-            ("Scheibe Y", "Scheibe Z"),
-            f"nested container, which cut refuses; move its slice rows to {REPOSITORY}#298",
-            id="closed_parent",
+            body.ItemKind.CONTAINER, False, REPOSITORY, _NESTED_CUT_FIRST, id="closed_parent"
         ),
         pytest.param(
             body.ItemKind.CONTAINER,
             False,
             "other-owner/other-repo",
-            ("Scheibe Y", "Scheibe Z"),
-            "nested container, which cut refuses; move its slice rows to "
-            "other-owner/other-repo#298",
+            _NESTED_CUT_FIRST,
             id="parent_in_another_repository",
         ),
     ],
 )
-def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
+def test_next_proposes_a_nested_containers_row_as_a_cut_that_cut_runs(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
     parent_kind: body.ItemKind,
     parent_open: bool,
     parent_repository: str,
-    slice_titles: tuple[str, ...],
-    repair: str,
+    advice: str,
 ) -> None:
-    """A container that is itself a child, its
-    own children closed and an uncut `[[slice]]` row left. `cut` refuses it
-    whatever its parent's type, state, or repository, so `next` never prints
-    that `cut` -- it names the container's repair under `SKIPPED` instead,
-    and `cut` keeps its refusal: the advice and the command agree."""
+    """Spec: NEXT-71, CUT-48. A container that is itself a child, its own
+    children closed and an uncut `[[slice]]` row left, gets `cut_slice` like any
+    other container whatever its parent's type, state or repository, and the
+    printed `cut` creates the child under it."""
     parent = Issue(
         298,
         "Epic",
@@ -4598,7 +4578,7 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
         299,
         "Nested epic",
         (),
-        complete_contract("keiner", slice=slice_entries(*slice_titles)),
+        complete_contract("keiner", slice=slice_entries("Scheibe Y", "Scheibe Z")),
         "2026-08-20T00:00:00Z",
         "2026-08-20T00:00:00Z",
         kind=body.ItemKind.CONTAINER,
@@ -4614,20 +4594,15 @@ def test_next_names_a_nested_containers_repair_where_cut_refuses_its_row(
     client.parents[299] = workboard.ParentIssue(
         workboard.IssueReference(parent_repository, 298), parent.body, parent_kind
     )
-    cut_arguments = ["--repo", REPOSITORY, "cut", "299", "--title", slice_titles[0]]
 
     next_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
     next_out = capsys.readouterr().out
-    cut_exit_code = issue_claim.main(cut_arguments)
+    cut_exit_code = issue_claim.main(["--repo", REPOSITORY, "cut", "299", "--title", "Scheibe Y"])
 
-    assert cut_exit_code == 2
-    assert f"\n#299: {repair}\n" in next_out
-    assert "cut 299" not in next_out
-    assert capsys.readouterr().err == (
-        f"ERROR: #299 is itself a child of {parent_repository}#298; "
-        "nested containers are not supported\n"
-    )
-    assert next_exit_code == (0 if parent_kind is body.ItemKind.FEATURE else 3)
+    assert next_exit_code == 0
+    assert advice in next_out
+    assert cut_exit_code == 0
+    assert client.created_children[0][0] == 299
 
 
 _WIDE_SCOPE = ("src/a.py", "src/b.py", "src/c.py", "src/d.py", "src/e.py")
@@ -5334,54 +5309,6 @@ def test_foreign_text_printers_json_keep_the_foreign_lines_as_stored(
     issue_claim.main([*arguments, "--json"])
 
     assert _FOREIGN_MULTI_LINE_TEXT in json.loads(capsys.readouterr().out)[key]
-
-
-def test_state_ref_next_claim_in_a_skipped_reason_runs_past_a_higher_ranked_item(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """A nested container's repair names a claim that the
-    ordering rule would refuse while a higher-ranked item is free, so it
-    carries `--out-of-order <reason>`; filled in, the retype and the claim
-    both run unchanged in a real shell and succeed."""
-    repo, _remote, _seeded = _real_state_ref_repository(
-        monkeypatch,
-        tmp_path,
-        {
-            10: _state_ref_item_body("Top work", scope=["docs/top.md"]),
-            20: _state_ref_container_body("Epic"),
-            21: _state_ref_container_body("Nested epic", "Scheibe Z", parent=20),
-        },
-    )
-    lane = tmp_path / "repo-worktrees" / "issue-21-nested"
-    real_git(repo, "worktree", "add", "-q", str(lane), "-b", "codex/issue-21-nested")
-    _stand_in_with_the_live_trunk(monkeypatch, lane)
-    nested = items.format_item_id(21)
-
-    next_exit_code = issue_claim.main(["next"])
-    repair = _printed_line_after(capsys.readouterr().out, f"\n{nested}: ")
-    retype, claim = repair.removeprefix("nested container, which cut refuses; run ").split(
-        " and claim it with "
-    )
-    retype_bash_exit_code, retype_arguments = arguments_bash_hands_aco(retype, tmp_path)
-    retype_exit_code = issue_claim.main(retype_arguments)
-    filled_claim = claim.replace("<paths>", "docs/nested.md").replace(
-        "<reason>", shlex.quote("the operator wants it first")
-    )
-    claim_bash_exit_code, claim_arguments = arguments_bash_hands_aco(filled_claim, tmp_path)
-    in_order_exit_code = issue_claim.main(claim_arguments[:-2])
-    in_order_refusal = capsys.readouterr().err
-    claim_exit_code = issue_claim.main(claim_arguments)
-
-    assert claim_arguments[-2] == "--out-of-order"
-    assert "use --out-of-order REASON to proceed" in in_order_refusal
-    assert (
-        next_exit_code,
-        retype_bash_exit_code,
-        retype_exit_code,
-        claim_bash_exit_code,
-        in_order_exit_code,
-        claim_exit_code,
-    ) == (0, 0, 0, 0, 2, 0), capsys.readouterr().err
 
 
 def test_state_ref_next_pulls_past_an_item_waiting_on_the_operator_and_claim_does_not_warn(

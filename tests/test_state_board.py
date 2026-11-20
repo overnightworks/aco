@@ -12,7 +12,6 @@ import hashlib
 import io
 import json
 import re
-import shlex
 import sys
 import uuid
 from collections.abc import Callable, Mapping
@@ -2570,25 +2569,6 @@ class TestCliStateRefForge:
                 f"{CONTAINER_ID} has no row 9; cuttable rows: 1",
                 id="missing-row",
             ),
-            pytest.param(
-                {
-                    **_item_files(),
-                    "aco-0000aa.md": _state_ref_body(
-                        _CONTAINER_PROJECTION,
-                        item_record(title="Outer", state="open", kind="container"),
-                    ).encode(),
-                    f"{CONTAINER_ID}.md": _state_ref_body(
-                        _CONTAINER_PROJECTION,
-                        item_record(
-                            title="Epic", state="open", kind="container", parent="aco-0000aa"
-                        ),
-                    ).encode(),
-                },
-                [],
-                f"{CONTAINER_ID} is itself a child of aco-0000aa; "
-                "nested containers are not supported",
-                id="nested-container",
-            ),
             *(
                 pytest.param(
                     _item_files_with_container_block(
@@ -2615,7 +2595,7 @@ class TestCliStateRefForge:
         row: list[str],
         refusal: str,
     ) -> None:
-        """`--row 9` naming no entry, a container that is itself a child, or a
+        """`--row 9` naming no entry, or a
         row whose `done_when` holds a display control (BODY-66, CUT-05)
         refuses by the item id -- the same by-name refusals GitHub's own
         cut tests prove -- and nothing reaches the remote. A readable
@@ -2698,7 +2678,7 @@ class TestCliStateRefForge:
             f"{CONTAINER_ID}.md": _container_body_with_slices(slice_rows, parent=outer_id).encode(),
         }
 
-    def test_next_names_the_move_to_the_parent_for_a_nested_containers_rows_under_state_ref(
+    def test_next_proposes_a_nested_containers_row_and_cut_creates_its_child_under_it(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
@@ -2706,61 +2686,27 @@ class TestCliStateRefForge:
         bare_remote: Path,
         worktree: Path,
     ) -> None:
-        """A nested container's several uncut rows need moving to
-        its parent, named by item id, and `cut` keeps its refusal."""
-        outer_id, item_files = self._nested_container_files(((1, "Slice Y"), (2, "Slice Z")))
+        """Spec: NEXT-71, CUT-48. A container that is itself a child gets
+        `cut_slice` by item id, and the cut makes the child under it."""
+        _outer_id, item_files = self._nested_container_files(((1, "Slice Y"), (2, "Slice Z")))
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
 
         next_status = issue_claim.main(["next"])
         next_out = capsys.readouterr().out
         cut_status = issue_claim.main(["cut", CONTAINER_ID, "--title", "Slice Y"])
 
-        assert (next_status, cut_status) == (3, 2)
-        assert (
-            f"\n{CONTAINER_ID}: nested container, which cut refuses; "
-            f"move its slice rows to {outer_id}\n"
-        ) in next_out
-        assert capsys.readouterr().err == (
-            f"ERROR: {CONTAINER_ID} is itself a child of {outer_id}; "
-            "nested containers are not supported\n"
+        assert next_status == 0
+        assert next_out.startswith(
+            f"cut_slice {CONTAINER_ID}: Slice Y\nNext: aco cut {CONTAINER_ID}\n"
         )
-
-    def test_following_next_for_a_nested_containers_one_row_ends_in_a_claim_under_state_ref(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        tmp_path: Path,
-        bare_remote: Path,
-        worktree: Path,
-    ) -> None:
-        """`next`'s repair
-        for a nested container's one uncut row is a command aco runs under
-        state-ref too -- `item edit --kind task` (ITEM-47) -- and following
-        it to the end claims the item on that row's scope."""
-        _outer_id, item_files = self._nested_container_files(((1, "Slice Z"),))
-        self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
-        _enter_claim_lane(monkeypatch, worktree, "codex/nested-container")
-
-        next_status = issue_claim.main(["next"])
-        advice = next(
-            line
-            for line in capsys.readouterr().out.splitlines()
-            if line.startswith(f"{CONTAINER_ID}: nested container")
+        assert cut_status == 0
+        child_id = capsys.readouterr().out.strip().rsplit(" ", 1)[1]
+        state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
+        assert state.tip is not None
+        child_body = store.read_item_files(worktree, state.tip)[f"{child_id}.md"].decode()
+        assert parse_body(child_body, storage=Storage.STATE_REF).contract.now == (
+            f"Cut from {CONTAINER_ID}"
         )
-        repair = advice.split("; run aco ", 1)[1].split(" and claim it with ", 1)[0]
-        repair_status = issue_claim.main(shlex.split(repair))
-        repair_out = capsys.readouterr().out
-        claim_status = issue_claim.main(
-            ["claim", CONTAINER_ID, "--agent", "Codex Sol", "--scope", "README"]
-        )
-
-        assert (next_status, repair, repair_status) == (
-            3,
-            f"item edit {CONTAINER_ID} --kind task",
-            0,
-        )
-        assert repair_out == f"EDITED {CONTAINER_ID} kind=task\n"
-        assert claim_status == 0, capsys.readouterr().err
 
     def _cut_child_scope(
         self, worktree: Path, bare_remote: Path, capsys: pytest.CaptureFixture[str]
@@ -4036,16 +3982,10 @@ class TestCliStateRefForge:
         problem: str,
     ) -> None:
         """`Slice A` turned unreadable -- `Slice B` is
-        blocked by it and a childless container with an uncut row is nested
-        under it -- yet `board`, `next` and `rulings` still read, `board`
+        blocked by it -- yet `board`, `next` and `rulings` still read, `board`
         and `next` naming it by its defect (BOARD-54), `item show` still
         reads every other item, and only `item show` of that item refuses."""
-        nested_id = "aco-00000b"
-        nested_body = _container_body_with_slices(((1, "Cut it"),), parent=CHILD_A_ID)
-        item_files = {
-            **_item_files_with_a_malformed_item(content, CHILD_A_ID),
-            f"{nested_id}.md": nested_body.encode(),
-        }
+        item_files = _item_files_with_a_malformed_item(content, CHILD_A_ID)
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
         unreadable_line = f"\n{CHILD_A_ID}: body malformed: "
 
@@ -4070,10 +4010,8 @@ class TestCliStateRefForge:
             CONTAINER_NUMBER,
             CHILD_A_NUMBER,
             CHILD_B_NUMBER,
-            items.item_number(nested_id),
         }
         assert unreadable_line in next_out
-        assert f"\n{nested_id}: " in next_out
         assert f"\n{CHILD_B_ID}: blocked by {CHILD_A_ID}" in next_out
         assert json.loads(own_json_show.stdout)["message"] == _malformed_item_refusal(
             problem, CHILD_A_ID

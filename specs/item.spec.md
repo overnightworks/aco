@@ -461,7 +461,7 @@ Under `storage = "state-ref"` the retype is its own write (CAS-71), and the chil
 
 ### E-ITEM-13 — a childless container turns Task, one with an open child stays
 
-Setup: `storage = "state-ref"`, `<item-id>` a nested container with one uncut row and no open child, `<container-id>` a container with an open child
+Setup: `storage = "state-ref"`, `<item-id>` a container with one uncut row and no open child, `<container-id>` a container with an open child
 
 ```console
 $ aco item edit <item-id> --kind task
