@@ -5,6 +5,7 @@ from datetime import date
 
 import pytest
 from board_fixtures import (
+    block_dependency,
     board_issue,
     complete_contract,
     projected_board,
@@ -128,6 +129,35 @@ def test_a_container_with_a_wait_and_an_uncut_row_is_never_cut(
     assert workboard.next_action(board) is None
     assert item.actionable_reason == reason
     assert not item.waits_on_operator
+
+
+def test_a_container_with_an_open_blocker_and_an_uncut_row_is_never_cut() -> None:
+    """NEXT-69."""
+    contract = complete_contract("Cut it.", slice=slice_entries("Scheibe A"))
+    issue = workboard.Issue(
+        NUMBER,
+        "Blocked epic",
+        (),
+        contract,
+        "2026-08-20T00:00:00Z",
+        "2026-08-20T00:00:00Z",
+        kind=ItemKind.CONTAINER,
+        children_closed=1,
+        children_total=1,
+        blocked_by_count=1,
+    )
+    board = projected_board(
+        (issue,),
+        (),
+        (),
+        (),
+        BoardConfig(),
+        today=date(2026, 11, 15),
+        dependencies={NUMBER: (block_dependency(9),)},
+    )
+
+    assert workboard.next_action(board) is None
+    assert board.items[0].actionable_reason == "blocked by #9"
 
 
 @pytest.mark.parametrize(("wait", "reason"), WAITS_WITH_REASON)

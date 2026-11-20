@@ -2142,14 +2142,13 @@ def closable_container_number(
 
 def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
     """The action a childless container qualifies for, read off its one `childless_verdict`, or
-    `None` to skip it: a non-`VALID` body names its own finding elsewhere and is never guessed
-    through, a `NestedRepairVerdict` names its repair under `SKIPPED`, not a `cut` that `cut`
-    refuses, and a container waiting on the operator or on a `wait` is only ever closed, never
-    cut. An idea container is none of these."""
+    `None` to skip it: a non-`VALID` body names its own finding elsewhere, a `NestedRepairVerdict`
+    its repair under `SKIPPED`, and a container waiting on the operator, on a `wait` or on an
+    open blocker is only ever closed, never cut."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
-    if item.is_waiting and not isinstance(verdict, CloseVerdict):
+    if (item.is_waiting or item.open_blockers) and not isinstance(verdict, CloseVerdict):
         return None
     match verdict:
         case CutVerdict(title=cut_title):
@@ -2562,7 +2561,8 @@ def _actionable_reason(facts: _ActionabilityFacts) -> str | None:
     if _waits_on_operator(facts):
         return WAITING_ON_OPERATOR
     if facts.kind is ItemKind.CONTAINER:
-        if facts.wait is not None:
+        held = facts.open_blockers and isinstance(facts.childless_verdict, CutVerdict)
+        if facts.wait is not None or held:
             return _claim_or_completeness_reason(facts)
         return (
             facts.childless_container_reason
