@@ -104,6 +104,7 @@ layers = [
     "github_graphql | github_actions | github_issue_payload | github_body_write | github_failure | github_merge_queue | earlier_rulings",
     "forge | rulings",
     "workboard",
+    "recurring_audit",
     "items | expectations",
     "body",
     "item_wait | item_handover | item_step | body_planned",
