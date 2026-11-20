@@ -1,0 +1,8 @@
+claim_id = "cde9a33acfe9460b8345b4c0312d2d08"
+agent = "Claude deb862cb-0966-452b-a001-fbf8c7b46d71"
+role = "builder"
+base = "332fde7aa29b6768bc91331a65237fec4cb23f03"
+branch = "claude/issue-996-lane-record-test-mirrors"
+scope = ["quality/baseline.toml", "tests/test_cmd_lane_record_runs.py", "tests/test_cmd_lane_record_show.py", "tests/test_lane_runs.py", "tests/test_lane_runs_lane_figures.py"]
+opened_commit = "221f52e6e0fca24973a417ed08158c74472a91f0"
+whole_reason = "The mirrors and the tests that take over their spec citations change together, so no spec ID loses its test between two landings."
