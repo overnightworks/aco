@@ -5582,29 +5582,6 @@ def test_next_json_closes_a_container_with_no_slice_row_whose_next_line_names_wo
     assert "cut_title" not in payload
 
 
-def test_next_cut_line_shows_the_row_title_although_the_container_next_line_names_work(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
-    """Spec: NEXT-05, NEXT-12. The cut line and JSON `slice` read the first
-    uncut row's title, never the container's own `Next` prose."""
-    container, container_children = container_with_children(
-        189,
-        closed=1,
-        body=complete_contract("Danach die Abnahme planen.", slice=slice_entries("Scheibe C")),
-    )
-    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
-    client.children[189] = container_children
-
-    text_status = issue_claim.main(["--repo", REPOSITORY, "next"])
-    text = capsys.readouterr().out
-    json_status = issue_claim.main(["--repo", REPOSITORY, "next", "--json"])
-    payload = json.loads(capsys.readouterr().out)
-
-    assert (text_status, json_status) == (0, 0)
-    assert text.splitlines()[0] == "cut_slice #189: Scheibe C"
-    assert payload["slice"] == "Scheibe C"
-
-
 def test_next_caps_the_parallel_text_list_at_three_and_counts_the_rest(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:

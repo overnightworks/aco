@@ -1984,9 +1984,9 @@ def _action_scope(
     action: NextAction, uncut_by_container: Mapping[int, UncutSlices]
 ) -> tuple[str, ...] | None:
     """The scope one `NextAction` occupies for `parallel_set`: a work item's
-    own `scope` or a cut proposal's first uncut row scope; `()` for a close or
-    check, a zero-cost action against no paths; `None` when the action names
-    no scope of its own."""
+    own `scope` or a cut proposal's first uncut row scope; `()` for a close, a
+    zero-cost action against no paths; `None` when the action names no scope
+    of its own."""
     if isinstance(action, WorkItemAction):
         return action.scope
     if isinstance(action, CutSliceAction):
@@ -2035,7 +2035,7 @@ def parallel_set(
     board: Board, live_claims: tuple[protocol.ScopedClaim, ...], action: NextAction | None
 ) -> ParallelSet:
     """Every further free item `next`'s first `action` can run alongside right
-    now, none held back for an overlap. A close or check action and a
+    now, none held back for an overlap. A close action and a
     `board.recovery` item (`zero_cost_closes`' own domain) are skipped outright."""
     if action is None:
         return ParallelSet((), (), False)
