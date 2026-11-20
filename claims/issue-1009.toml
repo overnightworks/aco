@@ -1,8 +1,0 @@
-claim_id = "ffc4beb7a2f24d08bb41686186cfc747"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "a6f8bb3ba745da9723cb65ce1006a65a9ef90b54"
-branch = "claude/issue-1009-next-blocked-container-cut"
-scope = ["quality/baseline.toml", "specs/next.spec.md", "src/aco/workboard.py", "tests/test_cmd_next_blocked_container.py", "tests/test_workboard_wait.py"]
-opened_commit = "a2a6b404fa39be58d795839c0f43b499c302d1df"
-whole_reason = "One decider change plus its spec and two test hosts; they must land together, and the baseline only lowers."
