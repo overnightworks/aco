@@ -147,7 +147,7 @@ Issue-less refusal order: LAND-16, LAND-17, LAND-70, LAND-75/76, LAND-73, LAND-7
 ## Parent closing at the last open child
 
 Parentage is GitHub's own sub-issue relation, read fresh for every `check`;
-recorded for the declared work item, and the acceptance criteria below assume
+the "parent" is the one recorded for the declared work item, and the acceptance criteria below assume
 the other classification checks pass. An uncut `[[slice]]` row is work left in
 the parent. A malformed body's own defect sentence
 is `specs/body-block.spec.md`'s own fact, cited here as `<body defect
@@ -166,7 +166,7 @@ then LAND-79 and LAND-21, and only then LAND-19.
 - [ ] [LAND-86] An open sub-issue of the parent in another repository counts as another open child: closing the last local child is no last-child landing (LAND-21 does not fire) and LAND-24 applies.
 - [ ] [LAND-26] A parent whose own body reads as malformed refuses `has parent <ref> with a <body defect sentence>`, exit `2`, before the last-child rule runs; a valid but incomplete parent proceeds to it.
 - [ ] [LAND-27] A recorded parent whose own kind is not `container` refuses `has parent <ref> of kind <kind>, which is not a container; only a container holds children`, exit `2`.
-- [ ] [LAND-28] A recorded parent in another repository sets no parent requirement (LAND-21, LAND-22, LAND-24..LAND-27, LAND-79 do not apply): the landing neither must nor may close it, exit `0`.
+- [ ] [LAND-28] A recorded parent in another repository sets no parent requirement (LAND-21, LAND-22, LAND-24..LAND-27, LAND-79 do not apply): the landing neither must nor may close it, its own repository closes it, exit `0`.
 
 ## What `release --merged` requires
 

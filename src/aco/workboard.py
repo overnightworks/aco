@@ -589,7 +589,7 @@ class BoardItem:
     actionable_reason: str | None
     # Whether the operator's ruling, not an agent, frees this item,
     # decided once by `_waits_on_operator`: `next` names it under
-    # `waiting on operator:` and never cuts or checks such a container.
+    # `waiting on operator:` and never cuts it and never names it first.
     waits_on_operator: bool
     # `actionable_reason` as `next`'s text prints it under `SKIPPED`:
     # through `protocol.terminal_text`. The prose itself, a cut slice's title
