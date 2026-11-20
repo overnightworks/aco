@@ -94,7 +94,7 @@ other printable space are text.
 - [ ] [NEXT-42] A scope `claim` calls wide here (four paths, or a directory such as `src`) and no body `whole` ends `Run:` with `--whole <reason>`; with `whole` set, it is left out (E-NEXT-14).
 - [ ] [NEXT-37] Text shows each display control in a title, `Next`, slice title or `SKIPPED` reason as its escape: `a\x1b[2J` prints as typed; TAB, NBSP and `Größe` as is; `--json` unchanged but BODY-68.
 - [ ] [NEXT-03] An item naming its own top-level `scope` drops `--scope` from `Run:`; a scopeless item's `Run:` ends `--scope <paths>` and gains a further `scope unknown` line (see E-NEXT-02).
-- [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths -- instead prints `--scope=<path>` per path of that row, with no `scope unknown`.
+- [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths prints `--scope=<path>` per path of that row, with no `scope unknown`.
 - [ ] [NEXT-04] A still-proposed item that is pulled (NEXT-70 holds the others) adds `expectations unruled: refine before the pull`, a stale ruling `ruled <n> landings ago: refine again at the pull`, never both.
 - [ ] [NEXT-48] A withdrawn line (BODY-104) never adds `expectations unruled` and never dates a ruling; an item of only withdrawn lines adds neither NEXT-04 hint.
 - [ ] [NEXT-23] A scopeless, sliceless item still qualifies as this action (`scope unknown`, NEXT-03); `claim`/`start`'s own precedence check reads a narrower rule (`specs/claim.spec.md` CLM-23).
