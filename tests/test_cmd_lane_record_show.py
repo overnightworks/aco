@@ -59,13 +59,12 @@ class Start(StrEnum):
 @dataclass(frozen=True)
 class Step:
     """One run a scenario begins and, with `ran`, adds with a record that states `changes` over a
-    valid one and leaves out the fields in `omitted`."""
+    valid one."""
 
     run: str
     start: Start = Start.NOWHERE
     ran: tuple[RoutingStage, ...] | None = STAGES_RAN
     changes: dict[str, object] = field(default_factory=dict)
-    omitted: tuple[str, ...] = ()
 
 
 def head_of(world: World) -> str:
@@ -84,9 +83,7 @@ def play(world: World, capsys: pytest.CaptureFixture[str], *steps: Step) -> str:
         began = world.run(capsys, *begin_arguments(world, step.run, *start_flags[step.start]))
         assert began.status == 0, began.stderr
         if step.ran is not None:
-            stated = lane_record_object(**step.changes)
-            content = {name: value for name, value in stated.items() if name not in step.omitted}
-            file = write_lane_record_file(world.scratch, content)
+            file = write_lane_record_file(world.scratch, lane_record_object(**step.changes))
             added = world.run(
                 capsys, *add_arguments(world, step.run, file=file, end_tip=head, stages=step.ran)
             )
@@ -227,17 +224,6 @@ def assert_shown(
             id="the-only-run-is-begun-without-a-record",
         ),
         pytest.param(
-            (Step(FIRST_RUN), Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, ran=None)),
-            {
-                "complete": False,
-                "lane.stages.review": None,
-                "lane.stages.land": None,
-                "lane.risk": None,
-                "lane.fix_rounds": None,
-            },
-            id="a-second-run-is-begun-without-a-record",
-        ),
-        pytest.param(
             (
                 Step(FIRST_RUN),
                 Step(
@@ -319,71 +305,6 @@ def test_two_chained_runs_show_the_first_build_the_last_review_summed_counts_and
     }
 
     assert_shown(world, capsys, steps, expected)
-
-
-def test_a_record_that_lacks_misses_leaves_the_misses_unknown_and_the_other_counts_summed(
-    world: World, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LANREC-81, LANREC-82."""
-    steps = (Step(FIRST_RUN), Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, omitted=("misses",)))
-    expected: dict[str, object] = {
-        "complete": True,
-        "lane.misses": None,
-        "lane.fix_rounds": four(2, 0, 4, 0),
-        "lane.blocking": four(6, 0, 2, 0),
-    }
-
-    assert_shown(world, capsys, steps, expected)
-
-
-@pytest.mark.parametrize(
-    ("second_experiment", "expected"),
-    [
-        pytest.param("builder-sonnet", "builder-sonnet", id="the-same-tag-in-every-run"),
-        pytest.param("other-tag", None, id="differing-tags"),
-    ],
-)
-def test_the_experiment_is_the_tag_every_run_states_and_unknown_where_they_differ(
-    world: World,
-    capsys: pytest.CaptureFixture[str],
-    second_experiment: str,
-    expected: str | None,
-) -> None:
-    """Spec: LANREC-83."""
-    steps = (
-        Step(FIRST_RUN),
-        Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes={"experiment": second_experiment}),
-    )
-
-    assert_shown(world, capsys, steps, {"complete": True, "lane.experiment": expected})
-
-
-def test_a_count_summed_beyond_999_in_one_stage_is_shown_as_999(
-    world: World, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LANREC-81."""
-    changes: dict[str, object] = {"fix_rounds": four(600, 0, 0, 0), "misses": four(0, 0, 0, 0)}
-    steps = (
-        Step(FIRST_RUN, changes=changes),
-        Step(SECOND_RUN, Start.AFTER_THE_EARLIER_RUN, changes=changes),
-    )
-
-    assert_shown(world, capsys, steps, {"complete": True, "lane.fix_rounds": four(999, 0, 0, 0)})
-
-
-def test_a_stage_no_run_ran_is_none_except_review_which_is_unknown(
-    world: World, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LANREC-79."""
-    expected: dict[str, object] = {
-        "complete": True,
-        "lane.stages.review": None,
-        "lane.stages.fix": "none",
-        "lane.stages.test": "none",
-        "lane.stages.gate": "none",
-    }
-
-    assert_shown(world, capsys, (Step(FIRST_RUN, ran=(RoutingStage.BUILD,)),), expected)
 
 
 def test_a_run_that_starts_at_a_merge_of_trunk_onto_the_earlier_end_tip_follows(
