@@ -865,14 +865,7 @@ def test_board_marks_text_only_items_stale_only_after_seven_idle_days(
 
 def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
     now = datetime(2026, 8, 21, tzinfo=UTC)
-    blocker = workboard.Issue(
-        20,
-        "Unlabelled prerequisite",
-        (),
-        "",
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-    )
+    blocker = board_issue(20, "Unlabelled prerequisite", "", open_dependents=1)
     product = workboard.Issue(
         21,
         "Product work",
@@ -894,7 +887,7 @@ def test_board_ranks_a_real_blocker_ahead_of_a_blocked_product_item() -> None:
     )
 
     assert [item.number for item in projected.items] == [20, 21]
-    assert projected.items[0].unblocks_count == 1
+    assert (projected.items[0].unblocks_count, projected.items[0].priority_bucket) == (1, "blocker")
     assert projected.items[1].open_blockers == (workboard.IssueReference(REPOSITORY, 20),)
 
 
@@ -1045,7 +1038,7 @@ _RANKINGS = {
     "ci-ahead-of-a-high-scoring-blocker": _Ranking(
         (
             board_issue(30, "CI", "", labels=("ci",)),
-            board_issue(31, "Blocker", ""),
+            board_issue(31, "Blocker", "", open_dependents=1),
             board_issue(32, "Dependent", "", blocked_by_count=1),
         ),
         (workboard.PullRequest(90, "Fixes #31", "", "branch"),),
@@ -1112,9 +1105,7 @@ def test_board_ranks_a_blocker_ahead_of_a_last_open_child() -> None:
     last_child = workboard.Issue(
         101, "Last open child", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
     )
-    blocker = workboard.Issue(
-        102, "Unblocks other work", (), "", "2026-08-20T00:00:00Z", "2026-08-20T00:00:00Z"
-    )
+    blocker = board_issue(102, "Unblocks other work", "", open_dependents=1)
     dependent = workboard.Issue(
         103,
         "Depends on the blocker",
@@ -1583,6 +1574,7 @@ def test_next_names_the_boards_top_row_even_when_it_is_not_the_highest_score() -
         51,
         "Prerequisite the operator prioritized",
         complete_contract("Unblock #52.", scope=["src/widget.py"]),
+        open_dependents=1,
     )
     dependent, dependent_blockers = blocked_issue(
         52, "Depends on the prerequisite", block_dependency(51), next_step="Ship it."

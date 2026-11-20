@@ -454,6 +454,7 @@ class StateRefBoard:
             children_closed,
             children_total,
             len(record.blocked_by),
+            items.open_dependents((held.record for held in self._items.values()), item_id),
             author_is_member=True,
         )
 
@@ -535,9 +536,8 @@ class StateRefBoard:
         return self._default_branch
 
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
-        """Every open item, plus every unreadable one as a row the board
-        names by its defect: its state may not read, so it
-        counts as open, and one such item never hides the others."""
+        """Every open item, plus every unreadable one as a row the board names by its defect:
+        its state may not read, so it counts as open, and one never hides the others."""
         self._refuse_a_foreign_entry()
         return (
             *(

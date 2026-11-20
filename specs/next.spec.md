@@ -37,6 +37,7 @@ other printable space are text.
 | `--repo` under `storage = "state-ref"` | BOARD-42 (cited) | BOARD-42 (cited), NEXT-24 |
 | no actionable item at all | NEXT-01 | NEXT-01 |
 | a work item is the top action | NEXT-02, NEXT-03 | NEXT-11 |
+| an item has an open dependent in any repository | NEXT-72 | NEXT-11 |
 | that action, run outside a linked non-default worktree | NEXT-41 | NEXT-11 |
 | that action's scope is wide and the body names no `whole` | NEXT-42 | NEXT-11 |
 | that item's expectations are proposed or old-ruled | NEXT-04 | NEXT-11 |
@@ -90,6 +91,7 @@ other printable space are text.
 ## A work item action
 
 - [ ] [NEXT-02] The top-ranked item prints `<label> score <s>: <title>`, then `Next: <item's own Next>`, then `Run: aco claim <n>` from a linked worktree on a non-default branch, exit `0` (see E-NEXT-01).
+- [ ] [NEXT-72] An item's score adds 20 for each open item that names it as a blocker, in any repository (a closed dependent adds nothing), and that count is `unblocks_count`. Under `github` it is GitHub's open-dependent count from the board listing, at no request beyond it; under `state-ref` it is the open items in the store that name the item in `blocked_by`. An item with such a dependent ranks in the `blocker` bucket (E-NEXT-23).
 - [ ] [NEXT-41] From any other checkout, where `claim` refuses, `Run:` is `aco start <n> --slug=<slug>`, the title's slug, else the id: `!!! ???` gives the number under `github`, the id under `state-ref` (E-NEXT-14).
 - [ ] [NEXT-42] A scope `claim` calls wide here (four paths, or a directory such as `src`) and no body `whole` ends `Run:` with `--whole <reason>`; with `whole` set, it is left out (E-NEXT-14).
 - [ ] [NEXT-37] Text shows each display control in a title, `Next`, slice title or `SKIPPED` reason as its escape: `a\x1b[2J` prints as typed; TAB, NBSP and `Größe` as is; `--json` unchanged but BODY-68.
@@ -577,5 +579,20 @@ close: none
 
 SKIPPED
 #298: container; claim a child
+exit 0
+```
+
+### E-NEXT-23 — an item that an open item in another repository waits on
+
+Setup: bare-remote, fake `gh`, issue `#10` open, complete, `scope = ["README.md"]`, one open dependent in another repository
+
+```console
+$ aco next
+#10 score 10: Work
+Next: Claim #10.
+Run: aco claim 10
+parallel: none
+scope unknown: none
+close: none
 exit 0
 ```

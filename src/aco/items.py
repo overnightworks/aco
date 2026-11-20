@@ -90,6 +90,13 @@ class ItemRecord:
     closed_at: str | None
 
 
+def open_dependents(records: Iterable[ItemRecord], item_id: str) -> int:
+    """How many of `records` are open and name `item_id` in their `blocked_by`."""
+    return sum(
+        record.state is RecordState.OPEN and item_id in record.blocked_by for record in records
+    )
+
+
 def item_number(item_id: str) -> int:
     """`item_id`'s hex suffix, read as an integer -- the value every port
     type keyed by `int` (`workboard.Issue.number`, `workboard.IssueReference.number`,

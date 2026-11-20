@@ -110,6 +110,7 @@ def _issue_line(number: int, *, pull_request: bool = False) -> str:
             "childrenClosed": None,
             "childrenTotal": None,
             "blockedByCount": 0,
+            "openDependents": 0,
         }
     )
 

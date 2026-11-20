@@ -188,7 +188,6 @@ CONTAINER_ISSUE = workboard.Issue(
     ItemKind.CONTAINER,
     children_closed=0,
     children_total=2,
-    blocked_by_count=0,
 )
 CHILD_A_ISSUE = workboard.Issue(
     CHILD_A_NUMBER,
@@ -198,7 +197,7 @@ CHILD_A_ISSUE = workboard.Issue(
     "2026-09-10T00:00:00Z",
     "2026-09-15T00:00:00Z",
     ItemKind.TASK,
-    blocked_by_count=0,
+    open_dependents=1,
 )
 CHILD_B_ISSUE = workboard.Issue(
     CHILD_B_NUMBER,
@@ -1124,6 +1123,7 @@ class TestStateRefBoardAgainstARealStateTree:
                 issue.children_closed,
                 issue.children_total,
                 issue.blocked_by_count,
+                issue.open_dependents,
             )
 
         actual = {_identity_fields(issue) for issue in state_ref_board.list_open_board_issues()}

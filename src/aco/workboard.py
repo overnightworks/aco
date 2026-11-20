@@ -3,13 +3,11 @@
 import re
 import shlex
 import tomllib
-from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import partial
-from itertools import chain
 from pathlib import Path
 from typing import NoReturn
 
@@ -136,6 +134,9 @@ class Issue:
     children_closed: int | None = None
     children_total: int | None = None
     blocked_by_count: int = 0
+    # Open items in any repository that name this one as a blocker: the one count
+    # `unblocks_count` and the blocker bucket read, filled by each store.
+    open_dependents: int = 0
     # Whether a writer of the repository wrote it; a store that does not say counts as no member's.
     author_is_member: bool = False
     # Why the store could not read this item at all: the board names it with this
@@ -1730,8 +1731,7 @@ def build_board(inputs: BoardBuildInputs) -> Board:
         )
         for issue in issues
     }
-    blocked = Counter(chain.from_iterable(blockers.values()))
-    unblocks = {issue.number: blocked[IssueReference(repository, issue.number)] for issue in issues}
+    unblocks = {issue.number: issue.open_dependents for issue in issues}
     container_progress = {
         issue.number: progress
         for issue in issues
