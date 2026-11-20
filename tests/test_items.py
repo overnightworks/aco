@@ -1,8 +1,10 @@
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from store_fixtures import decoded_item_record
 
 from aco import items, protocol
 from aco.body import (
@@ -396,3 +398,27 @@ class TestParseOrigin:
             return
         with pytest.raises(ClaimUnavailableError, match="is not an origin"):
             items.parse_origin(value)
+
+
+@pytest.mark.parametrize(
+    ("dependents", "expected"),
+    [
+        pytest.param([(items.RecordState.OPEN, ("aco-000002",))], 1, id="open"),
+        pytest.param([(items.RecordState.CLOSED, ("aco-000002",))], 0, id="closed"),
+        pytest.param([(items.RecordState.OPEN, ("aco-000009",))], 0, id="names-another-item"),
+        pytest.param(
+            [(items.RecordState.OPEN, ("aco-000002",))] * 2 + [(items.RecordState.OPEN, ())],
+            2,
+            id="counts-each-open-dependent-once",
+        ),
+    ],
+)
+def test_open_dependents_counts_only_open_records_naming_the_item(
+    dependents: list[tuple[items.RecordState, tuple[str, ...]]], expected: int
+) -> None:
+    records = [
+        replace(decoded_item_record(state=state), blocked_by=blocked_by)
+        for state, blocked_by in dependents
+    ]
+
+    assert items.open_dependents(records, "aco-000002") == expected

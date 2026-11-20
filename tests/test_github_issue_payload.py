@@ -5,7 +5,13 @@ import json
 
 import pytest
 from board_fixtures import REPOSITORY
-from github_pages import api_head, api_pull_request
+from github_pages import (
+    api_head,
+    api_pull_request,
+    board_issue_page_client,
+    raw_board_issue,
+    rest_board_issue_page_client,
+)
 
 from aco import github
 from aco.forge import ForgeMalformedResponseError
@@ -90,3 +96,49 @@ def test_the_landing_read_refuses_a_falsy_body_that_is_not_text(body: object) ->
 
     with pytest.raises(ForgeMalformedResponseError):
         client.landing(12)
+
+
+def _rest_issue(**fields: object) -> dict[str, object]:
+    return {
+        "number": 5,
+        "title": "Title",
+        "labels": [],
+        "body": "",
+        "created_at": "2026-08-20T00:00:00Z",
+        "updated_at": "2026-08-20T00:00:00Z",
+        **fields,
+    }
+
+
+@pytest.mark.parametrize(
+    ("fields", "open_dependents"),
+    [
+        pytest.param(
+            {"issue_dependencies_summary": {"blocking": 2, "total_blocking": 3}},
+            2,
+            id="two-open-of-three",
+        ),
+        pytest.param(
+            {"issue_dependencies_summary": {"blocking": 0, "total_blocking": 1}},
+            0,
+            id="its-only-dependent-closed",
+        ),
+        pytest.param({}, 0, id="no-summary"),
+    ],
+)
+def test_the_board_listing_carries_the_open_dependents_github_counts(
+    fields: dict[str, object], open_dependents: int
+) -> None:
+    client = rest_board_issue_page_client(_rest_issue(**fields))
+
+    issues = client.list_open_board_issues()
+
+    assert [issue.open_dependents for issue in issues] == [open_dependents]
+
+
+@pytest.mark.parametrize("count", ["2", -1, True, None], ids=["text", "negative", "bool", "null"])
+def test_the_board_listing_refuses_a_malformed_open_dependents_count(count: object) -> None:
+    client = board_issue_page_client(raw_board_issue(openDependents=count))
+
+    with pytest.raises(ForgeMalformedResponseError, match="malformed board issue"):
+        client.list_open_board_issues()

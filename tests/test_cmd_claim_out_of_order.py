@@ -46,8 +46,13 @@ def claimable(number: int, title: str) -> workboard.Issue:
     )
 
 
-def top_item(title: str = "Top work") -> workboard.Issue:
-    return board_issue(11, title, complete_contract("Claim #11.", scope=TOP_SCOPE))
+def top_item(title: str = "Top work", *, open_dependents: int = 1) -> workboard.Issue:
+    return board_issue(
+        11,
+        title,
+        complete_contract("Claim #11.", scope=TOP_SCOPE),
+        open_dependents=open_dependents,
+    )
 
 
 def serve_board(
@@ -130,6 +135,7 @@ def test_claim_refuses_when_the_higher_priority_item_needs_refining(
             scope=["src/needs-rulings.py"],
             expectation=[returned_option_entry("Name it.")],
         ),
+        open_dependents=1,
     )
     waiting, waiting_dependencies = blocked_issue(
         12, "Waits for rulings", block_dependency(11), next_step="Claim #12."
@@ -162,6 +168,7 @@ def test_claim_refuses_for_a_higher_priority_item_even_at_a_lower_score(
         50,
         "Prerequisite the operator prioritized",
         complete_contract("Unblock #52.", scope=["src/prerequisite.py"]),
+        open_dependents=1,
     )
     dependent, dependent_blockers = blocked_issue(
         52, "Depends on the prerequisite", block_dependency(50), next_step="Ship it."
@@ -240,7 +247,7 @@ def test_claim_does_not_require_out_of_order_for_the_top_ranked_item(
 ) -> None:
     """Spec: CLM-08."""
     standpoint = stand_in(branch=lane_branch(10))
-    serve_board(monkeypatch, (claimable(10, "Top work"), top_item("Lower work")))
+    serve_board(monkeypatch, (claimable(10, "Top work"), top_item("Lower work", open_dependents=0)))
 
     status = claim(scope=CLAIMED_SCOPE, issue=10)
 

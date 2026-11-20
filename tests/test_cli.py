@@ -268,6 +268,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
             "createdAt": "2026-08-10T00:00:00Z",
             "updatedAt": "2026-08-20T00:00:00Z",
             "blockedByCount": 0,
+            "openDependents": 1,
         },
         {
             "number": 11,
@@ -279,6 +280,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
             "createdAt": "2026-08-12T00:00:00Z",
             "updatedAt": "2026-08-20T00:00:00Z",
             "blockedByCount": 1,
+            "openDependents": 0,
         },
         {
             "number": 12,
@@ -288,6 +290,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
             "createdAt": "2026-08-01T00:00:00Z",
             "updatedAt": "2026-08-10T00:00:00Z",
             "blockedByCount": 0,
+            "openDependents": 0,
         },
         {
             "number": 13,
@@ -297,6 +300,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
             "createdAt": "2026-08-02T00:00:00Z",
             "updatedAt": "2026-08-19T00:00:00Z",
             "blockedByCount": 0,
+            "openDependents": 0,
         },
         {
             "number": 14,
@@ -306,6 +310,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
             "createdAt": "2026-08-02T00:00:00Z",
             "updatedAt": "2026-08-20T00:00:00Z",
             "blockedByCount": 0,
+            "openDependents": 0,
         },
     ]
     open_prs_json = [
@@ -345,15 +350,8 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
         elif "/issues?" in endpoint:
             rows = issues_json
         elif endpoint.startswith(f"repos/{repository}/issues/11/dependencies/blocked_by"):
-            rows = [
-                {
-                    "number": 10,
-                    "state": "open",
-                    "closedAt": None,
-                    "repository": str(repository),
-                    "isPullRequest": False,
-                }
-            ]
+            blocker = {"number": 10, "state": "open", "closedAt": None, "isPullRequest": False}
+            rows = [{**blocker, "repository": str(repository)}]
         elif endpoint.startswith(f"repos/{repository}/pulls?state=open"):
             rows = open_prs_json
         elif endpoint.endswith("/events?per_page=100&page=1"):
@@ -793,7 +791,7 @@ def _stub_issue_reference(
 
 _TOP_AND_BLOCKED = (
     board_issue(10, "Lower work", complete_contract("Claim #10.")),
-    board_issue(11, "Top work", complete_contract("Claim #11.")),
+    board_issue(11, "Top work", complete_contract("Claim #11."), open_dependents=1),
     board_issue(12, "Depends on top", complete_contract("Claim #12."), blocked_by_count=1),
 )
 _BLOCKED_BY_ELEVEN = {12: (block_dependency(11),)}
@@ -929,7 +927,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
         ),
         pytest.param(
             (
-                board_issue(9, "Open blocker", complete_contract("Claim #9.")),
+                board_issue(9, "Open blocker", complete_contract("Claim #9."), open_dependents=1),
                 board_issue(10, "Blocked", complete_contract("Claim #10."), blocked_by_count=1),
             ),
             {10: (block_dependency(9),)},
@@ -1151,6 +1149,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
         11,
         "Needs rulings",
         complete_contract("Claim #11.", expectation=[returned_option_entry("Name it.")]),
+        open_dependents=1,
     )
     blocked, blocked_dependencies = blocked_issue(
         12, "Waits for rulings", block_dependency(11), next_step="Claim #12."
@@ -5043,7 +5042,9 @@ def _rulings_of_titled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, title: s
 def _claim_past_titled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, title: str) -> list[str]:
     """A claim of #10 past a higher-ranked #11 titled `title`, out of order."""
     lower = board_issue(10, "Lower work", complete_contract("Claim #10."))
-    top = board_issue(11, title, complete_contract("Claim #11.", scope=["src/top.py"]))
+    top = board_issue(
+        11, title, complete_contract("Claim #11.", scope=["src/top.py"]), open_dependents=1
+    )
     dependent, dependent_blockers = blocked_issue(
         12, "Depends on top", block_dependency(11), next_step="Claim #12."
     )
@@ -8565,14 +8566,12 @@ def _landed_dependency(
 def _two_dependants_freed_by_the_landing() -> tuple[
     tuple[Issue, ...], dict[int, tuple[IssueDependency, ...]]
 ]:
-    """Two open items whose only blocker was `WORK_ITEM_ISSUE`, one of which
-    also unblocks a third, still-waiting item, plus a fourth item a foreign
-    repository still blocks even though its own local blocker just closed
-    -- the fixture `release --merged`'s own `freed`/`next`
-    tests share, so a lower- and a higher-scored freed pick differ only by
-    which one unblocks something else, and a not-fully-freed item stays out
-    of `freed` even once its local blocker is gone, and a fifth item freed
-    by an earlier landing is not this landing's to report."""
+    """Two open items whose only blocker was `WORK_ITEM_ISSUE`, one of which also unblocks a
+    third, still-waiting item, plus a fourth item a foreign repository still blocks even though
+    its own local blocker just closed -- the fixture `release --merged`'s own `freed`/`next`
+    tests share, so a lower- and a higher-scored freed pick differ only by which one unblocks
+    something else, and a not-fully-freed item stays out of `freed` even once its local blocker
+    is gone, and a fifth item freed by an earlier landing is not this landing's to report."""
     lower, lower_dependencies = blocked_issue(80, "Lower priority freed item", _landed_dependency())
     higher, higher_dependencies = blocked_issue(
         81, "Higher priority freed item", _landed_dependency()
@@ -8589,6 +8588,7 @@ def _two_dependants_freed_by_the_landing() -> tuple[
         "Freed by an earlier landing",
         block_dependency(60, state=BlockerState.CLOSED, closed_at=datetime(2026, 9, 1, tzinfo=UTC)),
     )
+    higher = replace(higher, open_dependents=1)
     issues = (lower, higher, waiting, still_foreign_blocked, freed_earlier)
     dependencies = {
         **lower_dependencies,

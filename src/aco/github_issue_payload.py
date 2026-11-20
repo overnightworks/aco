@@ -74,7 +74,9 @@ BOARD_ISSUE_JQ = (
     "authorAssociation:(.author_association // null),"
     "childrenClosed:(.sub_issues_summary.completed // null),"
     "childrenTotal:(.sub_issues_summary.total // null),"
-    "blockedByCount:(.issue_dependencies_summary.total_blocked_by // 0)}"
+    "blockedByCount:(.issue_dependencies_summary.total_blocked_by // 0),"
+    # `blocking` counts open dependents of any repository; `total_blocking` counts closed ones too.
+    "openDependents:(.issue_dependencies_summary.blocking // 0)}"
 )
 
 
@@ -100,6 +102,7 @@ def board_issue(value: object) -> workboard.Issue:
     children_closed = value.get("childrenClosed")
     children_total = value.get("childrenTotal")
     blocked_by_count = value.get("blockedByCount")
+    open_dependents = value.get("openDependents")
     if (
         not _is_count(number, minimum=1)
         or not isinstance(title, str)
@@ -111,6 +114,7 @@ def board_issue(value: object) -> workboard.Issue:
         or (kind_raw is not None and not isinstance(kind_raw, str))
         or not _valid_children_progress(children_closed, children_total)
         or not _is_count(blocked_by_count)
+        or not _is_count(open_dependents)
     ):
         raise forge.ForgeMalformedResponseError("GitHub returned a malformed board issue")
     return workboard.Issue(
@@ -124,6 +128,7 @@ def board_issue(value: object) -> workboard.Issue:
         children_closed,
         children_total,
         blocked_by_count,
+        open_dependents,
         author_is_member=is_member(value.get("authorAssociation")),
     )
 
