@@ -8830,6 +8830,32 @@ def test_release_merged_json_carries_the_parent_closable_number(
     assert payload["parent_closable"] == PARENT_OF_WORK_ITEM
 
 
+def test_release_merged_of_a_grandchild_names_its_phase_and_leaves_the_top_epic_open(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """NEXT-07: landing the last grandchild names its phase closable; the epic above
+    the phase, whose child is still open, is neither named nor closed."""
+    top_epic = 1
+    client = _released_last_child_client(monkeypatch, sibling_open=False)
+    client.parents[PARENT_OF_WORK_ITEM] = workboard.ParentIssue(
+        workboard.IssueReference(REPOSITORY, top_epic),
+        complete_contract("keiner"),
+        body.ItemKind.CONTAINER,
+    )
+    client.children[top_epic] = (ChildItem(PARENT_OF_WORK_ITEM, ChildState.OPEN, "Phase"),)
+
+    exit_code = issue_claim.main(
+        ["--repo", REPOSITORY, "release", str(WORK_ITEM_ISSUE), "--merged", "12", "--json"]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert (payload["parent_closable"], top_epic in client.closed_issues) == (
+        PARENT_OF_WORK_ITEM,
+        False,
+    )
+
+
 def test_release_merged_fetches_each_candidates_dependencies_only_once(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
