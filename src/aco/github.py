@@ -906,37 +906,21 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed default branch")
         return branch
 
-    def _open_issue_page(self, page: int) -> tuple[object, ...]:
-        raw = self._run(
-            [
-                "api",
-                f"repos/{self.repository}/issues?state=open&per_page={ISSUES_PER_PAGE}&page={page}",
-                "--jq",
-                (
-                    # No `select` here (unlike a single `--paginate` call):
-                    # a page must report its true raw item count so a short page
-                    # still correctly signals "no more pages" even when some of
-                    # its items are pull requests, filtered out below instead.
-                    '.[] | {number,title,labels:(.labels | map(.name)),body:(.body // ""),'
-                    "createdAt:.created_at,updatedAt:.updated_at,"
-                    'isPullRequest:has("pull_request"),'
-                    "kind:(.type.name // null),"
-                    "authorAssociation:(.author_association // null),"
-                    "childrenClosed:(.sub_issues_summary.completed // null),"
-                    "childrenTotal:(.sub_issues_summary.total // null),"
-                    "blockedByCount:(.issue_dependencies_summary.total_blocked_by // 0)}"
-                ),
-            ]
-        )
+    def _issue_page(self, page: int, *, state: str, label: str | None = None) -> tuple[object, ...]:
+        newest = f"&labels={quote(label, safe='')}&sort=created&direction=desc" if label else ""
+        query = f"state={state}{newest}&per_page={ISSUES_PER_PAGE}&page={page}"
+        path = f"repos/{self.repository}/issues?{query}"
+        raw = self._run(["api", path, "--jq", github_issue_payload.BOARD_ISSUE_JQ])
         return self._json_lines(raw, "board issue")
 
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
-        values = self._fetch_pages(self._open_issue_page, per_page=ISSUES_PER_PAGE)
-        return tuple(
-            github_issue_payload.board_issue(value)
-            for value in values
-            if not (isinstance(value, dict) and value.get("isPullRequest"))
+        values = self._fetch_pages(
+            lambda page: self._issue_page(page, state="open"), per_page=ISSUES_PER_PAGE
         )
+        return github_issue_payload.board_issues(values)
+
+    def newest_labelled_issues(self, label: str) -> tuple[workboard.Issue, ...]:
+        return github_issue_payload.board_issues(self._issue_page(1, state="all", label=label))
 
     MALFORMED_BOARD_DEPENDENCY = "GitHub returned a malformed board blocked-by dependency"
 

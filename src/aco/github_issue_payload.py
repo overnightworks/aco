@@ -2,6 +2,7 @@
 single-item read, which share the one rule for who counts as a member."""
 
 import json
+from collections.abc import Iterable
 from typing import TypeIs
 
 from . import forge, protocol, workboard
@@ -59,6 +60,31 @@ def _valid_children_progress(closed: object, total: object) -> bool:
     if closed is None or total is None:
         return False
     return _is_count(closed) and _is_count(total) and int(closed) <= int(total)
+
+
+# The fields `board_issue` reads. No `select` for pull requests: a page must
+# report its true raw item count so a short page still signals "no more
+# pages" even when some of its items are pull requests, which `board_issues`
+# filters out instead.
+BOARD_ISSUE_JQ = (
+    '.[] | {number,title,labels:(.labels | map(.name)),body:(.body // ""),'
+    "createdAt:.created_at,updatedAt:.updated_at,"
+    'isPullRequest:has("pull_request"),'
+    "kind:(.type.name // null),"
+    "authorAssociation:(.author_association // null),"
+    "childrenClosed:(.sub_issues_summary.completed // null),"
+    "childrenTotal:(.sub_issues_summary.total // null),"
+    "blockedByCount:(.issue_dependencies_summary.total_blocked_by // 0)}"
+)
+
+
+def board_issues(values: Iterable[object]) -> tuple[workboard.Issue, ...]:
+    """The issues among `values` read by `BOARD_ISSUE_JQ`, pull requests left out."""
+    return tuple(
+        board_issue(value)
+        for value in values
+        if not (isinstance(value, dict) and value.get("isPullRequest"))
+    )
 
 
 def board_issue(value: object) -> workboard.Issue:

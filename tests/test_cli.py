@@ -173,12 +173,8 @@ def _live_store_claim() -> protocol.ActiveClaim:
 
 @dataclass
 class _MinimalForgeReader:
-    """A `forge.ForgeReader` shape narrower than `FakeForge` for tests that
-    exercise only `board_read.build_board`'s own priority/child-fetch wiring: no request
-    counter, no write surface, no repository target resolution -- just the
-    open issues, children, and merged-PR floor a `board_read.build_board` build reads. One
-    shared shape rather than three near-identical inline classes, each
-    repeating the same `forge.ForgeReader` stub methods."""
+    """A `forge.ForgeReader` shape narrower than `FakeForge` for tests that exercise only
+    `board_read.build_board`'s wiring: the open issues, children and merged-PR floor it reads."""
 
     open_issues: tuple[Issue, ...] = ()
     children_by_number: dict[int, tuple[ChildItem, ...]] = field(default_factory=dict)
@@ -226,6 +222,9 @@ class _MinimalForgeReader:
         return ()
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:
+        return ()
+
+    def newest_labelled_issues(self, label: str) -> tuple[Issue, ...]:
         return ()
 
     def list_children(self, number: int) -> tuple[ChildItem, ...]:
@@ -867,6 +866,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
     "with_head": [],
     "ahead_of_caller": [],
     "ahead_of_caller_unavailable": None,
+    "audits": [],
 }
 
 
@@ -1066,7 +1066,7 @@ def test_next_json_pins_the_raw_envelope_text_for_a_work_item_success(
         '"skipped": [{"number": 12, "reason": "blocked by #11"}], '
         '"parallel": {"first_scope_unknown": true, "candidates": [], "scope_unknown": []}, '
         '"close": [], "waiting_on_operator": [], "ideas": [], "with_head": [], '
-        '"ahead_of_caller": [], "ahead_of_caller_unavailable": null, '
+        '"ahead_of_caller": [], "ahead_of_caller_unavailable": null, "audits": [], '
         '"number": 11, "score": 10, '
         '"title": "Top work", "next": "Claim #11.", '
         '"command": "aco claim 11 --scope <paths>", "ruling_landings": null, '
