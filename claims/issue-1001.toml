@@ -3,6 +3,6 @@ agent = "Claude deb862cb-0966-452b-a001-fbf8c7b46d71"
 role = "builder"
 base = "8911e470b49560374da4d806bb062a16c47e7f9d"
 branch = "claude/issue-1001-wait-ends-on-due-audit"
-scope = ["README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/wait.spec.md", "src/aco/board_read.py", "src/aco/board_wait.py", "src/aco/cmd_wait.py", "tests/test_board_wait.py", "tests/test_board_wait_recurring_audit.py", "tests/test_cmd_wait_recurring_audit.py"]
+scope = ["README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/wait.spec.md", "src/aco/board_read.py", "src/aco/board_wait.py", "src/aco/cmd_wait.py", "tests/conftest.py", "tests/support/audit_world.py", "tests/support/wait_fixtures.py", "tests/test_board_wait.py", "tests/test_board_wait_recurring_audit.py", "tests/test_cmd_next_recurring_audit.py", "tests/test_cmd_wait_board.py", "tests/test_cmd_wait_recurring_audit.py"]
 opened_commit = "04b28fa61fa1f3091ce2c70b8a28417182a00d8d"
 whole_reason = "The wait loop, its printed lines, the spec lines and the two documents change together so none of them states a wait the code does not make."
