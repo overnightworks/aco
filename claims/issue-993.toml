@@ -1,5 +1,5 @@
 claim_id = "d13d7f93400f4590a91f78f4fe39412f"
-agent = "Claude deb862cb-0966-452b-a001-fbf8c7b46d71"
+agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
 role = "builder"
 base = "1d665fbe3b93fb4d616550432b486258efc03041"
 branch = "claude/issue-993-mcp-wait-tests-tables"
