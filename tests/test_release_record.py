@@ -101,9 +101,10 @@ def test_the_per_stage_sums_clamp_at_999_before_the_total_which_does_not(
 def test_the_refusal_of_both_names_an_issue_less_lane_by_its_claim_id(repository: Path) -> None:
     """Spec: LANREC-91."""
     blob = runs_blob(repository, two_chained_runs())
+    record = record_file()
 
     with pytest.raises(protocol.ClaimUnavailableError) as refusal:
-        release(repository, blob, record=record_file(), lane=True)
+        release(repository, blob, record=record, lane=True)
 
     assert str(refusal.value) == BOTH_REFUSED.format(label="cli-claim")
 
