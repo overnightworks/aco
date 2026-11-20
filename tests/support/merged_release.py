@@ -6,17 +6,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from cli_fixtures import landed_from_another_clone, push_lane_branch, real_git
+from board_fixtures import block_body
+from cli_fixtures import fresh_observation, landed_from_another_clone, push_lane_branch, real_git
 from github_fixtures import (
     LANDING_BRANCH,
+    WORK_ITEM_ISSUE,
     FakeForge,
     landing_pull_request,
     merge_on_the_forge,
     serve_forge,
 )
-from store_fixtures import claim_intent, publish_claims_from_a_second_clone
+from store_fixtures import claim_intent, item_record, publish_claims_from_a_second_clone
 
-from aco import protocol, store
+from aco import body, items, protocol, store
 from aco.workboard import MergeMethod
 
 PULL_REQUEST = 12
@@ -90,3 +92,34 @@ def arrange_merged_pull_request(
 
 def state_ref_claims(clone: Path, remote: Path) -> dict[str, protocol.ActiveClaim]:
     return dict(store.peek_state(worktree=clone, remote=str(remote)).claims)
+
+
+def item_text(size: body.Size | None, *, record: dict[str, object] | None = None) -> str:
+    """The text of a work item that declares `size`, or none; `record` makes it a state-ref one."""
+    data: dict[str, object] = {
+        "version": 1,
+        "now": "Ship it.",
+        "next": "none",
+        "done_when": "Merged.",
+    }
+    if size is not None:
+        data["size"] = size.value
+    if record is not None:
+        data["record"] = record
+    return block_body(body.render_block(data).removesuffix("\n"), before="Prose.\n\n", after="")
+
+
+def seed_open_item(clone: Path, remote: Path, size: body.Size | None = None) -> None:
+    """The work item as an open record on the real state ref, declaring `size` when given."""
+    content = item_text(size, record=item_record(title="Item", state="open", kind="task"))
+    item_id = items.format_item_id(WORK_ITEM_ISSUE)
+    store.commit_transition(
+        observed=fresh_observation(clone, remote),
+        subject=store.TransitionSubject(f"seed item {item_id}"),
+        intent=protocol.ItemWriteIntent(
+            item_id=item_id,
+            expected=None,
+            new_oid=store.hash_blob(clone, content.encode()),
+            operation_id="seed-item",
+        ),
+    )

@@ -38,7 +38,7 @@ exit `2`, exactly as `specs/claim-record.spec.md` already documents.
 | a subtree malformed | — | — | CAS-27..33, CAS-78 |
 | a runs write by a non-holder, over a changed file, or for no live claim | — | CAS-81, CAS-82 | — |
 | a runs write whose push is rejected | — | CAS-83 | — |
-| a release or a landing of a claim that has runs | — | CAS-84 | — |
+| a release or a landing of a claim that has runs | — | CAS-84, CAS-85 | — |
 | a runs file of a claim id with no live claim | — | CAS-80 | CAS-79 |
 | a resource file malformed | — | — | CAS-34..36 |
 | an item write's `expected` is stale or `None` | — | CAS-19, CAS-20 | — |
@@ -144,6 +144,7 @@ Under `storage = "github"`, parent validation, retyping, issue creation and sub-
 - [ ] [CAS-82] Another claim id refuses `claim id '<id>' has no active claim`, another agent the writer's holder sentence, a file written since the writer's stale sentence (LANREC-63, LANREC-59).
 - [ ] [CAS-83] A rejected push re-applies a runs write to the fresh tip, so another writer's unrelated commit does not lose it (CAS-13).
 - [ ] [CAS-84] A release and a landing remove the released claim's runs file in their own commit; `runs/` goes with its last file, and the runs files of other claim ids stay (LANREC-67).
+- [ ] [CAS-85] A release and a landing carry the blob of the claim's runs file their record was computed from; a tip whose file for the claim differs, appeared or vanished refuses them (LANREC-92).
 
 ## `schema.toml`
 

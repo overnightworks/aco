@@ -57,6 +57,10 @@ class RunEntry:
 class RunsFile:
     runs: tuple[RunEntry, ...] = ()
 
+    def holds_runs(self) -> bool:
+        """Whether the claim stores a run: a runs file with no entry stores none."""
+        return bool(self.runs)
+
     def entry(self, run: str) -> RunEntry | None:
         return next((entry for entry in self.runs if entry.run == run), None)
 
@@ -365,10 +369,3 @@ def _holder_sentence(action: RunsAction, label: str, session: str, holder: str) 
 def holder_refusal(action: RunsAction, label: str, *, session: str) -> Callable[[str], str]:
     """The refusal of `session` as a non-holder of `label`, as a function of the holder."""
     return partial(_holder_sentence, action, label, session)
-
-
-def stale_refusal(label: str) -> str:
-    return (
-        f"the stored runs of {label} were written since this command read them; "
-        "run the same command again"
-    )

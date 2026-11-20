@@ -75,13 +75,14 @@ def top_level_entries(remote: Path) -> set[str]:
     return {path.split("/", 1)[0] for path in tree_listing(remote)}
 
 
-def release_intent() -> protocol.ReleaseIntent:
+def release_intent(expected_runs: protocol.ObjectId | None = None) -> protocol.ReleaseIntent:
     return protocol.ReleaseIntent(
         claim_id=protocol.ClaimId(CLAIM_ID),
         agent="Ada",
         role="builder",
         outcome=protocol.AbandonedRelease("done"),
         operation_id="op-release",
+        expected_runs=expected_runs,
     )
 
 
@@ -269,7 +270,12 @@ def test_a_release_removes_the_claims_runs_file_in_its_own_commit_and_runs_goes_
     claimed_with_runs(worktree, bare_remote)
     assert "runs" in top_level_entries(bare_remote)
 
-    released = commit(worktree, bare_remote, "release issue 42", release_intent())
+    released = commit(
+        worktree,
+        bare_remote,
+        "release issue 42",
+        release_intent(store.hash_blob(worktree, RUNS_FILE)),
+    )
 
     assert dict(released.runs) == {}
     assert "runs" not in top_level_entries(bare_remote)
@@ -300,7 +306,12 @@ def test_a_release_keeps_the_runs_files_of_other_claim_ids(
         runs_write(worktree, b"other runs", claim_id=OTHER_CLAIM_ID),
     )
 
-    commit(worktree, bare_remote, "release issue 42", release_intent())
+    commit(
+        worktree,
+        bare_remote,
+        "release issue 42",
+        release_intent(store.hash_blob(worktree, RUNS_FILE)),
+    )
 
     assert [path for path in tree_listing(bare_remote) if path.startswith("runs/")] == [
         f"runs/{OTHER_CLAIM_ID}.json"
@@ -331,6 +342,7 @@ def test_a_landing_removes_the_claims_runs_file_in_its_own_commit_and_runs_goes_
         role="builder",
         outcome=protocol.LandedRelease(protocol.ObjectId("4" * 40)),
         operation_id="op-landing",
+        expected_runs=store.hash_blob(worktree, RUNS_FILE),
     )
 
     commit(worktree, bare_remote, "release issue 42", landing)

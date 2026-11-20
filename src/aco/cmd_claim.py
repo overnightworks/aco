@@ -13,6 +13,7 @@ from . import (
     board_read,
     body,
     checkout,
+    claim_json,
     forge,
     items,
     policy,
@@ -131,11 +132,10 @@ def claim_request(
     refuses it, `checked_claim`'s own first check -- it binds the empty
     tuple instead of raising: `checked_claim` replaces it with the item's
     own body scope, or a live claim's stored scope on replay, before this
-    request's scope ever reaches a wide-scope check or a write. With
-    `--base` and `--branch` given it reads no checkout at all (
-    `start` checks its claim before the worktree exists). `adopted` claims a
-    pull request's own head branch, whatever its prefix, as an issue-less
-    lane (`aco adopt`); `aco claim` never passes it."""
+    request's scope ever reaches a wide-scope check or a write. With `--base` and
+    `--branch` given it reads no checkout at all (`start` checks its claim before the
+    worktree exists). `adopted` claims a pull request's own head branch, whatever its
+    prefix, as an issue-less lane (`aco adopt`); `aco claim` never passes it."""
     agent = protocol.outbound_text(
         checkout.resolved_agent(arguments.agent), "agent", maximum=protocol.AGENT_MAX_LENGTH
     )
@@ -217,12 +217,12 @@ def _claim_json(
     report.emit_json(
         True,
         ClaimReason.CLAIMED,
-        **protocol.claim_identity_fields(claimed),
-        **protocol.resource_fields(claimed.resource),
+        **claim_json.claim_identity_fields(claimed),
+        **claim_json.resource_fields(claimed.resource),
         versioned_files=versioning.versioned_files,
         versioned_files_total=versioning.versioned_files_total,
         share=versioning.share,
-        touches=[protocol.touch_json(claim) for claim in touches],
+        touches=[claim_json.touch_json(claim) for claim in touches],
         checks=[check.as_json() for check in checks],
     )
     return 0
