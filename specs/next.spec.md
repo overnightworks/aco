@@ -117,8 +117,8 @@ other printable space are text.
 - NEXT-26, NEXT-47 (retired).
 - [ ] [NEXT-34] A NEXT-05 container not the first action reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` in `<title>` escaped in text and `--json`; never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
-- [ ] [NEXT-39] An item whose `wait` names `operator` is never pulled, cut or named as the first action; `waiting on operator: <labels>` names it unless `close:` does; a claimed task reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
-- [ ] [NEXT-59] A `wait` that holds (`trigger`, or `until <date>` up to that date) keeps an item unpulled, a container uncut and never the first action, a container without an uncut row staying under `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
+- [ ] [NEXT-39] An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
+- [ ] [NEXT-59] A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
 - [ ] [NEXT-61] The label `needs-operator` on an item without an operator `wait` holds nothing: the item is pulled or cut like any other.
 - [ ] [NEXT-60] A container whose open children all live in other repositories reads `container; waiting on <owner>/<repo>#<n>, ...` under `SKIPPED`, never `container; claim a child` (NEXT-38 appends it).
 - [ ] [NEXT-40] `aco next --help` names `wait.operator` as what holds an item for the operator, the `step` tool as the way to set it, and the label `needs-operator` as its GitHub view.
