@@ -18,9 +18,9 @@ from cli_fixtures import (
     run_cli,
     track_board_config,
 )
-from github_fixtures import FakeForge
+from github_fixtures import FakeForge, serve_forge
 
-from aco import checkout, github, protocol, recurring_audit
+from aco import checkout, protocol, recurring_audit
 from aco.recurring_audit import Reason
 
 LABEL = "audit-scenario"
@@ -34,7 +34,6 @@ TOP_WORK_LINES = (
     "parallel: unknown (first action names no scope)\nclose: none\n"
 )
 NO_ACTION_LINES = "No actionable item.\nparallel: none\nscope unknown: none\nclose: none\n"
-REAL_FETCH = checkout.fetch_remote
 
 
 def entry_toml(
@@ -64,7 +63,6 @@ class World:
     clone: Path
     monkeypatch: pytest.MonkeyPatch
     own: FakeForge
-    fetches: list[str]
     anchor_sha: str = ""
 
     def configure(self, toml: str) -> None:
@@ -88,24 +86,25 @@ class World:
         issue = board_issue(ANCHOR_NUMBER, "Audit findings", body, labels=(LABEL,))
         self.own.labelled_issues = {LABEL: (issue,)}
 
-    def fetching(self, *, works: bool) -> None:
-        def fetch(remote: str, *, directory: Path) -> None:
-            self.fetches.append(remote)
-            if not works:
-                raise protocol.ClaimError("fetch refused for the scenario")
-            REAL_FETCH(remote, directory=directory)
-
-        self.monkeypatch.setattr(checkout, "fetch_remote", fetch)
+    def break_fetch(self) -> None:
+        """Makes `origin`'s fetch ask for a branch it lacks: any later fetch is refused,
+        while the remote's other reads still work."""
+        real_git(
+            self.clone,
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/absent:refs/remotes/origin/absent",
+        )
 
 
 @pytest.fixture
 def world(monkeypatch: pytest.MonkeyPatch, github_clone: Path, github_world: Path) -> World:
     freeze_cli_now(monkeypatch)
-    own = FakeForge(board_issues=(board_issue(11, "Top work", complete_contract("Claim #11.")),))
-    monkeypatch.setattr(github, "GitHubForge", lambda repository: own)
-    made = World(github_clone, monkeypatch, own, [])
-    made.fetching(works=False)
-    return made
+    own = serve_forge(
+        monkeypatch,
+        FakeForge(board_issues=(board_issue(11, "Top work", complete_contract("Claim #11.")),)),
+    )
+    return World(github_clone, monkeypatch, own)
 
 
 def next_both(capsys: pytest.CaptureFixture[str]) -> tuple[CliRun, CliRun, dict[str, Any]]:
@@ -228,10 +227,11 @@ def test_an_audit_that_is_not_due_prints_nothing_and_carries_no_entry(
     world.configure(entry_toml())
     sha = world.anchor_at(days_ago=anchor_days_ago, commits_after=commits_after)
     world.label_issue(f"audited through {sha}")
+    world.break_fetch()
 
     printed, _result, payload = next_both(capsys)
 
-    assert (printed.stdout, payload["audits"], world.fetches) == (TOP_WORK_LINES, [], [])
+    assert (printed.stdout, payload["audits"]) == (TOP_WORK_LINES, [])
 
 
 def test_an_anchor_only_the_fetched_trunk_holds_is_counted_after_the_one_fetch(
@@ -247,7 +247,6 @@ def test_an_anchor_only_the_fetched_trunk_holds_is_counted_after_the_one_fetch(
         commit_on_trunk(other, world.monkeypatch, days_ago=0, message=f"later {index}")
     real_git(other, "push", "-q", "origin", "main")
     world.label_issue(f"audited through {sha}")
-    world.fetching(works=True)
 
     printed, _result, payload = next_both(capsys)
 
@@ -267,7 +266,6 @@ def test_an_anchor_the_fetched_trunk_lacks_too_is_due_as_off_the_trunk(
     world.configure(entry_toml())
     real_git(world.clone, "push", "-q", "origin", "main")
     world.label_issue(f"audited through {FOREIGN_SHA}")
-    world.fetching(works=True)
 
     printed, _result, payload = next_both(capsys)
 
@@ -286,18 +284,16 @@ def test_a_failed_fetch_leaves_the_audit_unavailable_and_the_work_item_as_it_was
     world.configure(entry_toml())
     real_git(world.clone, "push", "-q", "origin", "main")
     world.label_issue(f"audited through {FOREIGN_SHA}")
+    world.break_fetch()
 
     printed, result, payload = next_both(capsys)
 
-    unavailable = f"audit {NAME}: unavailable (fetch refused for the scenario)"
-    assert (printed.status, printed.stdout, result.status) == (
-        0,
-        f"{unavailable}\n\n{TOP_WORK_LINES}",
-        0,
-    )
-    assert [(entry["reason"], entry["error"]) for entry in payload["audits"]] == [
-        (Reason.UNAVAILABLE, "fetch refused for the scenario")
-    ]
+    assert (printed.status, result.status) == (0, 0)
+    assert printed.stdout.startswith(f"audit {NAME}: unavailable (")
+    assert printed.stdout.endswith(f"\n\n{TOP_WORK_LINES}")
+    assert [
+        (entry["reason"], "refs/heads/absent" in entry["error"]) for entry in payload["audits"]
+    ] == [(Reason.UNAVAILABLE, True)]
 
 
 def test_a_failed_listing_leaves_the_audit_unavailable_and_the_work_item_as_it_was(
