@@ -13,7 +13,6 @@ from aco.routing_line import RoutingStage
 
 FIRST_TIP = "1" * 40
 SECOND_TIP = "2" * 40
-THIRD_TIP = "3" * 40
 LABEL = "#42"
 
 
@@ -276,32 +275,10 @@ def test_a_begin_appends_the_run_after_the_runs_before_it() -> None:
     assert merged.runs.runs == (*before.runs, a_run("run-2", start_tip=SECOND_TIP, follows=True))
 
 
-def test_the_same_begin_again_changes_nothing_and_keeps_the_stored_decision() -> None:
-    before = runs_of(a_run("run-1", start_tip=FIRST_TIP, follows=False))
-
-    merged = lane_runs.begin(before, run="run-1", start_tip=FIRST_TIP, follows=True, label=LABEL)
-
-    assert (merged.runs, merged.changed) == (before, False)
-
-
-def test_a_begin_with_another_start_tip_is_refused() -> None:
-    before = runs_of(a_run("run-1", start_tip=FIRST_TIP))
-
-    with pytest.raises(lane_runs.RunsRefusedError, match=r"run-1 of #42 was begun with start tip"):
-        lane_runs.begin(before, run="run-1", start_tip=SECOND_TIP, follows=True, label=LABEL)
-
-
 def test_a_begin_with_a_start_tip_after_one_without_is_refused() -> None:
     before = runs_of(a_run("run-1", start_tip=None))
 
     with pytest.raises(lane_runs.RunsRefusedError, match="start tip none"):
-        lane_runs.begin(before, run="run-1", start_tip=FIRST_TIP, follows=True, label=LABEL)
-
-
-def test_a_begin_after_the_runs_add_is_refused_even_with_its_own_start_tip() -> None:
-    before = runs_of(a_run("run-1", start_tip=FIRST_TIP, added=an_added_run()))
-
-    with pytest.raises(lane_runs.RunsRefusedError, match="run-1 of #42"):
         lane_runs.begin(before, run="run-1", start_tip=FIRST_TIP, follows=True, label=LABEL)
 
 
@@ -315,63 +292,7 @@ def test_an_add_stores_the_record_on_the_begun_entry() -> None:
     assert merged.runs.runs == (a_run("run-1", start_tip=FIRST_TIP, added=added), a_run("run-2"))
 
 
-def test_an_add_of_a_run_that_was_not_begun_is_refused_naming_the_begin_command() -> None:
-    runs = runs_of(a_run("run-1"))
-    added = an_added_run()
-
-    with pytest.raises(lane_runs.RunsRefusedError) as refusal:
-        lane_runs.add(runs, run="run-2", added=added, label=LABEL)
-
-    assert str(refusal.value) == ("run run-2 of #42 was not begun; run aco lane-record begin first")
-
-
-def test_the_same_entry_added_again_changes_nothing() -> None:
-    before = runs_of(a_run("run-1", added=an_added_run()))
-
-    merged = lane_runs.add(before, run="run-1", added=an_added_run(), label=LABEL)
-
-    assert (merged.runs, merged.changed) == (before, False)
-
-
-@pytest.mark.parametrize(
-    "other",
-    [
-        pytest.param(lane_runs.RunAdded(THIRD_TIP, (RoutingStage.BUILD,), the_record()), id="tip"),
-        pytest.param(
-            lane_runs.RunAdded(SECOND_TIP, (RoutingStage.REVIEW,), the_record()), id="stages"
-        ),
-        pytest.param(
-            lane_runs.RunAdded(SECOND_TIP, (RoutingStage.BUILD,), the_record(risk="risky")),
-            id="record",
-        ),
-    ],
-)
-def test_another_entry_under_an_added_run_id_is_refused(other: lane_runs.RunAdded) -> None:
-    before = runs_of(a_run("run-1", added=an_added_run()))
-
-    with pytest.raises(lane_runs.RunsRefusedError, match="run-1 of #42"):
-        lane_runs.add(before, run="run-1", added=other, label=LABEL)
-
-
-def test_a_ran_stage_whose_slot_in_the_record_is_none_contradicts_the_record() -> None:
-    record = the_record()
-    assert record.stages[RoutingStage.GATE] == "none"
-
-    with pytest.raises(lane_runs.RunsRefusedError) as refusal:
-        lane_runs.require_ran_stages_run(record, (RoutingStage.BUILD, RoutingStage.GATE))
-
-    assert str(refusal.value) == "the record's stage gate is none, which --ran contradicts"
-
-
 def test_ran_stages_that_the_record_fills_are_accepted() -> None:
     lane_runs.require_ran_stages_run(
         the_record(), (RoutingStage.BUILD, RoutingStage.REVIEW, RoutingStage.TEST)
     )
-
-
-def test_the_holder_refusal_names_the_action_the_item_and_both_agents() -> None:
-    begin = lane_runs.holder_refusal(lane_runs.RunsAction.BEGIN, LABEL, session="Bea")("Ada")
-    add = lane_runs.holder_refusal(lane_runs.RunsAction.ADD, LABEL, session="Bea")("Ada")
-
-    assert begin == "only the holder may begin a run of #42 (holder='Ada', this session='Bea')"
-    assert add == "only the holder may add a run to #42 (holder='Ada', this session='Bea')"

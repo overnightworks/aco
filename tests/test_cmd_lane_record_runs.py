@@ -105,6 +105,24 @@ def test_a_repeated_begin_changes_nothing_and_says_so(
     assert world.state_tip() == tip
 
 
+def test_a_repeated_begin_keeps_the_follows_judged_at_its_first_begin(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-53, LANREC-54."""
+    world.run(capsys, *begin_arguments(world, FIRST_RUN))
+    world.run(capsys, *begin_arguments(world, SECOND_RUN))
+    tip = world.state_tip()
+
+    again = world.run(capsys, *begin_arguments(world, FIRST_RUN, "--json"))
+
+    stored = world.stored_runs()
+    assert stored is not None
+    assert stored.runs[0].follows is True
+    assert json.loads(again.stdout)["follows"] is True
+    assert json.loads(again.stdout)["reason"] == "already_begun"
+    assert world.state_tip() == tip
+
+
 @pytest.mark.parametrize(
     "later",
     [
