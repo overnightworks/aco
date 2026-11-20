@@ -168,7 +168,7 @@ class TestNextAndBoardNeverReadItAsOpenOrRuled:
         ("lines", "state", "progress", "hint"),
         [
             pytest.param(
-                (card(), withdrawn()),
+                (returned_card(), withdrawn()),
                 "proposed",
                 {"open": 1, "total": 2},
                 "expectations unruled: refine before the pull",

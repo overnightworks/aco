@@ -175,7 +175,7 @@ class TestRuleOther:
             "proposed",
             {"open": 1, "total": 2},
         )
-        assert "expectations unruled" in run_cli(["next"], capsys).expect_success()
+        assert "waiting on operator: #7" in run_cli(["next"], capsys).stdout
         later = serve_item(monkeypatch, client.item_bodies[7])
         run_cli(["rule", "7", *decide("A", "chat", line=1)], capsys)
         serve_written(monkeypatch, later.item_bodies[7])

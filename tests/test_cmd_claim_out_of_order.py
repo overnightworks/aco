@@ -17,7 +17,7 @@ from board_fixtures import (
 )
 from claim_worktrees import StandIn, Standpoint, claim, make_stand_in, standing_claims
 from github_fixtures import FakeForge, serve_forge
-from option_cards import open_option_entry
+from option_cards import returned_option_entry
 
 from aco import forge, protocol, workboard
 
@@ -128,7 +128,7 @@ def test_claim_refuses_when_the_higher_priority_item_needs_refining(
         complete_contract(
             "Claim #11.",
             scope=["src/needs-rulings.py"],
-            expectation=[open_option_entry("Name it.")],
+            expectation=[returned_option_entry("Name it.")],
         ),
     )
     waiting, waiting_dependencies = blocked_issue(

@@ -33,6 +33,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | the signal cannot be touched | WAIT-13 | — |
 | no item, `aco next` names an action at the start or while it waits | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, a line that waited on the operator is no longer open | WAIT-14, WAIT-15 | WAIT-16 |
+| no item, the only item has open option lines, none sent back | WAIT-26 | WAIT-14 |
 | no item, a ruling written by aco, a closed blocker, a released claim or an `until` date that arrives | WAIT-17, WAIT-18, WAIT-19 | — |
 | no item, a recurring audit is due | WAIT-23, WAIT-25 | WAIT-25 |
 | no item, an audit is not due or unavailable, or none is configured | WAIT-23, WAIT-24 | WAIT-25 |
@@ -70,6 +71,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 - [ ] [WAIT-14] `aco wait [--json]` without an item ends, exit `0`, when `aco next` names an action or a line that waited on the operator at its previous read no longer does (see E-WAIT-05, E-WAIT-06).
   - It ends at once when `aco next` names an action at its start; it has no timeout (WAIT-09).
   - A line of an item that is no longer open is not reported.
+- [ ] [WAIT-26] An item that waits on the operator by NEXT-70 is no action: `aco wait` without an item does not end on it, and ends once one of its lines is ruled or sent back.
 - [ ] [WAIT-15] It prints `ACTIONABLE <label>` for the item `aco next` names, then `CHANGED <label> line <k>: <state>` (the WAIT-01 shape) for each changed line, in board order (see E-WAIT-05, E-WAIT-06).
 - [ ] [WAIT-16] `--json` prints `reason: "actionable"` with `"item": <n>` when an action is named, else `reason: "changed"`, and `"lines": [{"item": <n>, "index": <k>, "state": "<state>"}, …]` (see E-WAIT-05).
   - An `actionable` envelope carries `lines` only when lines changed too; a `changed` one always does (see E-WAIT-06).

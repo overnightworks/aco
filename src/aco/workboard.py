@@ -1620,7 +1620,7 @@ def _board_item(
         contract=contract,
         contract_complete=parsed.contract_complete,
         idea=idea,
-        operator_wait=waits_on_operator(parsed.wait),
+        operator_wait=waits_on_operator(parsed.wait) or parsed.cards_wait_on_operator,
         read_state=parsed.read_state,
         malformed_defect=(
             contract.defects[0] if parsed.read_state is BodyReadState.MALFORMED else None

@@ -92,7 +92,7 @@ from github_fixtures import (
     landing_readiness,
 )
 from landing_world_parts import landing_listing
-from option_cards import card, decide, open_option_entry
+from option_cards import card, decide, open_option_entry, returned_option_entry
 from reader_only_forge import ReaderOnlyForge
 from store_fixtures import (
     RaceOnceTransport,
@@ -1083,7 +1083,7 @@ PULLED_WITH_REFINING_FIRST = (
     "Run: aco claim 10 --scope <paths>\n"
     + _SCOPE_UNKNOWN_NOTE_LINE
     + "expectations unruled: refine before the pull\n"
-    + _PARALLEL_UNKNOWN_TAIL
+    + _PARALLEL_UNKNOWN_TAIL.replace("close: none\n", "close: none\nwith head: #10 line 1\n")
 )
 
 
@@ -1098,7 +1098,7 @@ PULLED_WITH_REFINING_FIRST = (
             id="no_expectation_entry_remains_actionable",
         ),
         pytest.param(
-            (open_option_entry("Name it."),),
+            (returned_option_entry("Name it."),),
             body.ExpectationState.PROPOSED,
             PULLED_WITH_REFINING_FIRST,
             id="proposed_expectations_are_pulled_with_refining_first",
@@ -1111,7 +1111,7 @@ PULLED_WITH_REFINING_FIRST = (
             id="fully_ruled_expectations_remain_actionable",
         ),
         pytest.param(
-            (ruled_expectation("Name it.", ruling="no"), open_option_entry("Remove it.")),
+            (returned_option_entry("Remove it."), ruled_expectation("Name it.", ruling="no")),
             body.ExpectationState.PROPOSED,
             PULLED_WITH_REFINING_FIRST,
             id="mixed_expectations_are_pulled_with_refining_first",
@@ -1150,7 +1150,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
     unruled = board_issue(
         11,
         "Needs rulings",
-        complete_contract("Claim #11.", expectation=[open_option_entry("Name it.")]),
+        complete_contract("Claim #11.", expectation=[returned_option_entry("Name it.")]),
     )
     blocked, blocked_dependencies = blocked_issue(
         12, "Waits for rulings", block_dependency(11), next_step="Claim #12."
@@ -1175,7 +1175,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
         + _SCOPE_UNKNOWN_NOTE_LINE
         + "expectations unruled: refine before the pull\n"
         + _PARALLEL_UNKNOWN_TAIL
-        + "\n"
+        + "with head: #11 line 1\n\n"
         "SKIPPED\n"
         "#12: blocked by #11\n"
         "#13: claimed\n"
@@ -1199,7 +1199,7 @@ def test_next_pulls_an_unruled_item_and_names_only_unworkable_ones_as_skipped(
             {"number": 13, "reason": "claimed"},
         ],
         "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-        **_NOTHING_NAMED_JSON,
+        **(_NOTHING_NAMED_JSON | {"with_head": [{"number": 11, "lines": [1]}]}),
     }
 
 

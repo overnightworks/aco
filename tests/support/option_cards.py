@@ -112,6 +112,12 @@ def open_option_entry(text: str | None = None) -> dict[str, object]:
     return entry if text is None else {**entry, "text": text}
 
 
+def returned_option_entry(text: str | None = None) -> dict[str, object]:
+    """`open_option_entry` sent back to its head."""
+    entry: dict[str, object] = tomllib.loads(returned_card())["expectation"][0]
+    return entry if text is None else {**entry, "text": text}
+
+
 def card_body(line: str, *, before: str = "", newline: str = "\n") -> str:
     return block_body(MINIMAL_BLOCK_TOML + before + "\n" + line).replace("\n", newline)
 
