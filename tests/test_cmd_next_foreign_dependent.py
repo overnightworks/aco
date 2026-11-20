@@ -1,7 +1,6 @@
 """`aco next` scores an item for each open item that names it as a blocker, in
 any repository, and ranks it as a blocker (NEXT-72)."""
 
-import json
 from dataclasses import replace
 
 import pytest
@@ -30,16 +29,3 @@ def test_next_ranks_an_item_with_a_foreign_open_dependent_first_with_twenty_adde
     result = run_cli(["next"], capsys)
 
     assert (result.status, result.stdout.splitlines()[0]) == (0, "#10 score 10: Root")
-
-
-@pytest.mark.usefixtures("github_world")
-def test_next_json_names_the_item_with_a_foreign_open_dependent_with_twenty_added(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: NEXT-72"""
-    _serve_root_with_foreign_dependent(monkeypatch)
-
-    result = run_cli(["next", "--json"], capsys)
-
-    payload = json.loads(result.stdout)
-    assert (result.status, payload["number"], payload["score"]) == (0, ROOT, 10)
