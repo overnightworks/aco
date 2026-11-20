@@ -1,0 +1,8 @@
+claim_id = "a54764a87ab343ee9520f58d30592475"
+agent = "Claude deb862cb-0966-452b-a001-fbf8c7b46d71"
+role = "builder"
+base = "8911e470b49560374da4d806bb062a16c47e7f9d"
+branch = "claude/issue-1000-land-judges-stored-runs"
+scope = ["quality/baseline.toml", "specs/land.spec.md", "specs/lane-record.spec.md", "src/aco/cmd_land.py", "src/aco/cmd_lane_record.py", "src/aco/lane_record.py", "src/aco/lane_runs.py", "src/aco/release_record.py", "tests/support/lane_record_fixtures.py", "tests/support/lane_record_runs_world.py", "tests/test_cmd_land_runs.py"]
+opened_commit = "03c768bcd86101d27f4605b2c0f56cfc085c259d"
+whole_reason = "The guard, its owner in release_record, the spec lines and the rewritten land tests change together: the old after-merge test contradicts the new guard."
