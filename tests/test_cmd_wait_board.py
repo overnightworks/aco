@@ -173,7 +173,8 @@ class TestWaitingOnTheBoard:
             pytest.param([], ACTIONABLE_AFTER_THE_BLOCKER, id="text"),
             pytest.param(
                 ["--json"],
-                json.dumps({"ok": True, "reason": "actionable", "item": BLOCKED}) + "\n",
+                json.dumps({"ok": True, "reason": "actionable", "item": BLOCKED, "audits": []})
+                + "\n",
                 id="json",
             ),
         ],

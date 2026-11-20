@@ -33,6 +33,7 @@ pytest_plugins = [
     "release_cleanup_world",
     "check_pull_request_fixtures",
     "lane_record_runs_world",
+    "audit_world",
 ]
 
 
