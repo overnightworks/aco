@@ -1976,8 +1976,19 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
 def next_action(board: Board) -> NextAction | None:
     """The one action `next` recommends: the board's own top qualifying row
     -- the first of `_qualifying_actions`, whose docstring names what
-    qualifies and why."""
-    return next(_qualifying_actions(board), None)
+    qualifies and why, bar a waiting container: it stays under `close:`
+    (`zero_cost_closes`) and is never named first."""
+    return next(
+        (
+            action
+            for action in _qualifying_actions(board)
+            if not (
+                isinstance(action, CloseContainerAction)
+                and (action.container.waits_on_operator or action.container.wait is not None)
+            )
+        ),
+        None,
+    )
 
 
 def _action_scope(

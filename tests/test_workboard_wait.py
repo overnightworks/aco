@@ -131,17 +131,24 @@ def test_a_container_with_a_wait_and_an_uncut_row_is_never_cut(
 
 
 @pytest.mark.parametrize(("wait", "reason"), WAITS_WITH_REASON)
-def test_a_container_with_a_wait_and_no_uncut_row_is_closed(
+def test_a_container_with_a_wait_and_no_uncut_row_is_closed_never_named_first(
     wait: Mapping[str, object], reason: str
 ) -> None:
+    """NEXT-59."""
     board = _waiting_container_board(wait, [])
     item = board.items[0]
 
-    action = workboard.next_action(board)
-
-    assert isinstance(action, workboard.CloseContainerAction)
-    assert action.container.number == NUMBER
+    assert workboard.next_action(board) is None
+    assert workboard.zero_cost_closes(board) == (NUMBER,)
     assert item.actionable_reason == reason
+
+
+def test_a_container_with_an_operator_wait_and_no_uncut_row_is_closed_never_named_first() -> None:
+    """NEXT-39."""
+    board = _waiting_container_board({"operator": STEP}, [])
+
+    assert workboard.next_action(board) is None
+    assert workboard.zero_cost_closes(board) == (NUMBER,)
 
 
 @pytest.mark.parametrize(
