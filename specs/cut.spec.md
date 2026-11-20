@@ -32,7 +32,6 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `<n>` not open, or not on the board | CUT-01 | CUT-01 | CUT-01 | CUT-01 |
 | `--title` empty or whitespace only | CUT-33 | CUT-33 | CUT-33 | CUT-33 |
 | `<n>` open but not a container | CUT-02 | CUT-02 | CUT-02 | CUT-02 |
-| `<n>` itself has a parent | CUT-03 | CUT-03 | CUT-03 | CUT-03 |
 | `<n>`'s body is malformed | CUT-05, CUT-40 | CUT-05, CUT-40 | — | CUT-05, CUT-40 |
 | the item's lock is held, or cannot be taken | CUT-41 | CUT-41 | CUT-41 | CUT-41 |
 | the linked row's `done_when` holds a display control | CUT-39 | CUT-39 | — | CUT-05 |
@@ -63,14 +62,14 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `storage = "state-ref"`, the row removed | CUT-26, CUT-27 | CUT-26 | — | — |
 | a container's first cut, or a later one | CUT-45, CUT-46 | CUT-45, CUT-46 | — | — |
 | a cut with no linked row | CUT-47 | — | — | — |
+| the container is itself a child of another item | CUT-48 | CUT-48 | — | — |
 
 ## The target
 
 - [ ] [CUT-01] `aco cut <n> --title T` against an `<n>` that names no open issue on the board refuses `#<n> is not an open container`, exit `2`, before any write.
 - [ ] [CUT-33] An empty or whitespace-only `--title` refuses `--title must be a non-empty string`, exit `2`, before anything is read or written; `--json` prints OUT-06's envelope.
 - [ ] [CUT-02] The same against an open issue that is not a container refuses `#<n> is not a container`, exit `2`.
-- [ ] [CUT-03] The same against a container that is itself a child of another item refuses `#<n> is itself a child of <ref>; nested containers are not supported`, exit `2`.
-- [ ] [CUT-34] `aco next` never proposes a cut CUT-03 refuses: it names a nested container's repair under `SKIPPED` instead (`specs/next.spec.md` NEXT-25, E-NEXT-09).
+- CUT-03, CUT-34 (retired).
 - CUT-04 (retired).
 - [ ] [CUT-41] `cut` holds the item's lock (RULE-40) from before its first forge read through its container write: a held lock prints RULE-42's line; one it cannot take refuses as RULE-41 (see E-CUT-11).
 - [ ] [CUT-42] A row-removal write the body check answers refuses `created #<child>; <check sentence>; if row <idx> is still in #<n>'s aco block, re-run aco cut <n> --row <idx> -- it adopts the child`, exit `2`.
@@ -141,6 +140,7 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 - [ ] [CUT-45] A container's first cut (no stamp, no child but this cut's own) writes `planned_at_first_cut = <n>` (BODY-118) in its row-removal write, `<n>` being that child plus the rows left uncut.
 - [ ] [CUT-46] A container with the stamp or another child (open or closed, any repository) gets no new one; an adoption or re-run (CUT-19) of the first cut writes the same count.
 - [ ] [CUT-47] A cut with no linked row (CUT-10), and `aco item new --parent`, write no container body and stamp nothing.
+- [ ] [CUT-48] A container that is itself a child of another item is cut like any other: the child is created and linked under that container, never under its parent, and `aco next` proposes it (NEXT-71).
 
 ## Never
 
@@ -164,7 +164,7 @@ default, no `storage` key tracked) also names a fixed, deterministic fake
 `gh` as a setup precondition; a session under `storage = "state-ref"` names
 no `gh` at all -- `PATH` carries none.
 
-### E-CUT-01 -- refused before any write: not open, not a container, already parented
+### E-CUT-01 -- refused before any write: not open, not a container
 
 Setup: bare-remote, `storage = "github"`, fake `gh`
 
@@ -174,9 +174,6 @@ $ aco cut 90 --title "Slice A"
 exit 2
 $ aco cut 91 --title "Slice A"
 2> ERROR: #91 is not a container
-exit 2
-$ aco cut 92 --title "Slice A"
-2> ERROR: #92 is itself a child of example/agent-coordination#80; nested containers are not supported
 exit 2
 ```
 

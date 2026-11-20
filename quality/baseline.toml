@@ -21,23 +21,23 @@
 "src/aco/protocol.py" = 1517
 "src/aco/state_board.py" = 921
 "src/aco/store.py" = 1534
-"src/aco/workboard.py" = 2712
+"src/aco/workboard.py" = 2620
 "tests/support/cli_fixtures.py" = 888
 "tests/test_board.py" = 3575
 "tests/test_checkout.py" = 2037
-"tests/test_cli.py" = 11994
+"tests/test_cli.py" = 11921
 "tests/test_cmd_adopt.py" = 1427
-"tests/test_cmd_cut.py" = 1067
+"tests/test_cmd_cut.py" = 1066
 "tests/test_cmd_land_after_merge_rerun.py" = 862
 "tests/test_cmd_land_preflight_claim.py" = 851
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
 "tests/test_github.py" = 2473
-"tests/test_state_board.py" = 5897
+"tests/test_state_board.py" = 5835
 "tests/test_store.py" = 4233
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 80
+"build_board" = 70
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 82
@@ -57,7 +57,7 @@
 
 [function_lines."src/aco/workboard.py"]
 "_board_item" = 95
-"build_board" = 95
+"build_board" = 94
 
 [function_lines."tests/support/github_fixtures.py"]
 "landed_observations" = 61
@@ -70,7 +70,6 @@
 "_board_fixture_environment" = 108
 "test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state" = 60
 "test_next_close_names_every_zero_cost_action_regardless_of_rank" = 61
-"test_next_names_a_nested_containers_repair_where_cut_refuses_its_row" = 60
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73
 "test_release_merged_rerun_under_state_ref_never_touches_a_lane_opened_after_an_abandon" = 62
 "test_start_keeps_its_worktree_once_the_claims_push_was_sent_and_a_rerun_resumes_it" = 66

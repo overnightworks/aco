@@ -12,7 +12,6 @@ from board_fixtures import (
     complete_contract,
     container_with_children,
     projected_board,
-    slice_entries,
 )
 from cli_fixtures import freeze_cli_now, run_cli, track_board_config
 from github_fixtures import FakeForge, assert_github_world, serve_forge
@@ -68,28 +67,6 @@ def test_a_summary_counting_every_child_closed_yields_to_a_list_holding_an_open_
         workboard.zero_cost_closes(projected),
         isinstance(workboard.next_action(projected), CloseContainerAction),
     ) == ((1, 2, (244,)), "container; claim a child", (), False)
-
-
-@pytest.mark.parametrize(
-    ("open_children", "named"), [((), True), ((244,), False)], ids=["no-open-child", "open-child"]
-)
-def test_a_container_without_an_open_listed_child_is_read_for_its_nesting_parent(
-    open_children: tuple[int, ...], named: bool
-) -> None:
-    """Spec: BOARD-58"""
-    listed, children = container_with_children(
-        CONTAINER,
-        closed=1,
-        open_children=open_children,
-        body=complete_contract("keiner", slice=slice_entries("Scheibe")),
-    )
-    container = _stale_summary(listed, closed=0, total=1)
-
-    named_containers = workboard.childless_containers_with_uncut_rows(
-        (container,), {CONTAINER: children}, Storage.GITHUB
-    )
-
-    assert (named_containers == (CONTAINER,)) is named
 
 
 def test_next_names_a_container_closable_whose_summary_lags_its_closed_children(
