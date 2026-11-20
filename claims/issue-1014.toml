@@ -1,0 +1,8 @@
+claim_id = "9d409ac9aa4b469097b390c7a948fbd4"
+agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
+role = "builder"
+base = "7e0ff17c0df732241524838ed1a73cb227c6f60d"
+branch = "claude/issue-1014-foreign-dependents-score"
+scope = ["quality/baseline.toml", "specs/next.spec.md", "src/aco/github_issue_payload.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/support/github_pages.py", "tests/test_board.py", "tests/test_cli.py", "tests/test_cmd_next_foreign_dependent.py", "tests/test_github_issue_payload.py", "tests/test_state_board.py"]
+opened_commit = "cb2e930e446949a01ea66670476e50424db50f8d"
+whole_reason = "One count with one owner, filled by both storage adapters, with its spec and the tests that pin the score and the blocker bucket; they must land together."
