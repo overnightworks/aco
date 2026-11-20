@@ -1,8 +1,0 @@
-claim_id = "d13d7f93400f4590a91f78f4fe39412f"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "1d665fbe3b93fb4d616550432b486258efc03041"
-branch = "claude/issue-993-mcp-wait-tests-tables"
-scope = ["quality/baseline.toml", "tests/board/test_board_api_step_answers.py", "tests/board/test_board_cli.py", "tests/conftest.py", "tests/support", "tests/test_board_wait_recurring_audit.py", "tests/test_cmd_fleet_plans.py", "tests/test_cmd_item_new_repo.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_answer_step.py", "tests/test_cmd_mcp_earlier.py", "tests/test_cmd_mcp_step.py", "tests/test_cmd_wait_board.py", "tests/test_cmd_wait_rate_limit.py", "tests/test_mcp_server.py"]
-opened_commit = "5c646b9a2b202fb2ad7e99a6ed385d53f71b9672"
-whole_reason = "The fixtures move out of every module that copies them in one change, so no copy survives beside its new owner."
