@@ -90,29 +90,20 @@ def test_the_label_without_an_operator_wait_holds_nothing() -> None:
     assert item in board.ready_now
 
 
-@pytest.mark.parametrize(
-    ("wait", "reason"),
-    [
-        pytest.param(
-            {"trigger": "A second machine exists."},
-            "waiting: A second machine exists.",
-            id="trigger",
-        ),
-        pytest.param({"until": date(2026, 12, 1)}, "waiting: until 2026-12-01", id="until"),
-    ],
-)
-@pytest.mark.parametrize(
-    "next_line",
-    [
-        pytest.param("Cut it.", id="uncut-row-would-be-cut"),
-        pytest.param("Check it.", id="no-row-would-be-checked"),
-    ],
-)
-def test_a_container_with_a_wait_and_no_label_is_never_cut_or_checked(
-    wait: Mapping[str, object], reason: str, next_line: str
-) -> None:
-    rows = slice_entries("Scheibe A") if next_line == "Cut it." else []
-    contract = complete_contract(next_line, slice=rows, wait={**wait, "since": date(2026, 11, 1)})
+WAITS_WITH_REASON = [
+    pytest.param(
+        {"trigger": "A second machine exists."},
+        "waiting: A second machine exists.",
+        id="trigger",
+    ),
+    pytest.param({"until": date(2026, 12, 1)}, "waiting: until 2026-12-01", id="until"),
+]
+
+
+def _waiting_container_board(
+    wait: Mapping[str, object], rows: list[dict[str, object]]
+) -> workboard.Board:
+    contract = complete_contract("Cut it.", slice=rows, wait={**wait, "since": date(2026, 11, 1)})
     issue = workboard.Issue(
         NUMBER,
         "Held epic",
@@ -124,12 +115,33 @@ def test_a_container_with_a_wait_and_no_label_is_never_cut_or_checked(
         children_closed=1,
         children_total=1,
     )
-    board = projected_board((issue,), (), (), (), BoardConfig(), today=date(2026, 11, 15))
+    return projected_board((issue,), (), (), (), BoardConfig(), today=date(2026, 11, 15))
+
+
+@pytest.mark.parametrize(("wait", "reason"), WAITS_WITH_REASON)
+def test_a_container_with_a_wait_and_an_uncut_row_is_never_cut(
+    wait: Mapping[str, object], reason: str
+) -> None:
+    board = _waiting_container_board(wait, slice_entries("Scheibe A"))
     item = board.items[0]
 
     assert workboard.next_action(board) is None
     assert item.actionable_reason == reason
     assert not item.waits_on_operator
+
+
+@pytest.mark.parametrize(("wait", "reason"), WAITS_WITH_REASON)
+def test_a_container_with_a_wait_and_no_uncut_row_is_closed(
+    wait: Mapping[str, object], reason: str
+) -> None:
+    board = _waiting_container_board(wait, [])
+    item = board.items[0]
+
+    action = workboard.next_action(board)
+
+    assert isinstance(action, workboard.CloseContainerAction)
+    assert action.container.number == NUMBER
+    assert item.actionable_reason == reason
 
 
 @pytest.mark.parametrize(
