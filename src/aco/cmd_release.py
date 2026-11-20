@@ -384,12 +384,9 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     except protocol.ClaimError as error:
         # Only a refusal that names an item needs the storage, so a refusal that does not
         # still reaches the envelope when the board configuration cannot be read.
-        named = (
-            error
-            if error.naming is None
-            else workboard.named_refusal(error, context.config.storage)
-        )
-        return report.refuse(_ReleaseReason.PRECONDITION_FAILED, named, as_json=as_json)
+        if error.naming is not None:
+            error = workboard.named_refusal(error, context.config.storage)
+        return report.refuse(_ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
     return 0
 
 
