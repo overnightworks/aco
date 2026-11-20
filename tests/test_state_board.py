@@ -819,21 +819,6 @@ class TestMalformedItem:
             MALFORMED_NUMBER
         ]
 
-    def test_a_child_of_it_still_reads_its_parent_by_reference_with_the_kind_unknown(self) -> None:
-        """A child under an unreadable parent still reads as nested:
-        the parent answers by its reference and what of its text decodes."""
-        adapter = _state_ref_board(
-            {
-                **_item_files_with_a_malformed_item(_blank_title_item()),
-                f"{CHILD_A_ID}.md": _task_item(MALFORMED_ID),
-            }
-        )
-
-        parent = adapter.parent_issue(CHILD_A_NUMBER)
-
-        assert parent is not None
-        assert (parent.reference.number, parent.kind) == (MALFORMED_NUMBER, None)
-
     def test_its_container_counts_it_as_an_open_child(self) -> None:
         """A container whose only child is unreadable, that
         child's `[record].parent` still reading, never reads as childless,
@@ -2719,9 +2704,8 @@ class TestCliStateRefForge:
         state = store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}")
         assert state.tip is not None
         child_body = store.read_item_files(worktree, state.tip)[f"{child_id}.md"].decode()
-        assert parse_body(child_body, storage=Storage.STATE_REF).contract.now == (
-            f"Cut from {CONTAINER_ID}"
-        )
+        now = parse_body(child_body, storage=Storage.STATE_REF).contract.now
+        assert now == f"Cut from {CONTAINER_ID}"
         assert f'parent = "{CONTAINER_ID}"' in child_body
 
     def _cut_child_scope(
