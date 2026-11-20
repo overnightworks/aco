@@ -4,18 +4,16 @@ again, with the time, the trunk and the forge as the existing wait tests control
 
 from collections.abc import Callable
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
-from audit_world import LABEL, NAME, World, build_world, entry_toml
-from board_fixtures import FakeBoardProbe, board_issue, complete_contract, serve_board_probe
+from audit_world import LABEL, NAME, World, entry_toml
+from board_fixtures import board_issue, complete_contract
 from cli_fixtures import FROZEN_CLI_NOW, run_cli
-from wait_fixtures import Ticks, install
+from wait_fixtures import FIRST_PAUSE_AFTER_THE_READ, Ticks, install
 
 from aco import board_wait, cmd_wait, forge, protocol, session, workboard
 
 POLLS_PER_HOUR = int(board_wait.FULL_READ_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
-FIRST_PAUSE_AFTER_THE_READ = 5
 
 
 def reading(
@@ -47,16 +45,10 @@ def test_a_due_audit_ends_the_wait_beside_the_action_aco_next_names(
     assert board_wait.ending(frozenset(), found) == expected
 
 
-@pytest.fixture(autouse=True)
-def _probe(monkeypatch: pytest.MonkeyPatch) -> None:
-    serve_board_probe(monkeypatch, FakeBoardProbe())
-
-
 @pytest.fixture
-def world(monkeypatch: pytest.MonkeyPatch, github_clone: Path, github_world: Path) -> World:
-    built = build_world(monkeypatch, github_clone)
-    built.own.board_issues = ()
-    return built
+def world(audit_world: World) -> World:
+    audit_world.own.board_issues = ()
+    return audit_world
 
 
 def free_item() -> workboard.Issue:

@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from board_fixtures import board_issue, complete_contract
+from board_fixtures import FakeBoardProbe, board_issue, complete_contract, serve_board_probe
 from cli_fixtures import (
     FROZEN_CLI_NOW,
     freeze_cli_now,
@@ -90,3 +90,10 @@ def build_world(monkeypatch: pytest.MonkeyPatch, github_clone: Path) -> World:
         FakeForge(board_issues=(board_issue(11, "Top work", complete_contract("Claim #11.")),)),
     )
     return World(github_clone, monkeypatch, own)
+
+
+@pytest.fixture
+def audit_world(monkeypatch: pytest.MonkeyPatch, github_clone: Path, github_world: Path) -> World:
+    """The audit world with the board probe served, for the `aco wait` tests."""
+    serve_board_probe(monkeypatch, FakeBoardProbe())
+    return build_world(monkeypatch, github_clone)

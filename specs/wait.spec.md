@@ -96,7 +96,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - `aco wait ITEM --line N` is unchanged.
 - [ ] [WAIT-24] Each board read lists an entry's anchor (NEXT-65) only when the newest trunk landing's commit or the day differs from the last complete listing's; the due audits stay under that key. A listing with an unavailable audit is not kept, so the next read lists again; without an `audit` entry nothing is listed.
 - [ ] [WAIT-25] It prints `AUDIT <name>` per due audit, in entry order, before `ACTIONABLE` and `CHANGED`. `--json` always carries `"audits": [<name>, …]` last, `[]` when none is due, and prints `reason: "audit_due"` when an audit is due and no action is named (see E-WAIT-10).
-  - `lines` follows WAIT-16 under every reason; without an `audit` entry the output is WAIT-15's and WAIT-16's with the empty `audits` key only.
+  - `lines` follows WAIT-16 under every reason, so a due audit beside changed lines and no action prints `AUDIT` before `CHANGED`, with `reason: "audit_due"` and the `lines`; without an `audit` entry the output is WAIT-15's and WAIT-16's with the empty `audits` key only.
 
 `reason`, by which refusal fired:
 
