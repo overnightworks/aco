@@ -22,6 +22,7 @@ TRUNK_FILES = ("src/widget.py",)
 HELD_SCOPE = ("src/widget.py",)
 FIRST_RUN = "run-1"
 SECOND_RUN = "run-2"
+THIRD_RUN = "run-3"
 OTHER_AGENT = "Bea"
 LANDING_CLAIM_ID = protocol.ClaimId("landing")
 END_TIP = "b" * 40
@@ -85,6 +86,7 @@ SINGLE_RUN_TRAILERS = (
     "lane_misses_test: 0",
 )
 CHAINED_TIPS = (END_TIP, OTHER_TIP, "d" * 40)
+CHAINED_RUNS = (FIRST_RUN, SECOND_RUN, THIRD_RUN)
 
 
 @dataclass(frozen=True)
@@ -231,7 +233,7 @@ def chained_runs(*records: lane_record.LaneRecordFile | None) -> lane_runs.RunsF
     for position, record in enumerate(records):
         end_tip = CHAINED_TIPS[position]
         added = None if record is None else lane_runs.RunAdded(end_tip, STAGES_RAN, record)
-        entries.append(lane_runs.RunEntry(f"run-{position + 1}", start_tip, True, added))
+        entries.append(lane_runs.RunEntry(CHAINED_RUNS[position], start_tip, True, added))
         start_tip = end_tip
     return lane_runs.RunsFile(tuple(entries))
 

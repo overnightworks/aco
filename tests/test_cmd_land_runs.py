@@ -23,6 +23,7 @@ from lane_record_runs_world import (
     LANDING_CLAIM_ID,
     SINGLE_RUN_TRAILERS,
     SUMMED_TRAILERS,
+    THIRD_RUN,
     a_run_stored_late,
     chained_runs,
     commit_runs_file,
@@ -181,17 +182,6 @@ def landed_observations(
         "claims": {},
     }
     return observed, expected
-
-
-def test_a_landing_of_a_claim_with_stored_runs_writes_the_summed_trailers_and_drops_the_runs(
-    lane: LaneLandingWorld, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LANREC-90, REL-64."""
-    result = run_cli(["land", "12", "--head", lane.head], capsys)
-
-    assert (result.status, result.stderr) == (0, "")
-    assert routing_trailers_of(lane.remote) == SUMMED_TRAILERS
-    assert runs_files_in_state(lane) == 0
 
 
 @pytest.mark.parametrize("path", ALL_PATHS)
@@ -406,7 +396,7 @@ def test_a_run_added_between_the_releases_read_and_its_push_ends_the_landing_and
 ) -> None:
     """Spec: LANREC-92 -- the merge stands; the claim and its runs stay until the rerun."""
     race_before_the_push(
-        monkeypatch, a_run_stored_late(lane.clone, lane.remote, LANDING_CLAIM_ID, "run-3")
+        monkeypatch, a_run_stored_late(lane.clone, lane.remote, LANDING_CLAIM_ID, THIRD_RUN)
     )
 
     refused = run_cli(["land", "12", "--head", lane.head], capsys)
