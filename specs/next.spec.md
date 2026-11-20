@@ -117,7 +117,7 @@ other printable space are text.
 
 - [ ] [NEXT-08] Every other unworkable item is named once under a trailing `SKIPPED` block, `<label>: <reason>`; a container `next` itself recommends cutting or closing is left out of that list.
 - NEXT-26, NEXT-47 (retired).
-- [ ] [NEXT-34] A NEXT-05 container not the first action (blocked ones excluded, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped in text and `--json`.
+- [ ] [NEXT-34] A NEXT-05 container behind the first action (unblocked, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped in both outputs, never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
 - [ ] [NEXT-59] A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
