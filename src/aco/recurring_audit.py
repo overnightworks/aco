@@ -10,7 +10,7 @@ from typing import Protocol
 
 from . import protocol
 
-ANCHOR_LINE_PREFIX = "audited through "
+ANCHOR_PHRASE = "audited through"
 # The depth of the trunk walk an anchor is searched in.
 MAX_LANDINGS = 5000
 _ENTRY_KEYS = ("name", "label", "landings", "days", "run")
@@ -164,9 +164,9 @@ def unavailable(entry: RecurringAudit, sentence: str) -> Finding:
 
 def _last_anchor_line(body: str) -> str | None:
     named = [
-        stripped.removeprefix(ANCHOR_LINE_PREFIX).strip()
+        stripped.removeprefix(ANCHOR_PHRASE).strip()
         for stripped in map(str.strip, body.splitlines())
-        if stripped.startswith(ANCHOR_LINE_PREFIX)
+        if stripped.startswith(f"{ANCHOR_PHRASE} ")
     ]
     return named[-1] if named else None
 

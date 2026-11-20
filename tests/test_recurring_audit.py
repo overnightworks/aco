@@ -255,7 +255,7 @@ REFUSALS = {
 
 @pytest.mark.parametrize(("text", "refusal"), REFUSALS.values(), ids=REFUSALS.keys())
 def test_configuration_refuses_each_malformed_audit_entry(text: str, refusal: str) -> None:
-    """PIN-58, PIN-59, PIN-60, PIN-61, PIN-62."""
+    """PIN-58, PIN-59, PIN-60, PIN-61, PIN-62 (E-PIN-43)."""
     with pytest.raises(ClaimError) as refused:
         workboard.parse_config(text, CONFIG_PATH)
 
