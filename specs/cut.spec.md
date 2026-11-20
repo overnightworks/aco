@@ -32,7 +32,6 @@ with `--json` also `specs/output.spec.md`'s envelope, `reason`
 | `<n>` not open, or not on the board | CUT-01 | CUT-01 | CUT-01 | CUT-01 |
 | `--title` empty or whitespace only | CUT-33 | CUT-33 | CUT-33 | CUT-33 |
 | `<n>` open but not a container | CUT-02 | CUT-02 | CUT-02 | CUT-02 |
-| `<n>` itself has a parent | CUT-03 | CUT-03 | CUT-03 | CUT-03 |
 | `<n>`'s body is malformed | CUT-05, CUT-40 | CUT-05, CUT-40 | — | CUT-05, CUT-40 |
 | the item's lock is held, or cannot be taken | CUT-41 | CUT-41 | CUT-41 | CUT-41 |
 | the linked row's `done_when` holds a display control | CUT-39 | CUT-39 | — | CUT-05 |
