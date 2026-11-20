@@ -16,8 +16,9 @@ from github_fixtures import (
     serve_forge,
 )
 from landing_refusals import ParserExit, RefusalLength, refusal_observations
+from store_fixtures import publish_claims_from_a_second_clone
 
-from aco import cli, cmd_land, forge
+from aco import cli, cmd_land, forge, protocol
 
 HEAD_REQUIRED = "aco land needs --head <sha>, the head the reviewers saw: it merges only that state"
 OVERRIDE = ("--coordinator-override",)
@@ -31,6 +32,7 @@ class LandingCase:
     arguments: tuple[str, ...] = ()
     head_omitted: bool = False
     state_ref: bool = False
+    seeded_state: bool = True
     merged: bool = False
     body: str = "Work-Item: #72\n\nCloses #72"
     quality_config: str | None = None
@@ -65,6 +67,11 @@ def world(
     monkeypatch.setenv("LC_ALL", "C")
     monkeypatch.setenv("GIT_DISCOVERY_ACROSS_FILESYSTEM", "1")
     assert_github_world(github_clone, bare_remote)
+    state_tip = (
+        publish_claims_from_a_second_clone(github_clone, bare_remote, ()).tip
+        if case.seeded_state
+        else None
+    )
     if case.state_ref:
         track_board_config(github_clone, 'storage = "state-ref"\n')
     client = serve_forge(
@@ -80,7 +87,7 @@ def world(
             quality_config_error=case.quality_config_error,
         ),
     )
-    shared = landing_world(github_clone, bare_remote, client)
+    shared = landing_world(github_clone, bare_remote, client, remote_tip=state_tip)
     unchanged = shared.unchanged
     result = LandingScenario(github_clone, bare_remote, client, unchanged, case)
     monkeypatch.setattr(cmd_land, "pause_between_reads", result.pauses.append)
@@ -104,6 +111,14 @@ class TestLandReadiness:
                     length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="not-open",
+            ),
+            pytest.param(
+                LandingCase(
+                    replace(landing_readiness(), draft=True),
+                    protocol.MISSING_STATE_REF,
+                    seeded_state=False,
+                ),
+                id="a-missing-state-ref-refuses-before-the-draft",
             ),
             pytest.param(
                 LandingCase(

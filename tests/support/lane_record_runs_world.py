@@ -4,7 +4,7 @@ against under both storages, registered as the pytest plugin that gives those mo
 
 import dataclasses
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,6 +60,31 @@ SUMMED_TRAILERS = (
     "lane_misses_ci: 2",
     "lane_misses_test: 0",
 )
+SINGLE_RUN_TRAILERS = (
+    "lane_build: sonnet-5.5/high",
+    "lane_fix: none",
+    "lane_review: opus-5.5/medium",
+    "lane_test: none",
+    "lane_gate: none",
+    "lane_land: haiku-5.5/low",
+    "lane_fix_rounds: 3",
+    "lane_blocking: 4",
+    "lane_experiment: builder-sonnet",
+    "lane_risk: routine",
+    "lane_fix_rounds_review: 1",
+    "lane_fix_rounds_gate: 0",
+    "lane_fix_rounds_ci: 2",
+    "lane_fix_rounds_test: 0",
+    "lane_blocking_review: 3",
+    "lane_blocking_gate: 0",
+    "lane_blocking_ci: 1",
+    "lane_blocking_test: 0",
+    "lane_misses_review: 0",
+    "lane_misses_gate: 0",
+    "lane_misses_ci: 1",
+    "lane_misses_test: 0",
+)
+CHAINED_TIPS = (END_TIP, OTHER_TIP, "d" * 40)
 
 
 @dataclass(frozen=True)
@@ -193,17 +218,31 @@ def commit_runs_file(
     )
 
 
-def two_chained_runs() -> lane_runs.RunsFile:
-    """Two runs that ran `STAGES_RAN` with the record of `lane_record_object`, the second
-    following the first."""
-    record = lane_record.parse_record_file(json.dumps(lane_record_object()).encode())
-    first = lane_runs.RunEntry(
-        FIRST_RUN, None, True, lane_runs.RunAdded(END_TIP, STAGES_RAN, record)
-    )
-    second = lane_runs.RunEntry(
-        SECOND_RUN, END_TIP, True, lane_runs.RunAdded(OTHER_TIP, STAGES_RAN, record)
-    )
-    return lane_runs.RunsFile((first, second))
+def record_stating(**changes: object) -> lane_record.LaneRecordFile:
+    """The lane record file of `lane_record_object` with `changes`, parsed."""
+    return lane_record.parse_record_file(json.dumps(lane_record_object(**changes)).encode())
+
+
+def chained_runs(*records: lane_record.LaneRecordFile | None) -> lane_runs.RunsFile:
+    """Runs that each follow the one before and ran `STAGES_RAN` with their record; a run whose
+    record is `None` is begun and not added."""
+    entries: list[lane_runs.RunEntry] = []
+    start_tip: str | None = None
+    for position, record in enumerate(records):
+        end_tip = CHAINED_TIPS[position]
+        added = None if record is None else lane_runs.RunAdded(end_tip, STAGES_RAN, record)
+        entries.append(lane_runs.RunEntry(f"run-{position + 1}", start_tip, True, added))
+        start_tip = end_tip
+    return lane_runs.RunsFile(tuple(entries))
+
+
+def two_chained_runs(
+    verdicts: Sequence[dict[str, str]] | None = None,
+) -> lane_runs.RunsFile:
+    """Two runs that ran `STAGES_RAN` with the record of `lane_record_object` (its verdicts
+    replaced by `verdicts` where given), the second following the first."""
+    record = record_stating() if verdicts is None else record_stating(verdicts=list(verdicts))
+    return chained_runs(record, record)
 
 
 def a_run_stored_late(
