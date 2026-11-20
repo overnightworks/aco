@@ -16,6 +16,7 @@ from pathlib import Path
 from . import (
     board_read,
     body,
+    checkout,
     decide,
     expectations,
     forge,
@@ -47,22 +48,34 @@ class LineStatus:
 @dataclass(frozen=True)
 class BoardReading:
     """What one read of the board tells: the item `aco next` names, every line of
-    the open items, the foreign blockers still open, and the earliest `until`
-    wait still ahead."""
+    the open items, the foreign blockers still open, the earliest `until`
+    wait still ahead, and the names of the recurring audits that are due."""
 
     actionable_item: int | None
     lines: tuple[LineStatus, ...]
     foreign_blockers: tuple[forge.ProbeTarget, ...]
     earliest_until: item_wait.UntilWait | None
+    audits_due: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class BoardEnd:
-    """Why the wait ended: the item `aco next` names, and the lines that
-    stopped waiting on the operator, in board order. At least one holds."""
+    """Why the wait ended: the item `aco next` names, the lines that
+    stopped waiting on the operator, in board order, and the audits that are due,
+    in entry order. At least one holds."""
 
     actionable_item: int | None
     changed: tuple[LineStatus, ...]
+    audits_due: tuple[str, ...] = ()
+
+
+@dataclass
+class KeptAudits:
+    """The due audits of the last complete listing and the key it was made under: the
+    newest trunk landing's commit and the day."""
+
+    key: tuple[str | None, date] | None = None
+    due: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -109,9 +122,9 @@ def ending(waiting_before: frozenset[tuple[int, int]], reading: BoardReading) ->
         for line in reading.lines
         if (line.item, line.index) in waiting_before and not line.waiting
     )
-    if reading.actionable_item is None and not changed:
+    if reading.actionable_item is None and not changed and not reading.audits_due:
         return None
-    return BoardEnd(reading.actionable_item, changed)
+    return BoardEnd(reading.actionable_item, changed, reading.audits_due)
 
 
 def waiting_lines(reading: BoardReading) -> frozenset[tuple[int, int]]:
@@ -198,10 +211,30 @@ def _foreign_blockers(board: workboard.Board, repository: str) -> tuple[forge.Pr
     )
 
 
-def read_board(context: RunContext) -> BoardReading:
-    """One read of the open board and of `aco next`'s decision over it."""
+def audits_due(
+    context: RunContext, landings: tuple[checkout.TrunkLanding, ...], kept: KeptAudits
+) -> tuple[str, ...]:
+    """The names of the due audits, in entry order: `board_read.recurring_audit_reading`'s
+    listing, made only when the key (the newest landing, the day) differs from the one `kept`
+    holds. An unavailable audit is not due and keeps nothing, so the next read lists again."""
+    if not context.config.audit:
+        return ()
+    key = (landings[-1].sha if landings else None, context.today())
+    if kept.key == key:
+        return kept.due
+    findings = board_read.recurring_audit_reading(context, landings)
+    due = tuple(finding.entry.name for finding in findings if finding.is_due)
+    if all(finding.is_due for finding in findings):
+        kept.key, kept.due = key, due
+    return due
+
+
+def read_board(context: RunContext, kept: KeptAudits) -> BoardReading:
+    """One read of the open board and of `aco next`'s decision over it; `kept` holds the
+    audit verdicts between reads."""
     issues = context.forge.list_open_board_issues()
-    projected = board_read.observed_board(context, issues=issues).board
+    observed = board_read.observed_board(context, issues=issues)
+    projected = observed.board
     storage = context.config.storage
     action = workboard.next_action(projected)
     github = storage is body.Storage.GITHUB
@@ -212,6 +245,7 @@ def read_board(context: RunContext) -> BoardReading:
         earliest_until=earliest_pending_until(
             (body.parse_body(issue.body, storage=storage).wait for issue in issues), context.today()
         ),
+        audits_due=audits_due(context, observed.trunk_landings, kept),
     )
 
 
@@ -268,6 +302,7 @@ class _BoardWatch:
         self._pending = False
         self._failures = FailureRun(_say_still_waiting)
         self._read_before = False
+        self._audits = KeptAudits()
 
     def start(self) -> BoardEnd | None:
         """The first read: a failure here refuses, a rate limit apart (the first read is then
@@ -421,7 +456,7 @@ class _BoardWatch:
         for once more."""
         before = {item: self._modified(item) for item in self._signals}
         context = self._context.observed_afresh() if self._read_before else self._context
-        reading = read_board(context)
+        reading = read_board(context, self._audits)
         self._read_before = True
         end = ending(self._waiting, reading)
         if end is not None:

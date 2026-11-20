@@ -61,6 +61,7 @@ class _WaitReason(StrEnum):
 
     CHANGED = "changed"
     ACTIONABLE = "actionable"
+    AUDIT_DUE = "audit_due"
     INVALID_ITEM = "invalid_item"
     LINE_OUT_OF_RANGE = "line_out_of_range"
     INVALID_USAGE = "invalid_usage"
@@ -219,6 +220,21 @@ def _wait_for_lines(
     return 0
 
 
+def _emit_board_end_json(
+    end: board_wait.BoardEnd, storage: body.Storage, changed: list[dict[str, object]]
+) -> None:
+    """`reason` is `actionable` with an item named, else `audit_due` when an audit is due,
+    else `changed`; `lines` is carried when lines changed, and always with `changed`."""
+    lines = {"lines": changed} if changed else {}
+    if end.actionable_item is not None:
+        item = workboard.item_json_reference(end.actionable_item, storage)
+        report.emit_json(True, _WaitReason.ACTIONABLE, item=item, **lines, audits=end.audits_due)
+    elif end.audits_due:
+        report.emit_json(True, _WaitReason.AUDIT_DUE, **lines, audits=end.audits_due)
+    else:
+        report.emit_json(True, _WaitReason.CHANGED, lines=changed, audits=end.audits_due)
+
+
 def _emit_board_end(end: board_wait.BoardEnd, storage: body.Storage, *, as_json: bool) -> None:
     changed = [
         {
@@ -229,13 +245,10 @@ def _emit_board_end(end: board_wait.BoardEnd, storage: body.Storage, *, as_json:
         for line in end.changed
     ]
     if as_json:
-        if end.actionable_item is None:
-            report.emit_json(True, _WaitReason.CHANGED, lines=changed)
-        else:
-            item = workboard.item_json_reference(end.actionable_item, storage)
-            lines = {"lines": changed} if changed else {}
-            report.emit_json(True, _WaitReason.ACTIONABLE, item=item, **lines)
+        _emit_board_end_json(end, storage, changed)
         return
+    for name in end.audits_due:
+        print(f"AUDIT {name}")
     if end.actionable_item is not None:
         print(f"ACTIONABLE {workboard.item_label(end.actionable_item, storage)}")
     for line in end.changed:
