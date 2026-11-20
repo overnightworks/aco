@@ -332,10 +332,9 @@ def _parent_requirement(
     """The parent's demand, read from GitHub's sub-issue relation and its
     body under the repository's own pin.
 
-    Closing a parent's last open child completes the parent only when the
-    parent holds no uncut `[[slice]]` row and its own `Next` line names no
-    further work; with only `Next` work left, the landing may close the
-    parent (its one remaining child) but need not. A parent keeping other
+    Closing a parent's last open child completes the parent whenever the
+    parent holds no uncut `[[slice]]` row (LAND-21); with an uncut row the
+    parent stays open (LAND-22). A parent keeping other
     open children stays open, and must say what happens next. A parent in
     another repository sets no requirement: its own repository closes it.
     """

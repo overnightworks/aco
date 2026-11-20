@@ -14,6 +14,7 @@ from typing import cast
 import pytest
 from board_fixtures import (
     MINIMAL_BLOCK_TOML,
+    OPERATOR_WAIT,
     REPOSITORY,
     RULED_ON,
     TRIGGER_WAIT,
@@ -588,22 +589,6 @@ def test_uncut_is_empty_when_the_block_carries_no_slice_entry() -> None:
     )
 
     assert projected.uncut == ()
-
-
-@pytest.mark.parametrize(
-    ("next_line", "expected"),
-    [
-        pytest.param(None, False, id="no-next-line"),
-        pytest.param("keiner", False, id="german-none"),
-        pytest.param("Keine", False, id="german-none-casefolded"),
-        pytest.param("nichts", False, id="no-blockers-spelling"),
-        pytest.param("none", False, id="english-none"),
-        pytest.param("-", False, id="dash"),
-        pytest.param("Cut the next slice.", True, id="concrete-work"),
-    ],
-)
-def test_has_further_work(next_line: str | None, expected: bool) -> None:
-    assert workboard.has_further_work(next_line) is expected
 
 
 def issues_created_at(*created_ats: str) -> tuple[workboard.Issue, ...]:
@@ -1384,14 +1369,10 @@ def test_next_action_names_the_top_actionable_work_item() -> None:
     assert action.item.number == 10
 
 
-def test_next_action_never_cuts_a_container_whose_slice_table_is_empty() -> None:
-    """An empty `[[slice]]` table is the typed statement that
-    there is nothing here to cut, even when the container's own `Next` line
-    still names real work. `next_action` must not fall back to building a
-    `CutSliceAction` (and an unrunnable `cut --title "<paragraph>"`) out of
-    that prose -- nor offer to close it while that sentence names work:
-    it names the container
-    and its own sentence through `CheckContainerAction` instead."""
+def test_next_action_closes_a_container_with_an_empty_slice_table_and_next_prose() -> None:
+    """An empty `[[slice]]` table is the typed statement that there is nothing
+    here to cut, so `next_action` neither builds a `CutSliceAction` out of the
+    container's `Next` prose nor keeps the container open for it."""
     container = workboard.Issue(
         130,
         "Container",
@@ -1409,13 +1390,12 @@ def test_next_action_never_cuts_a_container_whose_slice_table_is_empty() -> None
 
     action = workboard.next_action(projected)
 
-    assert isinstance(action, workboard.CheckContainerAction)
-    assert (action.container.number, action.next_step) == (130, "Cut the next slice.")
-    assert workboard.zero_cost_closes(projected) == ()
-    assert action.container.actionable_reason == workboard.CHECK_DONE_WHEN
+    assert isinstance(action, workboard.CloseContainerAction)
+    assert action.container.number == 130
+    assert workboard.zero_cost_closes(projected) == (130,)
 
 
-def test_next_action_closes_a_container_with_no_open_child_and_no_further_work() -> None:
+def test_next_action_closes_a_container_with_no_open_child_and_no_uncut_row() -> None:
     container, container_children = container_with_children(
         140, closed=3, body=complete_contract("keiner", done_when="All slices land.")
     )
@@ -1458,14 +1438,17 @@ def test_zero_cost_closes_names_a_closable_container_that_also_landed_once() -> 
     assert workboard.zero_cost_closes(projected) == (140,)
 
 
-def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work() -> None:
-    """An empty `Next` line alone must not close a container that still has
-    an undispatched `[[slice]]` entry."""
+@pytest.mark.parametrize("next_line", ["", "keiner", "Danach die Abnahme planen."])
+def test_next_action_cuts_a_container_with_an_uncut_row_whatever_its_next_line_says(
+    next_line: str,
+) -> None:
+    """Only an undispatched `[[slice]]` entry decides the cut, and its title is
+    the one `cut` links."""
     container = workboard.Issue(
         141,
         "Container",
         (),
-        complete_contract("", slice=slice_entries("Scheibe C")),
+        complete_contract(next_line, slice=slice_entries("Scheibe C")),
         "2026-08-20T00:00:00Z",
         "2026-08-20T00:00:00Z",
         kind=ItemKind.CONTAINER,
@@ -1480,7 +1463,7 @@ def test_next_action_cuts_a_container_with_an_uncut_row_and_no_further_next_work
 
     assert isinstance(action, workboard.CutSliceAction)
     assert action.container.number == 141
-    assert action.next_step == "Scheibe C"
+    assert action.cut_title == "Scheibe C"
 
 
 @pytest.mark.parametrize(
@@ -2551,8 +2534,8 @@ STATE_REF_RECORD: dict[str, object] = {
             ItemKind.CONTAINER,
             (workboard.ChildItem(80, workboard.ChildState.CLOSED, "Child"),),
             complete_contract("Cut slice 2."),
-            None,
-            id="a_next_line_naming_work_keeps_the_parent_un_closable",
+            79,
+            id="a_next_line_naming_work_still_names_the_parent",
         ),
         pytest.param(
             ItemKind.CONTAINER,
@@ -2570,7 +2553,7 @@ STATE_REF_RECORD: dict[str, object] = {
         ),
     ],
 )
-def test_closable_container_number_decides_by_kind_children_uncut_rows_next_line_and_body_shape(
+def test_closable_container_number_decides_by_kind_children_uncut_rows_and_body_shape(
     kind: ItemKind,
     children: tuple[workboard.ChildItem, ...],
     body: str,
@@ -2632,8 +2615,18 @@ def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_
         ),
         pytest.param(
             complete_contract("Cut slice 2."),
-            workboard.ParentCompletion.PERMITTED,
-            id="no_row_and_next_work_permits_closing",
+            workboard.ParentCompletion.REQUIRED,
+            id="no_row_requires_closing_although_next_names_work",
+        ),
+        pytest.param(
+            complete_contract("Cut slice 2.", wait=OPERATOR_WAIT),
+            workboard.ParentCompletion.REQUIRED,
+            id="no_row_requires_closing_although_the_operator_wait_holds",
+        ),
+        pytest.param(
+            complete_contract("keiner", wait=TRIGGER_WAIT),
+            workboard.ParentCompletion.REQUIRED,
+            id="no_row_requires_closing_although_a_trigger_wait_holds",
         ),
         pytest.param(
             complete_contract("keiner", slice=slice_entries("Scheibe 1")),
@@ -2652,7 +2645,7 @@ def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_
         ),
     ],
 )
-def test_parent_completion_reads_uncut_rows_before_the_next_line(
+def test_parent_completion_reads_only_the_uncut_rows(
     parent_body: str, expected: workboard.ParentCompletion
 ) -> None:
     parsed = parse_body(parent_body, storage=Storage.GITHUB)

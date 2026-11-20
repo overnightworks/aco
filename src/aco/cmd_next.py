@@ -115,7 +115,7 @@ def _claims_in_place(context: session.RunContext) -> bool:
 class _NextReason(StrEnum):
     """`aco next`'s own `--json` `reason` vocabulary
     (`specs/next.spec.md`): the action type -- `work_item`, `cut_slice`,
-    `check_container`, `close_container` -- names a success (`ok: true`) exactly as it did
+    `close_container` -- names a success (`ok: true`) exactly as it did
     when carried under the dropped `"action"` key; `nothing_actionable`
     is the one `ok: false` outcome that exits `3` in text (NEXT-01) and
     under `--json` alike, the sole reason exit `3` is ever used.
@@ -126,7 +126,6 @@ class _NextReason(StrEnum):
 
     WORK_ITEM = "work_item"
     CUT_SLICE = "cut_slice"
-    CHECK_CONTAINER = "check_container"
     CLOSE_CONTAINER = "close_container"
     NOTHING_ACTIONABLE = "nothing_actionable"
     INVALID_USAGE = "invalid_usage"
@@ -138,8 +137,6 @@ def _next_action_reason(action: workboard.NextAction) -> _NextReason:
         return _NextReason.WORK_ITEM
     if isinstance(action, workboard.CutSliceAction):
         return _NextReason.CUT_SLICE
-    if isinstance(action, workboard.CheckContainerAction):
-        return _NextReason.CHECK_CONTAINER
     return _NextReason.CLOSE_CONTAINER
 
 
@@ -168,7 +165,7 @@ def _next_action_payload(
         return {
             "number": number,
             "title": action.container.title,
-            "slice": action.next_step,
+            "slice": action.cut_title,
             "cut_title": action.cut_title,
             "command": _next_action_command(action, storage, site=site),
         }
@@ -176,9 +173,7 @@ def _next_action_payload(
         "number": number,
         "closed": action.container_progress.closed,
         "total": action.container_progress.total,
-        "next_step": (
-            action.next_step if isinstance(action, workboard.CheckContainerAction) else None
-        ),
+        "next_step": None,
     }
 
 
@@ -491,18 +486,13 @@ def _next_action_lines(
     container_label = workboard.item_label(action.container.number, storage)
     if isinstance(action, workboard.CutSliceAction):
         return [
-            f"cut_slice {container_label}: {protocol.terminal_text(action.next_step)}",
+            f"cut_slice {container_label}: {protocol.terminal_text(action.cut_title)}",
             f"Next: {_next_action_command(action, storage, site=site)}",
-        ]
-    if isinstance(action, workboard.CheckContainerAction):
-        return [
-            f"check_container {container_label}: {workboard.CHECK_DONE_WHEN}",
-            f"Next: {protocol.terminal_text(action.next_step)}",
         ]
     progress = action.container_progress
     return [
         f"close_container {container_label}: "
-        f"{progress.closed}/{progress.total} children closed, no Next work"
+        f"{progress.closed}/{progress.total} children closed, no uncut row"
     ]
 
 

@@ -824,16 +824,20 @@ def _childless_container(number: int, body_text: str, *, labels: tuple[str, ...]
     )
 
 
-# Containers the operator holds -- one with an uncut row, one with a check, one closable, each
-# with an operator `wait` -- beside one with a trigger `wait` and one pullable item.
-_CHECK_WHILE_WAITING = complete_contract("Check it.", wait=TRIGGER_WAIT)
+# Containers the operator holds -- one with an uncut row, two closable, each with an operator
+# `wait` -- beside one with a trigger `wait` and an uncut row, one closable with a trigger
+# `wait`, and one pullable item.
+_CUT_WHILE_WAITING = complete_contract(
+    "Cut it.", slice=slice_entries("Scheibe B"), wait=TRIGGER_WAIT
+)
 _OPERATOR_HELD_CONTAINERS = (
     _childless_container(
         441, complete_contract("Cut it.", slice=slice_entries("Scheibe A"), wait=OPERATOR_WAIT)
     ),
     _childless_container(442, complete_contract("Check it.", wait=OPERATOR_WAIT)),
     _childless_container(443, complete_contract("keiner", wait=OPERATOR_WAIT)),
-    _childless_container(444, _CHECK_WHILE_WAITING),
+    _childless_container(444, _CUT_WHILE_WAITING),
+    _childless_container(445, complete_contract("keiner", wait=TRIGGER_WAIT)),
     board_issue(11, "Top work", complete_contract("Claim #11.")),
 )
 
@@ -1000,9 +1004,9 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
             "#11 score -10: Top work\nNext: Claim #11.\n"
             "Run: aco claim 11 --scope <paths>\n"
             + _SCOPE_UNKNOWN_NOTE_LINE
-            + "parallel: unknown (first action names no scope)\nclose: #443\n"
-            + f"waiting on operator: #441, #442\n\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
-            id="never_cuts_or_checks_a_container_the_operator_holds_but_still_closes_one",
+            + "parallel: unknown (first action names no scope)\nclose: #442, #443, #445\n"
+            + f"waiting on operator: #441\n\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
+            id="never_cuts_a_container_the_operator_holds_but_still_closes_one",
         ),
         pytest.param(
             _OPERATOR_HELD_CONTAINERS,
@@ -1022,7 +1026,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-                **(_NOTHING_NAMED_JSON | {"close": [443], "waiting_on_operator": [441, 442]}),
+                **(_NOTHING_NAMED_JSON | {"close": [442, 443, 445], "waiting_on_operator": [441]}),
             },
             id="json_lists_operator_held_containers_as_waiting_and_a_closable_one_under_close",
         ),
@@ -4059,10 +4063,9 @@ def test_next_prints_a_cut_command_cut_accepts_for_a_differing_next_line(
     accepts and that links exactly that entry. Without `--row`, `cut` links
     the first uncut entry and takes that entry's own title, so the
     printed command names the container alone -- no title, so the `next`
-    line's prose can never reach the child -- while the action line above
-    it keeps naming the container's own words. `next --json` carries the
-    same split as two fields: `slice` is that human step, `cut_title` is
-    the title `cut` accepts. The child each cut writes carries `cut`'s own
+    line's prose can never reach the child -- and the action line above
+    it names that same row title. `next --json` carries it in `slice` and
+    `cut_title`. The child each cut writes carries `cut`'s own
     fixed `next` (CUT-25), never the container's `next` line."""
     toml_text = (
         f'version = 1\nnow = "N"\nnext = "{_DIFFERING_NEXT_LINE}"\ndone_when = "D"\n'
@@ -4075,7 +4078,7 @@ def test_next_prints_a_cut_command_cut_accepts_for_a_differing_next_line(
     assert json_exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["reason"] == "cut_slice"
-    assert payload["slice"] == _DIFFERING_NEXT_LINE
+    assert payload["slice"] == "Scheibe 1"
     assert payload["cut_title"] == "Scheibe 1"
 
     json_cut_exit_code = issue_claim.main(
@@ -4094,7 +4097,7 @@ def test_next_prints_a_cut_command_cut_accepts_for_a_differing_next_line(
     next_exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
     assert next_exit_code == 0
     out = capsys.readouterr().out
-    assert out.splitlines()[0] == f"cut_slice #{CUT_CONTAINER}: {_DIFFERING_NEXT_LINE}"
+    assert out.splitlines()[0] == f"cut_slice #{CUT_CONTAINER}: Scheibe 1"
     command_line = out.splitlines()[1]
     cut_arguments = shlex.split(command_line.removeprefix("Next: aco "))
 
@@ -4354,7 +4357,7 @@ class _CutRoundTripCase:
     That row is the only thing that makes `next` print a `cut`
     command at all -- a container with no uncut row is never one of these
     cases, whatever its `Next` line says (see
-    `test_next_names_a_container_with_no_slice_row_by_its_own_next_line` for
+    `test_next_closes_a_container_with_no_slice_row_whose_next_line_names_work` for
     that combination instead). `expected_item_bodies`/`expected_output` take
     the freshly created child's number, since only `cut` fixes that."""
 
@@ -4395,7 +4398,7 @@ _CUT_ROUND_TRIP_CASES = (
     # at all, is the typed statement that there is nothing here to cut),
     # so they have no
     # `cut` command to round-trip; `test_next_names_a_closeable_container`
-    # and `test_next_names_a_container_with_no_slice_row_by_its_own_next_line`
+    # and `test_next_closes_a_container_with_no_slice_row_whose_next_line_names_work`
     # prove those instead.
 )
 
@@ -4918,28 +4921,6 @@ def _hostile_work_item_board() -> dict[int, str]:
     }
 
 
-def _hostile_cut_slice_board() -> dict[int, str]:
-    """A cuttable container, the top action, whose `Next` clears the screen."""
-    return {
-        41: _state_ref_item_body(
-            "Epic",
-            kind=body.ItemKind.CONTAINER,
-            next="cut \x1b[2J now",
-            slice=[{"index": 1, "title": "Größe"}],
-        )
-    }
-
-
-def _hostile_check_container_board() -> dict[int, str]:
-    """A slice-less container, the top action, whose `Next` retitles the
-    window."""
-    return {
-        41: _state_ref_item_body(
-            "Epic", kind=body.ItemKind.CONTAINER, next="check \x1b]0;pwned\x07 done_when"
-        )
-    }
-
-
 def _hostile_frozen_board() -> dict[int, str]:
     """An item frozen on a window-retitling trigger beside a workable one."""
     return {
@@ -4966,16 +4947,6 @@ def hostile_next_board(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
             id="work-item-top-and-quoted-skipped-slice",
         ),
         pytest.param(
-            _hostile_cut_slice_board,
-            f"cut_slice {items.format_item_id(41)}: cut \\x1b[2J now\n",
-            id="cut-slice-top",
-        ),
-        pytest.param(
-            _hostile_check_container_board,
-            "Next: check \\x1b]0;pwned\\x07 done_when\n",
-            id="check-container-top",
-        ),
-        pytest.param(
             _hostile_frozen_board,
             f"{items.format_item_id(42)}: waiting: thaw\\x1b]0;pwned\\x07\n",
             id="frozen-skipped",
@@ -4989,8 +4960,7 @@ def test_state_ref_next_text_hands_the_terminal_no_raw_control_character(
     item_bodies: Callable[[], dict[int, str]],
     escaped_line: str,
 ) -> None:
-    """Whatever `next` prints -- a work item, a
-    `cut_slice` or `check_container` action, a `SKIPPED` reason -- carries
+    """Whatever `next` prints -- a work item, a `SKIPPED` reason -- carries
     no control character a terminal would act on, each shown as its escape,
     and a slice title in `SKIPPED` prose sits inside a quote its own `"`
     cannot close."""
@@ -5542,7 +5512,7 @@ def test_next_names_a_closeable_container(
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "close_container #182: 3/3 children closed, no Next work\n"
+        "close_container #182: 3/3 children closed, no uncut row\n"
         "parallel: none\nscope unknown: none\nclose: #182\n"
     )
 
@@ -5568,46 +5538,33 @@ def test_next_json_names_a_closeable_container(
     assert "command" not in payload
 
 
-def test_next_names_a_container_with_no_slice_row_by_its_own_next_line(
+def test_next_closes_a_container_with_no_slice_row_whose_next_line_names_work(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """An empty slice table is the
-    typed statement that there is nothing here to cut, even though the
-    container's own `Next` line still names real work. `next` must not
-    fabricate `cut --title "<the whole Next paragraph>"` from that prose,
-    nor list it under `close:` while that sentence names work:
-    it names the container for a
-    `done_when` check and its own sentence, and no command."""
-    container = Issue(
-        187,
-        "Epic",
-        (),
-        complete_contract("Schließen, sobald die letzte Bedingung erfüllt ist."),
-        "2026-08-20T00:00:00Z",
-        "2026-08-20T00:00:00Z",
-        kind=body.ItemKind.CONTAINER,
-        children_closed=2,
-        children_total=2,
+    """Spec: NEXT-07. An empty slice table is the typed statement that nothing
+    is left to cut, so prose in the container's `Next` line neither keeps it
+    open nor becomes a `cut --title` command."""
+    container, container_children = container_with_children(
+        187, closed=2, body=complete_contract("Schließen, sobald die letzte Bedingung erfüllt ist.")
     )
-    _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client.children[187] = container_children
 
     exit_code = issue_claim.main(["--repo", REPOSITORY, "next"])
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "check_container #187: no open children; check done_when\n"
-        "Next: Schließen, sobald die letzte Bedingung erfüllt ist.\n"
-        "parallel: none\nscope unknown: none\nclose: none\n"
+        "close_container #187: 2/2 children closed, no uncut row\n"
+        "parallel: none\nscope unknown: none\nclose: #187\n"
     )
 
 
-def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
+def test_next_json_closes_a_container_with_no_slice_row_whose_next_line_names_work(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """The JSON form of the same case: `reason` is
-    `check_container`, never `close_container` while the `Next` line names
-    work; `next_step` carries that sentence, `close` stays empty, and no
-    `command` or `cut_title` is invented from it."""
+    """Spec: NEXT-07, NEXT-13. The JSON form of the same case: `reason` is
+    `close_container`, the container sits under `close`, and no `command` or
+    `cut_title` is invented from the prose."""
     container, container_children = container_with_children(
         188, closed=2, body=complete_contract("Schließen, sobald die letzte Bedingung erfüllt ist.")
     )
@@ -5618,14 +5575,34 @@ def test_next_json_names_a_container_with_no_slice_row_by_its_own_next_line(
 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["reason"] == "check_container"
+    assert payload["reason"] == "close_container"
     assert payload["number"] == 188
-    assert payload["closed"] == 2
-    assert payload["total"] == 2
-    assert payload["next_step"] == "Schließen, sobald die letzte Bedingung erfüllt ist."
-    assert payload["close"] == []
+    assert payload["close"] == [188]
     assert "command" not in payload
     assert "cut_title" not in payload
+
+
+def test_next_cut_line_shows_the_row_title_although_the_container_next_line_names_work(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """Spec: NEXT-05, NEXT-12. The cut line and JSON `slice` read the first
+    uncut row's title, never the container's own `Next` prose."""
+    container, container_children = container_with_children(
+        189,
+        closed=1,
+        body=complete_contract("Danach die Abnahme planen.", slice=slice_entries("Scheibe C")),
+    )
+    client = _configured_board_client(monkeypatch, tmp_path, open_issues=(container,))
+    client.children[189] = container_children
+
+    text_status = issue_claim.main(["--repo", REPOSITORY, "next"])
+    text = capsys.readouterr().out
+    json_status = issue_claim.main(["--repo", REPOSITORY, "next", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert (text_status, json_status) == (0, 0)
+    assert text.splitlines()[0] == "cut_slice #189: Scheibe C"
+    assert payload["slice"] == "Scheibe C"
 
 
 def test_next_caps_the_parallel_text_list_at_three_and_counts_the_rest(
@@ -5687,7 +5664,7 @@ def test_next_notes_a_cut_proposals_row_scope_overlap_with_the_first_action(
 
     assert exit_code == 0
     assert capsys.readouterr().out == (
-        "cut_slice #80: Cut it.\nNext: aco cut 80\n"
+        "cut_slice #80: Slice A\nNext: aco cut 80\n"
         "parallel: #81 (1 path), #82 (1 path; overlaps issue #80 on epic/a.py)\n"
         "scope unknown: none\nclose: none\n"
         '\nSKIPPED\n#81: cut slice "Slice B"; run aco cut 81\n'
@@ -8856,8 +8833,8 @@ def _released_last_child_client(
             False,
             "Cut slice 3.",
             (),
-            False,
-            id="a_parent_naming_further_work_omits_the_hint",
+            True,
+            id="a_parent_naming_further_work_still_gets_the_hint",
         ),
         pytest.param(
             False,
