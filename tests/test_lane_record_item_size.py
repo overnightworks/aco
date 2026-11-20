@@ -3,47 +3,15 @@
 from pathlib import Path
 
 import pytest
-from board_fixtures import REPOSITORY, block_body, standing_active_claim, write_repository_config
-from cli_fixtures import FROZEN_CLI_NOW, fresh_observation, real_git, run_cli
+from board_fixtures import REPOSITORY, standing_active_claim, write_repository_config
+from cli_fixtures import FROZEN_CLI_NOW, real_git, run_cli
 from github_fixtures import WORK_ITEM_ISSUE
 from lane_record_fixtures import release_trailers_of
-from merged_release import arrange_merged_pull_request
-from store_fixtures import item_record
+from merged_release import arrange_merged_pull_request, item_text, seed_open_item
 
-from aco import body, forge, items, protocol, store, workboard
+from aco import body, forge, protocol, store, workboard
 
 LANE_BRANCH = "docs/tidy-readme"
-
-
-def item_text(size: body.Size | None, *, record: dict[str, object] | None = None) -> str:
-    """The text of a work item that declares `size`, or none; `record` makes it a state-ref one."""
-    data: dict[str, object] = {
-        "version": 1,
-        "now": "Ship it.",
-        "next": "none",
-        "done_when": "Merged.",
-    }
-    if size is not None:
-        data["size"] = size.value
-    if record is not None:
-        data["record"] = record
-    return block_body(body.render_block(data).removesuffix("\n"), before="Prose.\n\n", after="")
-
-
-def seed_sized_item(clone: Path, remote: Path, size: body.Size) -> None:
-    """The work item as an open record on the real state ref, declaring `size`."""
-    content = item_text(size, record=item_record(title="Item", state="open", kind="task"))
-    item_id = items.format_item_id(WORK_ITEM_ISSUE)
-    store.commit_transition(
-        observed=fresh_observation(clone, remote),
-        subject=store.TransitionSubject(f"seed item {item_id}"),
-        intent=protocol.ItemWriteIntent(
-            item_id=item_id,
-            expected=None,
-            new_oid=store.hash_blob(clone, content.encode()),
-            operation_id="seed-item",
-        ),
-    )
 
 
 def recorded_size_lines(remote: Path) -> list[str]:
@@ -183,7 +151,7 @@ def test_a_state_ref_release_of_an_item_records_the_size_its_record_declares(
         pull_request_body="",
         branch=LANE_BRANCH,
     )
-    seed_sized_item(github_clone, bare_remote, body.Size.LARGE)
+    seed_open_item(github_clone, bare_remote, body.Size.LARGE)
     real_git(github_clone, "pull", "-q", "--ff-only", "origin", "main")
     write_repository_config(github_clone, 'storage = "state-ref"\n')
     real_git(github_clone, "checkout", "-q", LANE_BRANCH)

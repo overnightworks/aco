@@ -19,6 +19,8 @@ from lane_record_runs_world import (
     add_arguments,
     begin_arguments,
     commit_on,
+    race_before_the_push,
+    stale_runs_sentence,
 )
 
 from aco import lane_runs, protocol, store
@@ -100,6 +102,24 @@ def test_a_repeated_begin_changes_nothing_and_says_so(
     again = world.run(capsys, *begin_arguments(world, FIRST_RUN, "--start-tip", END_TIP))
 
     assert (again.status, again.stdout) == (0, f"ALREADY BEGUN run {FIRST_RUN} of {world.label}\n")
+    assert world.state_tip() == tip
+
+
+def test_a_repeated_begin_keeps_the_follows_judged_at_its_first_begin(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-53, LANREC-54."""
+    world.run(capsys, *begin_arguments(world, FIRST_RUN))
+    world.run(capsys, *begin_arguments(world, SECOND_RUN))
+    tip = world.state_tip()
+
+    again = world.run(capsys, *begin_arguments(world, FIRST_RUN, "--json"))
+
+    stored = world.stored_runs()
+    assert stored is not None
+    assert stored.runs[0].follows is True
+    assert json.loads(again.stdout)["follows"] is True
+    assert json.loads(again.stdout)["reason"] == "already_begun"
     assert world.state_tip() == tip
 
 
@@ -503,43 +523,16 @@ def test_stored_runs_that_changed_since_the_command_read_them_refuse_as_a_transi
 ) -> None:
     """Spec: LANREC-59, LANREC-89."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
-    claim = world.claim()
-    stored_before = store.fetch_state(worktree=world.directory, remote="origin").runs[
-        claim.claim_id
-    ]
     competing = lane_runs.RunsFile((lane_runs.RunEntry("run-x", None, True),))
-    real_commit_transition = store.commit_transition
-
-    def commit_after_a_competing_write(
-        *,
-        observed: store.Observation,
-        subject: store.TransitionSubject,
-        intent: protocol.ClaimTransitionIntent,
-    ) -> protocol.ClaimState:
-        monkeypatch.setattr(store, "commit_transition", real_commit_transition)
-        world.commit_state(
-            protocol.RunsWriteIntent(
-                claim_id=claim.claim_id,
-                agent="Ada",
-                expected=stored_before,
-                new_oid=store.hash_blob(world.directory, lane_runs.serialize_runs(competing)),
-                operation_id="op-competing",
-                holder_refusal="{}".format,
-                stale_refusal="never reached",
-            )
-        )
-        return real_commit_transition(observed=observed, subject=subject, intent=intent)
-
-    monkeypatch.setattr(store, "commit_transition", commit_after_a_competing_write)
+    race_before_the_push(
+        monkeypatch, lambda: world.store_runs_file(lane_runs.serialize_runs(competing))
+    )
 
     refused = world.run(capsys, *begin_arguments(world, SECOND_RUN, "--json"))
 
     assert refused.status == 2
     assert_json_refusal_object(refused.stderr, refused.stdout, reason="unavailable")
-    assert refused.stderr == (
-        f"ERROR: the stored runs of {world.label} were written since this command read them; "
-        "run the same command again\n"
-    )
+    assert refused.stderr == f"ERROR: {stale_runs_sentence(world.label)}\n"
     stored = world.stored_runs()
     assert stored is not None
     assert [entry.run for entry in stored.runs] == ["run-x"]

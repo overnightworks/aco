@@ -431,6 +431,9 @@ class BoardForge:
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:
         _unsupported("list_recently_closed_issues")
 
+    def newest_labelled_issues(self, label: str) -> tuple[workboard.Issue, ...]:
+        _unsupported("newest_labelled_issues")
+
     def link_child(self, parent: int, child: int) -> None:
         _unsupported("link_child")
 

@@ -969,6 +969,8 @@ class ReleaseIntent:
     outcome: ReleaseOutcome
     operation_id: str
     coordinator_override: bool = False
+    # The claim's runs file as the release read it; `apply` refuses a state whose file differs.
+    expected_runs: ObjectId | None = None
 
 
 @dataclass(frozen=True)
@@ -1046,6 +1048,7 @@ class LandingIntent:
     outcome: LandedRelease
     operation_id: str
     coordinator_override: bool = False
+    expected_runs: ObjectId | None = None
 
 
 @dataclass(frozen=True)
@@ -1304,20 +1307,33 @@ def _authorize_release(current: ActiveClaim, intent: ReleaseIntent | LandingInte
         )
 
 
-def _apply_release_intent(state: ClaimState, intent: ReleaseIntent) -> ClaimState:
+def stale_runs_sentence(label: str) -> str:
+    return (
+        f"the stored runs of {label} were written since this command read them; "
+        "run the same command again"
+    )
+
+
+def claim_label(claim: ActiveClaim, item_label: ItemLabel) -> str:
+    """The item an issue claim holds as `item_label` names it; an issue-less lane its claim id."""
+    identity = claim.identity
+    return item_label(identity.issue) if isinstance(identity, IssueIdentity) else claim.claim_id
+
+
+def _apply_release_intent(state: ClaimState, intent: ReleaseIntent | LandingIntent) -> ClaimState:
+    """`state` without the released claim and its runs file, which must be the one `intent` read."""
     found = _live_claim_by_id(state, intent.claim_id)
     if found is None:
         raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to release")
     key, current = found
     _authorize_release(current, intent)
-    new_claims = {
-        existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
-    }
-    return replace(  # NOSONAR(S5886) pyright types replace()
-        state,
-        claims=MappingProxyType(new_claims),
-        runs=_runs_without(state, intent.claim_id),
-    )
+    if state.runs.get(intent.claim_id) != intent.expected_runs:
+        raise ClaimUnavailableError(
+            naming=lambda item_label: stale_runs_sentence(claim_label(current, item_label))
+        )
+    claims = MappingProxyType({k: claim for k, claim in state.claims.items() if k != key})
+    runs = MappingProxyType({k: oid for k, oid in state.runs.items() if k != intent.claim_id})
+    return replace(state, claims=claims, runs=runs)  # NOSONAR(S5886) pyright types replace()
 
 
 ITEMS_WRITTEN_SINCE_CHECKED = "items/ was written since this write checked it; re-read and retry"
@@ -1389,27 +1405,10 @@ def _apply_landing_intent(state: ClaimState, intent: LandingIntent) -> ClaimStat
     `store.commit_transition` builds from it."""
     if state.tip is None:
         raise ClaimError(MISSING_STATE_REF)
-    found = _live_claim_by_id(state, intent.claim_id)
-    if found is None:
-        raise ClaimUnavailableError(f"claim id {intent.claim_id!r} has no active claim to release")
-    key, current = found
-    _authorize_release(current, intent)
+    released = _apply_release_intent(state, intent)
     _require_item_unwritten(state, intent.item_id, intent.item_expected)
-    new_claims = {
-        existing_key: claim for existing_key, claim in state.claims.items() if existing_key != key
-    }
-    new_items = {**state.items, intent.item_id: intent.item_new_oid}
-    return replace(  # NOSONAR(S5886) pyright types replace()
-        state,
-        claims=MappingProxyType(new_claims),
-        items=MappingProxyType(new_items),
-        runs=_runs_without(state, intent.claim_id),
-    )
-
-
-def _runs_without(state: ClaimState, claim_id: ClaimId) -> Mapping[str, ObjectId]:
-    """`state.runs` without the file of `claim_id`: a released or landed claim keeps none."""
-    return MappingProxyType({key: oid for key, oid in state.runs.items() if key != claim_id})
+    items = MappingProxyType({**state.items, intent.item_id: intent.item_new_oid})
+    return replace(released, items=items)  # NOSONAR(S5886) pyright types replace()
 
 
 def _apply_runs_write_intent(state: ClaimState, intent: RunsWriteIntent) -> ClaimState:
@@ -1507,53 +1506,6 @@ def resolved_identity(issue: int | None, branch: str) -> ClaimIdentity:
     if not is_issueless_lane_branch(branch):
         raise ClaimError(_issueless_lane_refusal(branch))
     return LaneIdentity()
-
-
-def touch_json(claim: ScopedClaim) -> dict[str, object]:
-    return {
-        **identity_json(claim.identity),
-        "claim_id": claim.claim_id,
-        "agent": claim.agent,
-        "scope": list(claim.scope),
-    }
-
-
-def identity_json(identity: ClaimIdentity) -> dict[str, object]:
-    """`issue`/`lane` pair for one claim's discriminated identity, for JSON output.
-
-    A lane claim's name lives in the sibling `branch` field of the same JSON
-    object, so `lane` stays a bare marker instead of duplicating it.
-    """
-    if isinstance(identity, LaneIdentity):
-        return {"issue": None, "lane": True}
-    return {"issue": identity.issue, "lane": None}
-
-
-def resource_fields(resource: ResourceHold | None) -> dict[str, object]:
-    if resource is None:
-        return {"resource": None, "resource_value": None}
-    return {"resource": resource.name, "resource_value": resource.value}
-
-
-def claim_identity_fields(claim: ActiveClaim) -> dict[str, object]:
-    """The one claim-identity dict every `--json` view of a live claim
-    shares -- `status`, `status --path`, `claim`, and `rescope`
-    each spread this instead of typing the same seven
-    fields out by hand a fifth time with their own drifting order. A view
-    still projects its own remaining fields explicitly beside it: `resource`/
-    `resource_value` (every view but `rescope`, which names no `--resource`
-    flag of its own), `whole` (`status` and `status --path` alone), and
-    whatever else is that view's own (`overlaps`/`age`/`old` for `status`,
-    `versioned_files`/`touches`/`checks` for `claim`)."""
-    return {
-        **identity_json(claim.identity),
-        "claim_id": claim.claim_id,
-        "agent": claim.agent,
-        "role": claim.role,
-        "base": claim.base,
-        "branch": claim.branch,
-        "scope": list(claim.scope),
-    }
 
 
 def require_state_ref(state: ClaimState) -> None:

@@ -75,6 +75,12 @@ other printable space are text.
 | a red entry, no actionable item | NEXT-53 | NEXT-53 |
 | an entry names an item of this repository or of another | NEXT-54 | NEXT-54 |
 | an entry's state is closed, missing, a pull request, unreadable | NEXT-55 | NEXT-51 |
+| the configuration declares no audit | no line | NEXT-63 |
+| an audit is due by landings, by days, with no anchor, a malformed anchor | NEXT-62, NEXT-64 | NEXT-63 |
+| an audit is not due | no line | NEXT-65 |
+| an anchor names a commit only the fetched trunk holds, or no trunk holds | NEXT-66 | NEXT-66 |
+| the fetch or the listing fails | NEXT-67 | NEXT-67 |
+| an audit is due, no actionable item | NEXT-68 | NEXT-68 |
 
 ## No actionable item
 
@@ -170,14 +176,34 @@ other printable space are text.
 - [ ] [NEXT-54] `<item>` is this repository's item as NEXT-35 names it (the bare number under `github`, the `aco-xxxxxx` id under `state-ref`), else `<owner>/<repo>#<n>`; `--json` `item` is that number, id or string.
 - [ ] [NEXT-55] `<state>` reads `is closed` for `closed`, `is not found or not accessible` for `missing`, `is a pull request` for `pull_request`, `is unreadable: <error>` for `unreadable`; open prints no line.
 
+## Recurring audits
+
+`.aco/board.toml` declares audits (PIN-58..62). An entry's *anchor* is the newest issue (`state-ref`: item) carrying its label, open or closed, whose body holds a line `audited through <sha>` once stripped; of several in one body the last counts. `<k>` counts the first-parent trunk landings after that commit, `<d>` the UTC days from its committer date to today.
+
+- [ ] [NEXT-62] Between `RECOVERY` and the action or `No actionable item.`, each due audit prints `audit_due <name>: <sentence>`, `Next: <run>` escaped as NEXT-37 does, and a blank line; `<run>` is never interpreted.
+- [ ] [NEXT-63] `--json` always carries `audits` after `ahead_of_caller_unavailable`: `{name, reason, anchor, sha, landings_since, days_since, run, error}` per due or unavailable entry, `[]` else; `run` is unescaped.
+- [ ] [NEXT-64] `reason` and `<sentence>` follow the table below; `<anchor>` names the issue as NEXT-35 does, `<sha7>` is the commit's first seven characters; `anchor` is its number or id, `sha` the commit or `null`.
+- [ ] [NEXT-65] An audit not due prints nothing and carries no entry. Each entry costs one listing of its label's newest issues, none without an entry, none under `state-ref`; landings come from local git.
+- [ ] [NEXT-66] An anchor commit the local trunk lacks fetches the canonical remote once and reads the trunk again; one still absent is `anchor_off_trunk`, one now found is counted by the rule below.
+- [ ] [NEXT-67] A failed fetch or listing prints `audit <name>: unavailable (<sentence>)`, no `Next:` line; `--json` has `reason` `unavailable`, `error` the sentence; work item and exit status stay (see E-NEXT-19).
+- [ ] [NEXT-68] A due or unavailable audit never changes the exit status or the top-level `reason`: with no actionable item `next` still exits `3` and `reason` is `nothing_actionable`.
+
+| `reason` | when | `<sentence>` |
+|---|---|---|
+| `landings` | `<k>` reaches the entry's `landings` | `<k> landings since <anchor>, audited through <sha7>` |
+| `days` | `<k>` is below it, at least 1, and `<d>` reaches `days` | `<d> days and <k> landing(s) since <anchor>, audited through <sha7>` |
+| `no_anchor` | no labelled issue holds the line | `no item labelled <label> holds an audited through line` |
+| `anchor_malformed` | the newest line names no full 40-hex commit | `<anchor>'s audited through line names no full commit` |
+| `anchor_off_trunk` | the commit is not among the last 5000 first-parent landings, NEXT-66 | `<anchor> audited through <sha7>, which is not among the last 5000 landings on <trunk>` |
+
 ## Never
 
-- `aco next` never writes anything: it is a pure projection: it reads what `board` reads, plus the trunk's ahead-of-caller list and the state of each item that list names (NEXT-49..55).
+- `aco next` never writes anything: it is a pure projection: it reads what `board` reads, plus the trunk's ahead-of-caller list and the state of each item that list names (NEXT-49..55), each audit's newest labelled issues and, only for an anchor the local trunk lacks, one fetch of the canonical remote (NEXT-62..68).
 - `close:` never fires the cut proposal's own `Next:`/`Run:` lines: a closable container's own action, when it is also the top action, never carries a command -- NEXT-06/NEXT-07 already refuse to invent one.
 - `parallel:`/`scope unknown:` never occupy or place a `board.recovery` item: a landed-but-open item is `close:`'s domain alone, never a `parallel:` candidate or an occupant that could crowd out a real free item behind it.
 - The first action's own row is never repeated inside `parallel:`'s candidate list, whatever its own scope is.
 - An overlap never withholds a free item: `parallel:` names the item with the overlap as its note, and the first action carries no note (`aco start` prints its overlaps, CLAIM-31).
-- Exit `3` never carries any action-specific line: `No actionable item.` alone stands where `Next:`/`Run:` would.
+- Exit `3` never carries any action-specific line: `No actionable item.` alone stands where `Next:`/`Run:` would; a due audit's own `Next:` line (NEXT-62) precedes it and is no action of the board.
 - Exit `3` is never returned for a refusal (NEXT-24's `invalid_usage`/`unavailable`): those exit `2`, matching every other emitter refusal; `3` is `nothing_actionable`'s alone.
 - `next --json` never carries an `action` key; the action type is the `reason` token.
 - `next` never drops NEXT-42 because a git failure made a directory look like a file; it refuses with git's detail.
@@ -524,5 +550,28 @@ close: none
 exit 0
 $ aco next --json
 {"ok": true, ..., "parallel": {"first_scope_unknown": false, "candidates": [{"number": 51, "scope": ["docs/guide.md", "src/a.py"], "overlaps": [{"issue": 99, "lane": null, "claim_id": "claim-99", "paths": ["docs/guide.md"]}, {"issue": 50, "lane": null, "claim_id": null, "paths": ["src/a.py"]}]}], "scope_unknown": []}, ...}
+exit 0
+```
+
+### E-NEXT-19 — a due audit and a failed listing beside the top work item
+
+Setup: bare-remote, fake `gh`, run from the main checkout, `.aco/board.toml` declares `[[audit]]` `name = "tests"`, `label = "audit-tests"`, `landings = 3`, `days = 7`, `run = "Run the audit skill."`, `name = "owners"` with `label = "audit-owners"` the same way; three landings follow the `audited through` commit of the newest `audit-tests` issue `#20`, the listing of `audit-owners` fails with `GitHub is down`; `#11` is a scopeless open item
+
+```console
+$ aco next
+audit_due tests: 3 landings since #20, audited through 1a2b3c4
+Next: Run the audit skill.
+
+audit owners: unavailable (GitHub is down)
+
+#11 score -10: Top work
+Next: Claim #11.
+Run: aco start 11 --slug=top-work --scope <paths>
+scope unknown
+parallel: unknown (first action names no scope)
+close: none
+exit 0
+$ aco next --json
+{"ok": true, ..., "ahead_of_caller_unavailable": null, "audits": [{"name": "tests", "reason": "landings", "anchor": 20, "sha": "1a2b3c4...", "landings_since": 3, "days_since": 0, "run": "Run the audit skill.", "error": null}, {"name": "owners", "reason": "unavailable", "anchor": null, "sha": null, "landings_since": null, "days_since": null, "run": "Run the audit skill.", "error": "GitHub is down"}], ...}
 exit 0
 ```

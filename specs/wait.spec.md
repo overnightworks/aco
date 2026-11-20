@@ -34,6 +34,8 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | no item, `aco next` names an action at the start or while it waits | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, a line that waited on the operator is no longer open | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, a ruling written by aco, a closed blocker, a released claim or an `until` date that arrives | WAIT-17, WAIT-18, WAIT-19 | — |
+| no item, a recurring audit is due | WAIT-23, WAIT-25 | WAIT-25 |
+| no item, an audit is not due or unavailable, or none is configured | WAIT-23, WAIT-24 | WAIT-25 |
 | no item, a transient failure other than a rate limit while it waits | WAIT-20 | — |
 | no item, a failure that is not transient | WAIT-20 | WAIT-20 |
 | `--line` without an item, or an item without `--line` | WAIT-21 | WAIT-21 |
@@ -90,6 +92,16 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - a run that began with another failure prints the warning once more when it meets the rate limit
   - a later failure without a reset never moves that time earlier; a moved signal causes no read before it; the state ref's own check goes on
   - the first read of the board stays owed to that time; the item's own first read answers before WAIT-04 and WAIT-05 apply
+- [ ] [WAIT-23] `aco wait` without an item also ends, exit `0`, when a recurring audit of `.aco/board.toml` is due as `aco next` names it (NEXT-62; see E-WAIT-10).
+  - an audit that is not due or unavailable (NEXT-67) does not end it
+  - `aco wait ITEM --line N` is unchanged.
+- [ ] [WAIT-24] Each board read lists an entry's anchor (NEXT-65) only when the newest trunk landing's commit or the day differs from the last complete listing's.
+  - the due audits stay under that key
+  - a listing with an unavailable audit is not kept, so the next read lists again; without an `audit` entry nothing is listed
+- [ ] [WAIT-25] It prints `AUDIT <name>` per due audit, in entry order, before `ACTIONABLE` and `CHANGED` (see E-WAIT-10).
+  - `--json` always carries `"audits": [<name>, …]` last, `[]` when none is due
+  - `--json` prints `reason: "audit_due"` when an audit is due and no action is named
+  - `lines` follows WAIT-16 under every reason, so a due audit beside changed lines and no action prints `AUDIT` before `CHANGED`, with `reason: "audit_due"` and the `lines`; without an `audit` entry the output is WAIT-15's and WAIT-16's with the empty `audits` key only.
 
 `reason`, by which refusal fired:
 
@@ -97,6 +109,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 |---|---|
 | (the success) | `changed` |
 | (the success, with an item) | `actionable` |
+| (the success, a due audit and no item named) | `audit_due` |
 | WAIT-04 (missing item, pull request, closed item, malformed body) | `invalid_item` |
 | WAIT-05 (out of range) | `line_out_of_range` |
 | WAIT-06 (`--repo` under `storage = state-ref`), WAIT-21, the parser's own refusals | `invalid_usage` |
@@ -196,7 +209,7 @@ $ aco wait
 CHANGED <item-id> line 3: ruled A <today>
 exit 0
 $ aco wait --json
-{"ok": true, "reason": "changed", "lines": [{"item": "<item-id>", "index": 3, "state": "ruled A <today>"}]}
+{"ok": true, "reason": "changed", "lines": [{"item": "<item-id>", "index": 3, "state": "ruled A <today>"}], "audits": []}
 exit 0
 ```
 
@@ -211,7 +224,7 @@ $ aco wait
 ACTIONABLE <item-id>
 exit 0
 $ aco wait --json
-{"ok": true, "reason": "actionable", "item": "<item-id>"}
+{"ok": true, "reason": "actionable", "item": "<item-id>", "audits": []}
 exit 0
 ```
 
@@ -255,3 +268,18 @@ exit 0
 ```
 
 The warning appears once; no call goes to GitHub before 20:15:27Z, where the board is read and the wait ends by WAIT-14.
+
+### E-WAIT-10 — a recurring audit is due
+
+Setup: bare-remote, bootstrapped, `storage = "github"`, an `audit` entry named `tests` in `.aco/board.toml` that is due by NEXT-62, no actionable item
+
+```console
+$ aco wait
+AUDIT tests
+exit 0
+$ aco wait --json
+{"ok": true, "reason": "audit_due", "audits": ["tests"]}
+exit 0
+```
+
+With item `#50` actionable too, the text is `AUDIT tests` then `ACTIONABLE #50`, and `--json` has `reason: "actionable"`, `"item": 50` and `"audits": ["tests"]`.

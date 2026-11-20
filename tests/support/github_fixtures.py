@@ -161,6 +161,9 @@ class FakeForge:
     closed_issues: set[int] = field(default_factory=set)
     recently_closed_issues: tuple[forge.ClosedIssue, ...] = ()
     closed_issue_cutoffs: list[datetime] = field(default_factory=list)
+    labelled_issues: dict[str, tuple[workboard.Issue, ...]] = field(default_factory=dict)
+    labelled_listing_error: protocol.ClaimError | None = None
+    labelled_listings: list[str] = field(default_factory=list)
     landing_comments: dict[int, str] = field(default_factory=dict)
     issue_references: dict[int, forge.ItemReference] = field(default_factory=dict)
     issue_reference_lookups: list[int] = field(default_factory=list)
@@ -493,6 +496,13 @@ class FakeForge:
         self._run()
         self.closed_issue_cutoffs.append(since)
         return self.recently_closed_issues
+
+    def newest_labelled_issues(self, label: str) -> tuple[workboard.Issue, ...]:
+        self._run()
+        self.labelled_listings.append(label)
+        if self.labelled_listing_error is not None:
+            raise self.labelled_listing_error
+        return self.labelled_issues.get(label, ())
 
 
 def assert_github_world(github_clone: Path, bare_remote: Path) -> None:

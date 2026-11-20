@@ -50,6 +50,7 @@ order `merge`, `squash`, `rebase`.
 | `storage = "state-ref"` | LANDCMD-01 |
 | `--coordinator-override` without `--role coordinator` | LANDCMD-19 |
 | `--record <file>` malformed, or its last verdict not the `--head` or not an approval | LANDCMD-77 (LANREC-31, LANREC-38..LANREC-40, LANREC-44, cited) |
+| the claims on the head branch store runs: unreadable, beside `--record`, or no approval of `--head` | LANDCMD-77 (LANREC-97, LANREC-98, cited) |
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
 | pull request not open | LANDCMD-02 |
 | pull request is a draft | LANDCMD-74 |
@@ -90,10 +91,12 @@ order `merge`, `squash`, `rebase`.
 
 ## Preflight, read-only, in order
 
-Every step here reads only: the one local `refs/aco/state` read LANDCMD-10's
-claim check needs is `store.peek_state` (CAS-49), never `fetch_state` --
-this worktree's own fetch anchor and lineage stamp stay untouched by a
-preflight, refused or not, exactly as `reset`'s own read does.
+Every step here reads only: the local `refs/aco/state` reads are `store.peek_state` (CAS-49),
+never `fetch_state` -- this worktree's own fetch anchor and lineage stamp stay untouched by a
+preflight, refused or not, exactly as `reset`'s own read does. The first read comes right after
+the pull request's head branch is checked (LANDCMD-50), for the stored runs of LANREC-97, so a
+missing or unreadable state ref refuses before the pull request's checks of LANDCMD-02 on; the
+second is the claim check of LANDCMD-10.
 
 - [ ] [LANDCMD-50] On a first run and a rerun alike, a head branch that is no safe branch name refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2` (E-LANDCMD-50).
 - [ ] [LANDCMD-51] A merged or queued pull request from another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
@@ -103,7 +106,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
 - [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
-- [ ] [LANDCMD-77] `--record <file>` is checked before any merge or write, a rerun too: LANREC-31 at the argument parse, LANREC-38, LANREC-39 and LANREC-44 after LANDCMD-19; it then writes its record (LANREC-42).
+- [ ] [LANDCMD-77] `--record <file>` is checked before any merge or write, a rerun too: LANREC-31 at the argument parse, LANREC-38, 39, 44 after LANDCMD-19, LANREC-98 after LANDCMD-50; it writes its record (LANREC-42).
 - [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - [ ] [LANDCMD-32] Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
 - [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
@@ -176,7 +179,7 @@ preflight, refused or not, exactly as `reset`'s own read does.
 - [ ] [LANDCMD-21] The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
 - [ ] [LANDCMD-16] Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
 - [ ] [LANDCMD-17] In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing after LANDCMD-54's line.
-- [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25 and 33, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
+- [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25, 33 and LANREC-97, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
 - [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-57, LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
 - [ ] [LANDCMD-57] After every RELEASED ending, first landing or resumed rerun, `merged: <sha>` (the full 40-hex merge commit) follows the release's lines, before LANDCMD-54's and LANDCMD-17's.
 - [ ] [LANDCMD-54] After a RELEASED ending, a red trunk at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)` for its first failed check, not skipped or neutral; else nothing (E-LANDCMD-54).

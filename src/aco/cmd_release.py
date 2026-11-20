@@ -12,12 +12,14 @@ from . import (
     board_read,
     body,
     checkout,
+    claim_json,
     forge,
     github,
     item_handover,
     landed_worktree,
     lane_record,
     protocol,
+    release_record,
     report,
     state_board,
     store,
@@ -58,7 +60,7 @@ def _release_json(release_report: _ReleaseReport) -> None:
     released, landing = release_report.selected, release_report.landing
     payload: dict[str, object] = {
         "outcome": release_report.outcome.reason,
-        **protocol.identity_json(released.identity),
+        **claim_json.identity_json(released.identity),
         "branch": released.branch,
         "claim_id": released.claim_id,
         "agent": release_report.agent,
@@ -380,6 +382,10 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
         lane_record.require_abandoned_release(parsed.record, parsed.abandoned)
         release_transition(parsed, context, _release_branch_for(parsed))
     except protocol.ClaimError as error:
+        # Only a refusal that names an item needs the storage, so a refusal that does not
+        # still reaches the envelope when the board configuration cannot be read.
+        if error.naming is not None:
+            error = workboard.named_refusal(error, context.config.storage)
         return report.refuse(_ReleaseReason.PRECONDITION_FAILED, error, as_json=as_json)
     return 0
 
@@ -436,9 +442,9 @@ def release_transition(
         coordinator_override=parsed.coordinator_override,
     )
     merge_commit, item = (None, None) if lane is None else (lane.merge_commit, lane.item)
-    evidence = lane_record.ReleaseEvidence(merge_commit, item, parsed.record)
+    evidence = release_record.ReleaseEvidence(merge_commit, item, parsed.record)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, evidence), intent
+        *release_record.release_write(context, resolved.selected, outcome, evidence, intent)
     )
     # Verifying the merge already fetched this ref, so reading it costs nothing.
     landing = worktree_cleanup = None
@@ -554,7 +560,7 @@ def _report_nothing_left_to_release(
             True,
             _ReleaseReason.MERGED,
             outcome=_NOTHING_LEFT_TO_RELEASE,
-            **protocol.identity_json(lane.identity),
+            **claim_json.identity_json(lane.identity),
             branch=None if on_trunk else lane.branch,
             worktree=worktree,
         )
@@ -655,9 +661,9 @@ def _cmd_release_landed(
         operation_id=uuid.uuid4().hex,
         coordinator_override=parsed.coordinator_override,
     )
-    evidence = lane_record.ReleaseEvidence(item=item)
+    evidence = release_record.ReleaseEvidence(item=item)
     new_state = context.transition(
-        lane_record.release_subject(context, resolved.selected, outcome, evidence), intent
+        *release_record.release_write(context, resolved.selected, outcome, evidence, intent)
     )
     client.mark_landed(write, new_oid)
     landing = _landing_report(context, identity, new_state, storage, trunk_ref)

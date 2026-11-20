@@ -1,7 +1,7 @@
 """The runs files of the state ref: the bytes of one stored `runs/<claim-id>.json`.
 
 Sibling of `store`, which owns the state ref's transport and names each runs file's blob in
-`ClaimState.runs`; `cmd_lane_record` is this module's production caller.
+`ClaimState.runs`; `lane_runs` and `release_record` are this module's production callers.
 """
 
 from pathlib import Path

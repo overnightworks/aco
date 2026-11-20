@@ -341,9 +341,7 @@ class StateRefBoard:
 
     @property
     def requests(self) -> int:
-        """Always zero: every byte this adapter reads was already fetched
-        by `session._state_ref_forge` before construction -- no
-        method below costs a further round trip."""
+        """Always zero: `session._state_ref_forge` fetched every byte this adapter reads."""
         return 0
 
     def holds(self, number: int) -> bool:
@@ -496,10 +494,9 @@ class StateRefBoard:
         return items.item_number(parent_id)
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
-        """`number`'s parent as the board reads it; an unreadable parent
-        is answered by its reference and whatever of its text
-        still decodes, its kind unknown, so the child still reads as nested
-        rather than refusing the whole board."""
+        """`number`'s parent as the board reads it; an unreadable parent is answered by
+        its reference and what of its text still decodes, its kind unknown, so the child
+        still reads as nested rather than refusing the whole board."""
         parent_number = self.parent_number(number)
         if parent_number is None:
             return None
@@ -653,12 +650,17 @@ class StateRefBoard:
             and datetime.fromisoformat(decoded.record.closed_at) >= cutoff
         )
 
+    def newest_labelled_issues(self, label: str) -> tuple[workboard.Issue, ...]:
+        self._refuse_a_foreign_entry()
+        carrying = (item.record for item in self._items.values() if label in item.record.labels)
+        newest = sorted(carrying, key=lambda record: record.created_at, reverse=True)
+        return tuple(self._issue(items.format_item_id(record.number)) for record in newest)
+
     def list_recent_merged_board_pull_requests(
         self, since: datetime
     ) -> tuple[workboard.PullRequest, ...]:
-        # `since` keeps the protocol's parameter name. State-ref cannot list merged
-        # pull requests, so `Board.recovery` stays empty, while `Stage.CODE_LANDED`
-        # and the Landungen view read the trunk walk instead.
+        # `since` keeps the protocol's name. State-ref lists no merged pull requests, so
+        # `Board.recovery` stays empty; the trunk walk feeds `Stage.CODE_LANDED` and Landungen.
         del since
         return ()
 
@@ -913,10 +915,7 @@ class StateRefBoard:
         )
 
     def item_oid(self, number: int) -> ObjectId:
-        """This item's own current blob oid, straight off this adapter's
-        already-read state: `aco item edit --json`'s own
-        output is the one caller that needs it -- never part of the generic
-        `ForgeWriter` port, since no other forge in this repository stores
-        one blob per item."""
+        """This item's current blob oid off the already-read state: only `aco item edit
+        --json` needs it, and no other forge stores one blob per item."""
         item_id = self._by_number[number]
         return self._items[item_id].oid

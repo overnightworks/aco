@@ -8,7 +8,17 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import ahead_of_caller, body, checkout, forge, github, protocol, state_history, workboard
+from . import (
+    ahead_of_caller,
+    body,
+    checkout,
+    forge,
+    github,
+    protocol,
+    recurring_audit,
+    state_history,
+    workboard,
+)
 from .session import RunContext
 
 
@@ -40,8 +50,9 @@ def parent_closable_number(
 # A stable invariant of the board's own ruling-freshness read,
 # not something an operator tunes: `RULING_OLD_AFTER_LANDINGS` (10) is the
 # most any ruling ever needs counted, so this bounds `git log`'s walk deep
-# enough that no realistic ruling window is ever truncated.
-TRUNK_LANDING_DEPTH = 5000
+# enough that no realistic ruling window is ever truncated. A recurring audit's
+# landings entry may count up to this depth (`recurring_audit.MAX_LANDINGS`).
+TRUNK_LANDING_DEPTH = recurring_audit.MAX_LANDINGS
 
 
 def validated_dependencies(
@@ -173,11 +184,13 @@ def fetch_validated_dependencies(
 
 @dataclass(frozen=True)
 class ClaimHistory:
-    """The store's own git-history read one board build needs, bundled so
-    `build_board` stays under the five-argument ceiling: `ages` is read from
-    an already-fetched `ClaimState`, never from a second observation."""
+    """The git-history reads one board build needs, bundled so `build_board` stays
+    under the five-argument ceiling: `ages` is read from an already-fetched
+    `ClaimState`, never from a second observation; `trunk_landings` is the trunk
+    walk a caller that counts landings itself already made (`None`: the build walks)."""
 
     ages: Mapping[str, datetime] = field(default_factory=dict)
+    trunk_landings: tuple[checkout.TrunkLanding, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -265,14 +278,14 @@ def build_board(
         dependencies = fetch_validated_dependencies(client, issues)
         trunk_ref = context.trunk_ref
     else:
-        # A merged release already fetched and validated this exact
-        # candidate set (`cmd_release._release_landing`'s own `list_board_dependencies`
-        # wave) and judged its landing on its own trunk
-        # ref, so neither is read a second time here.
+        # A merged release already fetched and validated this candidate set
+        # (`cmd_release._release_landing`) and judged its landing on its own trunk ref.
         dependencies, trunk_ref = landing.dependencies, landing.trunk_ref
-    trunk_landings = checkout.trunk_landings(
-        trunk_ref, TRUNK_LANDING_DEPTH, directory=context.toplevel
-    )
+    trunk_landings = history.trunk_landings
+    if trunk_landings is None:
+        trunk_landings = checkout.trunk_landings(
+            trunk_ref, TRUNK_LANDING_DEPTH, directory=context.toplevel
+        )
     reopened_at = client.reopened_at(
         _reopen_candidates(issues, merged_pull_request_rows, client.repository.path)
     )
@@ -309,20 +322,18 @@ def claim_ages(worktree: Path, state: protocol.ClaimState) -> dict[str, datetime
     return state_history.claim_ages(worktree=worktree, tip=state.tip, claims=state.claims.values())
 
 
-def _claim_history(worktree: Path, state: protocol.ClaimState) -> ClaimHistory:
-    return ClaimHistory(ages=claim_ages(worktree, state))
-
-
 @dataclass(frozen=True)
 class _ObservedBoard:
     """`observed_board`'s own result: the projected board, plus every live
     claim it was built from -- `next`'s own `parallel_set`
     needs each claim's scope for its overlap notes, and this is
     the one fetch that already read them, never a second store observation
-    for the same run."""
+    for the same run. `trunk_landings` is the one walk of the trunk the board was
+    built from, which a recurring audit counts landings in."""
 
     board: workboard.Board
     live_claims: tuple[protocol.ScopedClaim, ...]
+    trunk_landings: tuple[checkout.TrunkLanding, ...]
 
 
 @dataclass(frozen=True)
@@ -371,13 +382,16 @@ def observed_board(
         # nothing left to overlap the state fetch with.
         observed = context.observation
     live_claims = tuple(observed.claims.values())
+    trunk_landings = checkout.trunk_landings(
+        context.trunk_ref, TRUNK_LANDING_DEPTH, directory=context.toplevel
+    )
     projected = build_board(
         context,
         live_claims,
         issues=issues,
-        history=_claim_history(context.toplevel, observed),
+        history=ClaimHistory(claim_ages(context.toplevel, observed), trunk_landings),
     )
-    return _ObservedBoard(projected, live_claims)
+    return _ObservedBoard(projected, live_claims, trunk_landings)
 
 
 def pull_request_sentence(number: int, *, command: str) -> str:
@@ -448,3 +462,46 @@ def ahead_of_caller_reading(
         for target in dict.fromkeys(entry.item for entry in parsed)
     }
     return tuple(ahead_of_caller.JudgedEntry(entry, *states[entry.item]) for entry in parsed)
+
+
+class _AuditTrunk:
+    """The trunk walk the audits are judged against: the board's own until an
+    anchor names a commit it lacks, then the walk of the freshly fetched trunk,
+    read once for every entry."""
+
+    def __init__(self, context: RunContext, landings: tuple[checkout.TrunkLanding, ...]) -> None:
+        self._context = context
+        self._landings = landings
+        self._fetched = False
+
+    def holding(self, anchor: recurring_audit.Anchor) -> tuple[checkout.TrunkLanding, ...]:
+        if not self._fetched and recurring_audit.is_off_trunk(anchor, self._landings):
+            self._landings = checkout.trunk_landings(
+                self._context.fetched_trunk_ref(),
+                TRUNK_LANDING_DEPTH,
+                directory=self._context.toplevel,
+            )
+            self._fetched = True
+        return self._landings
+
+
+def _audit_finding(
+    context: RunContext, entry: recurring_audit.RecurringAudit, trunk: _AuditTrunk
+) -> recurring_audit.Finding | None:
+    try:
+        anchor = recurring_audit.anchor_in(context.forge.newest_labelled_issues(entry.label))
+        landings = trunk.holding(anchor) if anchor is not None else ()
+    except protocol.ClaimError as error:
+        return recurring_audit.unavailable(entry, str(error))
+    return recurring_audit.verdict(entry, anchor, landings, context.today())
+
+
+def recurring_audit_reading(
+    context: RunContext, trunk_landings: tuple[checkout.TrunkLanding, ...]
+) -> tuple[recurring_audit.Finding, ...]:
+    """The due or unavailable audits of the configuration, one anchor listing per
+    entry and none without an entry; `trunk_landings` is the walk the board was built
+    from."""
+    trunk = _AuditTrunk(context, trunk_landings)
+    findings = (_audit_finding(context, entry, trunk) for entry in context.config.audit)
+    return tuple(finding for finding in findings if finding is not None)

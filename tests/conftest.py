@@ -5,8 +5,9 @@ than one module asks for by name -- plus `git_call_spy`, the git call counter tw
 modules share, and `github_world`, the GitHub-checkout
 world check many modules share; everything else stays local to its test
 module. The one exception is registration: `cli_fixtures`, `adoption_world`,
-`release_cleanup_world`, `check_pull_request_fixtures`, `lane_record_runs_world` and
-`discovery_fixtures` and `wait_fixtures` are loaded as pytest plugins (`pytest_plugins` below).
+`release_cleanup_world`, `check_pull_request_fixtures`, `lane_record_runs_world`,
+`discovery_fixtures`, `wait_fixtures` and `audit_world` are loaded as pytest plugins
+(`pytest_plugins` below).
 `cli_fixtures` gives every test module its `bare_remote` and `worktree` fixtures
 by name, and its autouse `_isolate_agent_identity` applies to every test;
 `adoption_world` gives every module its `world` fixture, and
@@ -38,6 +39,7 @@ pytest_plugins = [
     "lane_record_runs_world",
     "discovery_fixtures",
     "wait_fixtures",
+    "audit_world",
 ]
 
 

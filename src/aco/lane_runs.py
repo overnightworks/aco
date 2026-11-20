@@ -2,18 +2,19 @@
 
 A run is begun at a start tip and later added with its end tip, the stages that ran and its lane
 record. The runs of one claim are one JSON file in the state tree; this module owns the file's
-shape, whether a run follows the run before it, and the merge a begin or an add makes. It
-touches no git, no state ref and no clock: the ancestry fact `follows` judges by is its
-argument."""
+shape, the read of a stored file with the one sentence that refuses an unusable one, whether a
+run follows the run before it, and the merge a begin or an add makes. It writes no state ref and
+reads no clock: the ancestry fact `follows` judges by is its argument."""
 
 import json
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import partial
+from pathlib import Path
 from typing import cast
 
-from . import lane_record, protocol
+from . import lane_record, protocol, state_runs
 from .routing_line import NO_STAGE, RoutingStage, stage_choice_fits
 
 RUNS_FILE_VERSION = 1
@@ -56,6 +57,10 @@ class RunEntry:
 @dataclass(frozen=True)
 class RunsFile:
     runs: tuple[RunEntry, ...] = ()
+
+    def holds_runs(self) -> bool:
+        """Whether the claim stores a run: a runs file with no entry stores none."""
+        return bool(self.runs)
 
     def entry(self, run: str) -> RunEntry | None:
         return next((entry for entry in self.runs if entry.run == run), None)
@@ -102,6 +107,17 @@ def parse_runs(content: bytes) -> RunsFile:
     if len({entry.run for entry in entries}) != len(entries):
         raise RunsFileError("a run is stored twice")
     return RunsFile(entries)
+
+
+def read_stored_runs(toplevel: Path, stored: protocol.ObjectId, label: str) -> RunsFile:
+    """The runs file the blob `stored` holds, for the claim called `label`; one that cannot be
+    read or is not exactly the stored shape is unavailable."""
+    try:
+        return parse_runs(state_runs.read_runs_file(toplevel, stored))
+    except (RunsFileError, protocol.ClaimError) as error:
+        raise protocol.ClaimUnavailableError(
+            f"the stored runs of {label} cannot be used: {error}"
+        ) from error
 
 
 def _members(
@@ -365,10 +381,3 @@ def _holder_sentence(action: RunsAction, label: str, session: str, holder: str) 
 def holder_refusal(action: RunsAction, label: str, *, session: str) -> Callable[[str], str]:
     """The refusal of `session` as a non-holder of `label`, as a function of the holder."""
     return partial(_holder_sentence, action, label, session)
-
-
-def stale_refusal(label: str) -> str:
-    return (
-        f"the stored runs of {label} were written since this command read them; "
-        "run the same command again"
-    )

@@ -4,17 +4,16 @@ The record is computed once, before the release commit is pushed. A figure that 
 is unknown and has no trailer: no failure here refuses or delays a release."""
 
 import codecs
-import dataclasses
 import json
 import re
-from collections.abc import Callable, Collection, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from . import body, checkout, forge, protocol, store, workboard
+from . import body, checkout, protocol, workboard
 from .routing_line import (
     EXPERIMENT_TAG,
     RoutingLine,
@@ -22,7 +21,6 @@ from .routing_line import (
     parse_routing_line,
     stage_choice_fits,
 )
-from .session import RunContext
 
 
 class LaneOutcome(StrEnum):
@@ -140,13 +138,14 @@ class LaneRecordFile:
     risk: str | None
     experiment: str | None
 
-    def routing_line(self) -> RoutingLine:
-        """The routing figures the file states, as a routing line states them."""
-        return RoutingLine(
+    def figures(self) -> LaneFigures:
+        """The figures the file states, as those of a lane computed from stored runs are."""
+        return LaneFigures(
             stages=self.stages,
-            fix_rounds=sum(self.fix_rounds.values()),
-            blocking=sum(self.blocking.values()),
+            risk=self.risk,
             experiment=self.experiment,
+            counts=self.stage_counts(),
+            verdicts=self.verdicts,
         )
 
     def stage_counts(self) -> Mapping[FindingStage, StageCounts]:
@@ -163,14 +162,38 @@ class LaneRecordFile:
 
 @dataclass(frozen=True)
 class LaneFigures:
-    """The figures of a whole lane computed from its stored runs: `None` is unknown, never zero.
-    `lane_runs.lane_figures` computes them; `stages` holds every routing stage."""
+    """The figures of a whole lane, stated by a record file or computed from its stored runs by
+    `lane_runs.lane_figures`: `None` is unknown, never zero; `stages` holds every routing stage."""
 
     stages: Mapping[RoutingStage, str | None]
     risk: str | None
     experiment: str | None
     counts: Mapping[FindingStage, StageCounts]
     verdicts: tuple[JudgedVerdict, ...]
+
+    def routing_line(self) -> RoutingLine:
+        """The routing figures a release writes: the stage lines that are known, and the totals
+        of the four per-stage counts, each unknown where a per-stage count is."""
+        return RoutingLine(
+            stages={stage: choice for stage, choice in self.stages.items() if choice is not None},
+            fix_rounds=_summed(counts.fix_rounds for counts in self.counts.values()),
+            blocking=_summed(counts.blocking for counts in self.counts.values()),
+            experiment=self.experiment,
+        )
+
+
+UNKNOWN_FIGURES = LaneFigures(
+    stages=MappingProxyType(dict.fromkeys(RoutingStage)),
+    risk=None,
+    experiment=None,
+    counts=MappingProxyType(dict.fromkeys(FindingStage, StageCounts(None, None, None))),
+    verdicts=(),
+)
+
+
+def _summed(counts: Iterable[int | None]) -> int | None:
+    stated = list(counts)
+    return None if None in stated else sum(cast(list[int], stated))
 
 
 @dataclass(frozen=True)
@@ -233,9 +256,9 @@ class LaneRecord:
 class ReleasedLane:
     """The release being recorded: `released_at` is Unix seconds, `merge_commit` the sha the
     forge or the trunk walk named for a landed lane, `state_tip` the state-ref tip the claim
-    was read from, `item_size` the size class its work item declares, `record_file` the lane
-    record file the release was given, which states the routing figures instead of a routing
-    line."""
+    was read from, `item_size` the size class its work item declares, `figures` the routing
+    figures the release states in place of a routing line: a record file's, or those computed
+    from the lane's stored runs."""
 
     claim: protocol.ActiveClaim
     outcome: protocol.ReleaseOutcome
@@ -243,61 +266,16 @@ class ReleasedLane:
     released_at: int
     state_tip: str | None
     item_size: body.Size | None = None
-    record_file: LaneRecordFile | None = None
-
-
-@dataclass(frozen=True)
-class ReleaseEvidence:
-    """What a release holds beyond its claim and outcome: `verified_merge` is the merge commit
-    the forge's landing was verified to have (a github `--merged` release reads it nowhere
-    else), `item` the work item the landing release already read, whose body declares the size,
-    `record_file` the lane record file the release was given."""
-
-    verified_merge: str | None = None
-    item: forge.ItemReference | None = None
-    record_file: LaneRecordFile | None = None
-
-
-def release_subject(
-    context: RunContext,
-    claim: protocol.ActiveClaim,
-    outcome: protocol.ReleaseOutcome,
-    evidence: ReleaseEvidence,
-) -> store.TransitionSubject:
-    """The release transition's subject for `claim`, carrying its lane record."""
-    released = ReleasedLane(
-        claim,
-        outcome,
-        _merge_commit(outcome, evidence.verified_merge),
-        int(context.now().timestamp()),
-        context.observation.tip,
-        _declared_size(evidence.item, context.config.storage),
-        evidence.record_file,
-    )
-    record = compute_record(context.toplevel, context.config, released)
-    subject = store.transition_subject("release", claim.identity, claim.branch)
-    return dataclasses.replace(
-        subject, trailers=record.trailers(), committed_at=released.released_at
-    )
-
-
-def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:
-    return outcome.commit if isinstance(outcome, protocol.LandedRelease) else verified_merge
-
-
-def _declared_size(item: forge.ItemReference | None, storage: body.Storage) -> body.Size | None:
-    if item is None or item.body is None:
-        return None
-    return body.parse_body(item.body, storage=storage).size
+    figures: LaneFigures | None = None
 
 
 def compute_record(
     toplevel: Path, config: workboard.BoardConfig, released: ReleasedLane
 ) -> LaneRecord:
     """The record of `released`, every figure read from the repository at `toplevel`; the routing
-    figures come from its lane record file when it has one, and from a routing line otherwise."""
+    figures come from the figures the release states, and from a routing line without them."""
     measured = _measured_record(toplevel, config, released)
-    stated = released.record_file
+    stated = released.figures
     if stated is None:
         return measured
     return LaneRecord(
@@ -308,7 +286,7 @@ def compute_record(
         item_size=measured.item_size,
         routing=stated.routing_line(),
         risk=stated.risk,
-        counts=stated.stage_counts(),
+        counts=stated.counts,
     )
 
 
@@ -338,7 +316,7 @@ def _measured_record(
 
 
 def _routing_in(text: str, released: ReleasedLane) -> RoutingLine | None:
-    return parse_routing_line(text) if released.record_file is None else None
+    return parse_routing_line(text) if released.figures is None else None
 
 
 def _unknown_if_unreadable[Figure](read: Callable[[], Figure]) -> Figure | None:
@@ -743,13 +721,19 @@ def require_landable_record(record: LaneRecordFile | None, reviewed: str) -> Non
     """Refuse a landing whose lane record file judged another commit than `reviewed` (a full
     sha or a prefix of one), or whose last verdict is not an approval: nothing is merged or
     written for it. A landing without a record file has nothing to compare."""
-    if record is None:
-        return
-    if not record.verdicts:
+    if record is not None:
+        require_landable_verdicts(record.verdicts, reviewed)
+
+
+def require_landable_verdicts(verdicts: tuple[JudgedVerdict, ...], reviewed: str) -> None:
+    """Refuse a landing whose last verdict, in run order, judged another commit than `reviewed`
+    or is not an approval, or that has no verdict at all: the verdicts of a record file and of
+    stored runs are judged alike."""
+    if not verdicts:
         raise protocol.ClaimUnavailableError(
             "the lane record states no review or gate verdict, so it judged no head to land"
         )
-    last = record.verdicts[-1]
+    last = verdicts[-1]
     if not last.sha.startswith(reviewed):
         raise protocol.ClaimUnavailableError(
             f"the lane record's last verdict judged {last.sha}, not the reviewed {reviewed}"

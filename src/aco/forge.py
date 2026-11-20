@@ -526,6 +526,11 @@ class ForgeReader(BoardSource, Protocol):
         the closed half of the twin search."""
         ...
 
+    def newest_labelled_issues(self, label: str) -> tuple[workboard.Issue, ...]:
+        """The newest issues carrying `label`, open or closed, newest first, never a
+        pull request; one page of them, the newest hundred under `github`."""
+        ...
+
 
 class ForgeWriter(ForgeReader, Protocol):
     """`ForgeReader` plus every operation that mutates forge state."""

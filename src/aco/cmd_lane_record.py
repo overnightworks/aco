@@ -16,7 +16,6 @@ from . import (
     lane_runs,
     protocol,
     report,
-    state_runs,
     store,
     usage,
     workboard,
@@ -180,7 +179,7 @@ class _ClaimRuns:
             new_oid=store.hash_blob(self.context.toplevel, lane_runs.serialize_runs(runs)),
             operation_id=uuid.uuid4().hex,
             holder_refusal=lane_runs.holder_refusal(self.action, self.label, session=self.agent),
-            stale_refusal=lane_runs.stale_refusal(self.label),
+            stale_refusal=protocol.stale_runs_sentence(self.label),
         )
         subject = store.transition_subject(_COMMIT_SUBJECT, self.claim.identity, self.claim.branch)
         self.context.transition(
@@ -237,12 +236,7 @@ def _stored_runs(context: RunContext, live: _LiveClaim) -> lane_runs.RunsFile:
     """The runs stored with `live`, none when it stores none; unusable ones are unavailable."""
     if live.stored is None:
         return lane_runs.RunsFile()
-    try:
-        return lane_runs.parse_runs(state_runs.read_runs_file(context.toplevel, live.stored))
-    except (lane_runs.RunsFileError, protocol.ClaimError) as error:
-        raise protocol.ClaimUnavailableError(
-            f"the stored runs of {live.label} cannot be used: {error}"
-        ) from error
+    return lane_runs.read_stored_runs(context.toplevel, live.stored, live.label)
 
 
 def _descends(directory: Path, ancestor: str, tip: str) -> bool:
@@ -362,7 +356,7 @@ def _print_shown(label: str, runs: lane_runs.RunsFile, lane: Mapping[str, object
 def _show(parsed: argparse.Namespace, context: RunContext) -> int:
     live = _live_claim(parsed, context)
     stored = _stored_runs(context, live)
-    shown = bool(stored.runs)
+    shown = stored.holds_runs()
     lane = _lane_object(lane_runs.lane_figures(stored)) if shown else None
     if parsed.json:
         report.emit_json(

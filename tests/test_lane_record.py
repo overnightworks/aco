@@ -443,7 +443,7 @@ def test_a_lane_record_file_leaves_the_reasons_routing_line_unread(
 
     monkeypatch.setattr("aco.lane_record.parse_routing_line", read_no_routing_line)
     claim = standing_active_claim(lane=True, opened_commit=history.opened_commit)
-    stated = parse_record_file(json.dumps(lane_record_object()).encode())
+    stated = parse_record_file(json.dumps(lane_record_object()).encode()).figures()
     released = ReleasedLane(
         claim, protocol.AbandonedRelease(ROUTING), None, RELEASED_AT, history.tip, None, stated
     )
@@ -456,7 +456,7 @@ def test_a_lane_record_file_leaves_the_reasons_routing_line_unread(
 def release_trailers(
     history: LaneHistory, outcome: protocol.ReleaseOutcome, verified_merge: str | None = None
 ) -> tuple[str, ...]:
-    """The trailers `release_subject` puts on the release of a lane claimed in `history`."""
+    """The trailers `release_write` puts on the release of a lane claimed in `history`."""
     return release_trailers_of(
         toplevel=history.path,
         config=CONFIG,

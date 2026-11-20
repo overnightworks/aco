@@ -1,6 +1,7 @@
 """The lane record of a release run against an in-memory store."""
 
 import json
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -8,7 +9,7 @@ from typing import cast
 
 import pytest
 
-from aco import forge, lane_record, protocol, store, workboard
+from aco import forge, lane_record, protocol, release_record, store, workboard
 from aco.routing_line import RoutingStage
 from aco.session import RunContext
 
@@ -24,15 +25,51 @@ def stub_lane_record(monkeypatch: pytest.MonkeyPatch) -> None:
     """An in-memory store holds no state-ref commit, and a faked git answers no commit read,
     so its releases carry no lane record; `test_lane_record.py` drives the real one."""
 
-    def plain_subject(
+    def plain_write(
         _context: object,
         claim: protocol.ActiveClaim,
         _outcome: protocol.ReleaseOutcome,
-        _evidence: lane_record.ReleaseEvidence,
-    ) -> store.TransitionSubject:
-        return store.transition_subject("release", claim.identity, claim.branch)
+        _evidence: release_record.ReleaseEvidence,
+        intent: protocol.ReleaseIntent | protocol.LandingIntent,
+    ) -> release_record.ReleaseWrite:
+        subject = store.transition_subject("release", claim.identity, claim.branch)
+        return release_record.ReleaseWrite(subject, intent)
 
-    monkeypatch.setattr(lane_record, "release_subject", plain_subject)
+    monkeypatch.setattr(release_record, "release_write", plain_write)
+
+
+def release_written_of(
+    *,
+    toplevel: Path,
+    config: workboard.BoardConfig,
+    tip: str | None,
+    now: datetime,
+    claim: protocol.ActiveClaim,
+    outcome: protocol.ReleaseOutcome,
+    verified_merge: str | None = None,
+    item: forge.ItemReference | None = None,
+    record_file: lane_record.LaneRecordFile | None = None,
+    stored_runs: Mapping[str, protocol.ObjectId] | None = None,
+) -> release_record.ReleaseWrite:
+    """What `release_write` writes for the release of `claim`, whose observation holds the
+    runs blobs of `stored_runs` by claim id (none by default); its context holds no forge, so a
+    read of one fails the test."""
+    context = SimpleNamespace(
+        toplevel=toplevel,
+        config=config,
+        observation=SimpleNamespace(tip=tip, runs=stored_runs or {}),
+        now=lambda: now,
+    )
+    evidence = release_record.ReleaseEvidence(verified_merge, item, record_file)
+    intent = protocol.ReleaseIntent(
+        claim_id=claim.claim_id,
+        agent=claim.agent,
+        role=claim.role,
+        outcome=outcome,
+        operation_id="op-release",
+    )
+
+    return release_record.release_write(cast(RunContext, context), claim, outcome, evidence, intent)
 
 
 def release_trailers_of(
@@ -46,14 +83,17 @@ def release_trailers_of(
     verified_merge: str | None = None,
     item: forge.ItemReference | None = None,
 ) -> tuple[str, ...]:
-    """The trailers `release_subject` puts on the release of `claim`; its context holds no
-    forge, so a read of one fails the test."""
-    context = SimpleNamespace(
-        toplevel=toplevel, config=config, observation=SimpleNamespace(tip=tip), now=lambda: now
-    )
-    evidence = lane_record.ReleaseEvidence(verified_merge, item)
-
-    return lane_record.release_subject(cast(RunContext, context), claim, outcome, evidence).trailers
+    """The trailers a release of `claim` that stores no runs writes."""
+    return release_written_of(
+        toplevel=toplevel,
+        config=config,
+        tip=tip,
+        now=now,
+        claim=claim,
+        outcome=outcome,
+        verified_merge=verified_merge,
+        item=item,
+    ).subject.trailers
 
 
 JUDGED_SHA = "c" * 40

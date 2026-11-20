@@ -16,6 +16,7 @@ from aco import cmd_wait, forge, github, workboard
 MAXIMUM_PAUSES = 2000
 ITEM = 7
 OTHER_ITEM = 50
+FIRST_PAUSE_AFTER_THE_READ = 5
 
 
 @dataclass

@@ -14,6 +14,7 @@ from . import (
     expectations,
     policy,
     protocol,
+    recurring_audit,
     report,
     session,
     workboard,
@@ -290,6 +291,81 @@ class _NextReport:
     with_head: tuple[tuple[int, tuple[int, ...]], ...]
     site: _PullSite
     ahead: tuple[ahead_of_caller.JudgedEntry, ...] | ahead_of_caller.Unavailable
+    audits: tuple[recurring_audit.Finding, ...]
+    trunk_ref: str
+
+
+_AUDIT_SENTENCES = {
+    recurring_audit.Reason.LANDINGS: "{landings} landings since {issue}, {phrase} {sha7}",
+    recurring_audit.Reason.DAYS: (
+        "{days} days and {landings} landing(s) since {issue}, {phrase} {sha7}"
+    ),
+    recurring_audit.Reason.NO_ANCHOR: "no item labelled {label} holds an {phrase} line",
+    recurring_audit.Reason.ANCHOR_MALFORMED: "{issue}'s {phrase} line names no full commit",
+    recurring_audit.Reason.ANCHOR_OFF_TRUNK: (
+        "{issue} {phrase} {sha7}, which is not among the last {depth} landings on {trunk}"
+    ),
+}
+
+
+def _audit_headline(finding: recurring_audit.Finding, storage: body.Storage, trunk_ref: str) -> str:
+    anchor = finding.anchor
+    if finding.reason is recurring_audit.Reason.UNAVAILABLE:
+        error = protocol.terminal_text(str(finding.error))
+        return f"audit {finding.entry.name}: unavailable ({error})"
+    sentence = _AUDIT_SENTENCES[finding.reason].format(
+        landings=finding.landings_since,
+        days=finding.days_since,
+        issue="" if anchor is None else workboard.item_label(anchor.issue, storage),
+        sha7="" if anchor is None else anchor.named[:7],
+        label=finding.entry.label,
+        phrase=recurring_audit.ANCHOR_PHRASE,
+        depth=recurring_audit.MAX_LANDINGS,
+        trunk=trunk_ref,
+    )
+    return f"audit_due {finding.entry.name}: {sentence}"
+
+
+def _audit_lines(
+    audits: tuple[recurring_audit.Finding, ...], storage: body.Storage, trunk_ref: str
+) -> list[str]:
+    """One block per finding: the headline, the entry's text escaped as `Next:`
+    when the audit is due, and a blank line."""
+    lines: list[str] = []
+    for finding in audits:
+        lines.append(_audit_headline(finding, storage, trunk_ref))
+        if finding.is_due:
+            lines.append(f"Next: {protocol.terminal_text(finding.entry.run)}")
+        lines.append("")
+    return lines
+
+
+def _audits_json(
+    audits: tuple[recurring_audit.Finding, ...], storage: body.Storage
+) -> dict[str, object]:
+    return {
+        "audits": [
+            {
+                "name": finding.entry.name,
+                "reason": finding.reason,
+                "anchor": (
+                    None
+                    if finding.anchor is None
+                    else workboard.item_json_reference(finding.anchor.issue, storage)
+                ),
+                "sha": (
+                    finding.anchor.named
+                    if finding.anchor is not None and finding.anchor.is_commit
+                    else None
+                ),
+                "landings_since": finding.landings_since,
+                "days_since": finding.days_since,
+                "run": finding.entry.run,
+                "error": finding.error,
+            }
+            for finding in audits
+        ]
+    }
 
 
 def _ahead_item_name(target: ahead_of_caller.ItemTarget, storage: body.Storage) -> str:
@@ -387,6 +463,7 @@ def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
             for number, line_indexes in next_report.with_head
         ],
         **_ahead_json(next_report.ahead, storage),
+        **_audits_json(next_report.audits, storage),
     }
     if next_report.action is not None:
         payload.update(_next_action_payload(next_report.action, storage, site=next_report.site))
@@ -443,6 +520,7 @@ def _next(next_report: _NextReport, storage: body.Storage) -> None:
             for recovery_item in next_report.recovery
         )
         lines.append("")
+    lines.extend(_audit_lines(next_report.audits, storage, next_report.trunk_ref))
     lines.extend(
         _next_action_lines(next_report.action, storage, site=next_report.site)
         if next_report.action is not None
@@ -519,6 +597,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     with_head = _with_head(issues, storage)
     already_named = {_next_action_container_number(action), *close, *waiting, *ideas}
     skipped = tuple(item for item in _unworkable(projected) if item.number not in already_named)
+    audits = board_read.recurring_audit_reading(context, observed.trunk_landings)
     next_report = _NextReport(
         action=action,
         skipped=skipped,
@@ -530,6 +609,8 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
         with_head=with_head,
         site=site,
         ahead=board_read.ahead_of_caller_reading(context),
+        audits=audits,
+        trunk_ref=context.trunk_ref,
     )
     if as_json:
         _next_json(next_report, storage)
