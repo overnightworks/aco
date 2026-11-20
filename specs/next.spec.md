@@ -100,7 +100,7 @@ other printable space are text.
 
 ## A container's own action
 
-- [ ] [NEXT-05] A childless container with an undispatched `[[slice]]` row and no open blocker (NEXT-69) prints `cut_slice <label>: <title>`, that row's title, then `Next: aco cut <n>`, which cuts that row (CUT-06), exit `0` (E-NEXT-03).
+- [ ] [NEXT-05] A childless container with an undispatched `[[slice]]` row and no open blocker (NEXT-69) prints `cut_slice <label>: <title>` then `Next: aco cut <n>` (CUT-06), exit `0` (E-NEXT-03).
 - [ ] [NEXT-27] Every argument an advice line prints inside a command is quoted for a POSIX shell, so it runs as printed: scope path `docs/my notes.md` prints `--scope='docs/my notes.md'`.
 - [ ] [NEXT-31] An advice command attaches each option's value as `--<option>=<quoted>`, so a value starting with `-` still reaches it; a cut advice carries no title at all (see E-NEXT-10).
 - [ ] [NEXT-32] A display control in the first uncut row's title or `done_when` withholds `cut`; `SKIPPED`: `slice row <i> <field> holds a line break or control character; make it one printable line` (E-NEXT-10).
@@ -108,7 +108,7 @@ other printable space are text.
 - [ ] [NEXT-38] A container whose every open child, ITEM-54's included, is such an item reads `container; its open children do not read: <item-ids>` under `SKIPPED`, never `close:` (see E-NEXT-12).
 - NEXT-06 (retired).
 - [ ] [NEXT-07] A childless container without an uncut row prints `close_container <label>: <closed>/<total> children closed, no uncut row` (BOARD-58), whatever its `Next`, blocker or `wait` (E-NEXT-04).
-- [ ] [NEXT-69] A childless container with an uncut `[[slice]]` row and an open blocker never gets `cut_slice`, first or behind the top action; `SKIPPED` reads `blocked by <ref>` as for a blocked work item, and the next cuttable container or work item comes first (E-NEXT-20).
+- [ ] [NEXT-69] A childless container with an uncut `[[slice]]` row and an open blocker never gets `cut_slice`; `SKIPPED` reads `blocked by <ref>`, and the next cuttable container or work item comes first (E-NEXT-20).
 - [ ] [NEXT-25] A childless container with an uncut row that is a child of any item -- any type, open or closed, any repository -- never gets `cut_slice` (CUT-03); `SKIPPED` names its repair (E-NEXT-09).
 - [ ] [NEXT-29] That repair for one row claims as the retyped item's `Run:` will (NEXT-03): bare with a top-level `scope`, else `--scope=<path>` per row path, else `--scope <paths>` (E-NEXT-09).
 - [ ] [NEXT-33] Every claim a `SKIPPED` reason names ends `--out-of-order <reason>`, since a skipped item is never the first action; `<reason>`, like `<paths>`, is for the agent to fill in.
@@ -117,7 +117,7 @@ other printable space are text.
 
 - [ ] [NEXT-08] Every other unworkable item is named once under a trailing `SKIPPED` block, `<label>: <reason>`; a container `next` itself recommends cutting or closing is left out of that list.
 - NEXT-26, NEXT-47 (retired).
-- [ ] [NEXT-34] A NEXT-05 container not the first action, a blocked one excluded (NEXT-69), reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` in `<title>` escaped in text and `--json`; never `container; claim a child`.
+- [ ] [NEXT-34] A NEXT-05 container not the first action (blocked ones excluded, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped in text and `--json`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
 - [ ] [NEXT-59] A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
