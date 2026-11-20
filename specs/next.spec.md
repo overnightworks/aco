@@ -95,7 +95,7 @@ other printable space are text.
 - [ ] [NEXT-37] Text shows each display control in a title, `Next`, slice title or `SKIPPED` reason as its escape: `a\x1b[2J` prints as typed; TAB, NBSP and `Größe` as is; `--json` unchanged but BODY-68.
 - [ ] [NEXT-03] An item naming its own top-level `scope` drops `--scope` from `Run:`; a scopeless item's `Run:` ends `--scope <paths>` and gains a further `scope unknown` line (see E-NEXT-02).
 - [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths -- a retyped nested container (NEXT-29) -- instead prints `--scope=<path>` per path of that row, with no `scope unknown`.
-- [ ] [NEXT-04] A still-proposed item that is pulled (NEXT-70 holds the others) adds `expectations unruled: refine before the pull`; a stale ruling adds `ruled <n> landings ago: refine again at the pull` -- never both (see E-NEXT-02).
+- [ ] [NEXT-04] A still-proposed item that is pulled (NEXT-70 holds the others) adds `expectations unruled: refine before the pull`, a stale ruling `ruled <n> landings ago: refine again at the pull`, never both.
 - [ ] [NEXT-48] A withdrawn line (BODY-104) never adds `expectations unruled` and never dates a ruling; an item of only withdrawn lines adds neither NEXT-04 hint.
 - [ ] [NEXT-23] A scopeless, sliceless item still qualifies as this action (`scope unknown`, NEXT-03); `claim`/`start`'s own precedence check reads a narrower rule (`specs/claim.spec.md` CLM-23).
 
@@ -121,7 +121,7 @@ other printable space are text.
 - [ ] [NEXT-34] A NEXT-05 container behind the first action (unblocked, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped, never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
-- [ ] [NEXT-70] An item with at least one open option line and none of its open lines sent back (NEXT-45) waits on the operator as NEXT-39 says, without a `wait`: it is never pulled, cut or first, and `waiting on operator: <labels>` lists it (E-NEXT-21).
+- [ ] [NEXT-70] An item with an open option line, none sent back (NEXT-45), waits on the operator as NEXT-39 says, without a `wait`: never pulled, cut or first; `waiting on operator: <labels>` lists it (E-NEXT-21).
 - [ ] [NEXT-59] A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
 - [ ] [NEXT-61] The label `needs-operator` on an item without an operator `wait` holds nothing: the item is pulled or cut like any other.
 - [ ] [NEXT-60] A container whose open children all live in other repositories reads `container; waiting on <owner>/<repo>#<n>, ...` under `SKIPPED`, never `container; claim a child` (NEXT-38 appends it).
