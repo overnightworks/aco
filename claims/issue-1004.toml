@@ -1,7 +1,0 @@
-claim_id = "9dcd458add9e491296c01b4dcdedd9d6"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "95fcfb56a12ad5d5bd7239593355d31ee82eab36"
-branch = "claude/issue-1004-own-audit-entry"
-scope = [".aco/board.toml"]
-opened_commit = "e062e868951e3b3b12e36e43f3cf4beca3e681c7"
