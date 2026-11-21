@@ -10,9 +10,9 @@ from cli_fixtures import (
     real_repository_with_bare_remote,
     set_agent_identity_env,
 )
-from github_fixtures import FakeForge
+from github_fixtures import FakeForge, serve_forge
 
-from aco import checkout, forge, github, protocol, store, workboard
+from aco import checkout, forge, protocol, store, workboard
 from aco import cli as issue_claim
 
 _BRANCH = "codex/issue-314-fresh-slug-title"
@@ -31,7 +31,7 @@ def _start_scenario(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Pa
     item = board_issue(314, "Fresh Slug Title", complete_contract("Build it.", scope=["src/x.py"]))
     client = FakeForge(board_issues=(item,))
     client.issue_references[314] = forge.ItemReference(forge.ItemState.OPEN, item.title, item.body)
-    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
+    serve_forge(monkeypatch, client)
     monkeypatch.setattr(
         checkout, "remote_url", lambda _remote, **_kwargs: f"git@github.com:{REPOSITORY}.git"
     )
@@ -90,7 +90,7 @@ def test_start_rebuilding_a_gone_worktree_leaves_the_same_upstream(
 
 
 def test_a_refusal_after_the_build_removes_the_lane_while_the_main_checkout_stands_behind_the_trunk(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repo, remote = _start_scenario(monkeypatch, tmp_path)
     other = tmp_path / "other"
@@ -107,5 +107,12 @@ def test_a_refusal_after_the_build_removes_the_lane_while_the_main_checkout_stan
 
     assert _start() == 2
 
+    assert (
+        capsys.readouterr()
+        .err.rstrip()
+        .endswith(
+            f"removed worktree {_lane_worktree(repo)} and branch '{_BRANCH}' this start created"
+        )
+    )
     assert not _lane_worktree(repo).exists()
     assert _BRANCH not in real_git(repo, "branch", "--list").stdout
