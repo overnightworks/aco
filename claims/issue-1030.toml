@@ -1,0 +1,8 @@
+claim_id = "7583064df3a745a29ebaf9c0bfa5f3e5"
+agent = "Claude 965a9aa0-ab58-4ebc-8132-ff8a09cd7f58"
+role = "builder"
+base = "91d3f92c3984969070995c93170a4d79b97600e5"
+branch = "claude/issue-1030-exact-page-walk"
+scope = ["pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "src/aco/board_read.py", "src/aco/github.py", "src/aco/github_actions.py", "src/aco/github_paging.py", "src/aco/github_probe.py", "src/aco/github_pull_requests.py", "tests"]
+opened_commit = "8cb407d0ef9d932daac801149ccd06fc87d05bf1"
+whole_reason = "One paging owner replaces two mechanisms across the GitHub adapter, and every fake that answers a listing moves to its header-block shape in the same change."
