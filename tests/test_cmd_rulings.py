@@ -15,7 +15,7 @@ from board_fixtures import (
 )
 from cli_fixtures import run_cli
 from github_fixtures import FakeForge, serve_forge
-from github_pages import raw_board_issue
+from github_pages import listing_answer, raw_board_issue
 from option_cards import (
     RETURNED_NOTE,
     RETURNED_ON,
@@ -387,7 +387,7 @@ def test_rulings_reads_one_listing_page_and_no_claim_state(
 
     def run(arguments: list[str], input_data: bytes | None = None) -> str:
         calls.append(arguments)
-        return page
+        return listing_answer(arguments, page)
 
     def refuse_claim_state(**_: object) -> object:
         raise AssertionError("rulings must not read the claim state")

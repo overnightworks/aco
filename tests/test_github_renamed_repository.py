@@ -12,7 +12,7 @@ import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract
 from cli_fixtures import real_git, set_agent_identity_env
 from github_fixtures import FakeForge, serve_forge
-from github_pages import api_head, api_pull_request
+from github_pages import api_head, api_pull_request, listing_answer
 from store_fixtures import publish_claims_from_a_second_clone, state_ref_tip
 
 from aco import board_read, checkout, forge, github, workboard
@@ -91,7 +91,7 @@ class ScriptedGitHub:
         if arguments[-2:] == ["--jq", ".full_name"]:
             self.lookups += 1
             return self.canonical
-        return self.reply
+        return listing_answer(arguments, self.reply)
 
 
 def _stale_client(site: Site, canonical: str = CURRENT) -> tuple[GitHubForge, ScriptedGitHub]:

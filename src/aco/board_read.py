@@ -258,8 +258,7 @@ def build_board(
     # overlaps their `gh` subprocess wait time. Children get their own executor
     # (`_fetch_children`) so their concurrency stays capped at `BOARD_CHILD_FETCH_CONCURRENCY`
     # even once these two base reads finish and free their own pool's workers. The dependency
-    # wave runs afterward instead (below), so it never overlaps them. The readers in `github.py`
-    # fan out further inside each call, up to `PARALLEL_FETCH_CONCURRENCY` workers.
+    # wave runs afterward instead (below), so it never overlaps them.
     with ThreadPoolExecutor(max_workers=2) as pool:
         open_pull_requests = pool.submit(client.list_open_board_pull_requests)
         merged_pull_requests = pool.submit(client.list_recent_merged_board_pull_requests, since)
