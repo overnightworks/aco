@@ -369,7 +369,8 @@ def _parent_closing_defect(
     closing: frozenset[workboard.IssueReference],
     requirement: _ParentRequirement | None,
 ) -> workboard.ClassificationDefect | None:
-    """Whether closing the parent, or leaving it open, contradicts its body (LAND-21, LAND-79)."""
+    """Whether closing the parent, or leaving it open, contradicts its body (LAND-21, LAND-79,
+    LAND-92)."""
     if requirement is None:
         return None
     parent_closed = requirement.reference in closing
@@ -377,6 +378,11 @@ def _parent_closing_defect(
         return workboard.ClassificationDefect(
             f"closes parent {requirement.reference} although its body still holds "
             "an uncut slice row; cut it or delete the row first"
+        )
+    if parent_closed and requirement.completion is workboard.ParentCompletion.HELD:
+        return workboard.ClassificationDefect(
+            f"closes parent {requirement.reference} although it still holds "
+            "an open option line or an operator wait; rule the line or answer the step first"
         )
     if (
         requirement.last_child

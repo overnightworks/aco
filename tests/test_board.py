@@ -2612,8 +2612,8 @@ def test_closable_container_number_leaves_a_parent_with_an_uncut_row_open_under_
         ),
         pytest.param(
             complete_contract("Cut slice 2.", wait=OPERATOR_WAIT),
-            workboard.ParentCompletion.REQUIRED,
-            id="no_row_requires_closing_although_the_operator_wait_holds",
+            workboard.ParentCompletion.HELD,
+            id="an_operator_wait_holds_the_parent_open_although_no_row_is_left",
         ),
         pytest.param(
             complete_contract("keiner", wait=TRIGGER_WAIT),

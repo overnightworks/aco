@@ -1002,9 +1002,9 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
             "#11 score -10: Top work\nNext: Claim #11.\n"
             "Run: aco claim 11 --scope <paths>\n"
             + _SCOPE_UNKNOWN_NOTE_LINE
-            + "parallel: unknown (first action names no scope)\nclose: #442, #443, #445\n"
-            + f"waiting on operator: #441\n\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
-            id="never_cuts_a_container_the_operator_holds_but_still_closes_one",
+            + "parallel: unknown (first action names no scope)\nclose: #445\n"
+            + f"waiting on operator: #441, #442, #443\n\nSKIPPED\n#444: waiting: {WAIT_TRIGGER}\n",
+            id="never_cuts_nor_closes_a_container_the_operator_holds",
         ),
         pytest.param(
             _OPERATOR_HELD_CONTAINERS,
@@ -1024,7 +1024,7 @@ _NOTHING_NAMED_JSON: dict[str, object] = {
                 "ruling_landings": None,
                 "ruling_old": None,
                 "parallel": _UNKNOWN_SCOPE_PARALLEL_JSON,
-                **(_NOTHING_NAMED_JSON | {"close": [442, 443, 445], "waiting_on_operator": [441]}),
+                **(_NOTHING_NAMED_JSON | {"close": [445], "waiting_on_operator": [441, 442, 443]}),
             },
             id="json_lists_operator_held_containers_as_waiting_and_a_closable_one_under_close",
         ),

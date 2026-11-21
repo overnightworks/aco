@@ -5593,9 +5593,8 @@ class TestCliStateRefForge:
         )
 
         close_out = run_cli(["item", "close", child_id], capsys).expect_success()
-        # The container holds no uncut row, so the parent hint offers to close it.
-        parent_line = f"parent {container_id}: no open children — close it"
-        assert close_out.splitlines() == [f"CLOSED {child_id}", "freed: none", parent_line]
+        # The container's open option line holds it, so the parent hint stays away.
+        assert close_out.splitlines() == [f"CLOSED {child_id}", "freed: none"]
 
         ruled_out = run_cli(["rule", container_id, *decide("A", "chat", line=1)], capsys)
         ruled_sentence = f"RULED {container_id} line 1 A; 0 line(s) still open"

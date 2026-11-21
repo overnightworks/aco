@@ -53,12 +53,13 @@ other printable space are text.
 | a childless container with an uncut row has an open blocker | NEXT-69 | NEXT-14 |
 | that container is itself a child of another item | NEXT-71 | NEXT-14 |
 | a childless container has no uncut row | NEXT-07 | NEXT-13 |
+| that container holds an open or returned option line, or an operator `wait` | NEXT-73 | NEXT-14 |
 | that same container has an open blocker | NEXT-07 | NEXT-13 |
 | a landed-but-open item exists | LAND-53 (cited) | NEXT-14 |
 | an unworkable item exists beside the top action | NEXT-08 | NEXT-14 |
 | an item carries an operator `wait` | NEXT-39, NEXT-40 | NEXT-14 |
 | an item carries the label `needs-operator` and no operator `wait` | NEXT-61 | NEXT-14 |
-| a container carries an operator `wait` | NEXT-39, NEXT-28 | NEXT-14 |
+| a container carries an operator `wait` | NEXT-39, NEXT-73 | NEXT-14 |
 | an item's open option lines are all unreturned | NEXT-70 | NEXT-14 |
 | an item carries a `wait` that still holds | NEXT-59 | NEXT-14 |
 | a childless container carries a trigger or `until` `wait` that still holds | NEXT-59 | NEXT-14 |
@@ -110,7 +111,8 @@ other printable space are text.
 - [ ] [NEXT-36] An item PIN-14/PIN-15 refuses is named under `SKIPPED` as `<item-id>: body malformed: <field>: <message>`; every other item still reads, one it blocks stays blocked (see E-NEXT-11).
 - [ ] [NEXT-38] A container whose every open child, ITEM-54's included, is such an item reads `container; its open children do not read: <item-ids>` under `SKIPPED`, never `close:` (see E-NEXT-12).
 - NEXT-06 (retired).
-- [ ] [NEXT-07] A childless container without an uncut row prints `close_container <label>: <closed>/<total> children closed, no uncut row` (BOARD-58), whatever its `Next`, blocker or `wait` (E-NEXT-04).
+- [ ] [NEXT-07] A childless container without an uncut row prints `close_container <label>: <closed>/<total> children closed, no uncut row` (BOARD-58), whatever its `Next`, blocker or `trigger`/`until` wait, unless NEXT-73 holds it (E-NEXT-04).
+- [ ] [NEXT-73] A childless container without an uncut row that holds an open or returned option line, or an `operator` wait, is never closable: it stays off `close:` and is never `close_container`. With an `operator` wait or open lines none sent back it stands under `waiting on operator:` (NEXT-39, NEXT-70); with a line sent back (NEXT-45) it stays with the head, and `SKIPPED` reads `held by an option line sent back to its head`. Once the line is ruled or withdrawn and the step answered, it is closable again (E-NEXT-25). The operator's ruling of 21.11.2026 on the question recorded on aco#859: an open card must keep a container from closing, because closing it drops the card from the operator's inbox.
 - [ ] [NEXT-69] A childless container with an uncut `[[slice]]` row and an open blocker never gets `cut_slice`; `SKIPPED` reads `blocked by <ref>`; the next cuttable item comes first (E-NEXT-20).
 - NEXT-25, NEXT-29, NEXT-33 (retired).
 - [ ] [NEXT-71] A childless container with an uncut row that is itself a child of another item gets `cut_slice` like any other (NEXT-05; CUT-48), whatever that parent's type, state or repository (E-NEXT-22).
@@ -143,7 +145,7 @@ other printable space are text.
 
 ## `close:`
 
-- [ ] [NEXT-18] `close:` unions closable containers (kind, no open child, no uncut `[[slice]]` row) then recovery items, in board order, first-seen, whatever the first action (E-NEXT-06).
+- [ ] [NEXT-18] `close:` unions closable containers (kind, no open child, no uncut `[[slice]]` row, none held by NEXT-73) then recovery items, in board order, first-seen, whatever the first action (E-NEXT-06).
 - [ ] [NEXT-19] `close:` never names a container the forge reports no recognized `kind` for (BOARD-08's own exclusion): such an item is read as ordinary, not as one with nothing left to do.
 - [ ] [NEXT-20] `close:` prints `none` when neither a closable container nor a recovery item exists.
 
@@ -444,15 +446,15 @@ Next: Claim #11.
 Run: aco claim 11 --scope <paths>
 scope unknown
 parallel: unknown (first action names no scope)
-close: #442, #443
-waiting on operator: #441
+close: none
+waiting on operator: #441, #442, #443
 
 SKIPPED
 #444: waiting: <trigger text>
 exit 0
 ```
 
-`#441` gets no `cut`; `#444`, a trigger wait, is no operator wait: it gets no `cut` either, and `SKIPPED` names its wait (NEXT-59); `#442` and `#443` carry no uncut row, so they stay under `close:` alone whatever their wait or `Next` line says (NEXT-07, NEXT-28).
+`#441` gets no `cut`; `#444`, a trigger wait, is no operator wait: it gets no `cut` either, and `SKIPPED` names its wait (NEXT-59); `#442` and `#443` carry no uncut row, yet their operator wait keeps them off `close:` (NEXT-73).
 
 ### E-NEXT-16 — a line sent back to its head
 
@@ -612,3 +614,22 @@ close: none
 waiting on operator: #7
 exit 0
 ```
+
+### E-NEXT-25 — a closed-out container held by an option line
+
+Setup: bare-remote, fake `gh`, container `#7` with every child closed, no `[[slice]]` row and one open option line sent back to its head by `aco rule 7 --line 1 --unclear`; no other open item
+
+```console
+$ aco next
+No actionable item.
+parallel: none
+scope unknown: none
+close: none
+with head: #7 line 1
+
+SKIPPED
+#7: held by an option line sent back to its head
+exit 0
+```
+
+With the line still open and none sent back, `#7` stands under `waiting on operator: #7` instead; once the line is ruled, `close:` names `#7` (NEXT-73).

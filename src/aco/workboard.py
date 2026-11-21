@@ -1608,7 +1608,7 @@ def _board_item(
     childless_verdict = (
         None
         if container_progress is None or container_progress.open_count
-        else _childless_container_verdict(parsed.slices)
+        else _childless_container_verdict(parsed)
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
@@ -2112,12 +2112,11 @@ def closable_container_number(
 ) -> int | None:
     """The container `release --merged`/`item close` should name as freshly
     closable once one of its children just landed: `parent`'s own kind,
-    `children`'s open count and its own undispatched `[[slice]]` rows decide it exactly
+    `children`'s open count and its own body decide it exactly
     like `_qualifying_actions`'s `CloseContainerAction` branch -- a non-container
-    parent, one still holding another open child, or one with an uncut row is never
-    named. Whether a parent relation exists at all is the caller's own read
-    (`ParentIssue | None`, forge-specific); this function only ever decides once one
-    is given, never re-checking a state its one caller already ruled out.
+    parent, one holding another open child, an uncut row, an option line or an operator wait
+    is never named. Whether a parent relation exists at all is the caller's own read
+    (`ParentIssue | None`, forge-specific); this only decides once one is given.
     """
     if parent.kind is not ItemKind.CONTAINER:
         return None
@@ -2344,11 +2343,9 @@ class CutVerdict:
 
 @dataclass(frozen=True)
 class UnprintableRowVerdict:
-    """The first uncut row, the one `cut` links, has a one-line field, `key`,
-    holding a line break or another control character: a `cut` command naming its title would spread
-    over two printed lines or reach the terminal raw, and `cut` refuses its
-    `done_when`, so only making that field one printable line helps.
-    `row` is the index `cut --row` names that row by."""
+    """The first uncut row, the one `cut` links, has a one-line field, `key`, holding a
+    line break or control character, so `cut` refuses it and only making that field one
+    printable line helps. `row` is the index `cut --row` names that row by."""
 
     row: int
     key: str
@@ -2360,45 +2357,50 @@ class CloseVerdict:
     whatever its `Next` line, an open blocker or a `wait` says."""
 
 
+@dataclass(frozen=True)
+class HeldVerdict:
+    """No uncut row, but an open or returned option line or an operator `wait`
+    keeps the container open: closing it would drop the operator's question."""
+
+
 # What a container with no open child is up for, each verdict
 # carrying the data its own answer needs.
-ChildlessContainerVerdict = CutVerdict | UnprintableRowVerdict | CloseVerdict
+ChildlessContainerVerdict = CutVerdict | UnprintableRowVerdict | HeldVerdict | CloseVerdict
 
 
-def _childless_container_verdict(slices: tuple[SliceRow, ...]) -> ChildlessContainerVerdict:
-    """The one decider for a container with no open child:
-    `next`'s action, its `SKIPPED` reason, and `release --merged`'s
-    closable parent all read this answer rather than re-deriving it. An
-    uncut `[[slice]]` row is the only thing to cut -- unless the row's
-    title or `done_when` holds a line break or control character no printed
-    one-line advice or `cut` can carry; with no row left the container is
-    closable."""
-    if slices:
-        first = slices[0]
+def _childless_container_verdict(parsed: ParsedBody) -> ChildlessContainerVerdict:
+    """The one decider for a container with no open child: `next`'s action, its
+    `SKIPPED` reason, and `release --merged`'s closable parent all read this answer.
+    An uncut `[[slice]]` row is the only thing to cut, unless a line break or control
+    character in its title or `done_when` forbids it; with no row left the container
+    is closable, unless an option line or an operator `wait` holds it."""
+    if parsed.slices:
+        first = parsed.slices[0]
         unprintable_key = unprintable_slice_line_key(first)
         if unprintable_key is not None:
             return UnprintableRowVerdict(first.index, unprintable_key)
         return CutVerdict(first.title)
+    if parsed.expectation_progress.open or waits_on_operator(parsed.wait):
+        return HeldVerdict()
     return CloseVerdict()
 
 
 class ParentCompletion(StrEnum):
     """What a parent's own body says about closing it together with its last
-    open child (LAND-21, LAND-22, LAND-79): an uncut `[[slice]]` row forbids
-    it, and no row requires it."""
+    open child (LAND-21, LAND-22, LAND-79, LAND-92): an uncut `[[slice]]` row
+    forbids it, an option line or an operator `wait` holds it, no row requires it."""
 
     REQUIRED = "required"
     FORBIDDEN = "forbidden"
+    HELD = "held"
 
 
 def parent_completion(parsed: ParsedBody) -> ParentCompletion:
-    """The completion of a parent whose last open child just landed, read off
-    `_childless_container_verdict` so a landing and `next` agree on what
-    still counts as work."""
-    verdict = _childless_container_verdict(parsed.slices)
+    """The completion of a parent whose last child just landed, as `next` reads it."""
+    verdict = _childless_container_verdict(parsed)
     if isinstance(verdict, CloseVerdict):
         return ParentCompletion.REQUIRED
-    return ParentCompletion.FORBIDDEN
+    return ParentCompletion.HELD if isinstance(verdict, HeldVerdict) else ParentCompletion.FORBIDDEN
 
 
 def _childless_container_reason(
@@ -2406,10 +2408,8 @@ def _childless_container_reason(
     verdict: ChildlessContainerVerdict | None,
     storage: Storage,
 ) -> str | None:
-    """What container `number`, with no open child, is up for when `SKIPPED`
-    names it -- for a cuttable one not `next`'s first action,
-    its `cut` -- or `None` for a closable one, which `close:`
-    names."""
+    """What childless container `number` is up for when `SKIPPED` names it, or `None`
+    for a closable one, which `close:` names."""
     match verdict:
         case CutVerdict(title=title):
             return _cut_slice_reason(number, storage, title)
@@ -2418,14 +2418,14 @@ def _childless_container_reason(
                 f"slice row {row} {key} holds a line break or control character; "
                 "make it one printable line"
             )
+        case HeldVerdict():
+            return "held by an option line sent back to its head"
         case _:
             return None
 
 
 def _cut_slice_reason(number: int, storage: Storage, title: str) -> str:
-    """The `SKIPPED` reason of a cuttable container `number` that is not
-    `next`'s first action: its first uncut row `title`, quoted
-    by `_quoted_prose`, and the `cut` that row takes."""
+    """The `SKIPPED` reason of a cuttable container behind `next`'s first action."""
     return f"cut slice {_quoted_prose(title)}; run {cut_command(number, storage)}"
 
 

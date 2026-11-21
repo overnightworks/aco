@@ -173,12 +173,15 @@ def test_a_container_with_a_wait_and_no_uncut_row_is_closed_never_named_first(
     assert item.actionable_reason == reason
 
 
-def test_a_container_with_an_operator_wait_and_no_uncut_row_is_closed_never_named_first() -> None:
-    """NEXT-39."""
+def test_a_container_with_an_operator_wait_and_no_uncut_row_is_held_never_closed() -> None:
+    """NEXT-39, NEXT-73."""
     board = _waiting_container_board({"operator": STEP}, [])
 
     assert workboard.next_action(board) is None
-    assert workboard.zero_cost_closes(board) == (NUMBER,)
+    assert (workboard.zero_cost_closes(board), workboard.waiting_on_operator(board)) == (
+        (),
+        (NUMBER,),
+    )
 
 
 @pytest.mark.parametrize(

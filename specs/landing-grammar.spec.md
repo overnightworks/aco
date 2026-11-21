@@ -69,6 +69,7 @@ through git's trailer parsing with that block cut off (LAND-83, LAND-84).
 | missing/extra closing reference | — | LAND-18, LAND-19 | — | — |
 | non-closing landing keyword (`Implements #n`) | — | LAND-20 | — | — |
 | last open child, no uncut row | — | LAND-21 | — | — |
+| last open child, parent holds an open or returned option line or an operator `wait` | — | LAND-92 | — | — |
 | last open child, an uncut row remains | — | LAND-22, LAND-79 | — | — |
 | other open children, parent `Next` non-empty, parent also named for closing | — | LAND-19, LAND-79 | — | — |
 | other open children, no `Next` line | — | LAND-24 | — | — |
@@ -155,12 +156,13 @@ sentence>`, not restated.
 
 The refusals apply in this order, the first match winning: the parent's own
 defects (LAND-26, LAND-27), then LAND-24 (also when `next` is empty), then LAND-18,
-then LAND-79 and LAND-21, and only then LAND-19.
+then LAND-79, LAND-92 and LAND-21, and only then LAND-19.
 
-- [ ] [LAND-21] A last-child landing whose parent holds no uncut `[[slice]]` row closes the parent: omitting it refuses `closes the last open child of parent <ref>; close the parent too`, exit `2`.
+- [ ] [LAND-21] A last-child landing whose parent holds no uncut `[[slice]]` row and no open or returned option line or `operator` wait (LAND-92) closes the parent: omitting it refuses `closes the last open child of parent <ref>; close the parent too`, exit `2`.
 - LAND-23 (retired).
-- [ ] [LAND-22] The same landing, when the parent still holds an uncut `[[slice]]` row, may pass without closing the parent: exit `0`.
+- [ ] [LAND-22] The same landing, when the parent still holds an uncut `[[slice]]` row (or LAND-92 applies), may pass without closing the parent: exit `0`.
 - [ ] [LAND-79] A landing closing a parent that still holds an uncut `[[slice]]` row refuses `closes parent <ref> although its body still holds an uncut slice row; cut it or delete the row first`, exit `2`.
+- [ ] [LAND-92] A last-child landing whose parent holds no uncut `[[slice]]` row but an open or returned option line, or an `operator` wait, behaves as LAND-22 does: it may pass without closing the parent, exit `0`, and a landing closing that parent refuses `closes parent <ref> although it still holds an open option line or an operator wait; rule the line or answer the step first`, exit `2`. Once the line is ruled or withdrawn and the step answered, LAND-21 applies again. The operator's ruling of 21.11.2026 on the question recorded on aco#859: an open card keeps its container from closing, as closing drops the card from the operator's inbox (E-LAND-92).
 - [ ] [LAND-24] A landing leaving other open children behind, with no parent `Next` line, refuses `leaves parent <ref> open with <n> other open child/children, whose body carries no Next line`, exit `2`.
 - [ ] [LAND-25] The same landing, when the parent's `Next` line is non-empty, passes without closing the parent: exit `0`.
 - [ ] [LAND-86] An open sub-issue of the parent in another repository counts as another open child: closing the last local child is no last-child landing (LAND-21 does not fire) and LAND-24 applies.
@@ -315,6 +317,18 @@ $ aco check 57
 2> REFUSED: pull request #57 closes parent <owner>/<repo>#5 although its body still holds an uncut slice row; cut it or delete the row first
 exit 2
 ```
+
+### E-LAND-92 — closing a parent that still holds an open option line
+
+Setup: bare-remote, fake `gh`, parent `#5` a container with one open child `#42`, no uncut `[[slice]]` row, one open option line, pull request `#57` merged, body `Work-Item: #42\n\nCloses #42\nCloses #5`
+
+```console
+$ aco check 57
+2> REFUSED: pull request #57 closes parent <owner>/<repo>#5 although it still holds an open option line or an operator wait; rule the line or answer the step first
+exit 2
+```
+
+The body `Work-Item: #42\n\nCloses #42` passes with exit `0`: the parent stays open for the operator's answer.
 
 ### E-LAND-47 — a merge landing closes its item and releases the claim under state-ref
 

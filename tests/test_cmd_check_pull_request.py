@@ -9,6 +9,7 @@ from board_fixtures import (
     REPOSITORY,
     block_body,
     complete_contract,
+    ruled_expectation,
     slice_entries,
 )
 from check_pull_request_fixtures import (
@@ -29,6 +30,7 @@ from check_pull_request_fixtures import (
 )
 from cli_fixtures import pull_request_listing
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
+from option_cards import open_option_entry, returned_option_entry
 from store_fixtures import claim_intent
 
 from aco import body, forge, policy, protocol
@@ -509,6 +511,10 @@ UNCUT_ROW = (
     f"closes parent {PARENT} although its body still holds an uncut slice row; "
     "cut it or delete the row first"
 )
+HELD_PARENT = (
+    f"closes parent {PARENT} although it still holds an open option line or an operator wait; "
+    "rule the line or answer the step first"
+)
 NO_NEXT_LINE = (
     f"leaves parent {PARENT} open with {{}} other open {{}}, whose body carries no Next line"
 )
@@ -528,8 +534,20 @@ PARENT_ACCEPTANCES = {
     "closing-the-completed-parent": accepted_with_parent(
         CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner", now="Epic."))
     ),
-    "closing-a-parent-that-waits-on-the-operator": accepted_with_parent(
-        CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner", wait=OPERATOR_WAIT))
+    "last-child-with-an-operator-wait-leaves-the-parent-open": accepted_with_parent(
+        WORK_ITEM_BODY, ParentWorld(complete_contract("keiner", wait=OPERATOR_WAIT))
+    ),
+    "last-child-with-an-open-card-leaves-the-parent-open": accepted_with_parent(
+        WORK_ITEM_BODY,
+        ParentWorld(complete_contract("keiner", expectation=[open_option_entry()])),
+    ),
+    "last-child-with-a-returned-card-leaves-the-parent-open": accepted_with_parent(
+        WORK_ITEM_BODY,
+        ParentWorld(complete_contract("keiner", expectation=[returned_option_entry()])),
+    ),
+    "last-child-with-a-ruled-card-closes-the-parent": accepted_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        ParentWorld(complete_contract("keiner", expectation=[ruled_expectation("Alt")])),
     ),
     "closed-children-do-not-keep-the-parent-open": accepted_with_parent(
         CLOSES_ITEM_AND_PARENT, ParentWorld(complete_contract("keiner"), closed_children=2)
@@ -558,10 +576,20 @@ PARENT_CLOSING_REFUSALS = {
     "last-child-must-close-the-parent-whose-next-names-work": refused_with_parent(
         WORK_ITEM_BODY, CLOSE_PARENT_TOO, ParentWorld(complete_contract("Cut the next slice."))
     ),
-    "last-child-must-close-the-parent-that-waits-on-the-operator": refused_with_parent(
-        WORK_ITEM_BODY,
-        CLOSE_PARENT_TOO,
-        ParentWorld(complete_contract("Cut the next slice.", wait=OPERATOR_WAIT)),
+    "closing-the-parent-that-waits-on-the-operator": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        HELD_PARENT,
+        ParentWorld(complete_contract("keiner", wait=OPERATOR_WAIT)),
+    ),
+    "closing-the-parent-with-an-open-card": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        HELD_PARENT,
+        ParentWorld(complete_contract("keiner", expectation=[open_option_entry()])),
+    ),
+    "closing-the-parent-with-a-returned-card": refused_with_parent(
+        CLOSES_ITEM_AND_PARENT,
+        HELD_PARENT,
+        ParentWorld(complete_contract("keiner", expectation=[returned_option_entry()])),
     ),
     "other-children-and-no-next-line": refused_with_parent(
         WORK_ITEM_BODY,
@@ -663,7 +691,7 @@ PARENT_REFUSALS = {
 def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-21, LAND-22, LAND-25, LAND-28, LAND-86, CHECK-01"""
+    """Spec: LAND-21, LAND-22, LAND-92, LAND-25, LAND-28, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
@@ -671,7 +699,7 @@ def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
 def test_a_landing_that_contradicts_what_its_parent_still_holds_is_refused(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, LAND-86, CHECK-01"""
+    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, LAND-92, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
