@@ -572,7 +572,7 @@ def assert_world_arranged(
     world: StatusWorld, intents: tuple[protocol.ClaimIntent, ...], clone: Path, remote: Path
 ) -> str | None:
     """The state ref holds exactly the arranged claims, each opened at the commit before
-    its own, and every commit carries the arranged committer date."""
+    its own, and every claim commit carries the arranged committer date."""
     tip = state_ref_tip(remote)
     assert (tip is not None) == world.bootstrapped
     assert real_git(clone, "for-each-ref", store.STATE_REF).stdout == ""
@@ -587,8 +587,9 @@ def assert_world_arranged(
     opened_at = int((FROZEN_CLI_NOW - world.claim_age).timestamp())
     rewrites = int(world.twin is not None or world.severed)
     assert [int(date) for _commit, date in history] == [
-        opened_at,
-        *[int(FROZEN_CLI_NOW.timestamp())] * (len(intents) + rewrites),
+        int(FROZEN_CLI_NOW.timestamp()),
+        *[opened_at] * len(intents),
+        *[int(FROZEN_CLI_NOW.timestamp())] * rewrites,
     ]
     opened_commits = {
         intent.claim_id: history[position][0] for position, intent in enumerate(intents)
@@ -658,7 +659,7 @@ def check_status(
                 clone,
                 bare_remote,
                 intents,
-                bootstrapped_at=(FROZEN_CLI_NOW - world.claim_age).isoformat(),
+                claimed_at=(FROZEN_CLI_NOW - world.claim_age).isoformat(),
             )
         if (twin := world.twin) is not None:
             original = next(claim for claim in intents if claim.branch == twin.branch)

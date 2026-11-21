@@ -5,6 +5,7 @@ git-transport integration layer.
 """
 
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,31 @@ def test_claim_ages_reads_the_committer_date_of_each_claim_from_one_log_walk(
     assert set(ages) == {first.claim_id, second.claim_id}
     assert all(age.tzinfo is not None for age in ages.values())
     assert git_call_spy["log"] == 1
+
+
+def test_claim_ages_dates_a_claim_by_its_own_commit_not_the_idle_tip_it_followed(
+    monkeypatch: pytest.MonkeyPatch, bare_remote: Path, worktree: Path
+) -> None:
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-11-18T19:07:00+00:00")
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2026-11-19T17:18:00+00:00")
+    claim = _committed_claim(bare_remote, worktree, issue=1)
+    state = store.fetch_state(worktree=worktree, remote=str(bare_remote))
+    assert state.tip is not None
+
+    ages = state_history.claim_ages(worktree=worktree, tip=state.tip, claims=(claim,))
+
+    assert ages[claim.claim_id] == datetime(2026, 11, 19, 17, 18, tzinfo=UTC)
+
+
+def test_claim_ages_refuses_a_claim_whose_opened_commit_is_the_tip(
+    bare_remote: Path, worktree: Path
+) -> None:
+    store.bootstrap(worktree=worktree, remote=str(bare_remote))
+    claim = _committed_claim(bare_remote, worktree, issue=1)
+
+    with pytest.raises(protocol.StateLineageError, match="is not an ancestor"):
+        state_history.claim_ages(worktree=worktree, tip=claim.opened_commit, claims=(claim,))
 
 
 def test_claim_ages_survives_a_gc_prune_of_the_just_fetched_history(

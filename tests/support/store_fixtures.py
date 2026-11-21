@@ -242,12 +242,11 @@ def publish_claims_from_a_second_clone(
     remote: Path,
     intents: tuple[protocol.ClaimIntent, ...],
     *,
-    bootstrapped_at: str | None = None,
+    claimed_at: str | None = None,
 ) -> protocol.ClaimState:
     """Publish fixture claims without stamping or anchoring the landing clone.
 
-    `bootstrapped_at` dates the bootstrap commit alone: the commit the first
-    claim's `opened_commit` names, which `aco status` reads its age from."""
+    `claimed_at` dates the claim commits, which `aco status` reads each claim's age from."""
     seed = landing_clone.parent / "seed"
     real_git(landing_clone.parent, "clone", "-q", str(remote), str(seed))
     observed = seed.resolve() != landing_clone.resolve()
@@ -258,14 +257,14 @@ def publish_claims_from_a_second_clone(
         != real_git(landing_clone, "rev-parse", "--absolute-git-dir").stdout
     )
     assert observed == expected
-    with patch.dict(os.environ, {"GIT_COMMITTER_DATE": bootstrapped_at} if bootstrapped_at else {}):
-        store.bootstrap(worktree=seed, remote=str(remote))
-    for intent in intents:
-        store.commit_transition(
-            observed=fresh_observation(seed, remote),
-            subject=store.transition_subject("claim", intent.identity, intent.branch),
-            intent=intent,
-        )
+    store.bootstrap(worktree=seed, remote=str(remote))
+    with patch.dict(os.environ, {"GIT_COMMITTER_DATE": claimed_at} if claimed_at else {}):
+        for intent in intents:
+            store.commit_transition(
+                observed=fresh_observation(seed, remote),
+                subject=store.transition_subject("claim", intent.identity, intent.branch),
+                intent=intent,
+            )
     return store.peek_state(worktree=seed, remote=str(remote))
 
 
