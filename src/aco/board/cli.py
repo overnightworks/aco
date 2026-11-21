@@ -15,7 +15,12 @@ from logline import configure
 
 from .. import __version__, protocol, repositories
 from ..board_link import LOOPBACK_HOST
-from ..board_token import MalformedTokenFileError, board_token, token_path
+from ..board_token import (
+    MalformedTokenFileError,
+    UnreadableTokenFileError,
+    board_token,
+    token_path,
+)
 from .aco_source import AcoSource
 from .board import Board, Boards, Found, RepositoriesUnavailableError, RepoUnavailable
 from .server import RunningBoard, start_board
@@ -92,8 +97,13 @@ def serve(port: int | None) -> int:
     boards = Boards(discovered_boards)
     try:
         token = board_token(token_path(os.environ, Path.home()))
-    except MalformedTokenFileError as error:
-        print(f"ERROR: {error}; delete it to start with a new one", file=sys.stderr)
+    except (MalformedTokenFileError, UnreadableTokenFileError) as error:
+        remedy = (
+            "; delete it to start with a new one"
+            if isinstance(error, MalformedTokenFileError)
+            else ""
+        )
+        print(f"ERROR: {error}{remedy}", file=sys.stderr)
         return 1
     try:
         running = start_board(port, boards, token)
