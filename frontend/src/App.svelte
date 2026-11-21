@@ -83,10 +83,15 @@
 		}
 	}
 
+	function showView(next: BoardView) {
+		linkNote = null;
+		view = next;
+	}
+
 	function openDecided() {
 		decidedKey = firstDecidedKey(board.repos);
 		showDecidedCard = false;
-		view = 'decided';
+		showView('decided');
 	}
 
 	async function undo(key: string) {
@@ -264,7 +269,7 @@
 				<button
 					type="button"
 					aria-current={view === 'open' ? 'page' : undefined}
-					onclick={() => (view = 'open')}
+					onclick={() => showView('open')}
 					>{OPEN_TAB_LABEL}
 					<span class="n waiting" class:zero={counts.open === 0}>{counts.open}</span></button
 				>
@@ -276,12 +281,12 @@
 				<button
 					type="button"
 					aria-current={view === 'progress' ? 'page' : undefined}
-					onclick={() => (view = 'progress')}>{PROGRESS_TAB_LABEL}</button
+					onclick={() => showView('progress')}>{PROGRESS_TAB_LABEL}</button
 				>
 				<button
 					type="button"
 					aria-current={view === 'steps' ? 'page' : undefined}
-					onclick={() => (view = 'steps')}
+					onclick={() => showView('steps')}
 					>{STEPS_TAB_LABEL}
 					<span class="n waiting" class:zero={stepTotal === 0}>{stepTotal}</span></button
 				>

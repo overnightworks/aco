@@ -298,3 +298,18 @@ test('[ABRD-155] the stage stays on a card while one of its points is open and l
 
 	expect(screen.getByRole('heading', { name: 'Share the page?' })).toBeInTheDocument();
 });
+
+test('a link note is gone once the operator switches the view', async () => {
+	vi.stubGlobal('fetch', fakeFetch(200, { repos: [repo({ items: [item({ number: 42 })] })] }));
+
+	render(App, {
+		token: 'a-token',
+		link: { kind: 'card', repo: 'owner/repo', item: 99, line: 1 }
+	});
+	await screen.findByText('Diese Karte gibt es nicht mehr.');
+	const views = screen.getByRole('navigation', { name: 'Views' });
+
+	await fireEvent.click(within(views).getByRole('button', { name: /^Steps/ }));
+
+	expect(screen.queryByText('Diese Karte gibt es nicht mehr.')).not.toBeInTheDocument();
+});
