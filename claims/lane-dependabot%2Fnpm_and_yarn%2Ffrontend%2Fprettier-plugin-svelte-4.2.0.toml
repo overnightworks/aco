@@ -1,0 +1,7 @@
+claim_id = "8129959766f640efa9c471f3c190d5d5"
+agent = "Claude 965a9aa0-ab58-4ebc-8132-ff8a09cd7f58"
+role = "builder"
+base = "3759158f976532ecf26ec584c3c449d0c8929aff"
+branch = "dependabot/npm_and_yarn/frontend/prettier-plugin-svelte-4.2.0"
+scope = ["frontend/package.json", "frontend/pnpm-lock.yaml"]
+opened_commit = "a354cdd5da0301ec01bdb57d9732f19b098e4ee1"
