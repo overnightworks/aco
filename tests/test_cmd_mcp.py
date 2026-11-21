@@ -325,6 +325,29 @@ def test_an_asked_card_answers_no_link_where_the_token_file_is_unreadable(
     assert asked["result"]["structuredContent"]["written"] is True
 
 
+@pytest.mark.parametrize("malformed_port", ["0", '"8765"'])
+def test_an_asked_card_answers_no_link_where_the_board_port_is_malformed(
+    root: Path,
+    board_unit: BoardUnit,
+    config_file: Path,
+    malformed_port: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: MCP-80"""
+    repository_with_card(root / "here", 1, "Here")
+    configured = config_file.read_text(encoding="utf-8")
+    config_file.write_text(
+        configured.replace(f"board_port = {board_unit.port}", f"board_port = {malformed_port}"),
+        encoding="utf-8",
+    )
+
+    _, [asked] = run_mcp(monkeypatch, ask_line(1))
+
+    assert asked["result"]["isError"] is False
+    assert asked["result"]["structuredContent"]["link"] is None
+    assert asked["result"]["structuredContent"]["written"] is True
+
+
 @pytest.mark.parametrize(
     ("asked", "sentence"),
     [
