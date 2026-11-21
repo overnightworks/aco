@@ -87,7 +87,8 @@ request or unreadable (`specs/ahead-of-caller.spec.md`).
 ## Board
 
 `aco board --json` projects the open work board read-only for agents and
-scripts. `aco serve [--port N]` serves the open
+scripts. `aco serve [--port N]` (default: `board_port` beside `root` in the
+config file, else a free port) serves the open
 expectation lines of every checkout under the `root` in `~/.config/aco/config.toml`
 (`root = "<absolute path>"`; `$XDG_CONFIG_HOME` when absolute) that tracks
 `.aco/board.toml`, one per forge repository and rescanned on every read, as decision cards on 127.0.0.1
@@ -98,6 +99,9 @@ restarts in a user-only file (deleting it rotates the token)
 (`specs/serve.spec.md`). After the URL, every line on standard output is one JSON
 log record, one per answered request plus the start and stop lines. The browser app
 lives in `frontend/`; its build output is committed under `src/aco/board/static/`.
+With `board_port` set, `aco board --url [<item> [--line K]]` prints the board's address, an
+item's step link or a card's link, which opens the board at that card or step; the
+`ask` and `step` tools of `aco mcp` return the same link. The link names the repository of the checkout the command runs in (or `--repo`), so run it in the item's repository.
 
 ## MCP
 

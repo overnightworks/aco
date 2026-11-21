@@ -32,15 +32,13 @@ from urllib.parse import urlsplit
 
 from logline import RequestLine
 
+from ..board_link import LOOPBACK_HOST, PAGE_PATH, board_url
 from . import api, static
 from .board import Boards, RepositoriesUnavailableError, all_repos_unavailable
 from .ports import DecisionResult
 
-LOOPBACK_HOST = "127.0.0.1"
-TOKEN_FIELD = "t"  # noqa: S105 - names the query field that carries the token and holds no secret
 _TRACEPARENT_HEADER = "traceparent"
 TOKEN_HEADER = "X-Board-Token"  # noqa: S105 - names the header that carries the token and holds no secret
-PAGE_PATH = "/"
 API_PREFIX = "/api/"
 API_BOARD_PATH = "/api/board"
 API_RULE_PATH = "/api/rule"
@@ -166,13 +164,7 @@ def start_board(
     static.ensure_built()
     httpd = _BoardServer(port, token, boards, request_deadline_seconds)
     bound_port = httpd.server_address[1]
-    # A fragment, not a query: the browser never sends it back to the server,
-    # so the shell at `PAGE_PATH` needs no token to answer it (ABRD-10).
-    url = (
-        # S5332: loopback only, no TLS by design (README.md, `aco serve`)
-        f"http://{LOOPBACK_HOST}:{bound_port}{PAGE_PATH}"  # NOSONAR(S5332) loopback-only URL
-        f"#{TOKEN_FIELD}={token}"
-    )
+    url = board_url(bound_port, token)
     return RunningBoard(httpd=httpd, url=url)
 
 

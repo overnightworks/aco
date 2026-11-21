@@ -14,11 +14,17 @@ from types import FrameType
 from logline import configure
 
 from .. import __version__, protocol, repositories
+from ..board_link import LOOPBACK_HOST
+from ..board_token import (
+    MalformedTokenFileError,
+    UnreadableTokenFileError,
+    board_token,
+    token_path,
+)
 from .aco_source import AcoSource
 from .board import Board, Boards, Found, RepositoriesUnavailableError, RepoUnavailable
-from .server import LOOPBACK_HOST, RunningBoard, start_board
+from .server import RunningBoard, start_board
 from .static import StaticAssetsMissingError
-from .token_store import MalformedTokenFileError, board_token, token_path
 
 _REFUSED_EXIT_CODE = 2
 _SERVICE_NAME = "aco-board"
@@ -63,9 +69,19 @@ def _serve_until_stopped(running: RunningBoard) -> None:
         signal.signal(signal.SIGTERM, previous_handler)
 
 
-def serve(port: int) -> int:
-    """Serve the repositories under the configured root on `port` until
-    interrupted; 0 picks a free port."""
+def _listening_port(port: int | None) -> int:
+    """`port` when given, else `board_port` of the config file, else 0."""
+    if port is not None:
+        return port
+    configured = repositories.configured_board_port(
+        repositories.config_path(os.environ, Path.home())
+    )
+    return 0 if configured is None else configured
+
+
+def serve(port: int | None) -> int:
+    """Serve the repositories under the configured root on `port` (default: the
+    configured `board_port`) until interrupted; 0 picks a free port."""
     os.environ.setdefault("SERVICE_VERSION", __version__)
     try:
         configure(_SERVICE_NAME)
@@ -74,14 +90,18 @@ def serve(port: int) -> int:
         return _REFUSED_EXIT_CODE
     try:
         discovered_boards()
-    except RepositoriesUnavailableError as refusal:
+        port = _listening_port(port)
+    except (RepositoriesUnavailableError, protocol.ClaimError) as refusal:
         print(f"ERROR: {refusal}", file=sys.stderr)
         return _REFUSED_EXIT_CODE
     boards = Boards(discovered_boards)
     try:
         token = board_token(token_path(os.environ, Path.home()))
-    except MalformedTokenFileError as error:
-        print(f"ERROR: {error}; delete it to start with a new one", file=sys.stderr)
+    except (MalformedTokenFileError, UnreadableTokenFileError) as error:
+        remedy = ""
+        if isinstance(error, MalformedTokenFileError):
+            remedy = "; delete it to start with a new one"
+        print(f"ERROR: {error}{remedy}", file=sys.stderr)
         return 1
     try:
         running = start_board(port, boards, token)

@@ -11,6 +11,7 @@ import board_forge
 import pytest
 from board_fixtures import complete_contract, write_repository_config
 from cli_fixtures import run_cli
+from discovery_fixtures import BoardUnit
 from mcp_lines import call_line, serve_mcp
 
 from aco import body, forge, item_step, protocol, workboard
@@ -120,6 +121,7 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
         "item": 1,
         "step": STEP,
         "created": False,
+        "link": None,
     }
     stored = body.locate_block(here.stored_body(1)).data
     assert stored["next"] == before["next"]
@@ -199,6 +201,7 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
         "item": 2,
         "step": STEP,
         "created": True,
+        "link": None,
     }
     assert (created.title, created.kind, created.labels) == (TITLE, "task", [_LABEL])
     assert (checked.status, json.loads(checked.stdout)["ok"]) == (0, True)
@@ -473,3 +476,27 @@ def test_a_failure_after_the_item_exists_is_finished_by_the_same_call_without_a_
     assert repeated["structuredContent"]["item"] == 2
     assert here.stored_item(2).labels == [_LABEL]
     assert [operation for operation, _ in _writes(here)].count("create_issue") == 1
+
+
+@pytest.mark.parametrize(
+    ("line", "item"),
+    [
+        pytest.param(_step_line(1), 1, id="marked-item"),
+        pytest.param(_step_line(1, item=None, title=TITLE), 2, id="opened-item"),
+    ],
+)
+def test_a_step_answers_the_link_that_opens_it_on_the_board(
+    here: board_forge.BoardForge,
+    board_unit: BoardUnit,
+    monkeypatch: pytest.MonkeyPatch,
+    line: str,
+    item: int,
+) -> None:
+    """Spec: MCP-79"""
+    here.put_item(1, complete_contract("S1 Prepare the vault."), title="Key")
+
+    [marked] = _serve(monkeypatch, line)
+
+    assert marked["structuredContent"]["link"] == (
+        f"http://127.0.0.1:{board_unit.port}/#t={board_unit.token}&s=board-forge/here/{item}"
+    )

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TextIO
 
 from . import (
+    board_link,
     body,
     decide,
     earlier_rulings,
@@ -85,6 +86,9 @@ def ask(label: str, number: int, card: Mapping[str, object]) -> dict[str, object
         "item": number,
         "written": asked.written,
         "line": rulings.line_json(asked.line),
+        "link": board_link.configured_board_url_or_none(
+            board_link.CardLink(label, number, asked.line.index)
+        ),
         **_earlier(context, key, asked.line.area, tracked),
     }
 
@@ -190,12 +194,23 @@ def step(label: str, text: str, target: int | str, card: item_step.StepCard) -> 
         )
     if isinstance(target, int):
         _mark_in_turn(context, target, text, card, standing_title=None)
-        return {"repository": label, "item": target, "step": text, "created": False}
+        return _step_answer(label, target, text, created=False)
     standing = _standing_step_item(context, target, text)
     if standing is not None and _mark_in_turn(context, standing, text, card, standing_title=target):
-        return {"repository": label, "item": standing, "step": text, "created": False}
+        return _step_answer(label, standing, text, created=False)
     opened = decide.open_step_item(context, target, text, card)
-    return {"repository": label, "item": opened, "step": text, "created": True}
+    return _step_answer(label, opened, text, created=True)
+
+
+def _step_answer(label: str, item: int, text: str, *, created: bool) -> dict[str, object]:
+    """What `step` answers: the item, the step and the board's link to it."""
+    return {
+        "repository": label,
+        "item": item,
+        "step": text,
+        "created": created,
+        "link": board_link.configured_board_url_or_none(board_link.StepLink(label, item)),
+    }
 
 
 def _mark_in_turn(

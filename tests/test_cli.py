@@ -593,7 +593,7 @@ def test_board_naming_no_output_mode_refuses_before_any_read(
     status = issue_claim.main(["board"])
 
     assert status == 2
-    assert capsys.readouterr().err == "ERROR: aco board requires --json\n"
+    assert capsys.readouterr().err == "ERROR: aco board requires --json or --url\n"
 
 
 def test_board_serve_flag_is_an_unknown_argument(capsys: pytest.CaptureFixture[str]) -> None:

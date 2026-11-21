@@ -18,7 +18,9 @@
 	import { STEPS_TAB_LABEL, stepCount } from './app/model/steps';
 	import { BoardStore } from './app/state/board.svelte';
 	import { cardKey } from './app/model/decision';
+	import { resolveLink, stepKey, type LinkTarget } from './app/model/linkSelection';
 	import { DecisionStore } from './app/state/decision.svelte';
+	import LinkNote from './components/LinkNote.svelte';
 	import FailureStrip from './components/FailureStrip.svelte';
 	import ProgressView from './components/ProgressView.svelte';
 	import QuietSign from './components/QuietSign.svelte';
@@ -28,7 +30,7 @@
 	import TrackList from './components/TrackList.svelte';
 	import UndoStrip from './components/UndoStrip.svelte';
 
-	let { token }: { token: string | null } = $props();
+	let { token, link = null }: { token: string | null; link?: LinkTarget | null } = $props();
 
 	let decisions: DecisionStore | null = $state(null);
 	const board = new BoardStore(
@@ -39,6 +41,8 @@
 	let decidedKey: string | null = $state(null);
 	let showDecidedCard = $state(false);
 	let view: BoardView = $state('open');
+	let linkNote: string | null = $state(null);
+	let linkedStep: string | null = $state(null);
 	const counts = $derived(tabCounts(board.repos));
 	const stepTotal = $derived(stepCount(board.repos));
 	const hasViews = $derived(board.status === 'ready' && decisions !== null);
@@ -79,10 +83,15 @@
 		}
 	}
 
+	function showView(next: BoardView) {
+		linkNote = null;
+		view = next;
+	}
+
 	function openDecided() {
 		decidedKey = firstDecidedKey(board.repos);
 		showDecidedCard = false;
-		view = 'decided';
+		showView('decided');
 	}
 
 	async function undo(key: string) {
@@ -103,6 +112,18 @@
 		}
 	}
 
+	function openLink(outcome: ReturnType<typeof resolveLink> | null) {
+		if (outcome?.kind === 'card') {
+			selectedKey = outcome.key;
+			showQuestion = true;
+		} else if (outcome?.kind === 'step') {
+			linkedStep = stepKey(outcome.repo, outcome.item);
+			view = 'steps';
+		} else if (outcome?.kind === 'note') {
+			linkNote = outcome.note;
+		}
+	}
+
 	$effect(() => {
 		// Also after a stored answer is applied in place: its card may leave the list.
 		void board.repos;
@@ -110,6 +131,7 @@
 			if (!initialized) {
 				selectedKey = firstOpenKey(board.repos);
 				initialized = true;
+				openLink(link === null ? null : resolveLink(board.repos, link));
 			}
 			void tick().then(() => {
 				if (document.activeElement === question) focusQuestion(question);
@@ -247,7 +269,7 @@
 				<button
 					type="button"
 					aria-current={view === 'open' ? 'page' : undefined}
-					onclick={() => (view = 'open')}
+					onclick={() => showView('open')}
 					>{OPEN_TAB_LABEL}
 					<span class="n waiting" class:zero={counts.open === 0}>{counts.open}</span></button
 				>
@@ -259,12 +281,12 @@
 				<button
 					type="button"
 					aria-current={view === 'progress' ? 'page' : undefined}
-					onclick={() => (view = 'progress')}>{PROGRESS_TAB_LABEL}</button
+					onclick={() => showView('progress')}>{PROGRESS_TAB_LABEL}</button
 				>
 				<button
 					type="button"
 					aria-current={view === 'steps' ? 'page' : undefined}
-					onclick={() => (view = 'steps')}
+					onclick={() => showView('steps')}
 					>{STEPS_TAB_LABEL}
 					<span class="n waiting" class:zero={stepTotal === 0}>{stepTotal}</span></button
 				>
@@ -290,6 +312,9 @@
 		<p role="alert"><QuietSign kind="warn" />{SERVER_SILENT_SENTENCE} {board.error}</p>
 	{:else if decisions !== null}
 		{@const store = decisions}
+		{#if linkNote !== null}
+			<LinkNote note={linkNote} />
+		{/if}
 		<div class="split" hidden={view !== 'open'} class:show-question={showQuestion}>
 			<div class="tracks" bind:this={tracks} tabindex="-1">
 				<TrackList
@@ -298,6 +323,7 @@
 					{selectedKey}
 					saving={(key) => store.isSaving(key)}
 					onSelect={(key) => {
+						linkNote = null;
 						selectedKey = key;
 						store.showCard(key);
 						showQuestion = true;
@@ -320,7 +346,7 @@
 			</div>
 		</div>
 		{#if view === 'steps'}
-			<StepsView repos={board.repos} {decisions} />
+			<StepsView repos={board.repos} {decisions} current={linkedStep} />
 		{/if}
 		{#if view === 'progress'}
 			<ProgressView repos={board.repos} />

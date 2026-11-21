@@ -23,7 +23,7 @@ from board_fixtures import (
     searchless,
 )
 from cli_fixtures import run_cli
-from discovery_fixtures import repository_with_card, unreadable_checkout, write_config
+from discovery_fixtures import BoardUnit, repository_with_card, unreadable_checkout, write_config
 from github_fixtures import FakeForge, serve_forge
 from mcp_lines import Script, ask_line, call_line, run_mcp
 from option_cards import GOLDEN_CARD_HASH, open_option_entry
@@ -283,6 +283,69 @@ def test_an_asked_card_shows_in_the_inbox_read_and_is_stored_once(
     assert [shown["index"] for shown in item["lines"]] == [1, 2]
     assert item["lines"][1] == line
     assert here.body_writes() == [1]
+
+
+def test_an_asked_card_answers_the_link_that_opens_it_on_the_board(
+    root: Path, board_unit: BoardUnit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: MCP-79"""
+    repository_with_card(root / "here", 1, "Here")
+
+    _, [asked, repeated] = run_mcp(monkeypatch, ask_line(1), ask_line(2))
+
+    expected = f"http://127.0.0.1:{board_unit.port}/#t={board_unit.token}&c=board-forge/here/1/2"
+    assert asked["result"]["structuredContent"]["link"] == expected
+    assert repeated["result"]["structuredContent"]["link"] == expected
+
+
+def test_an_asked_card_answers_no_link_where_no_board_port_is_configured(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: MCP-80"""
+    repository_with_card(root / "here", 1, "Here")
+
+    _, [asked] = run_mcp(monkeypatch, ask_line(1))
+
+    assert asked["result"]["isError"] is False
+    assert asked["result"]["structuredContent"]["link"] is None
+
+
+def test_an_asked_card_answers_no_link_where_the_token_file_is_unreadable(
+    root: Path, board_unit: BoardUnit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: MCP-80"""
+    repository_with_card(root / "here", 1, "Here")
+    board_unit.token_file.unlink()
+    board_unit.token_file.mkdir()
+
+    _, [asked] = run_mcp(monkeypatch, ask_line(1))
+
+    assert asked["result"]["isError"] is False
+    assert asked["result"]["structuredContent"]["link"] is None
+    assert asked["result"]["structuredContent"]["written"] is True
+
+
+@pytest.mark.parametrize("malformed_port", ["0", '"8765"'])
+def test_an_asked_card_answers_no_link_where_the_board_port_is_malformed(
+    root: Path,
+    board_unit: BoardUnit,
+    config_file: Path,
+    malformed_port: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: MCP-80"""
+    repository_with_card(root / "here", 1, "Here")
+    configured = config_file.read_text(encoding="utf-8")
+    config_file.write_text(
+        configured.replace(f"board_port = {board_unit.port}", f"board_port = {malformed_port}"),
+        encoding="utf-8",
+    )
+
+    _, [asked] = run_mcp(monkeypatch, ask_line(1))
+
+    assert asked["result"]["isError"] is False
+    assert asked["result"]["structuredContent"]["link"] is None
+    assert asked["result"]["structuredContent"]["written"] is True
 
 
 @pytest.mark.parametrize(
