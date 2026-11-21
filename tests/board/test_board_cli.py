@@ -256,6 +256,7 @@ def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
 def test_serve_refuses_to_start_when_the_token_file_cannot_be_read(
     root: Path, board_token_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Spec: ABRD-193"""
     repository_with_card(root / "here", 1, "Here")
     board_token_file.mkdir(parents=True)
 

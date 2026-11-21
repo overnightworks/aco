@@ -1,4 +1,4 @@
-"""The board's address (`specs/serve.spec.md` ABRD-187, `specs/board.spec.md` BOARD-63)."""
+"""The board's address (ABRD-187, BOARD-63, BOARD-66)."""
 
 from pathlib import Path
 

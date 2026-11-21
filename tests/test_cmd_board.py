@@ -139,7 +139,7 @@ def test_board_url_without_a_board_port_refuses_naming_the_config_file(
 def test_board_url_without_a_token_file_refuses_naming_it(
     capsys: pytest.CaptureFixture[str], board_unit: BoardUnit, checkout: str
 ) -> None:
-    """Spec: BOARD-63"""
+    """Spec: BOARD-66"""
     token = board_unit.token_file
     token.unlink()
 
@@ -153,7 +153,7 @@ def test_board_url_without_a_token_file_refuses_naming_it(
 def test_board_url_with_an_unreadable_token_file_refuses_naming_it(
     capsys: pytest.CaptureFixture[str], board_unit: BoardUnit, checkout: str
 ) -> None:
-    """Spec: BOARD-63"""
+    """Spec: BOARD-66"""
     token = board_unit.token_file
     token.unlink()
     token.mkdir()

@@ -27,7 +27,8 @@ reason text.
 |---|---|---|
 | any state, before any other read | BOARD-44, BOARD-65 | — |
 | `--url`, with `board_port` and the token file present | BOARD-62, BOARD-64 | — |
-| `--url`, with `board_port` unset or no token file | BOARD-63 | — |
+| `--url`, with `board_port` unset | BOARD-63 | — |
+| `--url`, with no token file or one that cannot be read | BOARD-66 | — |
 | unsupported canonical-remote host | — | BOARD-02, BOARD-43 |
 | canonical remote with no URL configured | — | BOARD-53, BOARD-43 |
 | `.aco/board.toml` absent | — | PIN-32 (cited) |
@@ -55,9 +56,10 @@ reason text.
 - [ ] [BOARD-44] `aco board` naming neither `--json` nor `--url` refuses `aco board requires --json or --url`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
 
 - [ ] [BOARD-62] `aco board --url` prints the board's address, `http://127.0.0.1:<board_port>/#t=<board token>`, and a newline, nothing else, exit `0` (E-BOARD-30).
-- [ ] [BOARD-64] With an item it prints that step's link, `&s=<owner>/<repo>/<item>`, with `--line K` that card's, `&c=<owner>/<repo>/<item>/<K>`; `<owner>/<repo>` is `--repo` or the checkout's (ABRD-187), so a head runs `--url <item>` in the item's repository.
+- [ ] [BOARD-64] With an item it prints that step's link, `&s=<owner>/<repo>/<item>`, with `--line K` that card's, `&c=<owner>/<repo>/<item>/<K>`; `<owner>/<repo>` is `--repo` or the checkout's (ABRD-187).
 - [ ] [BOARD-65] `--json` with `--url`, an item or `--line` without `--url`, and `--line` without an item refuse, exit `2`, before any read.
-- [ ] [BOARD-63] `--url` refuses, exit `2`: `board_port is not set in <config path>`, or, with no token file, `<path> does not exist; start aco serve once to create the board token`, or, with a token file that cannot be read, `board token <path> is unreadable: <reason>`; it creates no file (E-BOARD-31).
+- [ ] [BOARD-63] `--url` refuses `board_port is not set in <config path>`, exit `2`, creating no file (E-BOARD-31).
+- [ ] [BOARD-66] `--url` refuses, exit `2`, creating no file: `<path> does not exist; start aco serve once to create the board token`, or `board token <path> is unreadable: <reason>`.
 
 ## The shared forge precondition
 
