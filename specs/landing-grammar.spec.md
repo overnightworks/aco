@@ -162,8 +162,8 @@ then LAND-79, LAND-92 and LAND-21, and only then LAND-19.
 - LAND-23 (retired).
 - [ ] [LAND-22] The same landing, when the parent still holds an uncut `[[slice]]` row (or LAND-92 applies), may pass without closing the parent: exit `0`.
 - [ ] [LAND-79] A landing closing a parent that still holds an uncut `[[slice]]` row refuses `closes parent <ref> although its body still holds an uncut slice row; cut it or delete the row first`, exit `2`.
-- [ ] [LAND-92] A last-child landing whose parent holds no uncut `[[slice]]` row but an open or returned option line, or an `operator` wait, may pass without closing the parent: exit `0`.
-- [ ] [LAND-93] A landing closing a parent held as in LAND-92 refuses `closes parent <ref> although it still holds an open option line or an operator wait; rule the line or answer the step first`, exit `2`.
+- [ ] [LAND-92] A last-child landing whose parent holds no uncut `[[slice]]` row but an open or returned option line, or an `operator` wait, may pass without closing the parent: exit `0` (E-LAND-92).
+- [ ] [LAND-93] Closing a LAND-92 parent refuses `closes parent <ref> although it still holds an open option line or an operator wait; rule the line or answer the step first`, exit `2` (E-LAND-92).
 - [ ] [LAND-24] A landing leaving other open children behind, with no parent `Next` line, refuses `leaves parent <ref> open with <n> other open child/children, whose body carries no Next line`, exit `2`.
 - [ ] [LAND-25] The same landing, when the parent's `Next` line is non-empty, passes without closing the parent: exit `0`.
 - [ ] [LAND-86] An open sub-issue of the parent in another repository counts as another open child: closing the last local child is no last-child landing (LAND-21 does not fire) and LAND-24 applies.

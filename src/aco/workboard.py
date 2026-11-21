@@ -2110,13 +2110,11 @@ def zero_cost_closes(board: Board) -> tuple[int, ...]:
 def closable_container_number(
     parent: ParentIssue, children: ChildList, storage: Storage
 ) -> int | None:
-    """The container `release --merged`/`item close` should name as freshly
-    closable once one of its children just landed: `parent`'s own kind,
-    `children`'s open count and its own body decide it exactly
-    like `_qualifying_actions`'s `CloseContainerAction` branch -- a non-container
-    parent, one holding another open child, an uncut row, an option line or an operator wait
-    is never named. Whether a parent relation exists at all is the caller's own read
-    (`ParentIssue | None`, forge-specific); this only decides once one is given.
+    """The container `release --merged`/`item close` names as freshly closable
+    once a child landed, decided like `_qualifying_actions`'s `CloseContainerAction`:
+    a non-container, a parent holding another open child, an uncut row, an option
+    line or an operator wait is never named. Whether a parent relation exists is the
+    caller's read; this only decides once one is given.
     """
     if parent.kind is not ItemKind.CONTAINER:
         return None
@@ -2355,27 +2353,23 @@ class UnprintableRowVerdict:
 
 @dataclass(frozen=True)
 class CloseVerdict:
-    """No uncut row: nothing is left to cut, so the container is closable
-    whatever its `Next` line, an open blocker or a `wait` says."""
+    """No uncut row: closable whatever its `Next` line, blocker or `wait` says."""
 
 
 @dataclass(frozen=True)
 class HeldVerdict:
-    """No uncut row, but an open or returned option line or an operator `wait`
-    keeps the container open: closing it would drop the operator's question."""
+    """No uncut row, but an option line or an operator `wait` keeps it open."""
 
 
-# What a container with no open child is up for, each verdict
-# carrying the data its own answer needs.
+# What a container with no open child is up for, with each answer's data.
 ChildlessContainerVerdict = CutVerdict | UnprintableRowVerdict | HeldVerdict | CloseVerdict
 
 
 def _childless_container_verdict(parsed: ParsedBody) -> ChildlessContainerVerdict:
-    """The one decider for a container with no open child: `next`'s action, its
-    `SKIPPED` reason, and `release --merged`'s closable parent all read this answer.
-    An uncut `[[slice]]` row is the only thing to cut, unless a line break or control
-    character in its title or `done_when` forbids it; with no row left the container
-    is closable, unless an option line or an operator `wait` holds it."""
+    """The one decider for a container with no open child, read by `next` and
+    `release --merged`: an uncut `[[slice]]` row is cut unless a line break or control
+    character forbids it; with no row left the container closes unless an option
+    line or `wait` holds it."""
     if parsed.slices:
         first = parsed.slices[0]
         unprintable_key = unprintable_slice_line_key(first)
@@ -2388,9 +2382,9 @@ def _childless_container_verdict(parsed: ParsedBody) -> ChildlessContainerVerdic
 
 
 class ParentCompletion(StrEnum):
-    """What a parent's own body says about closing it together with its last
-    open child (LAND-21, LAND-22, LAND-79, LAND-92): an uncut `[[slice]]` row
-    forbids it, an option line or an operator `wait` holds it, no row requires it."""
+    """What a parent's body says about closing it with its last open child
+    (LAND-21, LAND-22, LAND-79, LAND-92): an uncut row forbids it, an option
+    line or operator `wait` holds it, otherwise it is required."""
 
     REQUIRED = "required"
     FORBIDDEN = "forbidden"

@@ -140,7 +140,7 @@ class TestNextWithAHeldContainer:
 
         payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
 
-        assert (payload["close"], payload["waiting_on_operator"]) == expected
+        assert expected == (payload["close"], payload["waiting_on_operator"])
 
     def test_a_closed_out_container_with_a_returned_line_stays_with_the_head(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
