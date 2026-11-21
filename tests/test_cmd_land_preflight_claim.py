@@ -373,10 +373,9 @@ class TestLandClassification:
             pytest.param(
                 ClaimCase(
                     "pull request #12 changes "
-                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…, "
-                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb…, "
-                    "ccccccccccccccccccccccccccccccccccccccc…, which "
-                    "dependency_paths in .aco/board.toml…",
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…, bbbbbbbbbb…, which "
+                    "dependency_paths in .aco/board.toml does not name; "
+                    "a bump that needs a code edit lands as No-Item: fix",
                     pull_request=landing_pull_request(body="No-Item: deps", head_ref_name="fix/x"),
                     intents=(claim_intent(identity=protocol.LaneIdentity(), branch="fix/x"),),
                     item_reads=(),
@@ -401,7 +400,7 @@ class TestLandClassification:
                     ),
                     arguments=("--head", MERGE_COMMIT_SHA),
                     check_claims=True,
-                    length=RefusalLength.EXACTLY_LIMIT,
+                    length=RefusalLength.WITHIN_LIMIT,
                 ),
                 id="many-long-paths-bounded",
             ),

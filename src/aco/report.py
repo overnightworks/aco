@@ -131,8 +131,14 @@ def refusal_around_foreign_text(template: str, foreign_text: str, **words: objec
     """`template` with `{foreign}` replaced by `foreign_text` (a forge's error)
     shown as `bounded_refusal` shows foreign text, and cut alone so that the
     words around it always survive."""
-    room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
+    room = foreign_text_room(template.format(foreign="", **words))
     return template.format(foreign=cut_foreign_text(foreign_text, room), **words)
+
+
+def foreign_text_room(fixed_words: str, *, reserved: int = 0) -> int:
+    """The characters foreign text may take in a refusal sentence whose other words are
+    `fixed_words`, after `reserved` characters a caller prints before the sentence."""
+    return _REFUSAL_SENTENCE_LENGTH_LIMIT - reserved - len(fixed_words)
 
 
 def refusal_around_foreign_path(template: str, path_text: str, **words: object) -> str:
