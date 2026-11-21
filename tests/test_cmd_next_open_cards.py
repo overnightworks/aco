@@ -5,10 +5,17 @@ cuts such a container (E-NEXT-24)."""
 import json
 
 import pytest
-from board_fixtures import board_issue, complete_contract, container_with_children, slice_entries
+from board_fixtures import (
+    OPERATOR_WAIT,
+    board_issue,
+    complete_contract,
+    container_with_children,
+    ruled_expectation,
+    slice_entries,
+)
 from cli_fixtures import freeze_cli_now, run_cli
 from github_fixtures import FakeForge, serve_forge
-from option_cards import card, item_body, open_option_entry, returned_today
+from option_cards import card, item_body, open_option_entry, returned_option_entry, returned_today
 
 from aco import workboard
 
@@ -92,3 +99,66 @@ class TestNextWithOpenCards:
         payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
 
         assert (payload["number"], payload["waiting_on_operator"]) == (FREE_ITEM, [7])
+
+
+def serve_childless_container(monkeypatch: pytest.MonkeyPatch, body: str) -> None:
+    """Container `#7` with `body`: every child closed, no uncut row."""
+    container, children = container_with_children(7, closed=2, body=body)
+    freeze_cli_now(monkeypatch)
+    serve_forge(monkeypatch, FakeForge(board_issues=(container,), children={7: children}))
+
+
+@pytest.mark.usefixtures("github_world")
+class TestNextWithAHeldContainer:
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            pytest.param(
+                complete_contract("keiner", expectation=[open_option_entry()]),
+                ([], [7]),
+                id="open-card",
+            ),
+            pytest.param(
+                complete_contract("keiner", wait=OPERATOR_WAIT), ([], [7]), id="operator-wait"
+            ),
+            pytest.param(
+                complete_contract("keiner", expectation=[ruled_expectation("Alt")]),
+                ([7], []),
+                id="ruled-line",
+            ),
+        ],
+    )
+    def test_a_closed_out_container_is_closable_unless_a_card_or_wait_holds_it(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        body: str,
+        expected: tuple[list[int], list[int]],
+    ) -> None:
+        """Spec: NEXT-73, NEXT-07, NEXT-18, NEXT-39, NEXT-70"""
+        serve_childless_container(monkeypatch, body)
+
+        payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
+
+        assert expected == (payload["close"], payload["waiting_on_operator"])
+
+    def test_a_closed_out_container_with_a_returned_line_stays_with_the_head(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: NEXT-73, NEXT-45, NEXT-18"""
+        serve_childless_container(
+            monkeypatch, complete_contract("keiner", expectation=[returned_option_entry()])
+        )
+
+        text = run_cli(["next"], capsys).stdout
+
+        assert text.splitlines() == [
+            "No actionable item.",
+            "parallel: none",
+            "scope unknown: none",
+            "close: none",
+            "with head: #7 line 1",
+            "",
+            "SKIPPED",
+            "#7: held by an option line sent back to its head",
+        ]

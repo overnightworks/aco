@@ -1608,7 +1608,7 @@ def _board_item(
     childless_verdict = (
         None
         if container_progress is None or container_progress.open_count
-        else _childless_container_verdict(parsed.slices)
+        else _childless_container_verdict(parsed)
     )
     actionability = _ActionabilityFacts(
         kind=issue.kind,
@@ -2110,14 +2110,11 @@ def zero_cost_closes(board: Board) -> tuple[int, ...]:
 def closable_container_number(
     parent: ParentIssue, children: ChildList, storage: Storage
 ) -> int | None:
-    """The container `release --merged`/`item close` should name as freshly
-    closable once one of its children just landed: `parent`'s own kind,
-    `children`'s open count and its own undispatched `[[slice]]` rows decide it exactly
-    like `_qualifying_actions`'s `CloseContainerAction` branch -- a non-container
-    parent, one still holding another open child, or one with an uncut row is never
-    named. Whether a parent relation exists at all is the caller's own read
-    (`ParentIssue | None`, forge-specific); this function only ever decides once one
-    is given, never re-checking a state its one caller already ruled out.
+    """The container `release --merged`/`item close` names as freshly closable
+    once a child landed, decided like `_qualifying_actions`'s `CloseContainerAction`:
+    a non-container, a parent holding another open child, an uncut row, an option
+    line or an operator wait is never named. Whether a parent relation exists is the
+    caller's read; this only decides once one is given.
     """
     if parent.kind is not ItemKind.CONTAINER:
         return None
@@ -2356,49 +2353,50 @@ class UnprintableRowVerdict:
 
 @dataclass(frozen=True)
 class CloseVerdict:
-    """No uncut row: nothing is left to cut, so the container is closable
-    whatever its `Next` line, an open blocker or a `wait` says."""
+    """No uncut row: closable whatever its `Next` line, blocker or `wait` says."""
 
 
-# What a container with no open child is up for, each verdict
-# carrying the data its own answer needs.
-ChildlessContainerVerdict = CutVerdict | UnprintableRowVerdict | CloseVerdict
+@dataclass(frozen=True)
+class HeldVerdict:
+    """No uncut row, but an option line or an operator `wait` keeps it open."""
 
 
-def _childless_container_verdict(slices: tuple[SliceRow, ...]) -> ChildlessContainerVerdict:
-    """The one decider for a container with no open child:
-    `next`'s action, its `SKIPPED` reason, and `release --merged`'s
-    closable parent all read this answer rather than re-deriving it. An
-    uncut `[[slice]]` row is the only thing to cut -- unless the row's
-    title or `done_when` holds a line break or control character no printed
-    one-line advice or `cut` can carry; with no row left the container is
-    closable."""
-    if slices:
-        first = slices[0]
+# What a container with no open child is up for, with each answer's data.
+ChildlessContainerVerdict = CutVerdict | UnprintableRowVerdict | HeldVerdict | CloseVerdict
+
+
+def _childless_container_verdict(parsed: ParsedBody) -> ChildlessContainerVerdict:
+    """The one decider for a container with no open child, read by `next` and
+    `release --merged`: an uncut `[[slice]]` row is cut unless a line break or control
+    character forbids it; with no row left the container closes unless an option
+    line or `wait` holds it."""
+    if parsed.slices:
+        first = parsed.slices[0]
         unprintable_key = unprintable_slice_line_key(first)
         if unprintable_key is not None:
             return UnprintableRowVerdict(first.index, unprintable_key)
         return CutVerdict(first.title)
+    if parsed.expectation_progress.open or waits_on_operator(parsed.wait):
+        return HeldVerdict()
     return CloseVerdict()
 
 
 class ParentCompletion(StrEnum):
-    """What a parent's own body says about closing it together with its last
-    open child (LAND-21, LAND-22, LAND-79): an uncut `[[slice]]` row forbids
-    it, and no row requires it."""
+    """What a parent's body says about closing it with its last open child
+    (LAND-21, LAND-22, LAND-79, LAND-92): an uncut row forbids it, an option
+    line or operator `wait` holds it, otherwise it is required."""
 
     REQUIRED = "required"
     FORBIDDEN = "forbidden"
+    HELD = "held"
 
 
 def parent_completion(parsed: ParsedBody) -> ParentCompletion:
-    """The completion of a parent whose last open child just landed, read off
-    `_childless_container_verdict` so a landing and `next` agree on what
-    still counts as work."""
-    verdict = _childless_container_verdict(parsed.slices)
+    """The completion of a parent whose last child just landed, as `next` reads it."""
+    verdict = _childless_container_verdict(parsed)
     if isinstance(verdict, CloseVerdict):
         return ParentCompletion.REQUIRED
-    return ParentCompletion.FORBIDDEN
+    return ParentCompletion.HELD if isinstance(verdict, HeldVerdict) else ParentCompletion.FORBIDDEN
 
 
 def _childless_container_reason(
@@ -2418,6 +2416,8 @@ def _childless_container_reason(
                 f"slice row {row} {key} holds a line break or control character; "
                 "make it one printable line"
             )
+        case HeldVerdict():
+            return "held by an option line sent back to its head"
         case _:
             return None
 
