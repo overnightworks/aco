@@ -110,17 +110,37 @@ def serve_childless_container(monkeypatch: pytest.MonkeyPatch, body: str) -> Non
 
 @pytest.mark.usefixtures("github_world")
 class TestNextWithAHeldContainer:
-    def test_a_closed_out_container_with_an_open_card_is_not_closable_but_waits(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            pytest.param(
+                complete_contract("keiner", expectation=[open_option_entry()]),
+                ([], [7]),
+                id="open-card",
+            ),
+            pytest.param(
+                complete_contract("keiner", wait=OPERATOR_WAIT), ([], [7]), id="operator-wait"
+            ),
+            pytest.param(
+                complete_contract("keiner", expectation=[ruled_expectation("Alt")]),
+                ([7], []),
+                id="ruled-line",
+            ),
+        ],
+    )
+    def test_a_closed_out_container_is_closable_unless_a_card_or_wait_holds_it(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        body: str,
+        expected: tuple[list[int], list[int]],
     ) -> None:
-        """Spec: NEXT-73, NEXT-07, NEXT-18, NEXT-70"""
-        serve_childless_container(
-            monkeypatch, complete_contract("keiner", expectation=[open_option_entry()])
-        )
+        """Spec: NEXT-73, NEXT-07, NEXT-18, NEXT-39, NEXT-70"""
+        serve_childless_container(monkeypatch, body)
 
         payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
 
-        assert (payload["close"], payload["waiting_on_operator"]) == ([], [7])
+        assert (payload["close"], payload["waiting_on_operator"]) == expected
 
     def test_a_closed_out_container_with_a_returned_line_stays_with_the_head(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -142,24 +162,3 @@ class TestNextWithAHeldContainer:
             "SKIPPED",
             "#7: held by an option line sent back to its head",
         ]
-
-    def test_a_closed_out_container_with_an_operator_wait_is_not_closable_but_waits(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Spec: NEXT-73, NEXT-07, NEXT-18, NEXT-39"""
-        serve_childless_container(monkeypatch, complete_contract("keiner", wait=OPERATOR_WAIT))
-
-        payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
-
-        assert (payload["close"], payload["waiting_on_operator"]) == ([], [7])
-
-    def test_ruling_the_last_open_line_makes_the_container_closable_again(
-        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Spec: NEXT-73, NEXT-18"""
-        ruled = ruled_expectation("Alt")
-        serve_childless_container(monkeypatch, complete_contract("keiner", expectation=[ruled]))
-
-        payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
-
-        assert (payload["close"], payload["waiting_on_operator"]) == ([7], [])

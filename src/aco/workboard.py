@@ -2343,9 +2343,11 @@ class CutVerdict:
 
 @dataclass(frozen=True)
 class UnprintableRowVerdict:
-    """The first uncut row, the one `cut` links, has a one-line field, `key`, holding a
-    line break or control character, so `cut` refuses it and only making that field one
-    printable line helps. `row` is the index `cut --row` names that row by."""
+    """The first uncut row, the one `cut` links, has a one-line field, `key`,
+    holding a line break or another control character: a `cut` command naming its title would spread
+    over two printed lines or reach the terminal raw, and `cut` refuses its
+    `done_when`, so only making that field one printable line helps.
+    `row` is the index `cut --row` names that row by."""
 
     row: int
     key: str
@@ -2408,8 +2410,10 @@ def _childless_container_reason(
     verdict: ChildlessContainerVerdict | None,
     storage: Storage,
 ) -> str | None:
-    """What childless container `number` is up for when `SKIPPED` names it, or `None`
-    for a closable one, which `close:` names."""
+    """What container `number`, with no open child, is up for when `SKIPPED`
+    names it -- for a cuttable one not `next`'s first action,
+    its `cut` -- or `None` for a closable one, which `close:`
+    names."""
     match verdict:
         case CutVerdict(title=title):
             return _cut_slice_reason(number, storage, title)
@@ -2425,7 +2429,9 @@ def _childless_container_reason(
 
 
 def _cut_slice_reason(number: int, storage: Storage, title: str) -> str:
-    """The `SKIPPED` reason of a cuttable container behind `next`'s first action."""
+    """The `SKIPPED` reason of a cuttable container `number` that is not
+    `next`'s first action: its first uncut row `title`, quoted
+    by `_quoted_prose`, and the `cut` that row takes."""
     return f"cut slice {_quoted_prose(title)}; run {cut_command(number, storage)}"
 
 

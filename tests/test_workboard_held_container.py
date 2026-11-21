@@ -39,7 +39,7 @@ def test_an_option_line_decides_whether_a_parent_is_closable(
     completion: workboard.ParentCompletion,
     closable: int | None,
 ) -> None:
-    """Spec: NEXT-73, LAND-92"""
+    """Spec: NEXT-73, NEXT-74, LAND-92, LAND-93"""
     raw = complete_contract("keiner", expectation=lines)
     parsed = parse_body(raw, storage=Storage.GITHUB)
     parent = workboard.ParentIssue(PARENT, raw, ItemKind.CONTAINER)

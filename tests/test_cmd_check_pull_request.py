@@ -691,7 +691,7 @@ PARENT_REFUSALS = {
 def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-21, LAND-22, LAND-92, LAND-25, LAND-28, LAND-86, CHECK-01"""
+    """Spec: LAND-21, LAND-22, LAND-92, LAND-93, LAND-25, LAND-28, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
@@ -699,7 +699,7 @@ def test_a_landing_is_accepted_when_its_parent_stays_open_or_closes_with_it(
 def test_a_landing_that_contradicts_what_its_parent_still_holds_is_refused(
     case: PullRequestCase, flags: Flags, check_pull_request: PullRequestCheck
 ) -> None:
-    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, LAND-92, LAND-86, CHECK-01"""
+    """Spec: LAND-18, LAND-19, LAND-21, LAND-24, LAND-79, LAND-92, LAND-93, LAND-86, CHECK-01"""
     check_pull_request(case, flags)
 
 
