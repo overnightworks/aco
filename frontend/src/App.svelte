@@ -261,35 +261,41 @@
 		<h1 class="brand">Entscheidungs-Board</h1>
 		{#if hasViews}
 			{#if cardView}
-				<button type="button" class="back" onclick={leaveCard}
-					>‹ {view === 'open' ? OPEN_TAB_LABEL : DECIDED_TAB_LABEL}</button
-				>
+				<button type="button" class="back" onclick={leaveCard}>
+					‹ {view === 'open' ? OPEN_TAB_LABEL : DECIDED_TAB_LABEL}
+				</button>
 			{/if}
 			<nav aria-label="Views">
 				<button
 					type="button"
 					aria-current={view === 'open' ? 'page' : undefined}
 					onclick={() => showView('open')}
-					>{OPEN_TAB_LABEL}
-					<span class="n waiting" class:zero={counts.open === 0}>{counts.open}</span></button
 				>
+					{OPEN_TAB_LABEL}
+					<span class="n waiting" class:zero={counts.open === 0}>{counts.open}</span>
+				</button>
 				<button
 					type="button"
 					aria-current={view === 'decided' ? 'page' : undefined}
-					onclick={openDecided}>{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span></button
+					onclick={openDecided}
 				>
+					{DECIDED_TAB_LABEL} <span class="n">{counts.decided}</span>
+				</button>
 				<button
 					type="button"
 					aria-current={view === 'progress' ? 'page' : undefined}
-					onclick={() => showView('progress')}>{PROGRESS_TAB_LABEL}</button
+					onclick={() => showView('progress')}
 				>
+					{PROGRESS_TAB_LABEL}
+				</button>
 				<button
 					type="button"
 					aria-current={view === 'steps' ? 'page' : undefined}
 					onclick={() => showView('steps')}
-					>{STEPS_TAB_LABEL}
-					<span class="n waiting" class:zero={stepTotal === 0}>{stepTotal}</span></button
 				>
+					{STEPS_TAB_LABEL}
+					<span class="n waiting" class:zero={stepTotal === 0}>{stepTotal}</span>
+				</button>
 			</nav>
 			{#if token !== null}
 				{@const readToken = token}
