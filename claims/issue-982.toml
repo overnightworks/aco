@@ -1,0 +1,8 @@
+claim_id = "041b1aaecad540638f39938eb7415fec"
+agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
+role = "builder"
+base = "cf3e389d95b6c2edf69c87520fe4e04d2709fdd0"
+branch = "claude/issue-982-deps-refusal-names-fix"
+scope = ["specs/landing-grammar.spec.md", "src/aco/policy.py", "tests/support/check_pull_request_fixtures.py", "tests/test_cmd_adopt.py", "tests/test_cmd_check_pull_request.py", "tests/test_cmd_land_preflight_claim.py", "tests/test_policy.py"]
+opened_commit = "d6b708a1b0a599b315e4f6f7c44508e0a472d311"
+whole_reason = "One refusal sentence, its spec line and the tests that pin it."
