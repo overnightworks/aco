@@ -11,11 +11,10 @@ import sys
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 
-from . import forge, protocol, usage, workboard
+from . import forge, protocol, refusal_text, usage, workboard
 
-CLI_ERROR_PREFIX = "ERROR: "
-REFUSAL_LINE_LENGTH_LIMIT = 200
-_REFUSAL_SENTENCE_LENGTH_LIMIT = REFUSAL_LINE_LENGTH_LIMIT - len(CLI_ERROR_PREFIX)
+CLI_ERROR_PREFIX = refusal_text.CLI_ERROR_PREFIX
+REFUSAL_LINE_LENGTH_LIMIT = refusal_text.REFUSAL_LINE_LENGTH_LIMIT
 _PATH_ELLIPSIS = "…/"
 
 JSON_FLAG = "--json"
@@ -124,15 +123,15 @@ def bounded_refusal(sentence: str) -> str:
     (a check name, a head's board configuration key) may carry a newline or
     a terminal escape, so it is shown as `next` shows foreign text (`\\n`,
     `\\x1b`) before the length cap applies."""
-    return _cut_to(protocol.terminal_text(sentence), _REFUSAL_SENTENCE_LENGTH_LIMIT)
+    return refusal_text.cut_foreign_text(sentence, refusal_text.REFUSAL_SENTENCE_LENGTH_LIMIT)
 
 
 def refusal_around_foreign_text(template: str, foreign_text: str, **words: object) -> str:
     """`template` with `{foreign}` replaced by `foreign_text` (a forge's error)
     shown as `bounded_refusal` shows foreign text, and cut alone so that the
     words around it always survive."""
-    room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
-    return template.format(foreign=cut_foreign_text(foreign_text, room), **words)
+    room = refusal_text.foreign_text_room(template.format(foreign="", **words))
+    return template.format(foreign=refusal_text.cut_foreign_text(foreign_text, room), **words)
 
 
 def refusal_around_foreign_path(template: str, path_text: str, **words: object) -> str:
@@ -141,7 +140,7 @@ def refusal_around_foreign_path(template: str, path_text: str, **words: object) 
     so the file name and the words around it survive whole; the line passes its bound only
     when the file name and those words do not fit together. A path that the marker would not
     shorten is shown whole."""
-    room = _REFUSAL_SENTENCE_LENGTH_LIMIT - len(template.format(foreign="", **words))
+    room = refusal_text.foreign_text_room(template.format(foreign="", **words))
     printable = protocol.terminal_text(path_text)
     if len(printable) <= room:
         return template.format(foreign=printable, **words)
@@ -153,17 +152,6 @@ def refusal_around_foreign_path(template: str, path_text: str, **words: object) 
     if len(shortened) >= len(printable):
         shortened = printable
     return template.format(foreign=shortened, **words)
-
-
-def cut_foreign_text(foreign_text: str, limit: int) -> str:
-    """`foreign_text` shown as `bounded_refusal` shows foreign text, cut to `limit` characters."""
-    return _cut_to(protocol.terminal_text(foreign_text), limit)
-
-
-def _cut_to(printable: str, limit: int) -> str:
-    if len(printable) <= limit:
-        return printable
-    return printable[: limit - 1] + "…"
 
 
 def refuse(

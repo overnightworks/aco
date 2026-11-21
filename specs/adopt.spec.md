@@ -110,7 +110,7 @@ list reads nothing after it.
 - [ ] [ADOPT-15] Run in a linked worktree whose git directory names no checkout, it refuses START-24's sentence ending `run adopt from the main checkout`, exit `2`.
 - [ ] [ADOPT-16] A pull request whose listing names no file refuses `pull request #<n> changes no file; there is nothing to adopt`, exit `2`.
 - [ ] [ADOPT-17] A head branch name the claim store refuses as unsafe refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2`, before any write.
-- [ ] [ADOPT-19] Every refusal from adopt's own checks is one line of at most 200 characters with `ERROR: `, foreign text (agent names, paths) shown with display controls escaped, a longer one cut to end in `…`.
+- [ ] [ADOPT-19] Every refusal from adopt's own checks is one line of at most 200 characters with `ERROR: `, foreign text shown with display controls escaped and cut to end in `…`; LAND-77 keeps `No-Item: fix` last.
 - ADOPT-18 (retired).
 - [ ] [ADOPT-20] `aco adopt <n> --no-item <kind>` on an open same-repository pull request nobody claims prints E-ADOPT-01's lines, exit `0`; the lane claim names this session's agent as builder.
 - [ ] [ADOPT-21] A claim refused after the build drops both: `removed worktree <path> and branch '<branch>' this adopt created`, exit `2`; START-21 and START-23 hold with `adopt`.
