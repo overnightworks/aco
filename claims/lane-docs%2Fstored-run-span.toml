@@ -1,0 +1,7 @@
+claim_id = "3c89272177654f4e850fc750504bd227"
+agent = "Claude 651ce064-3358-4651-856f-d9e8e4232683"
+role = "builder"
+base = "3736dfc06de86fd5e6903a7dc8ef4237b3b0ba16"
+branch = "docs/stored-run-span"
+scope = ["specs/lane-record.spec.md"]
+opened_commit = "1c408a8874e4b21f39c8ddd33355ad836f2daa10"
