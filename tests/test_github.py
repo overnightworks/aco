@@ -13,7 +13,6 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from board_fixtures import REPOSITORY
@@ -23,6 +22,7 @@ from github_pages import (
     api_pull_request,
     board_issue_page_client,
     listing_answer,
+    listing_pages,
     listing_runner,
     paged_listing,
     raw_board_issue,
@@ -597,6 +597,9 @@ def _readiness_client(
         combined_state = "success"
     summary = json.dumps({"state": combined_state, "total": len(statuses)})
     name_page = [{"name": row["name"]} for row in statuses]
+    check_run_listing = [
+        check_run_pages.get(page, []) for page in range(1, max(check_run_pages, default=0) + 1)
+    ]
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         calls.append(arguments)
@@ -604,13 +607,7 @@ def _readiness_client(
         if path == _READINESS_PULL_REQUEST_PATH:
             return pull_request
         if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            page = int(parse_qs(urlsplit(path).query).get("page", ["1"])[0])
-            following = f"{_READINESS_CHECK_RUNS_PATH}?per_page=100&page={page + 1}"
-            return listing_answer(
-                arguments,
-                "\n".join(json.dumps(row) for row in check_run_pages.get(page, [])),
-                next_path=following if page + 1 in check_run_pages else None,
-            )
+            return listing_pages(arguments, check_run_listing)
         if path == _READINESS_STATUS_PATH:
             return summary
         assert path.startswith(_READINESS_STATUS_PATH)

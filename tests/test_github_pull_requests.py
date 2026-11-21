@@ -4,12 +4,12 @@ request's landing facts and the time an item was reopened. The GitHub CLI is the
 import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import MERGE_COMMIT_SHA
-from github_pages import api_head, api_pull_request, listing_answer
+from github_pages import api_head, api_pull_request, listing_pages
 
 from aco import forge, github, workboard
 
@@ -31,15 +31,7 @@ def scripted_rest(
     def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = next(argument for argument in arguments if argument.startswith("repos/"))
         asked.append(path)
-        location = urlsplit(path)
-        pages = routes[location.path]
-        page = int(parse_qs(location.query).get("page", ["1"])[0])
-        following = f"{path.split('&page=')[0]}&page={page + 1}"
-        return listing_answer(
-            arguments,
-            "\n".join(json.dumps(row) for row in pages[page - 1]),
-            next_path=following if page < len(pages) else None,
-        )
+        return listing_pages(arguments, routes[urlsplit(path).path])
 
     return github.GitHubForge(github.repository_id(REPOSITORY), run=run), asked
 
