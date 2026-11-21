@@ -5,6 +5,7 @@ import json
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import MERGE_COMMIT_SHA
+from github_pages import listing_answer
 
 from aco import github
 from aco.github import GitHubForge
@@ -23,7 +24,7 @@ def _client(**fields: object) -> GitHubForge:
             return json.dumps(pull_request)
         if arguments[1].endswith("/status"):
             return json.dumps({"state": "success", "total": 0})
-        return ""
+        return listing_answer(arguments, "")
 
     return GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
 

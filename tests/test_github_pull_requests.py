@@ -4,12 +4,12 @@ request's landing facts and the time an item was reopened. The GitHub CLI is the
 import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import MERGE_COMMIT_SHA
-from github_pages import api_head, api_pull_request
+from github_pages import api_head, api_pull_request, listing_pages
 
 from aco import forge, github, workboard
 
@@ -24,17 +24,14 @@ EVENTS = f"{ISSUES}/323/events"
 def scripted_rest(
     routes: Mapping[str, Sequence[Sequence[object]]],
 ) -> tuple[github.GitHubForge, list[str]]:
-    """An adapter whose `gh` answers each REST list `routes` names, page by page (a page past
-    the last is empty), one row per line as `--jq '.[]'` prints it, and records every path asked."""
+    """An adapter whose `gh` answers each REST list `routes` names, page by page with a `Link` to
+    the next one, one row per line as `--jq '.[]'` prints it, and records every path asked."""
     asked: list[str] = []
 
     def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = next(argument for argument in arguments if argument.startswith("repos/"))
         asked.append(path)
-        location = urlsplit(path)
-        pages = routes[location.path]
-        page = int(parse_qs(location.query)["page"][0])
-        return "\n".join(json.dumps(row) for row in (pages[page - 1] if page <= len(pages) else ()))
+        return listing_pages(arguments, routes[urlsplit(path).path])
 
     return github.GitHubForge(github.repository_id(REPOSITORY), run=run), asked
 

@@ -8,6 +8,7 @@ import pytest
 from board_fixtures import REPOSITORY
 from cli_fixtures import run_cli
 from github_fixtures import MERGE_COMMIT_SHA, FakeForge, landed_world
+from github_pages import listing_answer
 
 from aco import forge, github
 from aco.github import GitHubForge
@@ -45,7 +46,7 @@ def checks_read_from(runs: list[dict[str, object]]) -> tuple[forge.CheckRun, ...
 
     def transport(arguments: list[str], *, input_data: bytes | None = None) -> str:
         if "check-runs" in arguments[1]:
-            return "\n".join(json.dumps(row) for row in runs)
+            return listing_answer(arguments, "\n".join(json.dumps(row) for row in runs))
         return json.dumps({"state": "pending", "total": 0})
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=transport)

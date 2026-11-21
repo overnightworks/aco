@@ -91,6 +91,7 @@ from github_fixtures import (
     landing_pull_request,
     landing_readiness,
 )
+from github_pages import listing_answer
 from landing_world_parts import landing_listing
 from option_cards import card, decide, open_option_entry, returned_option_entry
 from reader_only_forge import ReaderOnlyForge
@@ -341,8 +342,7 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
     repository = github.repository_id(REPOSITORY)
     observed: list[list[str]] = []
 
-    def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        assert input_data is None
+    def run(arguments: list[str]) -> str:
         observed.append(arguments)
         endpoint = next((argument for argument in arguments if argument.startswith("repos/")), "")
         if "/issues?state=closed" in endpoint:
@@ -354,11 +354,11 @@ def _board_fixture_environment(monkeypatch: pytest.MonkeyPatch) -> list[list[str
             rows = [{**blocker, "repository": str(repository)}]
         elif endpoint.startswith(f"repos/{repository}/pulls?state=open"):
             rows = open_prs_json
-        elif endpoint.endswith("/events?per_page=100&page=1"):
+        elif endpoint.endswith("/events?per_page=100"):
             rows = []
         else:
             pytest.fail(f"unexpected board request: {arguments}")
-        return "\n".join(json.dumps(row) for row in rows)
+        return listing_answer(arguments, "\n".join(json.dumps(row) for row in rows))
 
     client = GitHubForge(repository, run=run)
     monkeypatch.setattr(github, "GitHubForge", lambda repository: client)

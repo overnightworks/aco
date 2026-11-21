@@ -17,7 +17,16 @@ from typing import Any, cast
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import LANDING_BRANCH, MERGE_COMMIT_SHA
-from github_pages import api_head, api_pull_request, board_issue_page_client, raw_board_issue
+from github_pages import (
+    api_head,
+    api_pull_request,
+    board_issue_page_client,
+    listing_answer,
+    listing_pages,
+    listing_runner,
+    paged_listing,
+    raw_board_issue,
+)
 from process_fixtures import UnstoppableProcess, reap
 
 from aco import forge, github, process, workboard
@@ -98,50 +107,19 @@ def test_github_adapter_fails_loud_on_a_malformed_board_issue(
 
 def test_github_adapter_fails_loud_when_a_board_issue_is_not_an_object() -> None:
     client = GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda arguments, input_data=None: '"not an object"'
+        github.repository_id(REPOSITORY),
+        run=listing_runner(lambda arguments, input_data=None: '"not an object"'),
     )
 
     with pytest.raises(ClaimError, match="malformed board issue"):
         client.list_open_board_issues()
 
 
-def _paged_board_issue_client(page_rows: Callable[[int], list[dict[str, object]]]) -> GitHubForge:
-    """An adapter whose `gh` stand-in answers each requested page number from
-    `page_rows`, so a test can decide where the listing runs short."""
-
-    def run(arguments: list[str], input_data: bytes | None = None) -> str:
-        page = int(arguments[1].rsplit("page=", 1)[1])
-        return "\n".join(json.dumps(row) for row in page_rows(page))
-
-    return GitHubForge(github.repository_id(REPOSITORY), run=run)
-
-
-def test_github_adapter_fetches_board_pages_until_one_comes_back_short(
+def test_github_adapter_reads_every_board_page_the_link_header_names(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A full first page means more may exist, so the listing asks for the
-    next batch; the short page inside that batch is what ends it, and pages
-    past the last one come back empty exactly as GitHub answers them."""
     monkeypatch.setattr(github, "ISSUES_PER_PAGE", 2)
-    pages = {
-        1: [raw_board_issue(number=1), raw_board_issue(number=2)],
-        2: [raw_board_issue(number=3)],
-    }
-    client = _paged_board_issue_client(lambda page: pages.get(page, []))
-
-    assert [issue.number for issue in client.list_open_board_issues()] == [1, 2, 3]
-
-
-def test_github_adapter_asks_for_a_second_batch_when_the_first_is_still_full(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """One concurrent batch is not always enough: a board whose whole first
-    batch comes back full must ask for another rather than stopping there."""
-    monkeypatch.setattr(github, "ISSUES_PER_PAGE", 1)
-    monkeypatch.setattr(github, "PARALLEL_FETCH_CONCURRENCY", 1)
-    client = _paged_board_issue_client(
-        lambda page: [raw_board_issue(number=page)] if page <= 3 else []
-    )
+    client = board_issue_page_client(*(raw_board_issue(number=number) for number in (1, 2, 3)))
 
     assert [issue.number for issue in client.list_open_board_issues()] == [1, 2, 3]
 
@@ -156,7 +134,7 @@ def test_github_adapter_accepts_pretty_and_ansi_colored_json() -> None:
     )
     client = GitHubForge(
         github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: f"\x1b[32m{pretty}\x1b[0m",
+        run=listing_runner(lambda arguments, input_data=None: f"\x1b[32m{pretty}\x1b[0m"),
     )
 
     assert [issue.number for issue in client.list_open_board_issues()] == [1, 2]
@@ -169,7 +147,7 @@ def test_github_adapter_accepts_concatenated_pretty_json_objects() -> None:
         raw_board_issue(number=2), indent=2
     )
     client = GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda arguments, input_data=None: raw
+        github.repository_id(REPOSITORY), run=listing_runner(lambda arguments, input_data=None: raw)
     )
 
     assert [issue.number for issue in client.list_open_board_issues()] == [1, 2]
@@ -364,7 +342,7 @@ def test_github_adapter_lists_only_issues_closed_since_the_cutoff() -> None:
         observed.append(arguments)
         return "\n".join(json.dumps(row) for row in rows)
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
     since = datetime(2026, 8, 27, 10, 0, tzinfo=UTC)
 
     closed = client.list_recently_closed_issues(since)
@@ -373,8 +351,8 @@ def test_github_adapter_lists_only_issues_closed_since_the_cutoff() -> None:
     assert observed == [
         [
             "api",
-            f"repos/{REPOSITORY}/issues?state=closed&since=2026-08-27T10:00:00Z"
-            "&per_page=100&page=1",
+            f"repos/{REPOSITORY}/issues?state=closed&since=2026-08-27T10:00:00Z&per_page=100",
+            "-i",
             "--jq",
             '.[] | {number,title,closedAt:.closed_at,isPullRequest:has("pull_request")}',
         ]
@@ -396,7 +374,8 @@ def test_github_adapter_lists_only_issues_closed_since_the_cutoff() -> None:
 )
 def test_github_adapter_fails_loud_on_a_malformed_closed_issue(row: object) -> None:
     client = GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda *_arguments, **_options: json.dumps(row)
+        github.repository_id(REPOSITORY),
+        run=listing_runner(lambda *_arguments, **_options: json.dumps(row)),
     )
     since = datetime(2026, 8, 27, tzinfo=UTC)
 
@@ -445,8 +424,15 @@ def test_github_adapter_fails_loud_on_a_malformed_child_identifier(payload: str)
 _LANDING_COMMENTS_PATH = f"repos/{REPOSITORY}/issues/79/comments"
 _LANDING_COMMENTS_READ = [
     "api",
-    "--paginate",
     f"{_LANDING_COMMENTS_PATH}?per_page=100",
+    "-i",
+    "--jq",
+    ".[] | {body}",
+]
+_LANDING_COMMENTS_SECOND_READ = [
+    "api",
+    f"{_LANDING_COMMENTS_PATH}?per_page=100&page=2",
+    "-i",
     "--jq",
     ".[] | {body}",
 ]
@@ -462,7 +448,7 @@ def test_github_adapter_closes_a_landed_item_with_a_comment_first() -> None:
         observed.append((arguments, input_data))
         return ""
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
 
     client.close_landed_item(79, pull_request=101)
 
@@ -492,7 +478,7 @@ def test_github_adapter_closing_a_landed_item_never_reaches_close_when_the_comme
             return ""
         raise forge.ForgeError("HTTP 500 comment failed")
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
 
     with pytest.raises(forge.ForgeError, match="comment failed"):
         client.close_landed_item(79, pull_request=101)
@@ -514,7 +500,7 @@ def test_github_adapter_closing_a_landed_item_skips_a_repeated_comment() -> None
         calls.append(arguments)
         return already_posted if input_data is None else ""
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
 
     client.close_landed_item(79, pull_request=101)
 
@@ -525,21 +511,13 @@ def test_github_adapter_closing_a_landed_item_skips_a_repeated_comment() -> None
 
 
 def test_github_adapter_finds_a_landing_comment_past_the_first_page() -> None:
-    """A plain `gh api` request serves only its own `per_page`
-    (100 here) without `--paginate`. With 150 unrelated comments ahead of
-    this run's own landing comment -- posted by a run whose close then
-    failed -- a rerun must still find it via `--paginate` and skip straight
-    to closing, never posting it a second time; dropping `--paginate` from
-    the request would make this fail, since the fake `gh` below then serves
-    only the truncated first page, which does not reach the landing
-    comment at index 150."""
-    unrelated_comments = [
-        json.dumps({"body": f"unrelated comment {index}"}) for index in range(150)
+    """With 100 unrelated comments filling the first page ahead of this run's own landing
+    comment -- posted by a run whose close then failed -- a rerun must follow the listing to the
+    second page, find it and skip straight to closing, never posting it a second time."""
+    comments = [
+        *({"body": f"unrelated comment {index}"} for index in range(100)),
+        {"body": github.landing_comment(101)},
     ]
-    all_comments = "\n".join(
-        [*unrelated_comments, json.dumps({"body": github.landing_comment(101)})]
-    )
-    first_page_only = "\n".join(unrelated_comments[:100])
     calls: list[list[str]] = []
     close_should_fail = True
 
@@ -547,7 +525,7 @@ def test_github_adapter_finds_a_landing_comment_past_the_first_page() -> None:
         calls.append(arguments)
         nonlocal close_should_fail
         if input_data is None:
-            return all_comments if "--paginate" in arguments else first_page_only
+            return paged_listing(arguments, comments)
         if close_should_fail:
             close_should_fail = False
             raise forge.ForgeError("HTTP 500 close failed")
@@ -559,18 +537,21 @@ def test_github_adapter_finds_a_landing_comment_past_the_first_page() -> None:
         client.close_landed_item(79, pull_request=101)
     client.close_landed_item(79, pull_request=101)
 
+    close = ["api", "--method", "PATCH", f"repos/{REPOSITORY}/issues/79", "--input", "-"]
     assert calls == [
         _LANDING_COMMENTS_READ,
-        ["api", "--method", "PATCH", f"repos/{REPOSITORY}/issues/79", "--input", "-"],
+        _LANDING_COMMENTS_SECOND_READ,
+        close,
         _LANDING_COMMENTS_READ,
-        ["api", "--method", "PATCH", f"repos/{REPOSITORY}/issues/79", "--input", "-"],
+        _LANDING_COMMENTS_SECOND_READ,
+        close,
     ]
 
 
 def test_github_adapter_fails_loud_on_a_malformed_issue_comment() -> None:
     client = GitHubForge(
         github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: json.dumps({"body": 5}),
+        run=listing_runner(lambda arguments, input_data=None: json.dumps({"body": 5})),
     )
 
     with pytest.raises(ClaimError, match="malformed issue comment"):
@@ -616,6 +597,9 @@ def _readiness_client(
         combined_state = "success"
     summary = json.dumps({"state": combined_state, "total": len(statuses)})
     name_page = [{"name": row["name"]} for row in statuses]
+    check_run_listing = [
+        check_run_pages.get(page, []) for page in range(1, max(check_run_pages, default=0) + 1)
+    ]
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         calls.append(arguments)
@@ -623,13 +607,11 @@ def _readiness_client(
         if path == _READINESS_PULL_REQUEST_PATH:
             return pull_request
         if path.startswith(_READINESS_CHECK_RUNS_PATH):
-            page = int(path.rsplit("page=", 1)[1])
-            return "\n".join(json.dumps(row) for row in check_run_pages.get(page, []))
+            return listing_pages(arguments, check_run_listing)
         if path == _READINESS_STATUS_PATH:
             return summary
         assert path.startswith(_READINESS_STATUS_PATH)
-        page = int(path.rsplit("page=", 1)[1])
-        return "\n".join(json.dumps(row) for row in name_page) if page == 1 else ""
+        return listing_answer(arguments, "\n".join(json.dumps(row) for row in name_page))
 
     return GitHubForge(github.repository_id(REPOSITORY), run=fake_run), calls
 
@@ -655,7 +637,8 @@ def test_github_adapter_reads_landing_readiness_from_the_pull_request_and_its_ch
         ],
         [
             "api",
-            f"{_READINESS_CHECK_RUNS_PATH}?per_page=100&page=1",
+            f"{_READINESS_CHECK_RUNS_PATH}?per_page=100",
+            "-i",
             "--jq",
             '.check_runs[] | {id,name,suite:(if .app.slug == "github-actions" '
             'then .check_suite.id else null end),conclusion:(if .status == "completed" '
@@ -746,7 +729,7 @@ def _raw_status_client(*, summary: str, names_page: str) -> GitHubForge:
         assert path.startswith(_READINESS_STATUS_PATH)
         return names_page
 
-    return GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    return GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
 
 
 def test_github_adapter_reads_a_pending_combined_status_aggregate_with_an_empty_names_page() -> (
@@ -847,7 +830,7 @@ def test_github_adapter_accepts_a_mergeable_state_it_has_never_seen_before() -> 
             return json.dumps({"state": "success", "total": 0})
         return ""
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
 
     readiness = client.landing_readiness(57)
 
@@ -1025,7 +1008,8 @@ def test_github_adapter_fails_loud_on_malformed_merge_answers(
     """A merge-settings or branch-rule answer this
     adapter cannot read as merge methods fails loud rather than guessing."""
     client = GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda arguments, input_data=None: answer
+        github.repository_id(REPOSITORY),
+        run=listing_runner(lambda arguments, input_data=None: answer),
     )
 
     with pytest.raises(ClaimError, match=refusal):
@@ -1116,14 +1100,14 @@ def test_github_adapter_reads_the_default_branchs_merge_rules(
         observed.append(arguments)
         return answer
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=fake_run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(fake_run))
 
     assert client.merge_rules("main").merge_methods == rules
     assert observed == [
         [
             "api",
-            "--paginate",
             f"repos/{REPOSITORY}/rules/branches/main?per_page=100",
+            "-i",
             "--jq",
             ".[]",
         ]
@@ -1495,7 +1479,8 @@ def test_github_adapter_item_reference_fails_loud_on_a_malformed_response(
 )
 def test_github_board_dependency_fails_loud_on_a_malformed_shape(raw: str) -> None:
     client = GitHubForge(
-        github.repository_id("example/agent-coordination"), run=lambda _arguments: raw
+        github.repository_id("example/agent-coordination"),
+        run=listing_runner(lambda _arguments: raw),
     )
 
     with pytest.raises(ClaimError, match="malformed board blocked-by dependency"):
@@ -1505,14 +1490,16 @@ def test_github_board_dependency_fails_loud_on_a_malformed_shape(raw: str) -> No
 def test_github_board_dependency_reads_a_closed_timestamp_as_an_aware_instant() -> None:
     client = GitHubForge(
         github.repository_id("example/agent-coordination"),
-        run=lambda _arguments: json.dumps(
-            {
-                "number": 151,
-                "state": "closed",
-                "closedAt": "2026-09-05T00:00:00Z",
-                "repository": "example/agent-coordination",
-                "isPullRequest": False,
-            }
+        run=listing_runner(
+            lambda _arguments: json.dumps(
+                {
+                    "number": 151,
+                    "state": "closed",
+                    "closedAt": "2026-09-05T00:00:00Z",
+                    "repository": "example/agent-coordination",
+                    "isPullRequest": False,
+                }
+            )
         ),
     )
 
@@ -1527,14 +1514,16 @@ def test_github_board_dependency_fails_loud_on_an_uncalendared_closed_timestamp(
     itself is the second, calendar-aware check that catches that."""
     client = GitHubForge(
         github.repository_id("example/agent-coordination"),
-        run=lambda _arguments: json.dumps(
-            {
-                "number": 151,
-                "state": "closed",
-                "closedAt": "9999-99-99T00:00:00Z",
-                "repository": "example/agent-coordination",
-                "isPullRequest": False,
-            }
+        run=listing_runner(
+            lambda _arguments: json.dumps(
+                {
+                    "number": 151,
+                    "state": "closed",
+                    "closedAt": "9999-99-99T00:00:00Z",
+                    "repository": "example/agent-coordination",
+                    "isPullRequest": False,
+                }
+            )
         ),
     )
 
@@ -2220,7 +2209,9 @@ def api_sub_issue(number: int, state: str, title: object = "T") -> dict[str, obj
 def sub_issue_client(*children: dict[str, object]) -> GitHubForge:
     return GitHubForge(
         github.repository_id(REPOSITORY),
-        run=lambda arguments, input_data=None: "\n".join(json.dumps(child) for child in children),
+        run=listing_runner(
+            lambda arguments, input_data=None: "\n".join(json.dumps(child) for child in children)
+        ),
     )
 
 
@@ -2232,7 +2223,7 @@ def test_github_adapter_reads_a_recorded_parent_and_its_children() -> None:
             )
         return "\n".join(json.dumps(api_sub_issue(number, "open")) for number in (72, 73))
 
-    client = GitHubForge(github.repository_id(REPOSITORY), run=run)
+    client = GitHubForge(github.repository_id(REPOSITORY), run=listing_runner(run))
 
     assert client.parent_issue(72) == workboard.ParentIssue(
         workboard.IssueReference(REPOSITORY, 79), "## Next\nCut."
@@ -2270,7 +2261,7 @@ def test_github_adapter_fails_loud_on_an_unreadable_sub_issue(child: dict[str, o
 
 def test_github_adapter_fails_loud_when_a_sub_issue_is_not_an_object() -> None:
     client = GitHubForge(
-        github.repository_id(REPOSITORY), run=lambda arguments, input_data=None: "5"
+        github.repository_id(REPOSITORY), run=listing_runner(lambda arguments, input_data=None: "5")
     )
 
     with pytest.raises(ClaimError, match="malformed sub-issue"):
@@ -2400,13 +2391,13 @@ def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listin
     )
     calls: list[list[str]] = []
     after = {"headSha": "b" * 40, "changedFiles": len(rows) + 1}
-    answers = iter(
-        [json.dumps(head), "\n".join(json.dumps(row) for row in rows), json.dumps(after)]
-    )
+    readings = iter([json.dumps(head), json.dumps(after)])
 
     def run(arguments: list[str], input_data: bytes | None = None) -> str:
         calls.append(arguments)
-        return next(answers)
+        if arguments[1].split("?")[0].endswith("/files"):
+            return paged_listing(arguments, rows)
+        return next(readings)
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=run)
     if not valid:
@@ -2430,15 +2421,14 @@ def test_pull_request_changes_brackets_every_page_and_refuses_a_malformed_listin
         )
     endpoint = f"repos/{REPOSITORY}/pulls/12"
     bracket = ["api", endpoint, "--jq", "{headSha:.head.sha,changedFiles:.changed_files}"]
+    files = ["-i", "--jq", ".[] | {filename,previous_filename,status}"]
+    second_page = (
+        [["api", endpoint + "/files?per_page=100&page=2", *files]] if len(rows) > 100 else []
+    )
     assert calls == [
         bracket,
-        [
-            "api",
-            "--paginate",
-            endpoint + "/files?per_page=100",
-            "--jq",
-            ".[] | {filename,previous_filename,status}",
-        ],
+        ["api", endpoint + "/files?per_page=100", *files],
+        *second_page,
         bracket,
     ]
 

@@ -10,10 +10,11 @@ import pytest
 from board_fixtures import REPOSITORY, complete_contract
 from check_pull_request_fixtures import LANE_BRANCH, LANE_CLAIM
 from cli_fixtures import freeze_cli_now, run_cli
-from github_pages import api_head, api_pull_request
+from github_pages import api_head, api_pull_request, listing_answer
 from rate_limit_fixtures import GRAPHQL_REFUSAL
 from store_fixtures import publish_claims_from_a_second_clone
 
+LISTING_HEAD = listing_answer(["-i"], "")
 # Answers a REST route (a request's path with the issue state it filters on) with the JSON its
 # `FAKE_GH_ROUTES` file holds, through the request's own `--jq` filter as `gh` does; refuses a
 # GraphQL or `pr` call, noting its arguments in `FAKE_GH_REFUSED`.
@@ -41,6 +42,8 @@ if "--jq" in arguments:
         ["jq", "-cr", arguments[arguments.index("--jq") + 1]],
         input=answer, capture_output=True, text=True, check=True,
     ).stdout.strip()
+if "-i" in arguments:
+    sys.stdout.write({head!r})
 print(answer)
 """
 ITEM = 90
@@ -81,7 +84,7 @@ def serve_rest(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, rest: dict[str, 
     refused = tmp_path / "gh-refused"
     refused.touch()
     fake_gh = shims / "gh"
-    fake_gh.write_text(FAKE_GH.format(python=sys.executable))
+    fake_gh.write_text(FAKE_GH.format(python=sys.executable, head=LISTING_HEAD))
     fake_gh.chmod(0o755)
     monkeypatch.setenv("PATH", f"{shims}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_GH_ROUTES", str(routes))
