@@ -30,7 +30,8 @@ def parent_closable_number(
     parent, read fresh, when every other child is already closed too and no
     undispatched `[[slice]]` row, open or returned option line or operator wait
     is left -- `workboard.closable_container_number` is the one owner for that
-    decision, reused rather than re-derived board-wide for one relation. `None` covers every non-container parent, one still
+    decision, reused rather than re-derived board-wide for one relation.
+    `None` covers every non-container parent, one still
     holding another open child, an already-closed parent (a second close
     would only refuse), or no parent at all. The container decision runs
     before the parent's own state read, so an unreadable parent
