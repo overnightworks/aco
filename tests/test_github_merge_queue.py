@@ -110,7 +110,9 @@ def rules_answer(*rule_types: str) -> str:
 def test_requires_merge_queue_reads_the_rule_on_the_branch(
     rule_types: tuple[str, ...], required: bool
 ) -> None:
-    client, _ = adapter_answering(lambda arguments: listing_answer(arguments, rules_answer(*rule_types)))
+    client, _ = adapter_answering(
+        lambda arguments: listing_answer(arguments, rules_answer(*rule_types))
+    )
 
     assert client.merge_rules("main").requires_merge_queue is required
 
@@ -127,14 +129,18 @@ def test_requires_merge_queue_is_false_on_a_plan_without_rulesets() -> None:
 
 
 def test_requires_merge_queue_refuses_a_rule_it_cannot_read() -> None:
-    client, _ = adapter_answering(lambda arguments: listing_answer(arguments, json.dumps(["merge_queue"])))
+    client, _ = adapter_answering(
+        lambda arguments: listing_answer(arguments, json.dumps(["merge_queue"]))
+    )
 
     with pytest.raises(forge.ForgeMalformedResponseError, match="branch merge rule"):
         client.merge_rules("main")
 
 
 def test_a_merge_queue_rule_leaves_the_merge_method_read_unchanged() -> None:
-    client, _ = adapter_answering(lambda arguments: listing_answer(arguments, rules_answer("merge_queue", "pull_request")))
+    client, _ = adapter_answering(
+        lambda arguments: listing_answer(arguments, rules_answer("merge_queue", "pull_request"))
+    )
 
     assert client.merge_rules("main").merge_methods == ()
 
