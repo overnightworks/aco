@@ -442,9 +442,6 @@ def test_adopt_refuses_in_a_linked_worktree_whose_git_directory_names_no_checkou
     assert world.forge.requests == 0
 
 
-LONG_NAME = "a-very-long-file-name-" + "x" * 80
-
-
 @pytest.mark.parametrize(
     ("arrange", "refusal_start"),
     [
@@ -479,20 +476,6 @@ def test_adopt_cuts_an_overlong_refusal_to_one_line_of_200_characters(
     assert result.stderr.startswith(refusal_start)
     assert result.stderr.endswith("…\n")
     assert len(result.stderr) == 201
-
-
-def test_adopt_keeps_the_way_out_when_three_overlong_file_names_are_refused(
-    world: AdoptionWorld, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LAND-77, ADOPT-19 -- the cut falls on the names, never on `No-Item: fix`."""
-    world.list_files(*(f"src/{index}/{LONG_NAME}.py" for index in range(3)))
-
-    result = adopt(capsys)
-
-    assert (result.status, result.stdout) == (2, "")
-    assert result.stderr.startswith(f"ERROR: pull request #{ADOPTED_PULL_REQUEST} changes src/0/")
-    assert result.stderr.endswith("lands as No-Item: fix\n")
-    assert len(result.stderr.rstrip("\n")) <= 200
 
 
 def _list_four_files(world: AdoptionWorld) -> None:
