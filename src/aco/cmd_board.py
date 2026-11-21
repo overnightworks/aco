@@ -202,12 +202,7 @@ def _selection(
 
 def _print_url(parsed: argparse.Namespace, context: RunContext) -> int:
     """The board's address, or the card's or step's link: the URL and a newline."""
-    try:
-        url = board_link.configured_board_url(_selection(parsed, context))
-    except RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=False)
-    except protocol.ClaimError as error:
-        return report.refuse(_BoardReason.UNAVAILABLE, error, as_json=False)
+    url = board_link.configured_board_url(_selection(parsed, context))
     # The URL is this command's whole output: a head pastes it as it is.
     print(url)
     return 0
