@@ -12,7 +12,7 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
-from ..repositories import state_directory
+from .repositories import state_directory
 
 _TOKEN_BYTES = 32
 _TOKEN_SHAPE = re.compile(rb"[A-Za-z0-9_-]{43,}\n?")

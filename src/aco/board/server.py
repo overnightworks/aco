@@ -32,9 +32,9 @@ from urllib.parse import urlsplit
 
 from logline import RequestLine
 
+from ..board_link import LOOPBACK_HOST, PAGE_PATH, board_url
 from . import api, static
 from .board import Boards, RepositoriesUnavailableError, all_repos_unavailable
-from .link import LOOPBACK_HOST, PAGE_PATH, board_url
 from .ports import DecisionResult
 
 _TRACEPARENT_HEADER = "traceparent"

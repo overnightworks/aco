@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
-from .. import protocol, repositories
-from .token_store import (
+from . import protocol, repositories
+from .board_token import (
     MalformedTokenFileError,
     MissingTokenFileError,
     existing_board_token,

@@ -4,8 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aco import protocol
-from aco.board import link
+from aco import board_link, protocol
 
 _TOKEN = "t" * 43
 
@@ -35,21 +34,21 @@ def _configure_port(config_file: Path, port: int) -> None:
     [
         pytest.param(None, f"http://127.0.0.1:8765/#t={_TOKEN}", id="board"),
         pytest.param(
-            link.CardLink("acme/widgets", 12, 3),
+            board_link.CardLink("acme/widgets", 12, 3),
             f"http://127.0.0.1:8765/#t={_TOKEN}&c=acme/widgets/12/3",
             id="card",
         ),
         pytest.param(
-            link.StepLink("acme/widgets", 12),
+            board_link.StepLink("acme/widgets", 12),
             f"http://127.0.0.1:8765/#t={_TOKEN}&s=acme/widgets/12",
             id="step",
         ),
     ],
 )
 def test_the_url_carries_the_token_and_the_selection_in_the_fragment(
-    selection: link.CardLink | link.StepLink | None, expected: str
+    selection: board_link.CardLink | board_link.StepLink | None, expected: str
 ) -> None:
-    assert link.board_url(8765, _TOKEN, selection) == expected
+    assert board_link.board_url(8765, _TOKEN, selection) == expected
 
 
 def test_the_configured_url_takes_port_and_token_from_the_configuration(
@@ -57,7 +56,7 @@ def test_the_configured_url_takes_port_and_token_from_the_configuration(
 ) -> None:
     _configure_port(config_file, 8765)
 
-    assert link.configured_board_url(link.StepLink("acme/widgets", 7)) == (
+    assert board_link.configured_board_url(board_link.StepLink("acme/widgets", 7)) == (
         f"http://127.0.0.1:8765/#t={_TOKEN}&s=acme/widgets/7"
     )
 
@@ -66,7 +65,7 @@ def test_a_missing_board_port_is_refused_naming_the_config_file(
     config_file: Path, token_file: Path
 ) -> None:
     with pytest.raises(protocol.ClaimError, match=f"^board_port is not set in {config_file}$"):
-        link.configured_board_url()
+        board_link.configured_board_url()
 
 
 def test_a_missing_token_file_is_refused_naming_it(config_file: Path) -> None:
@@ -74,7 +73,7 @@ def test_a_missing_token_file_is_refused_naming_it(config_file: Path) -> None:
     token_path = config_file.parents[2] / "state" / "aco" / "board-token"
 
     with pytest.raises(protocol.ClaimError, match=f"^{token_path} does not exist"):
-        link.configured_board_url()
+        board_link.configured_board_url()
     assert not token_path.exists()
 
 
@@ -83,7 +82,7 @@ def test_a_malformed_token_file_is_refused_naming_it(config_file: Path, token_fi
     token_file.write_text("short", encoding="utf-8")
 
     with pytest.raises(protocol.ClaimError, match=f"^{token_file} holds no board token$"):
-        link.configured_board_url()
+        board_link.configured_board_url()
 
 
 @pytest.mark.parametrize("configured", [False, True], ids=["no-port", "port-but-no-token"])
@@ -93,4 +92,4 @@ def test_the_optional_url_is_none_where_the_configuration_gives_none(
     if configured:
         _configure_port(config_file, 8765)
 
-    assert link.configured_board_url_or_none() is None
+    assert board_link.configured_board_url_or_none() is None

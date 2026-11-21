@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TextIO
 
 from . import (
+    board_link,
     body,
     decide,
     earlier_rulings,
@@ -25,7 +26,6 @@ from . import (
     usage,
     workboard,
 )
-from .board import link
 from .session import RunContext
 
 _GLOBAL_REPO_MESSAGE = "aco mcp finds its repositories itself; --repo does not apply to it"
@@ -86,7 +86,9 @@ def ask(label: str, number: int, card: Mapping[str, object]) -> dict[str, object
         "item": number,
         "written": asked.written,
         "line": rulings.line_json(asked.line),
-        "link": link.configured_board_url_or_none(link.CardLink(label, number, asked.line.index)),
+        "link": board_link.configured_board_url_or_none(
+            board_link.CardLink(label, number, asked.line.index)
+        ),
         **_earlier(context, key, asked.line.area, tracked),
     }
 
@@ -207,7 +209,7 @@ def _step_answer(label: str, item: int, text: str, *, created: bool) -> dict[str
         "item": item,
         "step": text,
         "created": created,
-        "link": link.configured_board_url_or_none(link.StepLink(label, item)),
+        "link": board_link.configured_board_url_or_none(board_link.StepLink(label, item)),
     }
 
 

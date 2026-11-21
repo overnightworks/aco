@@ -7,8 +7,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import cast
 
-from . import board_read, protocol, report, workboard
-from .board import link
+from . import board_link, board_read, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -156,6 +155,25 @@ def board_payload(board: workboard.Board) -> dict[str, object]:
     return cast(_JsonObject, _tuples_to_lists(payload))
 
 
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """`board`'s flags: `--json`, or `--url` with the item and `--line` it takes."""
+    report.add_json_flag(parser, "JSON only")
+    parser.add_argument(
+        "--url",
+        action="store_true",
+        help="print the board's address; with an item its step's link, with --line its card's",
+    )
+    parser.add_argument(
+        "item",
+        nargs="?",
+        type=workboard.parse_item_reference,
+        help="with --url, an item, as aco-xxxxxx, #n, or the bare number n",
+    )
+    parser.add_argument(
+        "--line", type=int, metavar="K", help="with --url and an item, the card's line"
+    )
+
+
 def _usage_refusal(parsed: argparse.Namespace) -> str | None:
     """The sentence naming what the flags got wrong, or `None` when they name
     exactly one mode with arguments that belong to it."""
@@ -172,20 +190,20 @@ def _usage_refusal(parsed: argparse.Namespace) -> str | None:
 
 def _selection(
     parsed: argparse.Namespace, context: RunContext
-) -> link.CardLink | link.StepLink | None:
+) -> board_link.CardLink | board_link.StepLink | None:
     """The card (`--line`) or step the URL opens, `None` for the board itself."""
     if parsed.item is None:
         return None
     repository = context.repository_id.path
     if parsed.line is None:
-        return link.StepLink(repository, parsed.item)
-    return link.CardLink(repository, parsed.item, parsed.line)
+        return board_link.StepLink(repository, parsed.item)
+    return board_link.CardLink(repository, parsed.item, parsed.line)
 
 
 def _print_url(parsed: argparse.Namespace, context: RunContext) -> int:
     """The board's address, or the card's or step's link: the URL and a newline."""
     try:
-        url = link.configured_board_url(_selection(parsed, context))
+        url = board_link.configured_board_url(_selection(parsed, context))
     except RepoMeaninglessUnderStateRefError as error:
         return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=False)
     except protocol.ClaimError as error:

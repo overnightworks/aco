@@ -14,12 +14,12 @@ from types import FrameType
 from logline import configure
 
 from .. import __version__, protocol, repositories
+from ..board_link import LOOPBACK_HOST
+from ..board_token import MalformedTokenFileError, board_token, token_path
 from .aco_source import AcoSource
 from .board import Board, Boards, Found, RepositoriesUnavailableError, RepoUnavailable
-from .link import LOOPBACK_HOST
 from .server import RunningBoard, start_board
 from .static import StaticAssetsMissingError
-from .token_store import MalformedTokenFileError, board_token, token_path
 
 _REFUSED_EXIT_CODE = 2
 _SERVICE_NAME = "aco-board"

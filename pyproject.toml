@@ -92,7 +92,8 @@ layers = [
     "lane_measure",
     "release_record",
     "lane_runs",
-    "board_read | policy | report | lane_record",
+    "board_link",
+    "board_read | policy | report | lane_record | board_token",
     "repositories",
     "session",
     "ahead_of_caller",
@@ -146,7 +147,7 @@ layers = [
     "cli",
     "server",
     "api | static",
-    "board | aco_source | token_store",
+    "board | aco_source",
     "ports",
 ]
 

@@ -37,6 +37,15 @@ test('a hash token is carried into session storage and the URL fragment is gone 
 	expect(window.sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('my-token');
 });
 
+test('a link in the fragment is gone from the address bar before mount, like the token', async () => {
+	document.body.innerHTML = '<div id="app"></div>';
+	window.history.replaceState(null, '', '/#t=my-token&c=acme/widgets/12/3');
+
+	await import('./main');
+
+	expect(window.location.hash).toBe('');
+});
+
 test('a session store that throws on read degrades to "no access" instead of crashing bootstrap', async () => {
 	document.body.innerHTML = '<div id="app"></div>';
 	vi.spyOn(window.sessionStorage, 'getItem').mockImplementation(() => {

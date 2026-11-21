@@ -14,7 +14,16 @@
 	import StepAnswer from './StepAnswer.svelte';
 	import WarnMark from './WarnMark.svelte';
 
-	let { repos, decisions }: { repos: RepoReading[]; decisions: DecisionStore } = $props();
+	let {
+		repos,
+		decisions,
+		current = null
+	}: { repos: RepoReading[]; decisions: DecisionStore; current?: string | null } = $props();
+
+	/** The step a link opened is brought into view once the view shows it. */
+	function bringIntoView(node: HTMLElement, isCurrent: boolean) {
+		if (isCurrent) node.scrollIntoView({ block: 'center' });
+	}
 
 	// A copy is told per step as listed: a changed card starts at Copy again.
 	let copies: Record<string, string> = $state({});
@@ -49,7 +58,12 @@
 			{#each repo.steps as step (step.number)}
 				{@const key = `${repo.name}#${step.number}`}
 				{@const copyKey = `${key}:${step.fingerprint}`}
-				<article aria-labelledby="step-{key}">
+				<article
+					aria-labelledby="step-{key}"
+					aria-current={key === current ? 'true' : undefined}
+					class:current={key === current}
+					use:bringIntoView={key === current}
+				>
 					<h3 id="step-{key}"><span class="number">#{step.number}</span> {step.title}</h3>
 					{#if step.purpose === null}
 						<p>{step.step}</p>
@@ -90,6 +104,10 @@
 		background: var(--surface);
 		font-size: 14px;
 		line-height: 21px;
+	}
+	article.current {
+		border-color: var(--accent);
+		box-shadow: inset 4px 0 0 var(--accent);
 	}
 	h3 {
 		margin: 0 0 6px;
