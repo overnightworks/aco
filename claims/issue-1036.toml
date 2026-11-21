@@ -1,8 +1,0 @@
-claim_id = "d0849b312f734774ae3f8e4bef4c5500"
-agent = "Claude 651ce064-3358-4651-856f-d9e8e4232683"
-role = "builder"
-base = "0773f6ff04232884fa0dfb4220555104dee86e2a"
-branch = "claude/issue-1036-lane-branch-upstream"
-scope = ["quality/baseline.toml", "specs/start.spec.md", "src/aco/checkout.py", "src/aco/cmd_claim.py", "src/aco/cmd_start.py", "tests"]
-opened_commit = "8b061cc93faa3b44ae506a93b1a0fc8d86772f40"
-whole_reason = "One lane-branch upstream rule across start's two build paths, its spec line and the tests that drive start."
