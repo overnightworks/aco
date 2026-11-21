@@ -111,7 +111,7 @@ LANREC-47 and the writer's part of LANREC-48 (Misses and its exclusions) bind th
 
 ## Stored runs
 
-A lane may run its stages in more than one workflow run. `aco lane-record begin` marks a run and `aco lane-record add` stores its record, both under the claim's id: the claim's runs file `runs/<claim-id>.json` of `refs/aco/state` (CAS-27, CAS-28), one file per live claim that has runs, which no command but these, `aco lane-record show` and a release reads. `<run>` is a run id, `<tip>` a full 40-digit commit sha, `<label>` the item as its storage names it (`#42`, `aco-xxxxxx`) and `<stage>` one of `build`, `review`, `fix`, `test`, `gate`.
+A stored run is one span of a lane's stages, begun and added once; one workflow run may store several in sequence, and a lane may span several workflow runs. `aco lane-record begin` marks a run and `aco lane-record add` stores its record, both under the claim's id: the claim's runs file `runs/<claim-id>.json` of `refs/aco/state` (CAS-27, CAS-28), one file per live claim that has runs, which no command but these, `aco lane-record show` and a release reads. `<run>` is a run id, `<tip>` a full 40-digit commit sha, `<label>` the item as its storage names it (`#42`, `aco-xxxxxx`) and `<stage>` one of `build`, `review`, `fix`, `test`, `gate`.
 - [ ] [LANREC-52] `aco lane-record begin <item> --run <run> [--start-tip <tip>] [--agent NAME] [--json]` adds a begun entry and prints `BEGAN run <run> of <label>` (E-LANREC-12).
 - [ ] [LANREC-63] Only the claim's holder may begin or add: another session refuses `only the holder may begin a run of <label> (holder='…', this session='…')`, `add a run to` for an add (E-LANREC-13).
 - [ ] [LANREC-68] A begin or an add for an unclaimed item refuses with the sentence of REL-09.
