@@ -1,8 +1,0 @@
-claim_id = "f5f67c3c3f48449c9c62214ed8f1f2ce"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "ad0e5ce1e4ff8e7d1f61dafdafcbde03d0aab4d3"
-branch = "claude/issue-1021-next-cut-guard-open-cards"
-scope = ["quality/baseline.toml", "specs/next.spec.md", "src/aco/workboard.py", "tests/test_cmd_next_open_cards.py"]
-opened_commit = "27505a12437a5a17efc5bbfb976d93852f22d07b"
-whole_reason = "One guard, its spec example and test; they move together."
