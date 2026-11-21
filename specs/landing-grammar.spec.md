@@ -132,7 +132,7 @@ is read (`parse_pull_request_classification`).
 - [ ] [LAND-74] A renamed file's record counts its old and new path, a deleted file's its path; the path set is taken after LAND-73 compares record counts, never before.
 - [ ] [LAND-75] A file listing is read between two reads of the pull request's head and changed-file count; it is judged only when both reads name the expected head and the same count.
 - [ ] [LAND-76] A listing failing LAND-75 refuses `changed while aco listed its files; run the command again`, exit `2`; `check` expects the head it read, `land` the readiness head `--head` verified.
-- [ ] [LAND-77] LAND-71 and LAND-87 names escape display controls, cut to 40 characters with `…`; `land` bounds the refusal to a 200-character line with `ERROR: `, cutting LAND-71 names to keep `No-Item: fix`.
+- [ ] [LAND-77] LAND-71 and LAND-87 names escape controls, cut to 40 with `…`, past three end `and <k> more`; `land` caps the refusal at 200 characters with `ERROR: `, cutting LAND-71 names to keep `No-Item: fix`.
 - [ ] [LAND-78] A `#n`, slice-title or trunk `Work-Item:` number has at most 18 ASCII digits; a longer or non-ASCII one is no reference, never truncated, and a trunk trailer carrying one lands nothing.
 - [ ] [LAND-87] A pull request changing a path its live claim leaves uncovered refuses `changes <paths>, which its claim does not cover; rescope the claim or revert them`, exit `2`; past three, `and <k> more`.
 - [ ] [LAND-88] A claim covers a path a scope entry equals or is an ancestor of, or a tracked `lane_shared` entry covers it (PIN-41); `--whole` widens nothing; a rename needs both paths covered (LAND-74).
