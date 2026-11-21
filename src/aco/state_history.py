@@ -5,6 +5,7 @@ module's production callers.
 """
 
 from collections.abc import Iterable
+from itertools import pairwise
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,8 +18,8 @@ _LOG_FORMAT = "%H%x09%cI"
 
 
 def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, datetime]:
-    """Every commit reachable from `tip` by first-parent descent, mapped to
-    its committer date, in one `git log` call.
+    """Every commit reachable from `tip` by first-parent descent, newest first,
+    mapped to its committer date, in one `git log` call.
 
     `refs/aco/state`'s own history is always linear by construction --
     `commit_transition` never writes a merge, every retry parents its new
@@ -44,22 +45,25 @@ def _first_parent_commit_dates(worktree: Path, tip: ObjectId) -> dict[ObjectId, 
 def claim_ages(
     *, worktree: Path, tip: ObjectId, claims: Iterable[ActiveClaim]
 ) -> dict[str, datetime]:
-    """Each `claim`'s age -- its `opened_commit`'s committer date -- from one
-    walk of `tip`'s history, replacing a `merge-base` plus `log`
-    pair per claim.
+    """Each `claim`'s age -- the committer date of the commit that added it, the
+    first-parent child of its `opened_commit` -- from one walk of `tip`'s
+    history, replacing a `merge-base` plus `log` pair per claim.
 
     Refuses with `StateLineageError` for a claim whose `opened_commit` the
-    walk never reaches (claim-record.spec.md, CLAIM-50): a claim's age display reads
-    real history, it never guesses across a lineage break.
+    walk never reaches or reaches only as the tip itself, with no commit after
+    it (claim-record.spec.md, CLAIM-50): a claim's age display reads real
+    history, it never guesses across a lineage break.
     """
     claim_list = tuple(claims)
     if not claim_list:
         return {}
     dates = _first_parent_commit_dates(worktree, tip)
+    commits = list(dates)
+    child_dates = {parent: dates[child] for child, parent in pairwise(commits)}
     ages: dict[str, datetime] = {}
     for claim in claim_list:
         try:
-            ages[claim.claim_id] = dates[claim.opened_commit]
+            ages[claim.claim_id] = child_dates[claim.opened_commit]
         except KeyError:
             raise StateLineageError(
                 f"{claim.opened_commit} is not an ancestor of {tip}; the ref may "

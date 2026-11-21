@@ -70,7 +70,7 @@ def publish(
     clone: Path, remote: Path, *claims: protocol.ClaimIntent, opened: timedelta = CLAIM_AGE
 ) -> None:
     publish_claims_from_a_second_clone(
-        clone, remote, claims, bootstrapped_at=(FROZEN_CLI_NOW - opened).isoformat()
+        clone, remote, claims, claimed_at=(FROZEN_CLI_NOW - opened).isoformat()
     )
 
 

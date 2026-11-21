@@ -137,7 +137,7 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 
 ## Age and takeover
 
-- [ ] [CLAIM-47] `aco status` prints each live claim's age from the committer date of its `opened_commit`, the state-ref tip that preceded the commit which added it, as `Xh Ym`.
+- [ ] [CLAIM-47] `aco status` prints each live claim's age from the committer date of the commit that added it, the first-parent child of its `opened_commit`, as `Xh Ym`; a fresh claim reads `0h 0m` on an idle ref.
 - [ ] [CLAIM-48] A claim older than one hour is marked, so its `aco status` line ends `3h 12m old`; at or under an hour it ends `0h 59m`.
 - [ ] [CLAIM-49] `aco rescope` replaces only the scope: `claim=<claim-id>`, `base=<sha>` and the printed age keep counting from the first claim (see E-CLAIM-05).
 - [ ] [CLAIM-50] A claim whose `opened_commit` is not an ancestor of the fetched tip refuses `<oid> is not an ancestor of <tip>; the ref may have been rewritten`, exit `2`.
