@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cache
 
-from . import body, checkout, forge, protocol, report, wide_scope, workboard
+from . import body, checkout, forge, protocol, refusal_text, wide_scope, workboard
 from .session import RunContext, paths_outside_claim, trunk_lane_shared_reading
 
 # `land` and `adopt` print `pull request #<number> ` before a defect's message and bound the
@@ -191,8 +191,12 @@ def dependency_rule_defect(
             f", which dependency_paths in {workboard.CONFIG_PATH.as_posix()} does not name; "
             "a bump that needs a code edit lands as No-Item: fix"
         )
-        room = report.foreign_text_room(before + after, reserved=_PULL_REQUEST_REFUSAL_PREFIX_ROOM)
-        return workboard.ClassificationDefect(before + report.cut_foreign_text(named, room) + after)
+        room = refusal_text.foreign_text_room(
+            before + after, reserved=_PULL_REQUEST_REFUSAL_PREFIX_ROOM
+        )
+        return workboard.ClassificationDefect(
+            before + refusal_text.cut_foreign_text(named, room) + after
+        )
     return None
 
 

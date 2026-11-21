@@ -115,6 +115,7 @@ layers = [
     "file_lock",
     "state_files",
     "claim_conflicts | claim_json",
+    "refusal_text",
     "protocol | process | routing_line | wide_scope",
     "toml_text",
 ]
