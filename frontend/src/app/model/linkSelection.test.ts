@@ -1,14 +1,6 @@
 import { expect, test } from 'vitest';
 import { item, line, optionLine, repo, ruledOptionLine, stepRead } from '../../test-support/board';
-import {
-	CARD_GONE_NOTE,
-	CARD_RULED_NOTE,
-	REPO_UNREADABLE_NOTE,
-	STEP_GONE_NOTE,
-	linkFromHash,
-	resolveLink,
-	stepKey
-} from './linkSelection';
+import { linkFromHash, resolveLink, stepKey } from './linkSelection';
 
 test.each([
 	['#t=secret&c=acme/widgets/12/3', { kind: 'card', repo: 'acme/widgets', item: 12, line: 3 }],
@@ -46,10 +38,10 @@ test('an open card resolves to its card key', () => {
 });
 
 test.each([
-	['a ruled option line', { item: 12, line: 4 }, CARD_RULED_NOTE],
-	['a ruled yes/no line', { item: 13, line: 1 }, CARD_RULED_NOTE],
-	['a line the item does not hold', { item: 12, line: 9 }, CARD_GONE_NOTE],
-	['an item the board does not list', { item: 99, line: 1 }, CARD_GONE_NOTE]
+	['a ruled option line', { item: 12, line: 4 }, 'Diese Karte ist schon entschieden.'],
+	['a ruled yes/no line', { item: 13, line: 1 }, 'Diese Karte ist schon entschieden.'],
+	['a line the item does not hold', { item: 12, line: 9 }, 'Diese Karte gibt es nicht mehr.'],
+	['an item the board does not list', { item: 99, line: 1 }, 'Diese Karte gibt es nicht mehr.']
 ])('%s resolves to a note', (_name, target, note) => {
 	expect(resolveLink([OPEN], { kind: 'card', repo: 'acme/widgets', ...target })).toEqual({
 		kind: 'note',
@@ -62,14 +54,14 @@ test('a repository that could not be read resolves to the unreadable note', () =
 
 	expect(resolveLink([failed], { kind: 'card', repo: 'acme/widgets', item: 12, line: 3 })).toEqual({
 		kind: 'note',
-		note: REPO_UNREADABLE_NOTE
+		note: 'Dieses Repo ist gerade nicht lesbar.'
 	});
 });
 
 test('a repository the board does not serve resolves to the gone note', () => {
 	expect(resolveLink([OPEN], { kind: 'step', repo: 'acme/other', item: 14 })).toEqual({
 		kind: 'note',
-		note: STEP_GONE_NOTE
+		note: 'Dieser Schritt wartet nicht mehr.'
 	});
 });
 
@@ -81,7 +73,7 @@ test('a waiting step resolves to the step, one no longer waiting to a note', () 
 	});
 	expect(resolveLink([OPEN], { kind: 'step', repo: 'acme/widgets', item: 12 })).toEqual({
 		kind: 'note',
-		note: STEP_GONE_NOTE
+		note: 'Dieser Schritt wartet nicht mehr.'
 	});
 });
 

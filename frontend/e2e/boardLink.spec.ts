@@ -1,7 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
 import { readBoardRuntime } from './runtime';
-import { CARD_GONE_NOTE, CARD_RULED_NOTE, STEP_GONE_NOTE } from '../src/app/model/linkSelection';
 import { item, line, optionLine, repo, stepRead } from '../src/test-support/board';
 
 const BOARD = {
@@ -68,8 +67,8 @@ for (const viewport of [
 		});
 
 		for (const [name, selection, note] of [
-			['a ruled card', 'c=acme/songmaker/42/3', CARD_RULED_NOTE],
-			['an unknown card', 'c=acme/songmaker/99/1', CARD_GONE_NOTE]
+			['a ruled card', 'c=acme/songmaker/42/3', 'Diese Karte ist schon entschieden.'],
+			['an unknown card', 'c=acme/songmaker/99/1', 'Diese Karte gibt es nicht mehr.']
 		]) {
 			test(`[ABRD-191] ${name} shows one line over the open list`, async ({ page }, testInfo) => {
 				await openLink(page, selection);
@@ -87,7 +86,7 @@ for (const viewport of [
 		}) => {
 			await openLink(page, 's=acme/songmaker/43');
 
-			await expect(page.getByRole('status')).toHaveText(STEP_GONE_NOTE);
+			await expect(page.getByRole('status')).toHaveText('Dieser Schritt wartet nicht mehr.');
 			await expect(page.locator('.tracks')).toContainText('Gäste');
 		});
 	});
