@@ -200,7 +200,7 @@ The browser proofs are `frontend/e2e/decide.spec.ts`,
 - [ ] [ABRD-93] The board token lives in a file, `$XDG_STATE_HOME/aco/board-token` when that value is an absolute path, else `~/.local/state/aco/board-token`; `aco serve` reads it before binding.
 - [ ] [ABRD-94] An absent token file is created with a fresh token: file mode `0600`, every missing directory `0700`, written whole or not at all.
 - [ ] [ABRD-95] A restart reuses the token, so an open tab keeps working; deleting the file rotates it.
-- [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16).
+- [ ] [ABRD-96] A file that is not one token (one line of 43 or more characters from `A-Z a-z 0-9 - _`, optional newline) is refused, exit `1`, nothing bound (E-ABRD-16); a token file that cannot be read is refused the same way, without the remedy to delete it (E-ABRD-16).
 - [ ] [ABRD-11] On `/api/rule` and `/api/step`, a body not complete 10 seconds after its headers or ending before its declared Content-Length answers 408 `{"error": "request timeout: body incomplete"}`.
 - [ ] [ABRD-20] Once every found repo's read fails or times out, `GET /api/board` answers 502 with the same `repos[]` envelope as ABRD-08, each entry its own reason (E-ABRD-06); the page shows it per ABRD-128.
 - [ ] [ABRD-12] Every answer, HTTP-layer refusals included, carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and a CSP with `base-uri`, `form-action`, and `frame-ancestors` set to `'none'`.
@@ -532,6 +532,14 @@ Setup: the token file, `<state home>/aco/board-token`, holds `not a token`
 ```console
 $ aco serve
 2> ERROR: <state home>/aco/board-token holds no board token; delete it to start with a new one
+exit 1
+```
+
+A token file that cannot be read (here, a directory) is refused with its reason and no remedy to delete it:
+
+```console
+$ aco serve
+2> ERROR: board token <state home>/aco/board-token is unreadable: <reason>
 exit 1
 ```
 

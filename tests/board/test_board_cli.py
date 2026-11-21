@@ -253,6 +253,21 @@ def test_serve_refuses_to_start_when_the_token_file_holds_no_token(
     )
 
 
+def test_serve_refuses_to_start_when_the_token_file_cannot_be_read(
+    root: Path, board_token_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repository_with_card(root / "here", 1, "Here")
+    board_token_file.mkdir(parents=True)
+
+    exit_code = cli.main(["serve", "--port", "0"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err.startswith(f"ERROR: board token {board_token_file} is unreadable: ")
+    assert "delete it" not in captured.err
+
+
 def test_serve_decides_in_the_repository_a_card_names_and_touches_no_other(
     root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
