@@ -224,6 +224,22 @@ def _claim_in_start_worktree(
         return cmd_claim.refuse_claim_error(error, context, as_json=False)
 
 
+def _track_own_branch(target: cmd_claim.LaneWorktree, context: RunContext) -> None:
+    """Point the lane branch's upstream at its own branch on the canonical
+    remote, which need not exist yet. The build tracks the trunk only so a
+    refused start can delete the fresh branch as merged (START-18); once the
+    claim holds, a bare push or pull must never touch the trunk (START-31)."""
+    branch_section = f"branch.{target.branch}"
+    checkout.git_output(
+        ["config", f"{branch_section}.remote", context.configured_canonical_remote],
+        directory=target.path,
+    )
+    checkout.git_output(
+        ["config", f"{branch_section}.merge", f"refs/heads/{target.branch}"],
+        directory=target.path,
+    )
+
+
 def _rebuild_and_resume(
     parsed: argparse.Namespace,
     context: RunContext,
@@ -251,6 +267,7 @@ def _rebuild_and_resume(
         cmd_claim.validate_built_worktree(checked, target, context, moved_refusal=_MOVED_REFUSAL)
     except protocol.ClaimError as error:
         return cmd_claim.refuse_built_worktree(error, target, command=_START_COMMAND)
+    _track_own_branch(target, context)
     _print_start_resume(resumed, observed, context.config.storage, versioning)
     return 0
 
@@ -294,5 +311,6 @@ def _check_build_and_claim(
     )
     if isinstance(result, int):
         return result
+    _track_own_branch(target, check_context)
     claimed, claims = result
     return cmd_claim.report_claim(plan, claimed, claims, as_json=False)
