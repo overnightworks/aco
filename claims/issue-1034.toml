@@ -1,0 +1,7 @@
+claim_id = "6dca8772dbf0434e92369edbef26375d"
+agent = "Claude 651ce064-3358-4651-856f-d9e8e4232683"
+role = "builder"
+base = "f3bb8a68bd1a84b5b1cd1d4a6dc605f058f40ace"
+branch = "claude/issue-1034-quality-v0-23-0"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", ".github/workflows/release.yml"]
+opened_commit = "174054aa59cd94cfdafa334130e6791aab826435"
