@@ -12,10 +12,10 @@ export type LinkTarget =
 	| { kind: 'card'; repo: string; item: number; line: number }
 	| { kind: 'step'; repo: string; item: number };
 
-export const CARD_RULED_NOTE = 'Diese Karte ist schon entschieden.';
-export const CARD_GONE_NOTE = 'Diese Karte gibt es nicht mehr.';
-export const STEP_GONE_NOTE = 'Dieser Schritt wartet nicht mehr.';
-export const REPO_UNREADABLE_NOTE = 'Dieses Repo ist gerade nicht lesbar.';
+const CARD_RULED_NOTE = 'Diese Karte ist schon entschieden.';
+const CARD_GONE_NOTE = 'Diese Karte gibt es nicht mehr.';
+const STEP_GONE_NOTE = 'Dieser Schritt wartet nicht mehr.';
+const REPO_UNREADABLE_NOTE = 'Dieses Repo ist gerade nicht lesbar.';
 
 export type LinkOutcome =
 	| { kind: 'card'; key: string }
