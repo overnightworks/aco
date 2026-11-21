@@ -70,9 +70,9 @@
 					{:else}
 						<p>{step.purpose}</p>
 						<pre>{step.actions}</pre>
-						<button type="button" class="copy" onclick={() => copy(copyKey, step.actions ?? '')}
-							>{copies[copyKey] ?? COPY_LABEL}</button
-						>
+						<button type="button" class="copy" onclick={() => copy(copyKey, step.actions ?? '')}>
+							{copies[copyKey] ?? COPY_LABEL}
+						</button>
 						<p><b>Expected</b> {step.expected}</p>
 						<p class="answer">{answerText(step)}</p>
 						<StepAnswer repo={repo.name} {step} {decisions} />

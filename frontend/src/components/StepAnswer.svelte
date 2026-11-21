@@ -49,22 +49,28 @@
 				type="button"
 				class="primary"
 				disabled={busy || report.trim() === ''}
-				onclick={() => decisions.answerStep(repo, step, 'report', report)}>{SEND_LABEL}</button
+				onclick={() => decisions.answerStep(repo, step, 'report', report)}
 			>
+				{SEND_LABEL}
+			</button>
 		{:else}
 			<button
 				type="button"
 				class="primary"
 				disabled={busy}
-				onclick={() => decisions.answerStep(repo, step, 'yes', '')}>{SUCCESS_LABEL}</button
+				onclick={() => decisions.answerStep(repo, step, 'yes', '')}
 			>
+				{SUCCESS_LABEL}
+			</button>
 		{/if}
 		<button
 			type="button"
 			aria-expanded={failing}
 			disabled={busy}
-			onclick={() => (failing = !failing)}>{FAILURE_LABEL}</button
+			onclick={() => (failing = !failing)}
 		>
+			{FAILURE_LABEL}
+		</button>
 	</div>
 	{#if failing}
 		<div class="answer-row">
@@ -75,8 +81,10 @@
 			<button
 				type="button"
 				disabled={busy || note.trim() === ''}
-				onclick={() => decisions.answerStep(repo, step, 'no', note)}>{SEND_LABEL}</button
+				onclick={() => decisions.answerStep(repo, step, 'no', note)}
 			>
+				{SEND_LABEL}
+			</button>
 		</div>
 	{/if}
 {/if}

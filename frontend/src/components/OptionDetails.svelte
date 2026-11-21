@@ -42,9 +42,9 @@
 	<dt>{ROW_LABEL.undo}</dt>
 	<dd>
 		<p>
-			<b class:final={option.undo === 'final'}
-				>{#if option.undo === 'final'}<WarnMark />{/if}{UNDO_LABEL[option.undo]}</b
-			>{undoTail(option)}
+			<b class:final={option.undo === 'final'}>
+				{#if option.undo === 'final'}<WarnMark />{/if}{UNDO_LABEL[option.undo]}
+			</b>{undoTail(option)}
 		</p>
 	</dd>
 	<dt>{ROW_LABEL.contract}</dt>
