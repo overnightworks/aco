@@ -10,11 +10,11 @@ import pytest
 from board_fixtures import REPOSITORY, complete_contract
 from check_pull_request_fixtures import LANE_BRANCH, LANE_CLAIM
 from cli_fixtures import freeze_cli_now, run_cli
-from github_pages import HEAD_END, LISTING_HEAD_LINES, api_head, api_pull_request
+from github_pages import api_head, api_pull_request, listing_answer
 from rate_limit_fixtures import GRAPHQL_REFUSAL
 from store_fixtures import publish_claims_from_a_second_clone
 
-LISTING_HEAD = "\r\n".join(LISTING_HEAD_LINES) + HEAD_END
+LISTING_HEAD = listing_answer(["-i"], "")
 # Answers a REST route (a request's path with the issue state it filters on) with the JSON its
 # `FAKE_GH_ROUTES` file holds, through the request's own `--jq` filter as `gh` does; refuses a
 # GraphQL or `pr` call, noting its arguments in `FAKE_GH_REFUSED`.

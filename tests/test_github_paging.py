@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from github_pages import listing_answer, paged_listing
+from github_pages import head_block, listing_answer, paged_listing
 from rate_limit_fixtures import REST_REFUSAL
 
 from aco import forge, github, github_paging
@@ -66,13 +66,9 @@ def paths_of(log: Path) -> list[str]:
     return [call[1] for call in calls_of(log) if "rate_limit" not in call]
 
 
-def head(status: str, *headers: str) -> str:
-    return "\r\n".join([f"HTTP/2.0 {status}", *headers]) + "\r\n\r\n"
-
-
 def failed_page(status: str, body: str, closing: str) -> str:
     """What `gh api -i` prints for a refused page: the head, the body, then its own message."""
-    return head(status, "Content-Type: application/json") + body + "\n" + closing
+    return head_block(status, "Content-Type: application/json") + body + "\n" + closing
 
 
 SUB_ISSUE = json.dumps(
@@ -84,8 +80,8 @@ SUB_ISSUE = json.dumps(
     }
 )
 NEXT_PAGE_LINK = 'Link: <https://api.github.com/repositories/1/issues?page=2>; rel="next"'
-FIRST_PAGE = head("200 OK", NEXT_PAGE_LINK) + SUB_ISSUE
-LAST_PAGE = head("200 OK") + SUB_ISSUE
+FIRST_PAGE = head_block("200 OK", NEXT_PAGE_LINK) + SUB_ISSUE
+LAST_PAGE = head_block("200 OK") + SUB_ISSUE
 
 
 def run_of(answers: list[str], calls: list[list[str]]) -> Callable[[list[str]], str]:
@@ -138,22 +134,23 @@ def test_a_listing_of_n_rows_costs_one_call_per_hundred_rows(rows: int) -> None:
     ("answer", "message"),
     [
         pytest.param(
-            head("200 OK", 'Link: <https://example.org/issues?page=2>; rel="next"') + "1",
+            head_block("200 OK", 'Link: <https://example.org/issues?page=2>; rel="next"') + "1",
             "outside its API",
             id="next-link-outside-the-api",
         ),
         pytest.param(
-            head("200 OK", 'Link: <http://api.github.com/issues?page=2>; rel="next"') + "1",
+            head_block("200 OK", 'Link: <http://api.github.com/issues?page=2>; rel="next"') + "1",
             "outside its API",
             id="next-link-without-tls",
         ),
         pytest.param(
-            head("200 OK", "Link: https://api.github.com/issues?page=2") + "1",
+            head_block("200 OK", "Link: https://api.github.com/issues?page=2") + "1",
             "malformed Link",
             id="link-without-angle-brackets",
         ),
         pytest.param(
-            head("200 OK", 'Link: <https://api.github.com/issues?page=2>; rel="next", junk') + "1",
+            head_block("200 OK", 'Link: <https://api.github.com/issues?page=2>; rel="next", junk')
+            + "1",
             "malformed Link",
             id="link-with-a-trailing-fragment",
         ),
@@ -171,7 +168,9 @@ def test_a_listing_fails_loud_on_a_foreign_or_malformed_link_or_a_missing_head(
 
 
 def test_a_listing_with_a_link_naming_no_next_page_ends_there() -> None:
-    last = head("200 OK", 'Link: <https://api.github.com/repositories/1/issues?page=1>; rel="prev"')
+    last = head_block(
+        "200 OK", 'Link: <https://api.github.com/repositories/1/issues?page=1>; rel="prev"'
+    )
     calls: list[list[str]] = []
 
     text = github_paging.read_pages(run_of([last + "7"], calls), LISTING, JQ)
@@ -225,7 +224,7 @@ def test_a_rate_limit_on_the_second_page_is_transient_and_names_its_reset(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     reset = datetime.now(UTC).replace(microsecond=0) + timedelta(minutes=30)
-    refused = head("403 Forbidden", "Content-Type: application/json") + REST_REFUSAL
+    refused = head_block("403 Forbidden", "Content-Type: application/json") + REST_REFUSAL
     log = gh_listing(
         [(FIRST_PAGE, 0), (refused, 1)], monkeypatch, tmp_path, str(int(reset.timestamp()))
     )
@@ -239,7 +238,7 @@ def test_a_rate_limit_on_the_second_page_is_transient_and_names_its_reset(
 
 
 def test_an_empty_listing_costs_one_call(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    log = gh_listing([(head("200 OK"), 0)], monkeypatch, tmp_path)
+    log = gh_listing([(head_block("200 OK"), 0)], monkeypatch, tmp_path)
     client = github.GitHubForge(REPOSITORY)
 
     children = client.list_children(79)
