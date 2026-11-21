@@ -20,6 +20,7 @@ from adoption_world import (
     repush_the_branch,
     the_forge_reads_the_branch_ready,
 )
+from check_pull_request_fixtures import outside
 from cli_fixtures import (
     ADOPTED_BRANCH,
     ADOPTED_PULL_REQUEST,
@@ -263,8 +264,8 @@ def _list_files_named(count: int) -> Callable[[AdoptionWorld], None]:
         pytest.param(
             lambda world: world.list_files("uv.lock", "pyproject.toml", "src/x.py"),
             "deps",
-            f"pull request #{ADOPTED_PULL_REQUEST} changes src/x.py, "
-            "which dependency_paths in .aco/board.toml does not name",
+            f"pull request #{ADOPTED_PULL_REQUEST} changes src/x.py, which dependency_paths in "
+            ".aco/board.toml does not name; a bump that needs a code edit lands as No-Item: fix",
             id="cell-7-path-outside-the-dependency-paths",
         ),
         pytest.param(
@@ -1226,9 +1227,7 @@ def _a_repush_adds_a_path_outside_the_dependency_paths(world: AdoptionWorld) -> 
         ),
         pytest.param(
             _a_repush_adds_a_path_outside_the_dependency_paths,
-            refusal_line(
-                "changes src/x.py, which dependency_paths in .aco/board.toml does not name"
-            ),
+            refusal_line(outside("src/x.py")),
             id="cell-39-repush-adds-a-path-outside-the-dependency-paths",
         ),
     ],

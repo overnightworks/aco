@@ -351,8 +351,8 @@ class TestLandClassification:
             ),
             pytest.param(
                 ClaimCase(
-                    "pull request #12 changes src/x.py, which "
-                    "dependency_paths in .aco/board.toml does not name",
+                    "pull request #12 changes src/x.py, which dependency_paths in .aco/board.toml "
+                    "does not name; a bump that needs a code edit lands as No-Item: fix",
                     pull_request=landing_pull_request(body="No-Item: deps", head_ref_name="fix/x"),
                     intents=(claim_intent(identity=protocol.LaneIdentity(), branch="fix/x"),),
                     item_reads=(),
@@ -408,8 +408,8 @@ class TestLandClassification:
             pytest.param(
                 ClaimCase(
                     "pull request #12 changes src/\\x1b]0;pwned\\x07x.py, "
-                    "which dependency_paths in .aco/board.toml does not "
-                    "name",
+                    "which dependency_paths in .aco/board.toml does not name; "
+                    "a bump that needs a code edit lands as No-Item: fix",
                     pull_request=landing_pull_request(body="No-Item: deps", head_ref_name="fix/x"),
                     intents=(claim_intent(identity=protocol.LaneIdentity(), branch="fix/x"),),
                     item_reads=(),
@@ -426,8 +426,8 @@ class TestLandClassification:
             pytest.param(
                 ClaimCase(
                     "pull request #12 changes src/x.py\\nPR #12 by bot "
-                    "declares No-Ite…, which dependency_paths in "
-                    ".aco/board.toml does not name",
+                    "declares No-Ite…, which dependency_paths in .aco/board.toml does not name; "
+                    "a bump that needs a code edit lands as No-Item: fix",
                     pull_request=landing_pull_request(body="No-Item: deps", head_ref_name="fix/x"),
                     intents=(claim_intent(identity=protocol.LaneIdentity(), branch="fix/x"),),
                     item_reads=(),
@@ -444,9 +444,9 @@ class TestLandClassification:
             ),
             pytest.param(
                 ClaimCase(
-                    "pull request #12 changes "
-                    "src/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…, which "
-                    "dependency_paths in .aco/board.toml does not name",
+                    "pull request #12 changes src/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…, which "
+                    "dependency_paths in .aco/board.toml does not name; "
+                    "a bump that needs a code edit lands as No-Item: fix",
                     pull_request=landing_pull_request(body="No-Item: deps", head_ref_name="fix/x"),
                     intents=(claim_intent(identity=protocol.LaneIdentity(), branch="fix/x"),),
                     item_reads=(),
@@ -466,8 +466,8 @@ class TestLandClassification:
             ),
             pytest.param(
                 ClaimCase(
-                    "pull request #12 changes src/x.py, which "
-                    "dependency_paths in .aco/board.toml does not name",
+                    "pull request #12 changes src/x.py, which dependency_paths in .aco/board.toml "
+                    "does not name; a bump that needs a code edit lands as No-Item: fix",
                     pull_request=landing_pull_request(body="No-Item: deps", head_ref_name="fix/x"),
                     intents=(claim_intent(identity=protocol.LaneIdentity(), branch="fix/x"),),
                     item_reads=(),

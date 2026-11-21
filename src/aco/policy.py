@@ -184,7 +184,8 @@ def dependency_rule_defect(
         )
         return workboard.ClassificationDefect(
             f"changes {named}, which dependency_paths in "
-            f"{workboard.CONFIG_PATH.as_posix()} does not name"
+            f"{workboard.CONFIG_PATH.as_posix()} does not name; "
+            "a bump that needs a code edit lands as No-Item: fix"
         )
     return None
 

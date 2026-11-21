@@ -120,6 +120,13 @@ class PullRequestObservation:
     written: WriteTrace
 
 
+def outside(named: str) -> str:
+    return (
+        f"changes {named}, which dependency_paths in .aco/board.toml does not name; "
+        "a bump that needs a code edit lands as No-Item: fix"
+    )
+
+
 def declares(
     body: str,
     label: str,

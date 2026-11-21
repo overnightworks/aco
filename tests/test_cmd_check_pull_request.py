@@ -24,6 +24,7 @@ from check_pull_request_fixtures import (
     PullRequestCheck,
     PullRequestWorld,
     declares,
+    outside,
     refused,
     rendered,
     unavailable,
@@ -67,10 +68,6 @@ def listing_of(*paths: str) -> forge.PullRequestChanges:
 
 def deps_world(listing: forge.PullRequestChanges | forge.ForgeError) -> PullRequestWorld:
     return replace(DEPS_WORLD, listing=listing)
-
-
-def outside(named: str) -> str:
-    return f"changes {named}, which dependency_paths in .aco/board.toml does not name"
 
 
 # Requests read the dispatch reference and landing, then the default branch;
