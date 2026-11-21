@@ -1,6 +1,7 @@
 """The arrangement of the repositories aco finds under its configured root:
 the config file, the root and one board checkout holding one open card."""
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -51,6 +52,28 @@ def repository_with_card(directory: Path, item: int, title: str) -> BoardForge:
 @pytest.fixture
 def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return isolate_config_file(tmp_path, monkeypatch)
+
+
+@dataclass(frozen=True)
+class BoardUnit:
+    """What a started board leaves for `aco board --url`: its port and token."""
+
+    port: int
+    token: str
+    token_file: Path
+
+
+@pytest.fixture
+def board_unit(config_file: Path, tmp_path: Path) -> BoardUnit:
+    """The config file names a `board_port` beside whatever else a test writes
+    to it, and the token file exists, both in this test's own homes."""
+    unit = BoardUnit(8765, "t" * 43, tmp_path / "state" / "aco" / "board-token")
+    unit.token_file.parent.mkdir(parents=True)
+    unit.token_file.write_text(unit.token, encoding="utf-8")
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    with config_file.open("a", encoding="utf-8") as handle:
+        handle.write(f"board_port = {unit.port}\n")
+    return unit
 
 
 @pytest.fixture

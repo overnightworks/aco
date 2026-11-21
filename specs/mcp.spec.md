@@ -30,6 +30,8 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a call after another call, or after a refusal | — | — | MCP-19 |
 | a `record_answer` written | — | — | MCP-56 |
 | a card on an open item a member wrote | — | — | MCP-21 |
+| a card or step answered, with a configured board | — | — | MCP-79 |
+| a card or step answered, with no configured board | — | — | MCP-80 |
 | the same card asked again | — | — | MCP-22, MCP-61 |
 | a card asked, and rulings of its area elsewhere or on closed items | — | — | MCP-57, MCP-58, MCP-59, MCP-60 |
 | a card asked and the search for earlier rulings cannot answer completely | — | — | MCP-62, MCP-65 |
@@ -101,7 +103,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 
 The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): `text`, the line keys and `options`, with no state key.
 
-- [ ] [MCP-21] `ask` appends one option line, dated today in UTC, to the open item, and answers `repository`, `item`, `written` true and the line as RUL-10 prints it (see E-MCP-04).
+- [ ] [MCP-21] `ask` appends one option line, dated today in UTC, to the open item, and answers `repository`, `item`, `written` true, the line as RUL-10 prints it (see E-MCP-04).
 - [ ] [MCP-22] The same card asked again writes nothing: `ask` answers `written` false and the line already there, the first when several match, with its ruling or return (see E-MCP-05).
 - [ ] [MCP-23] A withdrawn line never matches a card: asking after its withdrawal appends a new line.
 - [ ] [MCP-24] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-06).
@@ -168,6 +170,8 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 ## Answering a step
 
+- [ ] [MCP-79] `ask` and `step` also answer `link`: the URL `aco board --url` prints for the line asked or the step (BOARD-62, BOARD-64), built by the same producer (ABRD-187).
+- [ ] [MCP-80] Where `board_port` is not set or the token file is missing, `link` is `null` and the call succeeds all the same.
 - [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
 - [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` stays as it is, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
 - [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
@@ -228,10 +232,10 @@ Setup: `owner/a` holds the open item `#7`, written by a member, with no option l
 
 ```text
 > {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"ask","arguments":{"repository":"owner/a","item":7,"text":"<text>","question":"<question>","options":["<2 to 4 option objects>"],"...":"the other line keys"}}}
-< {"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":true,"line":{"index":1,"form":"options","asked_on":"2026-11-08"},"earlier":[],"earlier_more":0},"isError":false}}
+< {"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":7,"written":true,"line":{"index":1,"form":"options","asked_on":"2026-11-08"},"link":"http://127.0.0.1:8765/#t=<board token>&c=owner/a/7/1","earlier":[],"earlier_more":0},"isError":false}}
 ```
 
-The line carries every key `aco rulings --json` prints (RUL-10); only the keys shown are repeated here. `aco rulings 7` and `read_inbox` list it as open. No ruling of the area stands anywhere, so `earlier` is empty.
+The line carries every key `aco rulings --json` prints (RUL-10); only the keys shown are repeated here. `link` is the card's address on the board (MCP-79), `board_port` being `8765` in the config file. `aco rulings 7` and `read_inbox` list it as open. No ruling of the area stands anywhere, so `earlier` is empty.
 
 ### E-MCP-05 -- the same card again
 
@@ -311,10 +315,10 @@ Setup: `owner/a` holds the open item `#9`, written by a member, with a complete 
 
 ```text
 > {"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"step","arguments":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","purpose":"The old key leaked.","actions":"Open Settings, Deploy keys, click Rotate.","expected":"A new key shows."}}}
-< {"jsonrpc":"2.0","id":12,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","created":false},"isError":false}}
+< {"jsonrpc":"2.0","id":12,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","created":false,"link":"http://127.0.0.1:8765/#t=<board token>&s=owner/a/9"},"isError":false}}
 ```
 
-The block's `wait.operator` is the step, its `next` is as it was, and the item carries `needs-operator`, so E-MCP-11's `read_inbox` lists it. The same call again answers the same and writes no body.
+The block's `wait.operator` is the step, its `next` is as it was, and the item carries `needs-operator`, so E-MCP-11's `read_inbox` lists it; `link` opens the step on the board (MCP-79). The same call again answers the same and writes no body.
 
 ### E-MCP-13 -- a step on a new item
 

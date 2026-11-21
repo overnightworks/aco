@@ -1,4 +1,5 @@
 """The `board` command (`specs/board.spec.md`)."""
+# ruff: noqa: T201 - the board command writes its URL to stdout
 
 import argparse
 from dataclasses import asdict
@@ -7,13 +8,14 @@ from enum import StrEnum
 from typing import cast
 
 from . import board_read, protocol, report, workboard
+from .board import link
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
 class _BoardReason(StrEnum):
     """`aco board`'s own `--json` `reason` vocabulary
     (`specs/board.spec.md`): `projected` the only success. `invalid_usage`
-    covers a bare `aco board` naming no `--json` (BOARD-44) and `--repo`
+    covers a bare `aco board` naming neither `--json` nor `--url` (BOARD-44) and `--repo`
     under `storage = state-ref` (PIN-04); every other refusal -- an
     unsupported forge host (BOARD-02), a state-ref checkout with no
     resolvable default branch (PIN-05) -- falls to `unavailable`, matching
@@ -25,11 +27,14 @@ class _BoardReason(StrEnum):
 
 
 class _BoardNoModeUsageError(protocol.ClaimError):
-    """No `--json` given (BOARD-44): `board` has no
-    default mode of its own, so a bare `aco board` must name `--json` instead of guessing."""
+    """A `board` call that names no mode, or mixes flags that belong to different
+    modes (BOARD-44, BOARD-62): `board` has no default mode of its own."""
 
 
-_BOARD_NO_MODE_MESSAGE = "aco board requires --json"
+_BOARD_NO_MODE_MESSAGE = "aco board requires --json or --url"
+_BOARD_BOTH_MODES_MESSAGE = "aco board takes --json or --url, not both"
+_BOARD_LINK_ARGUMENTS_MESSAGE = "an item and --line belong to --url"
+_BOARD_LINE_WITHOUT_ITEM_MESSAGE = "--line names a card of an item; give the item"
 
 # The shape one decoded JSON object takes -- one alias so `cast` names a
 # real type instead of repeating the `"dict[str, object]"` string literal
@@ -151,11 +156,53 @@ def board_payload(board: workboard.Board) -> dict[str, object]:
     return cast(_JsonObject, _tuples_to_lists(payload))
 
 
+def _usage_refusal(parsed: argparse.Namespace) -> str | None:
+    """The sentence naming what the flags got wrong, or `None` when they name
+    exactly one mode with arguments that belong to it."""
+    if parsed.json and parsed.url:
+        return _BOARD_BOTH_MODES_MESSAGE
+    if not parsed.json and not parsed.url:
+        return _BOARD_NO_MODE_MESSAGE
+    if not parsed.url and (parsed.item is not None or parsed.line is not None):
+        return _BOARD_LINK_ARGUMENTS_MESSAGE
+    if parsed.line is not None and parsed.item is None:
+        return _BOARD_LINE_WITHOUT_ITEM_MESSAGE
+    return None
+
+
+def _selection(
+    parsed: argparse.Namespace, context: RunContext
+) -> link.CardLink | link.StepLink | None:
+    """The card (`--line`) or step the URL opens, `None` for the board itself."""
+    if parsed.item is None:
+        return None
+    repository = context.repository_id.path
+    if parsed.line is None:
+        return link.StepLink(repository, parsed.item)
+    return link.CardLink(repository, parsed.item, parsed.line)
+
+
+def _print_url(parsed: argparse.Namespace, context: RunContext) -> int:
+    """The board's address, or the card's or step's link: the URL and a newline."""
+    try:
+        url = link.configured_board_url(_selection(parsed, context))
+    except RepoMeaninglessUnderStateRefError as error:
+        return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=False)
+    except protocol.ClaimError as error:
+        return report.refuse(_BoardReason.UNAVAILABLE, error, as_json=False)
+    # The URL is this command's whole output: a head pastes it as it is.
+    print(url)
+    return 0
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     as_json = parsed.json
     try:
-        if not as_json:
-            raise _BoardNoModeUsageError(_BOARD_NO_MODE_MESSAGE)
+        usage_refusal = _usage_refusal(parsed)
+        if usage_refusal is not None:
+            raise _BoardNoModeUsageError(usage_refusal)
+        if parsed.url:
+            return _print_url(parsed, context)
         projected = board_read.observed_board(context).board
     except _BoardNoModeUsageError as error:
         return report.refuse(_BoardReason.INVALID_USAGE, error, as_json=as_json)

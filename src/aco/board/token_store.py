@@ -27,6 +27,14 @@ class MalformedTokenFileError(Exception):
         self.path = path
 
 
+class MissingTokenFileError(Exception):
+    """No token file exists yet: no board has been started on this machine."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(f"{path} does not exist; start aco serve once to create the board token")
+        self.path = path
+
+
 def token_path(environment: Mapping[str, str], home: Path) -> Path:
     """`$XDG_STATE_HOME/aco/board-token` when that is absolute, else under `home`."""
     return state_directory(environment, home) / "board-token"
@@ -57,6 +65,14 @@ def board_token(path: Path) -> str:
     finally:
         temporary.unlink()
     return token
+
+
+def existing_board_token(path: Path) -> str:
+    """The token `path` holds, never creating it."""
+    try:
+        return _read(path)
+    except FileNotFoundError:
+        raise MissingTokenFileError(path) from None
 
 
 def _make_missing_directories(directory: Path) -> None:

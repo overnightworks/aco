@@ -150,6 +150,17 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
     board = commands.add_parser(name, help="project the open work board, read-only")
     report.add_json_flag(board, "JSON only")
+    board.add_argument(
+        "--url",
+        action="store_true",
+        help="print the board's address; with an item its step's link, with --line its card's",
+    )
+    board.add_argument(
+        "item", nargs="?", type=workboard.parse_item_reference, help=f"with --url, {ITEM_REF_HELP}"
+    )
+    board.add_argument(
+        "--line", type=int, metavar="K", help="with --url and an item, the card's line"
+    )
 
 
 def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:

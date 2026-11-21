@@ -19,6 +19,8 @@ _CONFIG_FILE = Path("aco") / "config.toml"
 _CONFIG_HOME_VARIABLE = "XDG_CONFIG_HOME"
 _STATE_HOME_VARIABLE = "XDG_STATE_HOME"
 _ROOT_KEY = "root"
+_BOARD_PORT_KEY = "board_port"
+_HIGHEST_PORT = 65535
 
 
 class RootConfigError(protocol.ClaimError):
@@ -74,20 +76,28 @@ def config_path(environment: Mapping[str, str], home: Path) -> Path:
     return _xdg_directory(environment, _CONFIG_HOME_VARIABLE, home, ".config") / _CONFIG_FILE
 
 
+def _config_table(path: Path) -> dict[str, object]:
+    """The TOML table `path` holds; a missing file raises `FileNotFoundError`."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise
+    except (OSError, UnicodeDecodeError) as error:
+        raise RootConfigError(f"{path} cannot be read as UTF-8 text: {error}") from error
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        raise RootConfigError(f"{path} is not valid TOML: {error}") from error
+
+
 def configured_root(path: Path) -> Path:
     """The root `path` names, refused by name when it names none that exists."""
     try:
-        text = path.read_text(encoding="utf-8")
+        root = _config_table(path).get(_ROOT_KEY)
     except FileNotFoundError:
         raise RootConfigError(
             f'{path} does not exist; create it with {_ROOT_KEY} = "<absolute path>"'
         ) from None
-    except (OSError, UnicodeDecodeError) as error:
-        raise RootConfigError(f"{path} cannot be read as UTF-8 text: {error}") from error
-    try:
-        root = tomllib.loads(text).get(_ROOT_KEY)
-    except tomllib.TOMLDecodeError as error:
-        raise RootConfigError(f"{path} is not valid TOML: {error}") from error
     if not isinstance(root, str):
         raise RootConfigError(f'{path} sets no {_ROOT_KEY} = "<absolute path>"')
     if not Path(root).is_absolute():
@@ -95,6 +105,22 @@ def configured_root(path: Path) -> Path:
     if not Path(root).is_dir():
         raise RootConfigError(f"{path}: {_ROOT_KEY} {root} is not a directory")
     return Path(root)
+
+
+def configured_board_port(path: Path) -> int | None:
+    """The port the board listens on, `board_port` in `path`; `None` when the
+    file or the key is absent, refused by name when the value is no port."""
+    try:
+        port = _config_table(path).get(_BOARD_PORT_KEY)
+    except FileNotFoundError:
+        return None
+    if port is None:
+        return None
+    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= _HIGHEST_PORT:
+        raise RootConfigError(
+            f"{path}: {_BOARD_PORT_KEY} {port!r} is not an integer from 1 to {_HIGHEST_PORT}"
+        )
+    return port
 
 
 def discover(root: Path) -> Discovery:

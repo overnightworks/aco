@@ -25,9 +25,9 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
     serve.add_argument(
         "--port",
         type=_port,
-        default=0,
+        default=None,
         metavar="N",
-        help="loopback port to listen on; 0 (default) picks a free one",
+        help="loopback port to listen on; 0 picks a free one; default: board_port, else 0",
     )
 
 
