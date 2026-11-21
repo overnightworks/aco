@@ -223,7 +223,7 @@ def bounded_command(command: list[str], *, purpose: str, input_data: bytes | Non
         graphql = command[1:3] == ["api", "graphql"]
         limit = github_failure.RateLimit.GRAPHQL if graphql else github_failure.RateLimit.REST
         raise github_failure.nonzero_exit_failure(
-            decoded, exit_status, purpose, request_limit=limit
+            github_paging.without_head(decoded), exit_status, purpose, request_limit=limit
         )
     return decoded
 

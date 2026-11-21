@@ -66,9 +66,18 @@ def paths_of(log: Path) -> list[str]:
     return [call[1] for call in calls_of(log) if "rate_limit" not in call]
 
 
+FAILED_PAGE_HEADERS = (
+    "Content-Type: application/json; charset=utf-8",
+    "Content-Security-Policy: default-src 'none'",
+    "X-Oauth-Scopes: repo, workflow",
+    "X-Ratelimit-Remaining: 3499",
+)
+REFUSED_BODY = '{"message":"x"}'
+
+
 def failed_page(status: str, body: str, closing: str) -> str:
     """What `gh api -i` prints for a refused page: the head, the body, then its own message."""
-    return head_block(status, "Content-Type: application/json") + body + "\n" + closing
+    return head_block(status, *FAILED_PAGE_HEADERS) + body + "\n" + closing
 
 
 SUB_ISSUE = json.dumps(
@@ -210,7 +219,7 @@ def sub_issues_of(client: github.GitHubForge) -> object:
         ),
     ],
 )
-def test_a_failed_page_is_classified_from_the_closing_message_behind_the_head_block(
+def test_a_failed_page_is_refused_in_the_message_gh_prints_without_the_head_block(
     closing: str,
     status: str,
     error: type[forge.ForgeError],
@@ -218,14 +227,16 @@ def test_a_failed_page_is_classified_from_the_closing_message_behind_the_head_bl
     tmp_path: Path,
 ) -> None:
     gh_listing(
-        [(FIRST_PAGE, 0), (failed_page(status, '{"message":"x"}', closing), 1)],
+        [(FIRST_PAGE, 0), (failed_page(status, REFUSED_BODY, closing), 1)],
         monkeypatch,
         tmp_path,
     )
     client = github.GitHubForge(REPOSITORY)
 
-    with pytest.raises(error):
+    with pytest.raises(error) as refusal:
         sub_issues_of(client)
+
+    assert str(refusal.value) == f"{REFUSED_BODY}\n{closing}"
 
 
 def test_a_rate_limit_on_the_second_page_is_transient_and_names_its_reset(

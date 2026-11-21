@@ -27,6 +27,13 @@ def split_answer(decoded: str) -> tuple[list[str], str]:
     return head.splitlines(), "".join(body)
 
 
+def without_head(decoded: str) -> str:
+    """The output of a failed `gh api -i` call behind its head block: the body and gh's own
+    closing message, as a call without `-i` prints them. Output with no status line stays."""
+    head, body = split_answer(decoded)
+    return decoded if status(head) is None else body
+
+
 def status(head: list[str]) -> int | None:
     """The status code of a response head's first line, `None` when it has no status line."""
     found = _STATUS_LINE.match(head[0]) if head else None
