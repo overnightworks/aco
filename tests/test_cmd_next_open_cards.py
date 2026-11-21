@@ -1,13 +1,14 @@
 """`aco next` lists an item whose open option lines all wait on the operator apart
-from its actions (NEXT-70), as it lists an item with an operator `wait`."""
+from its actions (NEXT-70), as it lists an item with an operator `wait`, and never
+cuts such a container (E-NEXT-24)."""
 
 import json
 
 import pytest
-from board_fixtures import board_issue, complete_contract
+from board_fixtures import board_issue, complete_contract, container_with_children, slice_entries
 from cli_fixtures import freeze_cli_now, run_cli
 from github_fixtures import FakeForge, serve_forge
-from option_cards import card, item_body, returned_today
+from option_cards import card, item_body, open_option_entry, returned_today
 
 from aco import workboard
 
@@ -22,6 +23,22 @@ def serve_board(monkeypatch: pytest.MonkeyPatch, *issues: workboard.Issue) -> No
 
 def free_item() -> workboard.Issue:
     return board_issue(FREE_ITEM, "Frei", complete_contract(f"Claim #{FREE_ITEM}."))
+
+
+def serve_container_with_open_card_and_free_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Container `#7`: no open child, one uncut row, one open option line; beside `free_item`."""
+    container, children = container_with_children(
+        7,
+        closed=1,
+        body=complete_contract(
+            "Cut A.", slice=slice_entries("Scheibe A"), expectation=[open_option_entry()]
+        ),
+    )
+    freeze_cli_now(monkeypatch)
+    serve_forge(
+        monkeypatch,
+        FakeForge(board_issues=(container, free_item()), children={7: children}),
+    )
 
 
 @pytest.mark.usefixtures("github_world")
@@ -55,3 +72,23 @@ class TestNextWithOpenCards:
         payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
 
         assert (payload["number"], payload["waiting_on_operator"]) == (7, [])
+
+    def test_text_cuts_no_container_that_waits_on_its_card(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: NEXT-70, E-NEXT-24 -- the free item comes first, the container waits."""
+        serve_container_with_open_card_and_free_item(monkeypatch)
+
+        lines = run_cli(["next"], capsys).stdout.splitlines()
+
+        assert (lines[0].startswith(f"#{FREE_ITEM} "), WAITING_LINE in lines) == (True, True)
+
+    def test_json_cuts_no_container_that_waits_on_its_card(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Spec: NEXT-70, E-NEXT-24 -- --json names the free item, not a cut."""
+        serve_container_with_open_card_and_free_item(monkeypatch)
+
+        payload = json.loads(run_cli(["next", "--json"], capsys).stdout)
+
+        assert (payload["number"], payload["waiting_on_operator"]) == (FREE_ITEM, [7])

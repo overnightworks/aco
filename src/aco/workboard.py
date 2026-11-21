@@ -2133,15 +2133,14 @@ def closable_container_number(
 
 def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
     """The action a childless container qualifies for, read off its one `childless_verdict`, or
-    `None` to skip it: a non-`VALID` body names its own finding elsewhere, and a container
-    waiting on the operator, on a `wait` or on an open blocker is only ever closed, never cut."""
+    `None` to skip it: a non-`VALID` body names its own finding elsewhere, and a container waiting
+    on the operator's cards (NEXT-70), a `wait` or an open blocker is only closed, never cut."""
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
     verdict = item.childless_verdict
-    if (item.is_waiting or item.open_blockers) and not isinstance(verdict, CloseVerdict):
-        return None
+    held = item.is_waiting or item.waits_on_operator or bool(item.open_blockers)
     match verdict:
-        case CutVerdict(title=cut_title):
+        case CutVerdict(title=cut_title) if not held:
             return CutSliceAction(item, container, cut_title)
         case CloseVerdict():
             return CloseContainerAction(item, container)

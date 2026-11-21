@@ -122,7 +122,7 @@ other printable space are text.
 - [ ] [NEXT-34] A NEXT-05 container behind the first action (unblocked, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped, never `container; claim a child`.
 - [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
 - [ ] [NEXT-39] An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
-- [ ] [NEXT-70] An item with an open option line, none sent back (NEXT-45), waits on the operator as NEXT-39 says, without a `wait`: never pulled, cut or first; `waiting on operator: <labels>` lists it (E-NEXT-21).
+- [ ] [NEXT-70] An item with an open option line, none sent back (NEXT-45), waits on the operator as NEXT-39 says, without a `wait`: never pulled, cut or first; `waiting on operator: <labels>` lists it (E-NEXT-21); a childless container so waiting is never cut (E-NEXT-24).
 - [ ] [NEXT-59] A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
 - [ ] [NEXT-61] The label `needs-operator` on an item without an operator `wait` holds nothing: the item is pulled or cut like any other.
 - [ ] [NEXT-60] A container whose open children all live in other repositories reads `container; waiting on <owner>/<repo>#<n>, ...` under `SKIPPED`, never `container; claim a child` (NEXT-38 appends it).
@@ -594,5 +594,21 @@ Run: aco claim 10
 parallel: none
 scope unknown: none
 close: none
+exit 0
+```
+
+### E-NEXT-24 — a container whose open option line waits for the operator
+
+Setup: bare-remote, fake `gh`, container `#7` with no open child, one `[[slice]]` row and one open option line, no `wait`; `#8` is a scopeless open item
+
+```console
+$ aco next
+#8 score -10: Frei
+Next: Claim #8.
+Run: aco claim 8 --scope <paths>
+scope unknown
+parallel: unknown (first action names no scope)
+close: none
+waiting on operator: #7
 exit 0
 ```
