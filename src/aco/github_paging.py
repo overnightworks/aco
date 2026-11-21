@@ -12,6 +12,7 @@ from . import forge
 
 API_ORIGIN = "https://api.github.com/"
 _STATUS_LINE = re.compile(r"HTTP/\S+\s+(\d{3})")
+_HEADER_FIELD = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+:")
 _HEAD_END = re.compile(r"\r?\n\r?\n")
 _LINK_ENTRY = r'<([^>]*)>;\s*rel="([^"]*)"'
 _LINK_VALUE = re.compile(rf"{_LINK_ENTRY}(?:,\s*{_LINK_ENTRY})*")
@@ -63,6 +64,8 @@ def read_pages(run: Callable[[list[str]], str], path: str, jq: str) -> str:
         head, body = split_answer(run(["api", next_path, "-i", "--jq", jq]))
         if status(head) is None:
             raise forge.ForgeMalformedResponseError("GitHub returned an answer without a header")
+        if not all(_HEADER_FIELD.match(line) for line in head[1:]):
+            raise forge.ForgeMalformedResponseError("GitHub returned a malformed header block")
         next_path = _next_path(head)
         if body:
             pages.append(body)

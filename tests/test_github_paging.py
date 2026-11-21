@@ -156,9 +156,17 @@ def test_a_listing_of_n_rows_costs_one_call_per_hundred_rows(rows: int) -> None:
         ),
         pytest.param("1\n2", "without a header", id="body-without-a-head"),
         pytest.param("", "without a header", id="empty-answer"),
+        pytest.param(
+            'HTTP/2.0 200 OK\n{"number":5}', "malformed header block", id="body-in-the-head"
+        ),
+        pytest.param(
+            head_block("200 OK", "Content-Type: application/json", "[1]"),
+            "malformed header block",
+            id="header-line-without-a-field-name",
+        ),
     ],
 )
-def test_a_listing_fails_loud_on_a_foreign_or_malformed_link_or_a_missing_head(
+def test_a_listing_fails_loud_on_a_foreign_or_malformed_link_or_a_missing_or_malformed_head(
     answer: str, message: str
 ) -> None:
     run = run_of([answer], [])
