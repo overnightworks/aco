@@ -27,6 +27,14 @@ class MalformedTokenFileError(Exception):
         self.path = path
 
 
+class UnreadableTokenFileError(Exception):
+    """The token file exists but cannot be read."""
+
+    def __init__(self, path: Path, error: OSError) -> None:
+        super().__init__(f"board token {path} is unreadable: {error.strerror or error}")
+        self.path = path
+
+
 class MissingTokenFileError(Exception):
     """No token file exists yet: no board has been started on this machine."""
 
@@ -83,7 +91,12 @@ def _make_missing_directories(directory: Path) -> None:
 
 
 def _read(path: Path) -> str:
-    content = path.read_bytes()
+    try:
+        content = path.read_bytes()
+    except FileNotFoundError:
+        raise
+    except OSError as error:
+        raise UnreadableTokenFileError(path, error) from error
     if _TOKEN_SHAPE.fullmatch(content) is None:
         raise MalformedTokenFileError(path)
     return content.decode("ascii").removesuffix("\n")

@@ -15,6 +15,7 @@ from . import protocol, repositories
 from .board_token import (
     MalformedTokenFileError,
     MissingTokenFileError,
+    UnreadableTokenFileError,
     existing_board_token,
     token_path,
 )
@@ -69,7 +70,7 @@ def configured_board_url(selection: CardLink | StepLink | None = None) -> str:
         raise protocol.ClaimError(f"board_port is not set in {config}")
     try:
         token = existing_board_token(token_path(environment, home))
-    except (MalformedTokenFileError, MissingTokenFileError) as error:
+    except (MalformedTokenFileError, MissingTokenFileError, UnreadableTokenFileError) as error:
         raise protocol.ClaimError(str(error)) from error
     return board_url(port, token, selection)
 

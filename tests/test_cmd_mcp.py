@@ -310,6 +310,21 @@ def test_an_asked_card_answers_no_link_where_no_board_port_is_configured(
     assert asked["result"]["structuredContent"]["link"] is None
 
 
+def test_an_asked_card_answers_no_link_where_the_token_file_is_unreadable(
+    root: Path, board_unit: BoardUnit, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: MCP-80"""
+    repository_with_card(root / "here", 1, "Here")
+    board_unit.token_file.unlink()
+    board_unit.token_file.mkdir()
+
+    _, [asked] = run_mcp(monkeypatch, ask_line(1))
+
+    assert asked["result"]["isError"] is False
+    assert asked["result"]["structuredContent"]["link"] is None
+    assert asked["result"]["structuredContent"]["written"] is True
+
+
 @pytest.mark.parametrize(
     ("asked", "sentence"),
     [

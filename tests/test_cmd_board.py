@@ -150,6 +150,20 @@ def test_board_url_without_a_token_file_refuses_naming_it(
     assert not token.exists()
 
 
+def test_board_url_with_an_unreadable_token_file_refuses_naming_it(
+    capsys: pytest.CaptureFixture[str], board_unit: BoardUnit, checkout: str
+) -> None:
+    """Spec: BOARD-63"""
+    token = board_unit.token_file
+    token.unlink()
+    token.mkdir()
+
+    run = run_cli(["board", "--url"], capsys)
+
+    assert run.stdout == ""
+    assert run.expect_refusal() == f"ERROR: board token {token} is unreadable: Is a directory\n"
+
+
 @pytest.mark.parametrize(
     ("arguments", "sentence"),
     [

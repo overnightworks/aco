@@ -171,7 +171,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 ## Answering a step
 
 - [ ] [MCP-79] `ask` and `step` also answer `link`: the URL `aco board --url` prints for the line asked or the step (BOARD-62, BOARD-64), built by the same producer (ABRD-187).
-- [ ] [MCP-80] Where `board_port` is not set or the token file is missing, `link` is `null` and the call succeeds all the same.
+- [ ] [MCP-80] Wherever the link cannot be built (`board_port` unset or malformed, the token file missing, malformed or unreadable), `link` is `null` and the call succeeds all the same.
 - [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
 - [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` stays as it is, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
 - [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.

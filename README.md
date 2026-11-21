@@ -101,7 +101,7 @@ log record, one per answered request plus the start and stop lines. The browser 
 lives in `frontend/`; its build output is committed under `src/aco/board/static/`.
 With `board_port` set, `aco board --url [<item> [--line K]]` prints the board's address, an
 item's step link or a card's link, which opens the board at that card or step; the
-`ask` and `step` tools of `aco mcp` return the same link.
+`ask` and `step` tools of `aco mcp` return the same link. The link names the repository of the checkout the command runs in (or `--repo`), so run it in the item's repository.
 
 ## MCP
 
