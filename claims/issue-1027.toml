@@ -1,8 +1,0 @@
-claim_id = "8e41d7ab7d944ce5a63e86878d7eafbf"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "cf3e389d95b6c2edf69c87520fe4e04d2709fdd0"
-branch = "claude/issue-1027-board-link-per-card"
-scope = ["README.md", "frontend/e2e", "frontend/src", "quality/baseline.toml", "specs/board.spec.md", "specs/mcp.spec.md", "specs/serve.spec.md", "src/aco/board", "src/aco/cli.py", "src/aco/cmd_board.py", "src/aco/cmd_mcp.py", "src/aco/cmd_serve.py", "src/aco/item_step.py", "src/aco/mcp_server.py", "src/aco/repositories.py", "src/aco/session.py", "tests/board", "tests/support/e2e_server.py", "tests/test_board.py", "tests/test_board_link.py", "tests/test_cli.py", "tests/test_cmd_board.py", "tests/test_mcp_server.py", "tests/test_repositories.py"]
-opened_commit = "c0ae652f4553010d612b02a2c3330b419c734406"
-whole_reason = "One link producer read by serve, aco board --url and the mcp ask/step results, and the frontend that opens at the linked card or step; the parts only prove the link together."
