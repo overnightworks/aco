@@ -5,8 +5,8 @@ module's production callers.
 """
 
 from collections.abc import Iterable
-from itertools import pairwise
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 from .protocol import ActiveClaim, ClaimError, ObjectId, StateLineageError
