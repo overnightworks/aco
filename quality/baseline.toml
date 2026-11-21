@@ -26,10 +26,10 @@
 "tests/test_board.py" = 3567
 "tests/test_checkout.py" = 2037
 "tests/test_cli.py" = 11921
-"tests/test_cmd_adopt.py" = 1427
+"tests/test_cmd_adopt.py" = 1418
 "tests/test_cmd_cut.py" = 1066
 "tests/test_cmd_land_after_merge_rerun.py" = 862
-"tests/test_cmd_land_preflight_claim.py" = 851
+"tests/test_cmd_land_preflight_claim.py" = 850
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
 "tests/test_github.py" = 2473

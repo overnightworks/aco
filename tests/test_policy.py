@@ -49,33 +49,38 @@ def test_listed_paths_judge_only_a_complete_listing(
         pytest.param(
             "uv.lock",
             "uv.lock.bak",
-            "changes uv.lock.bak, which dependency_paths in .aco/board.toml does not name",
+            "changes uv.lock.bak, which dependency_paths in .aco/board.toml does not name; "
+            "a bump that needs a code edit lands as No-Item: fix",
             id="P9",
         ),
         pytest.param(
             ".github/workflows/",
             ".github/workflows/../../src/x.py",
             "changes .github/workflows/../../src/x.py, "
-            "which dependency_paths in .aco/board.toml does not name",
+            "which dependency_paths in .aco/board.toml does not name; "
+            "a bump that needs a code edit lands as No-Item: fix",
             id="P11",
         ),
         pytest.param(
             "vendor/",
             "vendor/a\\b",
-            "changes vendor/a\\b, which dependency_paths in .aco/board.toml does not name",
+            "changes vendor/a\\b, which dependency_paths in .aco/board.toml does not name; "
+            "a bump that needs a code edit lands as No-Item: fix",
             id="P11-backslash",
         ),
         pytest.param(
             "vendor/",
             "vendor/a ",
-            "changes vendor/a , which dependency_paths in .aco/board.toml does not name",
+            "changes vendor/a , which dependency_paths in .aco/board.toml does not name; "
+            "a bump that needs a code edit lands as No-Item: fix",
             id="P11-trailing-space",
         ),
         pytest.param(
             "vendor/",
             "vendor/" + "a" * 506,
             "changes vendor/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…, "
-            "which dependency_paths in .aco/board.toml does not name",
+            "which dependency_paths in .aco/board.toml does not name; "
+            "a bump that needs a code edit lands as No-Item: fix",
             id="P11-over-512",
         ),
     ],
