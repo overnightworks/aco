@@ -9,6 +9,7 @@ import pytest
 from board_fixtures import REPOSITORY
 from cli_fixtures import real_git, run_cli
 from github_fixtures import Checks, FakeForge, landed_world
+from github_pages import listing_answer
 
 from aco import forge, github
 from aco.github import GitHubForge
@@ -42,15 +43,17 @@ def checks_read_from(read: TrunkRead, sha: str) -> Callable[[bool], Checks]:
     when GitHub gives `read`'s rows."""
 
     def transport(arguments: list[str], *, input_data: bytes | None = None) -> str:
-        path = arguments[-3] if "--paginate" in arguments else arguments[1]
+        path = arguments[1]
         if "check-runs" in path:
-            return "\n".join(json.dumps(row) for row in read.check_runs)
+            return listing_answer(arguments, "\n".join(json.dumps(row) for row in read.check_runs))
         if "actions/runs" in path:
             if isinstance(read.workflow_runs, forge.ForgeError):
                 raise read.workflow_runs
             if isinstance(read.workflow_runs, str):
-                return read.workflow_runs
-            return "\n".join(json.dumps(row) for row in read.workflow_runs)
+                return listing_answer(arguments, read.workflow_runs)
+            return listing_answer(
+                arguments, "\n".join(json.dumps(row) for row in read.workflow_runs)
+            )
         return json.dumps({"state": "pending", "total": 0})
 
     client = GitHubForge(github.repository_id(REPOSITORY), run=transport)

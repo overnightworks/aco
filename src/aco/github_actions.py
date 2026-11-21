@@ -12,7 +12,7 @@ MALFORMED_CHECK_RUN = "GitHub returned a malformed check run"
 
 
 def push_suites(
-    read: Callable[[list[str]], tuple[object, ...]],
+    read: Callable[[str, str], tuple[object, ...]],
     repository: forge.RepositoryId,
     sha: str,
     *,
@@ -22,15 +22,7 @@ def push_suites(
     when `push_only` is off and every check run counts."""
     if not push_only:
         return None
-    rows = read(
-        [
-            "api",
-            "--paginate",
-            f"repos/{repository}/actions/runs?head_sha={sha}&per_page=100",
-            "--jq",
-            WORKFLOW_RUNS_JQ,
-        ]
-    )
+    rows = read(f"repos/{repository}/actions/runs?head_sha={sha}&per_page=100", WORKFLOW_RUNS_JQ)
     suites: set[int] = set()
     for row in rows:
         fields = row if isinstance(row, dict) else {}

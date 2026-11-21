@@ -5,6 +5,7 @@ import json
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import MERGE_COMMIT_SHA
+from github_pages import paged_listing
 
 from aco import forge, github
 from aco.github import GitHubForge
@@ -13,21 +14,14 @@ CHECK_RUNS_PATH = f"repos/{REPOSITORY}/commits/{MERGE_COMMIT_SHA}/check-runs"
 STATUS_PATH = f"repos/{REPOSITORY}/commits/{MERGE_COMMIT_SHA}/status"
 
 
-def check_run_forge(runs: list[dict[str, object]], *, page_size: int | None = None) -> GitHubForge:
-    """A real adapter whose transport answers `check-runs` with `runs` (split into pages of
-    `page_size`) and reports no combined-status context."""
-    pages = (
-        [runs]
-        if page_size is None
-        else [runs[i : i + page_size] for i in range(0, len(runs), page_size)]
-    )
+def check_run_forge(runs: list[dict[str, object]]) -> GitHubForge:
+    """A real adapter whose transport answers `check-runs` with `runs`, page by page as the
+    request's `per_page` selects, and reports no combined-status context."""
 
     def fake_run(arguments: list[str], *, input_data: bytes | None = None) -> str:
         path = arguments[1]
         if path.startswith(CHECK_RUNS_PATH):
-            page = int(path.rsplit("page=", 1)[1])
-            rows = pages[page - 1] if page <= len(pages) else []
-            return "\n".join(json.dumps(row) for row in rows)
+            return paged_listing(arguments, runs)
         assert path == STATUS_PATH
         return json.dumps({"state": "pending", "total": 0})
 
@@ -91,9 +85,7 @@ def test_check_read_keeps_the_newest_run_of_each_name(
 def test_check_read_compares_runs_across_pages(monkeypatch: pytest.MonkeyPatch) -> None:
     """Spec: LANDCMD-56."""
     monkeypatch.setattr(github, "ISSUES_PER_PAGE", 1)
-    client = check_run_forge(
-        [run_row(1, "pr-check", "failure"), run_row(2, "pr-check", "success")], page_size=1
-    )
+    client = check_run_forge([run_row(1, "pr-check", "failure"), run_row(2, "pr-check", "success")])
 
     checks = client.commit_checks(MERGE_COMMIT_SHA)
 

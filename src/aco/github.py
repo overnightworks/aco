@@ -9,7 +9,6 @@ from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TypeVar
 from urllib.parse import quote
 
 from . import (
@@ -18,6 +17,7 @@ from . import (
     github_failure,
     github_issue_payload,
     github_merge_queue,
+    github_paging,
     github_pull_requests,
     process,
     protocol,
@@ -27,11 +27,10 @@ from .body import ItemKind
 from .github_body_check import write_body_checked
 from .protocol import REPOSITORY_PATTERN, ClaimError
 
-_Page = TypeVar("_Page")
 # gh 2.45 colorizes --jq output when it believes stdout is a TTY.
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-# Page walks and per-item reads are independent fetches. This bounds how many `gh` subprocesses
-# one call runs at once, comfortably under GitHub's secondary rate limit for concurrent requests.
+# The candidate items' reopen reads are independent fetches. This bounds how many `gh` subprocesses
+# run at once, comfortably under GitHub's secondary rate limit for concurrent requests.
 PARALLEL_FETCH_CONCURRENCY = 20
 GH_TIMEOUT_SECONDS = 60
 GH_QUIET_ENVIRONMENT = {
@@ -49,9 +48,6 @@ API_ISSUE_STATES: dict[str, workboard.BlockerState] = {
 ITEM_KIND_TYPE_NAMES: dict[ItemKind, str] = {
     kind: name.capitalize() for name, kind in github_issue_payload.ISSUE_TYPE_KINDS.items()
 }
-# GitHub's issues-list pagination fills every page but the last, so a result
-# strictly under this count could only have come from one request -- one live
-# snapshot a concurrent open/close cannot have shifted an issue across.
 ISSUES_PER_PAGE = 100
 _READINESS_JQ = "{state,draft:.draft,headSha:.head.sha,mergeableState:.mergeable_state}"
 MALFORMED_PULL_REQUEST = github_pull_requests.MALFORMED_PULL_REQUEST
@@ -334,20 +330,14 @@ class GitHubForge:
         variables = {"owner": self.repository.namespace[0], "name": self.repository.name}
         return self._graphql(query, variables, ".data.repository", description)
 
-    def _paged_rows(
-        self, request: Callable[[int], list[str]], description: str
-    ) -> tuple[object, ...]:
-        """Every row of the REST list whose page `request` names, `ISSUES_PER_PAGE` to a page."""
-        return self._fetch_pages(
-            lambda page: self._json_lines(self._run(request(page)), description),
-            per_page=ISSUES_PER_PAGE,
-        )
+    def _listing(self, path: str, jq: str, description: str) -> tuple[object, ...]:
+        """Every row `jq` selects from the REST listing at `path`, one counted call per page."""
+        return self._json_lines(github_paging.read_pages(self._run, path, jq), description)
 
     def _reopened_at(self, number: int) -> datetime | None:
-        events = self._paged_rows(
-            lambda page: github_pull_requests.events_page_request(
-                self.repository, number, page, ISSUES_PER_PAGE
-            ),
+        events = self._listing(
+            github_pull_requests.events_path(self.repository, number, ISSUES_PER_PAGE),
+            github_pull_requests.ONE_ROW_PER_LINE,
             "issue event",
         )
         return github_pull_requests.reopened_at(events)
@@ -379,36 +369,6 @@ class GitHubForge:
                 f"GitHub returned invalid {description} JSON"
             ) from error
         return tuple(values)
-
-    def _fetch_pages(
-        self, page: Callable[[int], tuple[_Page, ...]], *, per_page: int
-    ) -> tuple[_Page, ...]:
-        """Every page from `page` (1-indexed), the first fetched alone and the
-        rest in concurrent batches of `PARALLEL_FETCH_CONCURRENCY`.
-
-        A single-page listing (the common case for a small or fresh
-        repository) costs exactly the one round trip it always did. A page
-        past the last one returns an empty array rather than erroring, so
-        once page 1 comes back full, a batch can ask for the next
-        `PARALLEL_FETCH_CONCURRENCY` page numbers at once; the batch's last
-        page coming back short of a full page is what ends the fetch, exactly
-        as a single `gh api --paginate` call would stop, just without waiting
-        for each page's round trip in turn.
-        """
-        first_page = page(1)
-        if len(first_page) < per_page:
-            return first_page
-        pages: list[_Page] = list(first_page)
-        start = 2
-        while True:
-            batch = range(start, start + PARALLEL_FETCH_CONCURRENCY)
-            with ThreadPoolExecutor(max_workers=PARALLEL_FETCH_CONCURRENCY) as pool:
-                fetched = list(pool.map(page, batch))
-            for page_values in fetched:
-                pages.extend(page_values)
-            if len(fetched[-1]) < per_page:
-                return tuple(pages)
-            start += PARALLEL_FETCH_CONCURRENCY
 
     def landing(self, number: int) -> forge.Landing:
         try:
@@ -464,17 +424,13 @@ class GitHubForge:
     def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
         # The files endpoint has no revision pin: both readings belong to this listing.
         before = self._listing_reading(number)
-        raw = self._run(
-            [
-                "api",
-                "--paginate",
-                f"repos/{self.repository}/pulls/{number}/files?per_page=100",
-                "--jq",
-                ".[] | {filename,previous_filename,status}",
-            ]
+        values = self._listing(
+            f"repos/{self.repository}/pulls/{number}/files?per_page=100",
+            ".[] | {filename,previous_filename,status}",
+            "changed files",
         )
         after = self._listing_reading(number)
-        files = tuple(self._changed_file(value) for value in self._json_lines(raw, "changed files"))
+        files = tuple(map(self._changed_file, values))
         if len({file.path for file in files}) != len(files):
             raise forge.ForgeMalformedResponseError("GitHub returned duplicate changed files")
         return forge.PullRequestChanges(before, after, files)
@@ -493,26 +449,16 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError(github_actions.MALFORMED_CHECK_RUN)
         return run_id, forge.CheckRun(name, conclusion), suite
 
-    def _check_run_page(self, sha: str, page: int) -> tuple[object, ...]:
-        raw = self._run(
-            [
-                "api",
-                f"repos/{self.repository}/commits/{sha}/check-runs"
-                f"?per_page={ISSUES_PER_PAGE}&page={page}",
-                "--jq",
-                '.check_runs[] | {id,name,suite:(if .app.slug == "github-actions" '
-                'then .check_suite.id else null end),conclusion:(if .status == "completed" '
-                "then .conclusion else null end)}",
-            ]
-        )
-        return self._json_lines(raw, "check run")
-
     def _check_runs(
         self, sha: str, suites: github_actions.Suites = None
     ) -> tuple[forge.CheckRun, ...]:
         """Each check name's newest run against `sha` among the `suites` admit, over every page."""
-        values = self._fetch_pages(
-            lambda page: self._check_run_page(sha, page), per_page=ISSUES_PER_PAGE
+        values = self._listing(
+            f"repos/{self.repository}/commits/{sha}/check-runs?per_page={ISSUES_PER_PAGE}",
+            '.check_runs[] | {id,name,suite:(if .app.slug == "github-actions" '
+            'then .check_suite.id else null end),conclusion:(if .status == "completed" '
+            "then .conclusion else null end)}",
+            "check run",
         )
         return github_actions.newest_per_name(map(self._check_run, values), suites)
 
@@ -548,18 +494,6 @@ class GitHubForge:
             )
         return state, total
 
-    def _combined_status_name_page(self, sha: str, page: int) -> tuple[object, ...]:
-        raw = self._run(
-            [
-                "api",
-                f"repos/{self.repository}/commits/{sha}/status"
-                f"?per_page={ISSUES_PER_PAGE}&page={page}",
-                "--jq",
-                ".statuses[] | {name:.context}",
-            ]
-        )
-        return self._json_lines(raw, "commit status")
-
     def _combined_status_names(self, sha: str) -> tuple[str, ...]:
         """Every combined-status context's own name, paginated:
         named to report each context as a
@@ -567,8 +501,10 @@ class GitHubForge:
         to fill in a refusal sentence once it reads anything else -- only
         `total_count` zero (no statuses at all) never pays for this
         pagination at all."""
-        values = self._fetch_pages(
-            lambda page: self._combined_status_name_page(sha, page), per_page=ISSUES_PER_PAGE
+        values = self._listing(
+            f"repos/{self.repository}/commits/{sha}/status?per_page={ISSUES_PER_PAGE}",
+            ".statuses[] | {name:.context}",
+            "commit status",
         )
         names: list[str] = []
         for value in values:
@@ -600,7 +536,7 @@ class GitHubForge:
         """Every check against `sha`: its check runs plus its combined commit status (SonarCloud
         and the like); `push_only` drops Actions runs that something other than a push started."""
         suites = github_actions.push_suites(
-            lambda arguments: self._json_lines(self._run(arguments), "workflow run"),
+            lambda path, jq: self._listing(path, jq, "workflow run"),
             self.repository,
             sha,
             push_only=push_only,
@@ -686,21 +622,16 @@ class GitHubForge:
     def _branch_rules(self, branch: str) -> tuple[object, ...]:
         """Every rule of every ruleset applying to `branch`, none on a plan without rulesets."""
         try:
-            raw = self._run(
-                [
-                    "api",
-                    "--paginate",
-                    f"repos/{self.repository}/rules/branches/{branch}?per_page=100",
-                    "--jq",
-                    ".[]",
-                ]
+            return self._listing(
+                f"repos/{self.repository}/rules/branches/{branch}?per_page=100",
+                github_pull_requests.ONE_ROW_PER_LINE,
+                "branch rules",
             )
         except forge.ForgePermissionDeniedError as error:
             refusal = str(error)
             if _RULESETS_UNAVAILABLE_STATUS in refusal and _RULESETS_UNAVAILABLE_ON_PLAN in refusal:
                 return ()
             raise
-        return self._json_lines(raw, "branch rules")
 
     def merge_landing(
         self,
@@ -880,17 +811,13 @@ class GitHubForge:
         not understand would otherwise vanish and make a parent look childless, which is exactly the
         landing this check must refuse. A child recorded in another repository is a `ForeignChild`.
         """
-        raw = self._run(
-            [
-                "api",
-                "--paginate",
-                f"repos/{self.repository}/issues/{number}/sub_issues?per_page=100",
-                "--jq",
-                ".[] | {number,repository:.repository_url,state,title,type:(.type.name // null)}",
-            ]
+        values = self._listing(
+            f"repos/{self.repository}/issues/{number}/sub_issues?per_page=100",
+            ".[] | {number,repository:.repository_url,state,title,type:(.type.name // null)}",
+            "sub-issue",
         )
         children: list[workboard.ChildItem | workboard.ForeignChild] = []
-        for value in self._json_lines(raw, "sub-issue"):
+        for value in values:
             child = self._issue_reference(value, "sub-issue")
             state = workboard.ChildState(self._issue_state(value, "sub-issue").value)
             if child.repository == self.repository.path:
@@ -906,21 +833,20 @@ class GitHubForge:
             raise forge.ForgeMalformedResponseError("GitHub returned a malformed default branch")
         return branch
 
-    def _issue_page(self, page: int, *, state: str, label: str | None = None) -> tuple[object, ...]:
+    def _issues_path(self, *, state: str, label: str | None = None) -> str:
         newest = f"&labels={quote(label, safe='')}&sort=created&direction=desc" if label else ""
-        query = f"state={state}{newest}&per_page={ISSUES_PER_PAGE}&page={page}"
-        path = f"repos/{self.repository}/issues?{query}"
-        raw = self._run(["api", path, "--jq", github_issue_payload.BOARD_ISSUE_JQ])
-        return self._json_lines(raw, "board issue")
+        return f"repos/{self.repository}/issues?state={state}{newest}&per_page={ISSUES_PER_PAGE}"
 
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
-        values = self._fetch_pages(
-            lambda page: self._issue_page(page, state="open"), per_page=ISSUES_PER_PAGE
+        values = self._listing(
+            self._issues_path(state="open"), github_issue_payload.BOARD_ISSUE_JQ, "board issue"
         )
         return github_issue_payload.board_issues(values)
 
     def newest_labelled_issues(self, label: str) -> tuple[workboard.Issue, ...]:
-        return github_issue_payload.board_issues(self._issue_page(1, state="all", label=label))
+        path = self._issues_path(state="all", label=label)
+        raw = self._run(["api", path, "--jq", github_issue_payload.BOARD_ISSUE_JQ])
+        return github_issue_payload.board_issues(self._json_lines(raw, "board issue"))
 
     MALFORMED_BOARD_DEPENDENCY = "GitHub returned a malformed board blocked-by dependency"
 
@@ -965,26 +891,19 @@ class GitHubForge:
         )
 
     def list_board_dependencies(self, number: int) -> tuple[workboard.IssueDependency, ...]:
-        raw = self._run(
-            [
-                "api",
-                "--paginate",
-                f"repos/{self.repository}/issues/{number}/dependencies/blocked_by"
-                f"?per_page={ISSUES_PER_PAGE}",
-                "--jq",
-                ".[] | {number,state,closedAt:.closed_at,repository:.repository.full_name,"
-                'isPullRequest:has("pull_request")}',
-            ]
+        values = self._listing(
+            f"repos/{self.repository}/issues/{number}/dependencies/blocked_by"
+            f"?per_page={ISSUES_PER_PAGE}",
+            ".[] | {number,state,closedAt:.closed_at,repository:.repository.full_name,"
+            'isPullRequest:has("pull_request")}',
+            "board dependency",
         )
-        return tuple(
-            self._board_dependency(value) for value in self._json_lines(raw, "board dependency")
-        )
+        return tuple(map(self._board_dependency, values))
 
     def list_open_board_pull_requests(self) -> tuple[workboard.PullRequest, ...]:
-        rows = self._paged_rows(
-            lambda page: github_pull_requests.open_page_request(
-                self.repository, page, ISSUES_PER_PAGE
-            ),
+        rows = self._listing(
+            github_pull_requests.open_pulls_path(self.repository, ISSUES_PER_PAGE),
+            github_pull_requests.ONE_ROW_PER_LINE,
             "open board pull request",
         )
         return github_pull_requests.open_pull_requests(rows)
@@ -993,29 +912,12 @@ class GitHubForge:
         self, since: datetime
     ) -> tuple[workboard.PullRequest, ...]:
         floor = since.astimezone(UTC).strftime(protocol.RFC3339_TIMESTAMP_FORMAT)
-        rows = self._paged_rows(
-            lambda page: github_pull_requests.merged_page_request(
-                self.repository, floor, page, ISSUES_PER_PAGE
-            ),
+        rows = self._listing(
+            github_pull_requests.closed_issues_path(self.repository, floor, ISSUES_PER_PAGE),
+            github_pull_requests.ONE_ROW_PER_LINE,
             "merged board pull request",
         )
         return github_pull_requests.merged_pull_requests(rows, floor)
-
-    def _closed_issue_page(self, since: str, page: int) -> tuple[object, ...]:
-        """One page of issues GitHub reports closed and updated at or after
-        `since` -- a superset of those closed since then, since a close is
-        itself an update; `list_recently_closed_issues` narrows it."""
-        raw = self._run(
-            [
-                "api",
-                github_pull_requests.closed_issues_path(
-                    self.repository, since, page, ISSUES_PER_PAGE
-                ),
-                "--jq",
-                '.[] | {number,title,closedAt:.closed_at,isPullRequest:has("pull_request")}',
-            ]
-        )
-        return self._json_lines(raw, "closed issue")
 
     def _closed_issue(self, value: object) -> tuple[forge.ClosedIssue, str] | None:
         """`value` and its own `closed_at`, or `None` for a pull request."""
@@ -1039,8 +941,10 @@ class GitHubForge:
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:
         cutoff = since.astimezone(UTC).strftime(protocol.RFC3339_TIMESTAMP_FORMAT)
-        values = self._fetch_pages(
-            lambda page: self._closed_issue_page(cutoff, page), per_page=ISSUES_PER_PAGE
+        values = self._listing(
+            github_pull_requests.closed_issues_path(self.repository, cutoff, ISSUES_PER_PAGE),
+            '.[] | {number,title,closedAt:.closed_at,isPullRequest:has("pull_request")}',
+            "closed issue",
         )
         # Both sides share RFC 3339's fixed UTC `Z` form, so string order is time order.
         return tuple(
@@ -1192,16 +1096,12 @@ class GitHubForge:
         that landed but a close that did not (a crash or a transient
         failure between the two `_run` calls below) must read this before
         posting the same comment a second time."""
-        raw = self._run(
-            [
-                "api",
-                "--paginate",
-                f"repos/{self.repository}/issues/{number}/comments?per_page=100",
-                "--jq",
-                ".[] | {body}",
-            ]
+        values = self._listing(
+            f"repos/{self.repository}/issues/{number}/comments?per_page=100",
+            ".[] | {body}",
+            "issue comment",
         )
-        for value in self._json_lines(raw, "issue comment"):
+        for value in values:
             if not isinstance(value, dict) or not isinstance(value.get("body"), str):
                 raise forge.ForgeMalformedResponseError("GitHub returned a malformed issue comment")
             if value["body"] == comment:

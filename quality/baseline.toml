@@ -17,7 +17,7 @@
 "src/aco/checkout.py" = 2019
 "src/aco/cli.py" = 820
 "src/aco/cmd_claim.py" = 1132
-"src/aco/github.py" = 1234
+"src/aco/github.py" = 1134
 "src/aco/protocol.py" = 1517
 "src/aco/state_board.py" = 921
 "src/aco/store.py" = 1534
@@ -32,12 +32,12 @@
 "tests/test_cmd_land_preflight_claim.py" = 850
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2473
+"tests/test_github.py" = 2466
 "tests/test_state_board.py" = 5834
 "tests/test_store.py" = 4233
 
 [function_lines."src/aco/board_read.py"]
-"build_board" = 70
+"build_board" = 69
 
 [function_lines."src/aco/cli.py"]
 "_add_item_parser" = 82
@@ -67,7 +67,7 @@
 "_trunk_history_repository" = 62
 
 [function_lines."tests/test_cli.py"]
-"_board_fixture_environment" = 106
+"_board_fixture_environment" = 105
 "test_landing_intent_survives_an_unrelated_ref_move_with_no_half_state" = 60
 "test_next_close_names_every_zero_cost_action_regardless_of_rank" = 61
 "test_next_prints_a_cut_command_that_cut_accepts_for_every_qualifying_container" = 73

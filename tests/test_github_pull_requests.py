@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from board_fixtures import REPOSITORY
 from github_fixtures import MERGE_COMMIT_SHA
-from github_pages import api_head, api_pull_request
+from github_pages import api_head, api_pull_request, listing_answer
 
 from aco import forge, github, workboard
 
@@ -24,8 +24,8 @@ EVENTS = f"{ISSUES}/323/events"
 def scripted_rest(
     routes: Mapping[str, Sequence[Sequence[object]]],
 ) -> tuple[github.GitHubForge, list[str]]:
-    """An adapter whose `gh` answers each REST list `routes` names, page by page (a page past
-    the last is empty), one row per line as `--jq '.[]'` prints it, and records every path asked."""
+    """An adapter whose `gh` answers each REST list `routes` names, page by page with a `Link` to
+    the next one, one row per line as `--jq '.[]'` prints it, and records every path asked."""
     asked: list[str] = []
 
     def run(arguments: list[str], *, input_data: bytes | None = None) -> str:
@@ -33,8 +33,13 @@ def scripted_rest(
         asked.append(path)
         location = urlsplit(path)
         pages = routes[location.path]
-        page = int(parse_qs(location.query)["page"][0])
-        return "\n".join(json.dumps(row) for row in (pages[page - 1] if page <= len(pages) else ()))
+        page = int(parse_qs(location.query).get("page", ["1"])[0])
+        following = f"{path.split('&page=')[0]}&page={page + 1}"
+        return listing_answer(
+            arguments,
+            "\n".join(json.dumps(row) for row in pages[page - 1]),
+            next_path=following if page < len(pages) else None,
+        )
 
     return github.GitHubForge(github.repository_id(REPOSITORY), run=run), asked
 

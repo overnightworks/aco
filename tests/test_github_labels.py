@@ -128,7 +128,7 @@ def test_labelled_issues_come_from_one_request_for_the_quoted_label_in_any_state
         [7],
         [
             f"repos/{REPOSITORY}/issues?state=all&labels=audit%20tests"
-            "&sort=created&direction=desc&per_page=100&page=1"
+            "&sort=created&direction=desc&per_page=100"
         ],
     )
 

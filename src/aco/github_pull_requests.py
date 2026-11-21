@@ -2,8 +2,8 @@
 request's landing facts and of an item's events, and the mapping of what they answer to the
 port's values.
 
-The module never runs `gh`: the adapter performs and counts every round trip, walks the pages
-and hands the parsed rows back, so no read here costs a GraphQL point.
+The module never runs `gh`: the adapter performs and counts every round trip, `github_paging`
+walks the pages and the adapter hands the parsed rows back, so no read here costs a GraphQL point.
 """
 
 from collections.abc import Callable, Iterable
@@ -18,39 +18,29 @@ _MALFORMED_EVENT = "GitHub returned a malformed issue event"
 _BOT_TYPE = "Bot"
 _BOT_LOGIN_SUFFIX = "[bot]"
 # `gh` prints a list's array as one row per line under this filter; no key is mapped by it.
-_ONE_ROW_PER_LINE = ["--jq", ".[]"]
+ONE_ROW_PER_LINE = ".[]"
 
 # Resolves a head repository's `OWNER/REPO` to its identity, or `None` when the text is no
 # repository; the adapter's answer also refuses a repository GitHub has renamed.
 SourceRepository = Callable[[str], forge.RepositoryId | None]
 
 
-def closed_issues_path(repository: forge.RepositoryId, since: str, page: int, per_page: int) -> str:
-    """One page of the issues GitHub reports closed and updated at or after `since`, newest
-    created first: a pull request merged after `since` was updated at its merge."""
-    return f"repos/{repository}/issues?state=closed&since={since}&per_page={per_page}&page={page}"
+def closed_issues_path(repository: forge.RepositoryId, since: str, per_page: int) -> str:
+    """The issues GitHub reports closed and updated at or after `since`, newest created first:
+    a pull request merged after `since` was updated at its merge."""
+    return f"repos/{repository}/issues?state=closed&since={since}&per_page={per_page}"
 
 
-def merged_page_request(
-    repository: forge.RepositoryId, since: str, page: int, per_page: int
-) -> list[str]:
-    return ["api", closed_issues_path(repository, since, page, per_page), *_ONE_ROW_PER_LINE]
-
-
-def open_page_request(repository: forge.RepositoryId, page: int, per_page: int) -> list[str]:
-    path = f"repos/{repository}/pulls?state=open&per_page={per_page}&page={page}"
-    return ["api", path, *_ONE_ROW_PER_LINE]
+def open_pulls_path(repository: forge.RepositoryId, per_page: int) -> str:
+    return f"repos/{repository}/pulls?state=open&per_page={per_page}"
 
 
 def landing_request(repository: forge.RepositoryId, number: int) -> list[str]:
     return ["api", f"repos/{repository}/pulls/{number}"]
 
 
-def events_page_request(
-    repository: forge.RepositoryId, number: int, page: int, per_page: int
-) -> list[str]:
-    path = f"repos/{repository}/issues/{number}/events?per_page={per_page}&page={page}"
-    return ["api", path, *_ONE_ROW_PER_LINE]
+def events_path(repository: forge.RepositoryId, number: int, per_page: int) -> str:
+    return f"repos/{repository}/issues/{number}/events?per_page={per_page}"
 
 
 def _malformed(message: str) -> forge.ForgeMalformedResponseError:
