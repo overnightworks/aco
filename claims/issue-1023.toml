@@ -1,8 +1,0 @@
-claim_id = "d4b273729447480ba65712644df89af5"
-agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
-role = "builder"
-base = "acd7164e543b68107b5f0d268f9c366793586a71"
-branch = "claude/issue-1023-close-held-by-open-card"
-scope = ["quality/baseline.toml", "specs/board.spec.md", "specs/landing-grammar.spec.md", "specs/next.spec.md", "src/aco/board_read.py", "src/aco/body.py", "src/aco/policy.py", "src/aco/workboard.py", "tests"]
-opened_commit = "61be171240279e0ea241c90a714113ecaf9d434e"
-whole_reason = "One closability fact read by next, board and land; the decider, its two specs and their tests move together."
