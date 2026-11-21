@@ -7,6 +7,7 @@ import pytest
 from board_fixtures import REPOSITORY, board_issue, complete_contract, container_with_children
 from cli_fixtures import freeze_cli_now, run_cli
 from github_fixtures import FakeForge, scripted_gh, serve_forge, sub_issue_row
+from github_pages import listing_runner
 
 from aco import workboard
 from aco.github import GitHubForge, repository_id
@@ -29,9 +30,9 @@ class ForgeListingSubIssuesFromGitHub(FakeForge):
     rows: tuple[str, ...] = ()
 
     def list_children(self, number: int) -> workboard.ChildList:
-        return GitHubForge(repository_id(REPOSITORY), run=scripted_gh(*self.rows)).list_children(
-            number
-        )
+        return GitHubForge(
+            repository_id(REPOSITORY), run=listing_runner(scripted_gh(*self.rows))
+        ).list_children(number)
 
 
 @pytest.mark.usefixtures("github_world")
