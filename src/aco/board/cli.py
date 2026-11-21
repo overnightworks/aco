@@ -98,11 +98,9 @@ def serve(port: int | None) -> int:
     try:
         token = board_token(token_path(os.environ, Path.home()))
     except (MalformedTokenFileError, UnreadableTokenFileError) as error:
-        remedy = (
-            "; delete it to start with a new one"
-            if isinstance(error, MalformedTokenFileError)
-            else ""
-        )
+        remedy = ""
+        if isinstance(error, MalformedTokenFileError):
+            remedy = "; delete it to start with a new one"
         print(f"ERROR: {error}{remedy}", file=sys.stderr)
         return 1
     try:

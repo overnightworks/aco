@@ -3,7 +3,7 @@
 `aco board` projects the open work board read-only, `--json` the one
 output mode (the operator-facing page is in `aco serve`,
 `specs/serve.spec.md`); a bare `aco board` naming no `--json` refuses
-instead (BOARD-44); `--url` prints the board's address (BOARD-62 to BOARD-65). This file owns `--json`'s own
+instead (BOARD-44); `--url` prints the board's address (BOARD-62 to BOARD-66). This file owns `--json`'s own
 shape -- its keys -- and the one forge-resolution precondition `aco
 next`/`aco rulings` share with it before either ever reads an issue (`##
 The shared forge precondition`, cited rather than restated by
