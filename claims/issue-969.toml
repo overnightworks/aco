@@ -1,0 +1,8 @@
+claim_id = "a183eaba881042ba82239dbd6dd59f56"
+agent = "Claude d8cf97a1-069e-4337-aac6-2a45cabd1eed"
+role = "builder"
+base = "6a42571d5c9238502cdc0b4382b8e0cf1d97bbbb"
+branch = "claude/issue-969-claim-age-from-claim-commit"
+scope = ["quality/baseline.toml", "specs/claim-record.spec.md", "src/aco/state_history.py", "tests/support/board_fixtures.py", "tests/test_cmd_status.py", "tests/test_state_history.py"]
+opened_commit = "e1ecde7953ea39bb00942d75fa5bc3e9a8178c87"
+whole_reason = "One age source, its spec line and the tests pinning it."
