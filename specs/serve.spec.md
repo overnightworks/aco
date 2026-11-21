@@ -39,6 +39,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a card saving, from its undo window's end to its answer applied | — | ABRD-97, ABRD-100 | — |
 | a read sent before an item's stored answer arrived | ABRD-98 | — | — |
 | a read while a card waits | ABRD-105 | — | — |
+| a link naming a card or a step | ABRD-188, ABRD-189, ABRD-191, ABRD-192 | — | — |
 | an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
 | a malformed step answer | — | — | ABRD-164, ABRD-165 |
 | a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
@@ -277,6 +278,13 @@ Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_
 - [ ] [ABRD-24] Shell/assets CSP adds `script-src 'self'`, `style-src 'self'`, `font-src 'self'`, `img-src data:` to ABRD-12, no nonce, inline or external source; built CSS is `text/css; charset=utf-8` (E-ABRD-08).
 - [ ] [ABRD-25] `aco serve` refuses to start with `ERROR: <path> is missing; build the frontend first (...)` once the committed shell is absent, never binding a board that could only answer its API.
 - [ ] [ABRD-26] `aco serve --json` is refused by the argument parser as plain text, never in the envelope: `aco: error: unrecognized arguments: --json`, exit `2` (see E-ABRD-09).
+- [ ] [ABRD-186] `aco serve` without `--port` listens on `board_port` of the config file when that is set, else on a free port; `--port` overrides it.
+- [ ] [ABRD-190] A `board_port` that is no integer from 1 to 65535 refuses `ERROR: <config path>: board_port <value> is not an integer from 1 to 65535`, exit `2`, nothing bound.
+- [ ] [ABRD-187] The printed URL, `aco board --url` and `ask`'s and `step`'s `link` share one producer: `http://127.0.0.1:<port>/#t=<token>[&c=<owner>/<repo>/<item>/<line> or &s=<owner>/<repo>/<item>]` (ABRD-10).
+- [ ] [ABRD-188] A page opened with `c=<owner>/<repo>/<item>/<line>` shows that item's open card selected, as the card view on a phone; the fragment is cleared like the token.
+- [ ] [ABRD-191] A linked card ruled, gone or in an unreadable repo shows one line over the open list: `Diese Karte ist schon entschieden.`, `Diese Karte gibt es nicht mehr.` or `Dieses Repo ist gerade nicht lesbar.`
+- [ ] [ABRD-189] A page opened with `s=<owner>/<repo>/<item>` opens the Steps view with that step marked as the current one.
+- [ ] [ABRD-192] A linked step no longer waiting, or in an unreadable repository, shows `Dieser Schritt wartet nicht mehr.` or `Dieses Repo ist gerade nicht lesbar.` over the open list.
 - [ ] [ABRD-27] The global `aco --repo OWNER/REPO` before `serve` is refused `ERROR: aco serve finds its repositories itself; --repo does not apply to it`, exit `2` (see E-ABRD-10).
 - [ ] [ABRD-124] `GET /assets/**` answers a built `.woff2` file as `font/woff2`; the shell's stylesheets load Open Sans and Oswald from there and the board makes no request to another host (see E-ABRD-08).
 

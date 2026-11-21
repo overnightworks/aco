@@ -76,6 +76,7 @@ def _serve_printing(
     monkeypatch: pytest.MonkeyPatch,
     scenario: Callable[[BoardClient], None],
     stop_signal: signal.Signals,
+    serve_arguments: tuple[str, ...] = ("--port", "0"),
 ) -> tuple[int, _PrintedLines]:
     """Run `aco serve`, drive `scenario`, then deliver `stop_signal` to the
     main thread, as the terminal or the unit's stop does; every line the run
@@ -98,11 +99,70 @@ def _serve_printing(
 
     driver = threading.Thread(target=drive)
     driver.start()
-    exit_code = cli.main(["serve", "--port", "0"])
+    exit_code = cli.main(["serve", *serve_arguments])
     driver.join()
     if failures:
         raise failures[0]
     return exit_code, printed
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind((LOOPBACK_HOST, 0))
+        return int(probe.getsockname()[1])
+
+
+def _printed_port(printed: _PrintedLines) -> int:
+    return int(printed.first_line().split(":")[2].split("/")[0])
+
+
+def _look_once(board: BoardClient) -> None:
+    assert board.get_board_json().status == 200
+
+
+def test_serve_without_port_binds_the_configured_board_port(
+    root: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: ABRD-186"""
+    repository_with_card(root / "here", 1, "Here")
+    port = _free_port()
+    write_config(config_file, f'root = "{root}"\nboard_port = {port}\n')
+
+    exit_code, printed = _serve_printing(monkeypatch, _look_once, signal.SIGINT, ())
+
+    assert exit_code == 0
+    assert _printed_port(printed) == port
+
+
+def test_serve_port_flag_overrides_the_configured_board_port(
+    root: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: ABRD-186"""
+    repository_with_card(root / "here", 1, "Here")
+    configured, flagged = _free_port(), _free_port()
+    write_config(config_file, f'root = "{root}"\nboard_port = {configured}\n')
+
+    exit_code, printed = _serve_printing(
+        monkeypatch, _look_once, signal.SIGINT, ("--port", str(flagged))
+    )
+
+    assert exit_code == 0
+    assert _printed_port(printed) == flagged
+
+
+def test_serve_refuses_a_board_port_that_is_no_port_naming_the_key(
+    root: Path, config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: ABRD-190"""
+    repository_with_card(root / "here", 1, "Here")
+    write_config(config_file, f'root = "{root}"\nboard_port = 70000\n')
+
+    exit_code = cli.main(["serve"])
+
+    assert exit_code == 2
+    assert f"ERROR: {config_file}: board_port 70000 is not an integer from 1 to 65535" in (
+        capsys.readouterr().err
+    )
 
 
 @pytest.fixture(autouse=True)

@@ -3,7 +3,7 @@
 `aco board` projects the open work board read-only, `--json` the one
 output mode (the operator-facing page is in `aco serve`,
 `specs/serve.spec.md`); a bare `aco board` naming no `--json` refuses
-instead (BOARD-44). This file owns `--json`'s own
+instead (BOARD-44); `--url` prints the board's address (BOARD-62 to BOARD-65). This file owns `--json`'s own
 shape -- its keys -- and the one forge-resolution precondition `aco
 next`/`aco rulings` share with it before either ever reads an issue (`##
 The shared forge precondition`, cited rather than restated by
@@ -25,7 +25,9 @@ reason text.
 
 | state \ trigger | `aco board` (no `--json`) | `--json` |
 |---|---|---|
-| any state, before any other read | BOARD-44 | — |
+| any state, before any other read | BOARD-44, BOARD-65 | — |
+| `--url`, with `board_port` and the token file present | BOARD-62, BOARD-64 | — |
+| `--url`, with `board_port` unset or no token file | BOARD-63 | — |
 | unsupported canonical-remote host | — | BOARD-02, BOARD-43 |
 | canonical remote with no URL configured | — | BOARD-53, BOARD-43 |
 | `.aco/board.toml` absent | — | PIN-32 (cited) |
@@ -50,8 +52,12 @@ reason text.
 - BOARD-55 (retired).
 - BOARD-27, BOARD-31, BOARD-56 (retired).
 
-- [ ] [BOARD-44] `aco board` naming no `--json` refuses `aco board requires --json`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
+- [ ] [BOARD-44] `aco board` naming neither `--json` nor `--url` refuses `aco board requires --json or --url`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
 
+- [ ] [BOARD-62] `aco board --url` prints the board's address, `http://127.0.0.1:<board_port>/#t=<board token>`, and a newline, nothing else, exit `0` (E-BOARD-30).
+- [ ] [BOARD-64] With an item it prints that step's link, `&s=<owner>/<repo>/<item>`, with `--line K` that card's, `&c=<owner>/<repo>/<item>/<K>`; `<owner>/<repo>` is `--repo` or the checkout's (ABRD-187).
+- [ ] [BOARD-65] `--json` with `--url`, an item or `--line` without `--url`, and `--line` without an item refuse, exit `2`, before any read.
+- [ ] [BOARD-63] `--url` refuses, exit `2`: `board_port is not set in <config path>`, or, with no token file, `<path> does not exist; start aco serve once to create the board token`; it creates no file (E-BOARD-31).
 
 ## The shared forge precondition
 
@@ -167,6 +173,32 @@ Setup: none -- a directory outside any git repository
 
 ```console
 $ aco board
-2> ERROR: aco board requires --json
+2> ERROR: aco board requires --json or --url
+exit 2
+```
+
+### E-BOARD-30 -- `--url` prints the link
+
+Setup: `board_port = 8765` in the config file, a board token file, a checkout of `owner/repo`
+
+```console
+$ aco board --url
+http://127.0.0.1:8765/#t=<board token>
+exit 0
+$ aco board --url 12
+http://127.0.0.1:8765/#t=<board token>&s=owner/repo/12
+exit 0
+$ aco board --url 12 --line 3
+http://127.0.0.1:8765/#t=<board token>&c=owner/repo/12/3
+exit 0
+```
+
+### E-BOARD-31 -- `--url` without a configured board
+
+Setup: the config file sets no `board_port`
+
+```console
+$ aco board --url
+2> ERROR: board_port is not set in <config path>
 exit 2
 ```

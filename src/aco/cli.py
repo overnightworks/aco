@@ -148,8 +148,7 @@ def _add_status_parser(commands: usage.Subcommands, name: str) -> None:
 
 
 def _add_board_parser(commands: usage.Subcommands, name: str) -> None:
-    board = commands.add_parser(name, help="project the open work board, read-only")
-    report.add_json_flag(board, "JSON only")
+    cmd_board.add_arguments(commands.add_parser(name, help="project the open work board"))
 
 
 def _add_rulings_parser(commands: usage.Subcommands, name: str) -> None:

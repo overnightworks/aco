@@ -2,15 +2,19 @@
 
 from dataclasses import replace
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 
 import pytest
+from aco_board_fixtures import board_checkout
 from board_fixtures import (
     board_issue,
     complete_contract,
     container_with_children,
     projected_board,
 )
+from cli_fixtures import run_cli
+from discovery_fixtures import BoardUnit
 
 from aco import cmd_board, workboard
 from aco.workboard import BoardConfig
@@ -84,3 +88,85 @@ def test_board_json_reads_a_container_with_only_a_foreign_open_child_as_waiting_
         False,
         f"container; waiting on {FOREIGN_CHILD}",
     )
+
+
+@pytest.fixture
+def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """The current directory is a board checkout; returns its forge repository."""
+    forge = board_checkout(tmp_path / "checkout")
+    monkeypatch.chdir(forge.directory)
+    return str(forge.repository)
+
+
+@pytest.mark.parametrize(
+    ("arguments", "suffix"),
+    [
+        pytest.param([], "", id="board"),
+        pytest.param(["7"], "&s={repository}/7", id="step"),
+        pytest.param(["#7", "--line", "3"], "&c={repository}/7/3", id="card"),
+    ],
+)
+def test_board_url_prints_the_link_and_nothing_else(
+    capsys: pytest.CaptureFixture[str],
+    board_unit: BoardUnit,
+    checkout: str,
+    arguments: list[str],
+    suffix: str,
+) -> None:
+    """Spec: BOARD-62, BOARD-64"""
+    run = run_cli(["board", "--url", *arguments], capsys)
+
+    assert (run.status, run.stderr) == (0, "")
+    assert run.stdout == (
+        f"http://127.0.0.1:{board_unit.port}/#t={board_unit.token}"
+        f"{suffix.format(repository=checkout)}\n"
+    )
+
+
+def test_board_url_without_a_board_port_refuses_naming_the_config_file(
+    capsys: pytest.CaptureFixture[str], config_file: Path, checkout: str
+) -> None:
+    """Spec: BOARD-63"""
+    config_file.parent.mkdir(parents=True)
+    config_file.write_text("", encoding="utf-8")
+
+    run = run_cli(["board", "--url"], capsys)
+
+    assert run.stdout == ""
+    assert run.expect_refusal() == f"ERROR: board_port is not set in {config_file}\n"
+
+
+def test_board_url_without_a_token_file_refuses_naming_it(
+    capsys: pytest.CaptureFixture[str], board_unit: BoardUnit, checkout: str
+) -> None:
+    """Spec: BOARD-63"""
+    token = board_unit.token_file
+    token.unlink()
+
+    run = run_cli(["board", "--url"], capsys)
+
+    assert run.stdout == ""
+    assert run.expect_refusal().startswith(f"ERROR: {token} does not exist")
+    assert not token.exists()
+
+
+@pytest.mark.parametrize(
+    ("arguments", "sentence"),
+    [
+        pytest.param([], "aco board requires --json or --url", id="no-mode"),
+        pytest.param(["--json", "--url"], "aco board takes --json or --url, not both", id="both"),
+        pytest.param(["--json", "7"], "an item and --line belong to --url", id="item-without-url"),
+        pytest.param(
+            ["--url", "--line", "3"],
+            "--line names a card of an item; give the item",
+            id="line-alone",
+        ),
+    ],
+)
+def test_board_refuses_flags_that_name_no_one_mode(
+    capsys: pytest.CaptureFixture[str], arguments: list[str], sentence: str
+) -> None:
+    """Spec: BOARD-44, BOARD-65"""
+    run = run_cli(["board", *arguments], capsys)
+
+    assert run.expect_refusal() == f"ERROR: {sentence}\n"

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from aco.board.token_store import MalformedTokenFileError, board_token, token_path
+from aco.board_token import MalformedTokenFileError, board_token, token_path
 
 
 @pytest.mark.parametrize(

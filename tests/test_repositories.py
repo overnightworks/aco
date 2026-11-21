@@ -300,3 +300,47 @@ def test_a_config_file_that_cannot_be_read_is_refused_by_name(
 
     with pytest.raises(repositories.RootConfigError, match=str(config)):
         repositories.configured_root(config)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param("board_port = 8765\n", 8765, id="set"),
+        pytest.param("board_port = 65535\n", 65535, id="highest-port"),
+        pytest.param('root = "/x"\n', None, id="key-absent"),
+    ],
+)
+def test_a_config_file_names_its_board_port(
+    tmp_path: Path, text: str, expected: int | None
+) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text(text, encoding="utf-8")
+
+    assert repositories.configured_board_port(config) == expected
+
+
+def test_a_missing_config_file_names_no_board_port(tmp_path: Path) -> None:
+    assert repositories.configured_board_port(tmp_path / "config.toml") is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["0", "65536", "-1", '"8765"', "true", "8765.0"],
+)
+def test_a_board_port_that_is_no_port_is_refused_naming_the_key(tmp_path: Path, value: str) -> None:
+    """Spec: ABRD-190"""
+    config = tmp_path / "config.toml"
+    config.write_text(f"board_port = {value}\n", encoding="utf-8")
+
+    with pytest.raises(repositories.RootConfigError, match=f"{config}: board_port .* 1 to 65535"):
+        repositories.configured_board_port(config)
+
+
+def test_a_config_file_that_is_not_toml_is_refused_when_reading_the_board_port(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text("board_port = = 1\n", encoding="utf-8")
+
+    with pytest.raises(repositories.RootConfigError, match="is not valid TOML"):
+        repositories.configured_board_port(config)

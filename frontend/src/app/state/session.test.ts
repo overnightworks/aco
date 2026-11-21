@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import {
 	TOKEN_STORAGE_KEY,
+	bootstrapLink,
 	bootstrapToken,
 	windowBootstrapEnvironment,
 	type BootstrapEnvironment
@@ -98,4 +99,11 @@ test('windowBootstrapEnvironment reads a real window and clears its fragment', (
 afterEach(() => {
 	window.sessionStorage.clear();
 	window.history.replaceState(null, '', '/');
+});
+
+test('the link a fragment names is read beside the token and leaves the history alone', () => {
+	const { env, replaceState } = fakeEnvironment({ hash: '#t=secret&c=acme/widgets/12/3' });
+
+	expect(bootstrapLink(env)).toEqual({ kind: 'card', repo: 'acme/widgets', item: 12, line: 3 });
+	expect(replaceState).not.toHaveBeenCalled();
 });

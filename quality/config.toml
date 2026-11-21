@@ -14,6 +14,12 @@ item = "#665"
 date = 2026-11-06
 reason = "the contract forbade items to import aco.metrics, a module that no longer exists"
 
+[[gate.loosened]]
+what = 'import contract "Decision board layers" changes layers'
+item = "#1027"
+date = 2026-11-21
+reason = "the token file moves out of aco.board to aco.board_token so core's board link producer may read it, so the row that held token_store beside board and aco_source loses it"
+
 [[root.allow]]
 entry = "frontend/"
 reason = "the web client, built apart from the Python package"

@@ -9,6 +9,7 @@
  * link has neither and reads as "no access".
  */
 
+import { linkFromHash, type LinkTarget } from '../model/linkSelection';
 import { tokenFromHash } from '../model/token';
 
 export const TOKEN_STORAGE_KEY = 'aco-board-token';
@@ -18,6 +19,11 @@ export interface BootstrapEnvironment {
 	pathWithSearch: string;
 	storage: Storage;
 	replaceState: (path: string) => void;
+}
+
+/** The card or step the link names; read before `bootstrapToken` clears the fragment. */
+export function bootstrapLink(env: BootstrapEnvironment): LinkTarget | null {
+	return linkFromHash(env.hash);
 }
 
 export function bootstrapToken(env: BootstrapEnvironment): string | null {
