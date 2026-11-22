@@ -845,13 +845,7 @@ def test_adopt_writes_the_line_alone_when_github_answers_a_null_body(
             current["body"] = patches[-1]["body"]
             return json.dumps({"body": current["body"]})
         return json.dumps(
-            {
-                "state": "open",
-                "title": "Bump x",
-                "body": current["body"],
-                "labels": [],
-                "is_landing": True,
-            }
+            dict(state="open", title="Bump x", body=current["body"], labels=[], is_landing=True)
         )
 
     over_gh = GitHubForge(world.forge.repository, run=gh)

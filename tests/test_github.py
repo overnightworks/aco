@@ -1380,13 +1380,7 @@ def test_github_adapter_item_reference_reports_a_pull_request_as_a_landing() -> 
     client = GitHubForge(
         github.repository_id("example/agent-coordination"),
         run=lambda _arguments: json.dumps(
-            {
-                "state": "open",
-                "title": "Land it",
-                "body": "Work-Item: #7",
-                "labels": [],
-                "is_landing": True,
-            }
+            dict(state="open", title="Land it", body="Work-Item: #7", labels=[], is_landing=True)
         ),
     )
 
