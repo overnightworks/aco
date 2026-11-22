@@ -3,6 +3,6 @@ agent = "Claude 651ce064-3358-4651-856f-d9e8e4232683"
 role = "builder"
 base = "2b4f9a5fab6baba521948f674a63d8e85e46f32b"
 branch = "claude/issue-1038-github-call-record"
-scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/github-calls.spec.md", "src/aco/cli.py", "src/aco/github.py", "src/aco/github_calls.py", "src/aco/github_failure.py", "src/aco/github_probe.py", "tests"]
+scope = ["docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/github-calls.spec.md", "specs/output.spec.md", "src/aco/cli.py", "src/aco/github.py", "src/aco/github_calls.py", "src/aco/github_failure.py", "src/aco/github_probe.py", "tests"]
 opened_commit = "e60bdfcd5548dc27a5fded88643b67c175cda87a"
 whole_reason = "One call record at the two places aco starts gh, its owner module, spec, architecture paragraph and tests."
