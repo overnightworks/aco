@@ -10,7 +10,7 @@ and `tools/call`, with the tools `read_inbox`, `ask`, `record_answer`, `step` an
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Final, cast
+from typing import Any, Final, cast
 
 from . import __version__, expectation_grammar, expectations, item_step, protocol
 
@@ -64,6 +64,7 @@ class Tools:
 _PARSE_ERROR: Final = -32700
 _INVALID_REQUEST: Final = -32600
 _METHOD_NOT_FOUND: Final = -32601
+_INTERNAL_ERROR: Final = -32603
 _INVALID_PARAMS: Final = -32602
 
 _INSTRUCTIONS: Final = (
@@ -313,17 +314,39 @@ _TOOLS: Final = (
 
 def reply(text: str, tools: Tools) -> str | None:
     """The line answering the message `text`, or None for a notification."""
+    message, refusal = _parsed(text)
+    if message is None:
+        return refusal
+    if "id" not in message:
+        return None
+    return _answer(message["id"], message["method"], message.get("params"), tools)
+
+
+def unanswered_reply(text: str, reason: str) -> str | None:
+    """The line answering the message `text` when no tool code could: a tool error
+    with `reason` for a `tools/call`, error `-32603` for another request, and what
+    `reply` gives for a message that is no request or a notification."""
+    message, refusal = _parsed(text)
+    if message is None:
+        return refusal
+    if "id" not in message:
+        return None
+    if message["method"] == "tools/call":
+        return _result(message["id"], _tool_error(reason))
+    return _error(message["id"], _INTERNAL_ERROR, reason)
+
+
+def _parsed(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """The message `text` holds, or the line refusing it."""
     try:
         message = json.loads(text)
     except ValueError, RecursionError:
         # Past the parser's limits (digit count, nesting) it raises these, not JSONDecodeError.
-        return unparsable_reply()
+        return None, unparsable_reply()
     invalid = _invalid_request(message)
     if invalid is not None:
-        return _error(None, _INVALID_REQUEST, invalid)
-    if "id" not in message:
-        return None
-    return _answer(message["id"], message["method"], message.get("params"), tools)
+        return None, _error(None, _INVALID_REQUEST, invalid)
+    return message, None
 
 
 def unparsable_reply() -> str:

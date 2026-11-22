@@ -1,5 +1,5 @@
 """`aco mcp`'s ask answer shows the earlier rulings of the card's area
-(`specs/mcp.spec.md`) through `cli.main(["mcp"])` over the board's test forge."""
+(`specs/mcp.spec.md`) through `cli.main(["mcp", "--direct"])` over the board's test forge."""
 
 from collections.abc import Callable
 from datetime import date

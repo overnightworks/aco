@@ -51,11 +51,25 @@ def ask_line(request_id: int, repository: str = "board-forge/here", item: int = 
 def run_mcp(
     monkeypatch: pytest.MonkeyPatch, *steps: str | bytes | Callable[[], None]
 ) -> tuple[int, list[dict[str, Any]]]:
-    """The exit code and every answer line of `cli.main(["mcp"])` over the board's
+    """The exit code and every answer line of `cli.main(["mcp", "--direct"])` over the board's
     test forge, reading `steps` as its standard input."""
     replies = io.StringIO()
     with monkeypatch.context() as served:
         served.setattr(session, "run_context", board_forge.run_context)
+        served.setattr(sys, "stdin", Script(*steps))
+        served.setattr(sys, "stdout", replies)
+        exit_code = cli.main(["mcp", "--direct"])
+    return exit_code, [json.loads(line) for line in replies.getvalue().splitlines()]
+
+
+def relay_mcp(
+    monkeypatch: pytest.MonkeyPatch, *steps: str | bytes | Callable[[], None]
+) -> tuple[int, list[dict[str, Any]]]:
+    """The exit code and every answer line of `cli.main(["mcp"])`, the process the
+    host starts, reading `steps` as its standard input; the fresh processes it
+    starts are real."""
+    replies = io.StringIO()
+    with monkeypatch.context() as served:
         served.setattr(sys, "stdin", Script(*steps))
         served.setattr(sys, "stdout", replies)
         exit_code = cli.main(["mcp"])

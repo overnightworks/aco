@@ -35,7 +35,7 @@ _WAIT_SECONDS = 30
 _NO_CARD = dict.fromkeys(("purpose", "actions", "expected", "answer"))
 _CHILD_PROGRAM = (
     "import board_forge, sys; from aco import cli, session; "
-    "session.run_context = board_forge.run_context; raise SystemExit(cli.main(['mcp']))"
+    "session.run_context = board_forge.run_context; raise SystemExit(cli.main(['mcp', '--direct']))"
 )
 
 
@@ -241,7 +241,7 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
     replies = io.StringIO()
     monkeypatch.setattr(sys, "stdout", replies)
 
-    exit_code = cli.main(["mcp"])
+    exit_code = cli.main(["mcp", "--direct"])
 
     [answer] = [json.loads(line) for line in replies.getvalue().splitlines()]
     entries = {
@@ -390,7 +390,7 @@ def test_a_broken_pipe_ends_the_server_with_exit_0(
     monkeypatch.setattr(sys, "stdin", Script(call_line(1)))
     monkeypatch.setattr(sys, "stdout", _ClosedPipe(write_end))
     try:
-        exit_code = cli.main(["mcp"])
+        exit_code = cli.main(["mcp", "--direct"])
     finally:
         os.close(write_end)
 
