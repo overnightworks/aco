@@ -17,7 +17,7 @@ class _Gh:
         self._answer = (text, exit_status)
         self.commands: list[list[str]] = []
 
-    def __call__(self, command: list[str], *, purpose: str) -> tuple[str, int]:
+    def __call__(self, command: list[str], *, purpose: str, repository: str) -> tuple[str, int]:
         self.commands.append(command)
         return self._answer
 

@@ -55,6 +55,9 @@ same way, from `--via` and from a stored `via`.
 `GitHubForge.merge_queue_state` and `enqueue_pull_request` and
 `UnqueuedPullRequest.removal_reason` are the merge queue surface of the GitHub adapter that
 no command calls yet; its tests drive them.
+
+`CallRecord.at`/`pid`/`started` are lines of the call record: `asdict` serializes every
+dataclass field whether or not any function reads it back by name.
 """
 
 import argparse
@@ -65,6 +68,7 @@ from aco.body import Size
 from aco.expectation_grammar import DecisionKind, RulingVia
 from aco.forge import UnqueuedPullRequest
 from aco.github import GitHubForge
+from aco.github_calls import CallRecord
 from aco.lane_record import Verdict
 from aco.workboard import (
     BoardItem,
@@ -151,4 +155,7 @@ _referenced_only_for_vulture = (
     GitHubForge.merge_queue_state,
     GitHubForge.enqueue_pull_request,
     UnqueuedPullRequest.removal_reason,
+    CallRecord.at,
+    CallRecord.pid,
+    CallRecord.started,
 )

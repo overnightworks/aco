@@ -36,28 +36,35 @@ class GitHubBoardProbe:
         """A 304 is unchanged whatever `gh`'s exit status; a 200 is changed and
         carries the ETag to send next. Any other answer is classified as a
         failed `gh` call is."""
-        decoded, exit_status = self._run(_command(target, token), purpose=_PURPOSE)
+        repository = target.repository
+        decoded, exit_status = self._run(
+            _command(target, token), purpose=_PURPOSE, repository=repository
+        )
         head, _body = github_paging.split_answer(decoded)
         status = github_paging.status(head)
         if status == _NOT_MODIFIED and token is not None:
             return forge.ProbeAnswer(changed=False, token=token)
         if status != _CHANGED:
-            raise self._failure(decoded, exit_status)
+            raise self._failure(decoded, exit_status, repository)
         etag = github_paging.header(head, "etag")
         if etag is None:
             raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned no ETag")
         return forge.ProbeAnswer(changed=True, token=etag)
 
-    def _failure(self, decoded: str, exit_status: int) -> forge.ForgeError:
+    def _failure(self, decoded: str, exit_status: int, repository: str) -> forge.ForgeError:
         """The failure of a refused probe; a rate limit carries the reset its owner states,
         read through this probe's own runner."""
         failure = github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
         if isinstance(failure, github_failure.RateLimitedError):
-            return github_failure.with_reset(failure, self._answer)
+            return github_failure.with_reset(
+                failure, lambda arguments: self._answer(arguments, repository)
+            )
         return failure
 
-    def _answer(self, arguments: list[str]) -> str:
-        decoded, exit_status = self._run(["gh", *arguments], purpose=_PURPOSE)
+    def _answer(self, arguments: list[str], repository: str) -> str:
+        decoded, exit_status = self._run(
+            ["gh", *arguments], purpose=_PURPOSE, repository=repository
+        )
         if exit_status != 0:
             raise github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
         return decoded

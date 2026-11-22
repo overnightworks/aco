@@ -14,6 +14,7 @@ from urllib.parse import quote
 from . import (
     forge,
     github_actions,
+    github_calls,
     github_failure,
     github_issue_payload,
     github_merge_queue,
@@ -75,13 +76,9 @@ _RULESETS_UNAVAILABLE_STATUS = "HTTP 403"
 
 
 def _branch_already_absent(error_text: str) -> bool:
-    """`delete_branch`'s own idempotent-absence signal (S8786):
-    `gh api`'s own error text puts the message before the
-    code -- "Reference does not exist (HTTP 422)" -- so this checks both
-    substrings independent of order, rather than the two-lookahead regex
-    that made an order-agnostic match super-linear to backtrack; any other
-    422 (a protected branch, a malformed ref name) is a real failure this
-    adapter must still surface."""
+    """`delete_branch`'s idempotent-absence signal: gh puts the message before the code --
+    "Reference does not exist (HTTP 422)" -- so both substrings are checked in either order;
+    any other 422 (a protected branch, a malformed ref name) is a real failure."""
     lowered = error_text.casefold()
     return "reference does not exist" in lowered and "http 422" in lowered
 
@@ -92,10 +89,8 @@ GITHUB_REMOTE_PATTERN = re.compile(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git
 
 
 def pull_request_number(value: str) -> int:
-    """`--merged`'s value under `storage = "github"`: a bare
-    decimal pull request number -- the sha grammar and the empty "newest
-    trunk landing" sentinel both belong to `storage = "state-ref"` alone,
-    since GitHub has no trunk walk to read either from."""
+    """`--merged`'s value under `storage = "github"`: a bare decimal pull request number; the
+    sha grammar and the "newest trunk landing" sentinel belong to `storage = "state-ref"`."""
     number = protocol.decimal_number_or_none(value)
     if number is None:
         raise protocol.ClaimUnavailableError(
@@ -136,28 +131,23 @@ def repository_id(text: str) -> forge.RepositoryId:
 def discover_repository(*, remote_url: str, directory: Path | None = None) -> forge.RepositoryId:
     """Resolve the repository `--repo` did not name.
 
-    Reads the canonical remote's URL first:
-    almost every checkout's remote already names its GitHub repository, and
-    that read is a local `git config` lookup, not a network round trip --
-    so `gh repo view` (a real `gh` API call, `GH_TIMEOUT_SECONDS` long) only
-    runs as a fallback, when the remote's own URL names no repository at
-    all. That fallback asks about the checkout at `directory`, not this
-    process's own cwd.
+    The remote's URL names it almost always, a local lookup; `gh repo view` (a GitHub call)
+    only runs when it does not, about the checkout at `directory`, not this process's cwd.
     """
     match = GITHUB_REMOTE_PATTERN.search(remote_url)
     if match is not None:
         return repository_id(f"{match.group(1)}/{match.group(2)}")
+    command = ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]
     try:
         result = process.run_captured(
-            ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
-            env=command_environment(),
-            timeout=GH_TIMEOUT_SECONDS,
-            cwd=directory,
+            command, env=command_environment(), timeout=GH_TIMEOUT_SECONDS, cwd=directory
         )
     except process.ExecutableMissingError:
         raise ClaimError("gh is required for issue claims") from None
     except process.ProcessTimedOutError:
+        github_calls.record(None, command, None)
         raise ClaimError("gh timed out while resolving the repository") from None
+    github_calls.record(None, command, result.exit_status)
     # `gh repo view`'s stdout alone -- a separate-stream result, so a stderr
     # warning can neither corrupt a good answer nor mask a real failure.
     cleaned = strip_ansi(result.stdout.decode("utf-8")).strip()
@@ -178,13 +168,9 @@ def _decoded(result: process.BoundedResult, purpose: str) -> str:
 
 
 def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeError:
-    """Translate a process failure that reached no forge response into a typed one.
-
-    An isinstance chain, not a dict keyed by `type(error)`: only the chain lets
-    each branch narrow `error` to the subtype that actually carries `.stage` and
-    `.detail`, so the dispatch and the type stay one honest fact instead of two
-    that could drift apart.
-    """
+    """Translate a process failure that reached no forge response into a typed one. An
+    isinstance chain, not a dict keyed by `type(error)`: only it narrows `error` to the subtype
+    that carries `.stage` and `.detail`."""
     if isinstance(error, process.ProcessTimedOutError):
         return forge.ForgeTransientError(f"{purpose} timed out")
     if isinstance(error, process.ProcessIoFailedError):
@@ -199,8 +185,13 @@ def _forge_failure(error: process.ProcessError, purpose: str) -> forge.ForgeErro
 
 
 def response_command(
-    command: list[str], *, purpose: str, input_data: bytes | None = None
+    command: list[str],
+    *,
+    purpose: str,
+    input_data: bytes | None = None,
+    repository: str | None = None,
 ) -> tuple[str, int]:
+    """`repository`, the `OWNER/REPO` the call works on, is what its call record names."""
     try:
         result = process.run_bounded(
             command,
@@ -213,17 +204,26 @@ def response_command(
     except process.ProcessStartFailedError as error:
         raise ClaimError(f"cannot start {purpose}: {error.detail}") from error
     except process.ProcessError as error:
+        github_calls.record(repository, command, None)
         raise _forge_failure(error, purpose) from error
+    github_calls.record(repository, command, result.exit_status, result.output)
     return _decoded(result, purpose), result.exit_status
 
 
-def bounded_command(command: list[str], *, purpose: str, input_data: bytes | None = None) -> str:
-    decoded, exit_status = response_command(command, purpose=purpose, input_data=input_data)
+def bounded_command(
+    command: list[str],
+    *,
+    purpose: str,
+    input_data: bytes | None = None,
+    repository: str | None = None,
+) -> str:
+    decoded, exit_status = response_command(
+        command, purpose=purpose, input_data=input_data, repository=repository
+    )
     if exit_status != 0:
-        graphql = command[1:3] == ["api", "graphql"]
-        limit = github_failure.RateLimit.GRAPHQL if graphql else github_failure.RateLimit.REST
+        quota = github_failure.quota_of(command)
         raise github_failure.nonzero_exit_failure(
-            github_paging.without_head(decoded), exit_status, purpose, request_limit=limit
+            github_paging.without_head(decoded), exit_status, purpose, quota=quota
         )
     return decoded
 
@@ -245,10 +245,9 @@ class GitHubForge:
         self._current_name: str | None = None
 
     def _require_current_name(self, reference: str) -> None:
-        """Refuse when `reference`, a repository name GitHub answered with, differs
-        from the run's and GitHub also calls the run's repository by another name.
-        Asks GitHub only for a differing reference, and at most once per forge
-        (concurrent reads may repeat the one idempotent lookup)."""
+        """Refuse when `reference`, a repository name GitHub answered with, differs from the
+        run's and GitHub also calls the run's repository by another name. Asks GitHub only
+        for a differing reference, at most once per forge (concurrent reads may repeat it)."""
         if reference == self.repository.path:
             return
         if self._current_name is None:
@@ -277,6 +276,7 @@ class GitHubForge:
             ["gh", *arguments],
             purpose="GitHub issue coordination",
             input_data=input_data,
+            repository=str(self.repository),
         )
 
     def _run(self, arguments: list[str], *, input_data: bytes | None = None) -> str:

@@ -48,7 +48,7 @@ command that gives it, and the sentence of a GitHub rate limit (OUT-13).
 - [ ] [OUT-13] A GitHub call refused under a rate limit is told by one sentence, alone as `ERROR: <sentence>` or as the cause inside a command's own sentence, exit `2`, never as a permission refusal (see E-OUT-07).
 - OUT-04 (retired).
 - The check's sentence is `#<n> body written, but overwritten in the meantime by <editor> at <time>`, `#<n> body written over a change by <editor> at <time> aco had not read; that change is only in the edit history` (`kept` true) or `#<n> body written, not verified (<cause>)`.
-- The rate-limit sentence is `GitHub's <GraphQL|REST> rate limit is reached; it resets at <time>`, with `<time>` in UTC as `YYYY-MM-DDTHH:MM:SSZ` also when it is already past, `GitHub's <GraphQL|REST> rate limit is reached; its reset time could not be read`, or `GitHub's secondary rate limit is reached; try again in a minute`.
+- The rate-limit sentence is `GitHub's <GraphQL|REST> rate limit is reached; it resets at <time>`, with `<time>` in UTC as `YYYY-MM-DDTHH:MM:SSZ` also when it is already past, `GitHub's <GraphQL|REST|search> rate limit is reached; its reset time could not be read` (a refused search names `search` and never has a reset time), or `GitHub's secondary rate limit is reached; try again in a minute`.
 - A forge that answered and refused (a 404, a 403 that names no rate limit) is not unreachable: it keeps its command's own token, and the text form keeps its sentence either way.
 
 ## Never
