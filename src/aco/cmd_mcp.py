@@ -246,19 +246,15 @@ def _mark_in_turn(
 def serve(requests: Iterable[bytes], replies: TextIO) -> None:
     """Answer each line of `requests` on `replies` until the lines end; a line
     that is no UTF-8 is answered as unparsable."""
-    for request in requests:
-        if not request.strip():
-            continue
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step)
+
+    def answer(request: bytes) -> str | None:
         try:
-            answer = mcp_server.reply(
-                request.decode("utf-8"),
-                mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step),
-            )
+            return mcp_server.reply(request.decode("utf-8"), tools)
         except UnicodeDecodeError:
-            answer = mcp_server.unparsable_reply()
-        if answer is not None:
-            replies.write(answer + "\n")
-            replies.flush()
+            return mcp_server.unparsable_reply()
+
+    mcp_server.answer_lines(requests, replies, answer)
 
 
 def add_parser(commands: usage.Subcommands, name: str) -> None:

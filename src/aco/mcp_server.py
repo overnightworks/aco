@@ -8,9 +8,9 @@ and `tools/call`, with the tools `read_inbox`, `ask`, `record_answer`, `step` an
 """
 
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Final, cast
+from typing import Any, Final, TextIO, cast
 
 from . import __version__, expectation_grammar, expectations, item_step, protocol
 
@@ -310,6 +310,20 @@ _TOOLS: Final = (
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False},
     },
 )
+
+
+def answer_lines(
+    requests: Iterable[bytes], replies: TextIO, answer: Callable[[bytes], str | None]
+) -> None:
+    """Write `answer` of each non-blank line of `requests` on `replies`, one line
+    each and flushed, until the lines end; None is no answer (a notification)."""
+    for request in requests:
+        if not request.strip():
+            continue
+        text = answer(request)
+        if text is not None:
+            replies.write(text if text.endswith("\n") else text + "\n")
+            replies.flush()
 
 
 def reply(text: str, tools: Tools) -> str | None:

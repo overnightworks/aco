@@ -2,7 +2,9 @@
 MCP-82) through `cli.main(["mcp"])`: the fresh processes it hands each line to are
 real, run from a copy of the package the test changes."""
 
+import io
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -107,23 +109,38 @@ def test_a_fresh_process_that_gives_no_answer_to_a_request_is_answered_with_its_
     assert answer["error"]["message"].startswith(f"aco could not answer this call: {reason}; ")
 
 
-def test_a_fresh_process_that_runs_past_the_bound_is_answered_and_stopped(
-    package: Path, monkeypatch: pytest.MonkeyPatch
+def _relayed(line: str, **options: float) -> dict[str, Any]:
+    replies = io.StringIO()
+    mcp_relay.relay([line.encode() + b"\n"], replies, **options)
+    return json.loads(replies.getvalue())
+
+
+def test_a_fresh_process_that_runs_past_the_bound_is_answered_with_the_bound(
+    package: Path,
 ) -> None:
     _broken(package, "def serve(requests, replies):\n    import time\n    time.sleep(120)")
-    monkeypatch.setattr(mcp_relay, "CHILD_TIMEOUT_SECONDS", 2.0)
 
-    _, [answer] = relay_mcp(monkeypatch, _PING)
+    answer = _relayed(_PING, timeout=2.0)
 
-    assert "ProcessTimedOutError" in answer["error"]["message"]
+    assert "it ran past 2 seconds; " in answer["error"]["message"]
+
+
+def test_a_fresh_process_whose_answer_is_too_large_is_answered_with_that_reason(
+    package: Path,
+) -> None:
+    _broken(package, "def serve(requests, replies):\n    replies.write('x' * (9 * 1024 * 1024))")
+
+    answer = _relayed(_PING)
+
+    assert "its answer was too large; " in answer["error"]["message"]
 
 
 def test_a_fresh_process_that_cannot_start_is_answered(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     missing = str(tmp_path / "no-python")
-    monkeypatch.setattr(mcp_relay, "child_command", lambda: [missing])
+    monkeypatch.setattr(sys, "executable", missing)
 
-    _, [answer] = relay_mcp(monkeypatch, _PING)
+    answer = _relayed(_PING)
 
     assert missing in answer["error"]["message"]

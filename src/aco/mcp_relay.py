@@ -20,26 +20,20 @@ def child_command() -> list[str]:
     return [sys.executable, "-P", "-m", "aco", "mcp", "--direct"]
 
 
-def relay(requests: Iterable[bytes], replies: TextIO) -> None:
-    """Hand each line of `requests` to a fresh process and write its answer on
-    `replies` until the lines end; a line the fresh process cannot answer is
-    answered with the reason."""
-    for request in requests:
-        if not request.strip():
-            continue
-        answer = _answer(request)
-        if answer is not None:
-            replies.write(answer if answer.endswith("\n") else answer + "\n")
-            replies.flush()
+def relay(
+    requests: Iterable[bytes], replies: TextIO, *, timeout: float = CHILD_TIMEOUT_SECONDS
+) -> None:
+    """Hand each line of `requests` to a fresh process, which may run `timeout`
+    seconds, and write its answer on `replies` until the lines end; a line the
+    fresh process cannot answer is answered with the reason."""
+    mcp_server.answer_lines(requests, replies, lambda request: _answer(request, timeout))
 
 
-def _answer(request: bytes) -> str | None:
+def _answer(request: bytes, timeout: float) -> str | None:
     try:
-        result = process.run_bounded_captured(
-            child_command(), input_data=request, timeout=CHILD_TIMEOUT_SECONDS
-        )
+        result = process.run_bounded_captured(child_command(), input_data=request, timeout=timeout)
     except process.ProcessError as error:
-        return _unanswered(request, str(error) or type(error).__name__)
+        return _unanswered(request, _reason(error, timeout))
     stderr = result.stderr.decode("utf-8", errors="replace")
     sys.stderr.write(stderr)
     if result.exit_status != 0:
@@ -49,6 +43,14 @@ def _answer(request: bytes) -> str | None:
     if not answer.strip():
         return _unanswered(request, "it answered nothing")
     return answer
+
+
+def _reason(error: process.ProcessError, timeout: float) -> str:
+    if isinstance(error, process.ProcessTimedOutError):
+        return f"it ran past {timeout:g} seconds"
+    if isinstance(error, process.ProcessOutputTooLargeError):
+        return "its answer was too large"
+    return str(error) or type(error).__name__
 
 
 def _unanswered(request: bytes, reason: str) -> str | None:
