@@ -141,8 +141,11 @@ def item_reference(value: object) -> forge.ItemReference:
     title = value.get("title")
     body = value.get("body")
     is_landing = value.get("is_landing")
+    labels = value.get("labels")
     if (
         state not in {"open", "closed"}
+        or not isinstance(labels, list)
+        or not all(isinstance(label, str) for label in labels)
         or not isinstance(title, str)
         or (body is not None and not isinstance(body, str))
         or not isinstance(is_landing, bool)
@@ -154,6 +157,7 @@ def item_reference(value: object) -> forge.ItemReference:
         body or "",
         is_landing,
         author_is_member=is_member(value.get("author_association")),
+        labels=tuple(labels),
     )
 
 

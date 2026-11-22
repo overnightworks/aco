@@ -18,7 +18,14 @@ from aco.forge import ForgeMalformedResponseError
 
 
 def _item_reference_client(**fields: object) -> github.GitHubForge:
-    payload = {"state": "open", "title": "Work", "body": "", "is_landing": False, **fields}
+    payload = {
+        "state": "open",
+        "title": "Work",
+        "body": "",
+        "labels": [],
+        "is_landing": False,
+        **fields,
+    }
     return github.GitHubForge(
         github.repository_id(REPOSITORY), run=lambda _arguments: json.dumps(payload)
     )
@@ -50,6 +57,14 @@ def test_the_single_item_read_says_whether_a_member_wrote_the_item(
     reference = client.item_reference(10)
 
     assert reference.author_is_member is is_member
+
+
+def test_the_single_item_read_names_the_labels_the_item_carries() -> None:
+    client = _item_reference_client(labels=["idea", "ui"])
+
+    reference = client.item_reference(10)
+
+    assert reference.labels == ("idea", "ui")
 
 
 def _landing_client(login: str, body: object = "", user_type: str = "Bot") -> github.GitHubForge:
