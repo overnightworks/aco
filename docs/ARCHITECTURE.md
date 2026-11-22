@@ -118,10 +118,10 @@ aco is a CLI installed per machine (the README owns installation); every
 machine reaches the same state ref on the canonical remote, which is the
 only shared state besides the forge. The board is a local process the
 operator starts with `aco serve`, by hand or by a unit; it keeps no
-coordination state of its own, only its access token file; the root it scans
-comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
+coordination state of its own, only its access token file and the call record; the
+root it scans comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
 kind of process: an agent host starts it over stdio for one session and it ends
-when the host closes stdin; it keeps no state and scans the same root
+when the host closes stdin; it keeps no state but the call record and scans the same root
 (`specs/mcp.spec.md`). Nothing else is deployed.
 
 ## Crosscutting Concepts
@@ -154,6 +154,17 @@ as the inbox already allows.
 `aco stats` compares two groups of lanes by the records on the state ref's
 release commits; it writes nothing and asks no forge
 (`specs/stats.spec.md`).
+
+### The GitHub call record
+
+Every `gh` call an aco process starts leaves one JSON line in `github-calls.jsonl` under the
+state directory: the command, the repository, the quota the call spends (core, GraphQL, search
+or none) and how it ended. `github_calls.py` owns it, and `github.py` records at the two places
+that start `gh`. `github_failure.py` owns the quota of a call and derives from it the limit a
+refusal names. The record is always on and needs no setting, because the sessions worth
+measuring run for hours: one append is cheap against a `gh` process, and a past window can be
+read after the fact. Two files of at most 32 MiB each bound it. A failed write costs the command
+one warning and nothing else (`specs/github-calls.spec.md`).
 
 ### The per-item turn
 

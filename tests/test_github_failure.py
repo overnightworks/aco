@@ -7,7 +7,7 @@ import pytest
 from rate_limit_fixtures import GRAPHQL_REFUSAL, REST_REFUSAL, SECONDARY_REFUSAL
 
 from aco import forge, github_failure
-from aco.github_failure import RateLimit
+from aco.github_failure import Quota
 
 READ_AT = datetime(2026, 11, 19, 19, 46, tzinfo=UTC)
 REST_429 = REST_REFUSAL.replace("(HTTP 403)", "(HTTP 429)")
@@ -15,36 +15,39 @@ SECONDARY_429 = SECONDARY_REFUSAL.replace("(HTTP 403)", "(HTTP 429)")
 PHRASE_IN_BODY = '{"body":"gh: API rate limit already exceeded for user ID 1."}'
 GRAPHQL_REACHED = "GitHub's GraphQL rate limit is reached; its reset time could not be read"
 REST_REACHED = "GitHub's REST rate limit is reached; its reset time could not be read"
+SEARCH_REACHED = "GitHub's search rate limit is reached; its reset time could not be read"
 SECONDARY_REACHED = "GitHub's secondary rate limit is reached; try again in a minute"
 
 
-def classified(text: str, limit: RateLimit = RateLimit.REST) -> forge.ForgeError:
-    return github_failure.nonzero_exit_failure(text, 1, "a test call", request_limit=limit)
+def classified(text: str, quota: Quota = Quota.CORE) -> forge.ForgeError:
+    return github_failure.nonzero_exit_failure(text, 1, "a test call", quota=quota)
 
 
 @pytest.mark.parametrize(
     ("text", "requested", "sentence"),
     [
-        pytest.param(GRAPHQL_REFUSAL, RateLimit.GRAPHQL, GRAPHQL_REACHED, id="recorded-graphql"),
-        pytest.param(GRAPHQL_REFUSAL, RateLimit.REST, REST_REACHED, id="the-requests-own-limit"),
-        pytest.param(REST_REFUSAL, RateLimit.REST, REST_REACHED, id="rest-403"),
-        pytest.param(REST_429, RateLimit.REST, REST_REACHED, id="rest-429"),
-        pytest.param(REST_429, RateLimit.GRAPHQL, GRAPHQL_REACHED, id="rest-429-graphql"),
-        pytest.param(SECONDARY_REFUSAL, RateLimit.GRAPHQL, SECONDARY_REACHED, id="secondary-403"),
-        pytest.param(SECONDARY_429, RateLimit.REST, SECONDARY_REACHED, id="secondary-429"),
+        pytest.param(GRAPHQL_REFUSAL, Quota.GRAPHQL, GRAPHQL_REACHED, id="recorded-graphql"),
+        pytest.param(GRAPHQL_REFUSAL, Quota.CORE, REST_REACHED, id="the-requests-own-limit"),
+        pytest.param(REST_REFUSAL, Quota.CORE, REST_REACHED, id="rest-403"),
+        pytest.param(REST_429, Quota.CORE, REST_REACHED, id="rest-429"),
+        pytest.param(REST_REFUSAL, Quota.SEARCH, SEARCH_REACHED, id="search-403"),
+        pytest.param(REST_REFUSAL, Quota.UNCOUNTED, REST_REACHED, id="uncounted-reads-core-limit"),
+        pytest.param(REST_429, Quota.GRAPHQL, GRAPHQL_REACHED, id="rest-429-graphql"),
+        pytest.param(SECONDARY_REFUSAL, Quota.GRAPHQL, SECONDARY_REACHED, id="secondary-403"),
+        pytest.param(SECONDARY_429, Quota.CORE, SECONDARY_REACHED, id="secondary-429"),
         pytest.param(
-            "gh: Too Many Requests (HTTP 429)", RateLimit.REST, SECONDARY_REACHED, id="bare-429"
+            "gh: Too Many Requests (HTTP 429)", Quota.CORE, SECONDARY_REACHED, id="bare-429"
         ),
         pytest.param(
             "gh: Too Many Requests (HTTP 429)",
-            RateLimit.GRAPHQL,
+            Quota.GRAPHQL,
             SECONDARY_REACHED,
             id="bare-429-graphql",
         ),
     ],
 )
 def test_a_rate_limit_is_a_transient_error_naming_the_limit_and_no_reset(
-    text: str, requested: RateLimit, sentence: str
+    text: str, requested: Quota, sentence: str
 ) -> None:
     """Spec: OUT-13, OUT-12 -- gh's closing message or an HTTP 429 marks a rate limit; it is
     secondary when gh says so or when only a 429 is known, else the request's own limit."""
@@ -158,3 +161,20 @@ def test_the_two_hour_bound_counts_from_the_read() -> None:
     after_an_hour = github_failure.graphql_reset(answer, READ_AT + timedelta(hours=1))
 
     assert (github_failure.graphql_reset(answer, READ_AT), after_an_hour) == (None, reset)
+
+
+@pytest.mark.parametrize(
+    ("command", "quota"),
+    [
+        pytest.param(["gh", "api", "graphql", "-f", "query={x}"], Quota.GRAPHQL, id="graphql"),
+        pytest.param(["gh", "repo", "view", "--json", "nameWithOwner"], Quota.GRAPHQL, id="view"),
+        pytest.param(["gh", "api", "search/issues?q=x"], Quota.SEARCH, id="search"),
+        pytest.param(["gh", "api", "-i", "search/issues", "--jq", "."], Quota.SEARCH, id="paged"),
+        pytest.param(["gh", "api", "rate_limit", "--jq", ".x"], Quota.UNCOUNTED, id="reset-read"),
+        pytest.param(["gh", "api", "repos/o/r/issues/1"], Quota.CORE, id="core"),
+    ],
+)
+def test_the_quota_a_call_spends_is_read_from_its_command_line(
+    command: list[str], quota: Quota
+) -> None:
+    assert github_failure.quota_of(command) is quota

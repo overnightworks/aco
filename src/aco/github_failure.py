@@ -34,7 +34,37 @@ class RateLimit(StrEnum):
 
     GRAPHQL = "GraphQL"
     REST = "REST"
+    SEARCH = "search"
     SECONDARY = "secondary"
+
+
+class Quota(StrEnum):
+    """The primary limit a `gh` call spends; the value is how a call record names it."""
+
+    CORE = "core"
+    GRAPHQL = "graphql"
+    SEARCH = "search"
+    UNCOUNTED = "uncounted"
+
+
+_REFUSED_LIMIT = {
+    Quota.CORE: RateLimit.REST,
+    Quota.GRAPHQL: RateLimit.GRAPHQL,
+    Quota.SEARCH: RateLimit.SEARCH,
+    Quota.UNCOUNTED: RateLimit.REST,
+}
+
+
+def quota_of(command: list[str]) -> Quota:
+    """The quota the `gh` command line spends: a GraphQL query and `repo view` spend GraphQL's,
+    a search page search's, the free `rate_limit` read none, every other call REST's core."""
+    if command[1:3] in (["api", "graphql"], ["repo", "view"]):
+        return Quota.GRAPHQL
+    if "rate_limit" in command:
+        return Quota.UNCOUNTED
+    if any(argument.startswith("search/") for argument in command):
+        return Quota.SEARCH
+    return Quota.CORE
 
 
 def _sentence(limit: RateLimit, resets_at: datetime | None) -> str:
@@ -55,13 +85,18 @@ class RateLimitedError(forge.ForgeRateLimitedError):
         self.limit = limit
 
 
-def _rate_limit(decoded: str, request_limit: RateLimit) -> RateLimit | None:
+def _rate_limit(decoded: str, quota: Quota) -> RateLimit | None:
     """The limit `decoded` ends with: the secondary one when gh says so or when only an
-    HTTP 429 is known, otherwise the limit of the refused request."""
+    HTTP 429 is known, otherwise the limit of the quota the refused call spends."""
     closing = _RATE_LIMIT_MESSAGE.search(decoded)
     if closing is not None:
-        return RateLimit.SECONDARY if closing.group("secondary") else request_limit
+        return RateLimit.SECONDARY if closing.group("secondary") else _REFUSED_LIMIT[quota]
     return RateLimit.SECONDARY if decoded.endswith(_TOO_MANY_REQUESTS) else None
+
+
+def is_rate_limited(decoded: str) -> bool:
+    """Whether `decoded` ends with a refusal under any rate limit."""
+    return _rate_limit(decoded, Quota.CORE) is not None
 
 
 def nonzero_exit_failure(
@@ -69,16 +104,16 @@ def nonzero_exit_failure(
     return_code: int,
     purpose: str,
     *,
-    request_limit: RateLimit = RateLimit.REST,
+    quota: Quota = Quota.CORE,
 ) -> forge.ForgeError:
     """Classify a nonzero `gh` exit from its decoded combined output.
 
     `gh`'s own exit code never carries the HTTP status, so this reads the
     same prose a human would; the fallback stays an unclassified `ForgeError`
     rather than guessing at retry safety. A rate limit is told first: gh words one
-    as a 403 or a 429 too. `request_limit` is the limit of the call that failed.
+    as a 403 or a 429 too. `quota` is the one the call that failed spends.
     """
-    limit = _rate_limit(decoded, request_limit)
+    limit = _rate_limit(decoded, quota)
     if limit is not None:
         return RateLimitedError(limit)
     if "HTTP 404" in decoded:

@@ -1,6 +1,7 @@
 """Coordinate coding-agent claims through this repository's own state ref."""
 
 import argparse
+import os
 import re
 import sys
 from collections.abc import Callable, Iterator
@@ -39,9 +40,11 @@ from . import (
     cmd_withdraw,
     expectation_grammar,
     github,
+    github_calls,
     items,
     protocol,
     report,
+    repositories,
     session,
     usage,
     workboard,
@@ -789,19 +792,14 @@ def _run_repository_command(
 
 
 def main(arguments: list[str] | None = None) -> int:
-    # Every refusal the parse itself raises -- argparse's own usage errors, and an argparse
-    # `type=` whose refusal is a `ClaimError` (`workboard.parse_item_reference`, a lane record
-    # file) -- fires before any namespace carries `--json`, so the mode is read back off the
-    # parsers this parse reached. Both report `invalid_usage` through the one envelope. Past the
-    # parse the plain sentence alone still stands: a refusal a command raises outside its own
-    # reported vocabulary must not be dressed as one.
+    # A refusal the parse raises (argparse's usage errors, a `type=` raising `ClaimError`) fires
+    # before any namespace carries `--json`, so the mode is read off the parsers reached and
+    # reported as `invalid_usage`; past the parse the plain sentence stands, undressed.
     given = sys.argv[1:] if arguments is None else arguments
     parser = _parser()
     try:
         parsed = parser.parse_args(given)
-        # Judged after the parse, not as an argparse `type=`: `--repo` precedes the subcommand,
-        # so a refusal raised while argparse reads it would fire before the parse reached the
-        # command that decides whether this run asked for JSON.
+        # After the parse: `--repo` precedes the subcommand, so a `type=` refuses unaware of --json.
         parsed.repo = None if parsed.repo is None else github.repository_id(parsed.repo)
     except usage.UsageError as error:
         return _refuse_usage(error, as_json=_asked_for_json(parser, given))
@@ -809,9 +807,11 @@ def main(arguments: list[str] | None = None) -> int:
         return report.refuse(
             PreDispatchReason.INVALID_USAGE, error, as_json=_asked_for_json(parser, given)
         )
+    calls = repositories.state_directory(os.environ, Path.home())
     try:
         command = _COMMANDS[parsed.command]
-        return _run_repository_command(command, parser, given, parsed)
+        with github_calls.recording(calls, parsed.command):
+            return _run_repository_command(command, parser, given, parsed)
     except protocol.ClaimError as error:
         return report.render_error(error)
 

@@ -102,6 +102,7 @@ layers = [
     "github_probe",
     "github | state_board | github_search",
     "github_body_check | github_pull_requests",
+    "github_calls",
     "github_graphql | github_actions | github_issue_payload | github_body_write | github_failure | github_merge_queue | github_paging | earlier_rulings",
     "forge | rulings",
     "workboard",
