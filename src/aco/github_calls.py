@@ -14,7 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import ClassVar
 
-from . import file_lock, github_failure, github_paging
+from . import file_lock, github_failure, github_paging, protocol
 
 RECORD_FILE = "github-calls.jsonl"
 ROTATED_FILE = "github-calls.1.jsonl"
@@ -22,7 +22,6 @@ _ROTATION_LOCK_FILE = "github-calls.lock"
 ROTATION_BYTES = 32 * 1024 * 1024
 _RECORD_MODE = 0o600
 _DIRECTORY_MODE = 0o700
-_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 # A response head's status line sits at the very start of the output.
 _STATUS_LINE_BYTES = 64
 _NOT_MODIFIED = 304
@@ -47,7 +46,7 @@ class CallRecord:
 
 
 def _now() -> str:
-    return datetime.now(UTC).strftime(_TIME_FORMAT)
+    return datetime.now(UTC).strftime(protocol.RFC3339_TIMESTAMP_FORMAT)
 
 
 def outcome_of(exit_status: int | None, output: bytes) -> Outcome:
