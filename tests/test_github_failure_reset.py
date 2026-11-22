@@ -157,6 +157,21 @@ def test_a_call_outside_the_forge_reads_no_reset(
     assert (caught.value.resets_at, len(calls_of(log))) == (None, 1)
 
 
+def test_a_refused_search_names_the_search_rate_limit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Spec: OUT-13 -- a search call spends the search quota, so its refusal names that limit."""
+    refusing_gh(monkeypatch, tmp_path, REST_REFUSAL)
+
+    with pytest.raises(forge.ForgeRateLimitedError) as caught:
+        github.bounded_command(["gh", "api", "search/issues"], purpose="the ruling search")
+
+    assert (
+        str(caught.value)
+        == "GitHub's search rate limit is reached; its reset time could not be read"
+    )
+
+
 def test_the_conditional_probe_reads_the_reset_through_its_own_runner(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
