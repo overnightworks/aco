@@ -12,7 +12,7 @@ import pytest
 import relay_world
 from mcp_lines import call_line, relay_mcp
 
-from aco import mcp_relay
+from aco import mcp_relay, process
 
 _PING = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "ping"})
 _INITIALIZE = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
@@ -128,7 +128,8 @@ def test_a_fresh_process_that_runs_past_the_bound_is_answered_with_the_bound(
 def test_a_fresh_process_whose_answer_is_too_large_is_answered_with_that_reason(
     package: Path,
 ) -> None:
-    _broken(package, "def serve(requests, replies):\n    replies.write('x' * (9 * 1024 * 1024))")
+    too_large = process.MAX_COMMAND_OUTPUT_BYTES + 1
+    _broken(package, f"def serve(requests, replies):\n    replies.write('x' * {too_large})")
 
     answer = _relayed(_PING)
 

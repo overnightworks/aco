@@ -1,6 +1,7 @@
 """A copy of the aco package a test changes, and a real `aco mcp` process over pipes."""
 
 import json
+import os
 import select
 import shutil
 import subprocess
@@ -27,7 +28,13 @@ def copy_package(directory: Path) -> Path:
 
 
 def set_version(package: Path, version: str) -> None:
-    (package / "__init__.py").write_text(f'__version__ = "{version}"\n', encoding="utf-8")
+    """Rewrites the version; the file's modification time moves on by a second so that
+    the bytecode cache, keyed on time and size, never serves the previous version."""
+    module = package / "__init__.py"
+    before = module.stat().st_mtime_ns
+    module.write_text(f'__version__ = "{version}"\n', encoding="utf-8")
+    moved_on = max(module.stat().st_mtime_ns, before) + 1_000_000_000
+    os.utime(module, ns=(moved_on, moved_on))
 
 
 class Relay:
