@@ -3,6 +3,6 @@ agent = "Claude c5111677-6948-459f-a346-aaa090b20fc6"
 role = "builder"
 base = "65f66bc8afaf5f92a14b9f423991c9256e18372b"
 branch = "claude/issue-1042-mcp-relay"
-scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "scripts/vulture_whitelist.py", "specs/mcp.spec.md", "src/aco/__main__.py", "src/aco/cmd_mcp.py", "src/aco/installed_code.py", "src/aco/mcp_relay.py", "src/aco/mcp_server.py", "tests"]
+scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "quality/config.toml", "scripts/vulture_whitelist.py", "specs/mcp.spec.md", "src/aco/__main__.py", "src/aco/cmd_mcp.py", "src/aco/installed_code.py", "src/aco/mcp_relay.py", "src/aco/mcp_server.py", "tests"]
 opened_commit = "4ff5052eb9c4c14c76e6b2afdc1c8df3a4a0857d"
 whole_reason = "The relay, its child, the install check, their spec, architecture and README sentences and their tests are one hand-off contract."
