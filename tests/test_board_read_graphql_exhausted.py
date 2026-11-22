@@ -130,7 +130,13 @@ def test_a_pull_request_check_succeeds_while_graphql_is_refused(
     bare_remote: Path,
 ) -> None:
     publish_claims_from_a_second_clone(github_clone, bare_remote, (LANE_CLAIM,))
-    landing_issue = {"state": "open", "title": "Tidy", "body": LANE_BODY, "pull_request": {}}
+    landing_issue = {
+        "state": "open",
+        "title": "Tidy",
+        "body": LANE_BODY,
+        "labels": [],
+        "pull_request": {},
+    }
     refused = serve_rest(
         monkeypatch,
         tmp_path,
