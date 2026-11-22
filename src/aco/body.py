@@ -722,6 +722,12 @@ def parse_body(body: str, *, storage: Storage = Storage.GITHUB) -> ParsedBody:
     return _valid_block_parsed_body(data, storage)
 
 
+def carries_no_block(raw_body: str) -> bool:
+    """Whether `raw_body` holds no `aco` fence at all: the one defect it then has
+    is `no aco block`, the only one an idea's body may carry."""
+    return not _fence_matches(raw_body)
+
+
 def _block_data(body: str) -> dict[str, object] | ParsedBody:
     """`body`'s one closed `aco` block, decoded as TOML but not yet
     schema-checked, or the `ParsedBody` that already says why it cannot be."""

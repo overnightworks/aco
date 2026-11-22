@@ -40,24 +40,44 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     ):
         if value is not None:
             return narrow_edit(parsed, context)
+    return _cmd_item_edit_body(parsed, context)
+
+
+def _cmd_item_edit_body(parsed: argparse.Namespace, context: RunContext) -> int:
+    """The whole-body `item edit` of `run`."""
     as_json = parsed.json
     try:
         number = parsed.item
         storage = context.config.storage
         new_body = _read_item_edit_body(number, storage, base=parsed.base)
         defects = body_shape_defects(new_body, storage=storage)
-        if defects:
+        # An idea's body carries no block; whether the item is one is read with the
+        # item, under its lock, so that judgement waits for `_replace_whole_body`.
+        awaits_the_idea_label = storage is body.Storage.GITHUB and body.carries_no_block(new_body)
+        if defects and not awaits_the_idea_label:
             return refuse_item_body_invalid(defects, as_json=as_json)
-        replaced = _replace_whole_body(context, number, new_body, base=parsed.base)
+        replaced = _replace_whole_body(
+            context, number, new_body, base=parsed.base, unless_idea=defects
+        )
         item_id = workboard.item_label(number, storage)
         _print_item_edit_result(item_id, number, replaced, as_json=as_json)
         return 0
+    except _BodyInvalidError as error:
+        return refuse_item_body_invalid(error.defects, as_json=as_json)
     except decide.StaleBodyError as error:
         return report.refuse(ItemReason.STALE, error, as_json=as_json)
     except forge.ForgeBodyWrittenError as error:
         return report.refuse_checked_write(error, as_json=as_json)
     except protocol.ClaimError as error:
         return report.refuse(ItemReason.PRECONDITION_FAILED, error, as_json=as_json)
+
+
+class _BodyInvalidError(Exception):
+    """A piped body whose defects only the live item could excuse and did not."""
+
+    def __init__(self, defects: tuple[str, ...]) -> None:
+        super().__init__(defects[0])
+        self.defects = defects
 
 
 def _read_item_edit_body(number: int, storage: body.Storage, *, base: str | None) -> str:
@@ -91,12 +111,19 @@ class _WholeBodyEdit:
 
 
 def _replace_whole_body(
-    context: RunContext, number: int, new_body: str, *, base: str
+    context: RunContext,
+    number: int,
+    new_body: str,
+    *,
+    base: str,
+    unless_idea: tuple[str, ...] = (),
 ) -> _WholeBodyEdit:
     """Replaces item `number`'s body with `new_body` if it still has the body `base` hashes,
     read afresh under the item's lock (ITEM-72), else refuses `StaleBodyError` and writes
     nothing. The state-ref board is built inside the lock, so the snapshot hashed is the
-    one written against, and its write always lands (ITEM-13)."""
+    one written against, and its write always lands (ITEM-13). `unless_idea` are the
+    defects of a body with no aco block: under `github` the live item's own labels
+    excuse them when it carries the idea label, else they refuse `body_invalid`."""
     storage = context.config.storage
     item_id = workboard.item_label(number, storage)
     item_argument = workboard.item_argument(number, storage)
@@ -120,6 +147,8 @@ def _replace_whole_body(
             )
         client = context.forge_writer
         reference = board_read.item_or_refuse(client, number, command="item edit", storage=storage)
+        if unless_idea and not workboard.has_label(reference.labels, context.config.idea_label):
+            raise _BodyInvalidError(unless_idea)
         current = reference.body or ""
         decide.require_current(
             base, decide.body_hash(current), item_id=item_id, item_argument=item_argument
