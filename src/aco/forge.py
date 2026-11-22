@@ -247,6 +247,8 @@ class ItemReference:
     never itself bound to another forge's issue.
     `author_is_member` says whether a member of the repository wrote the item,
     by the same rule as the board listing; the default is a stranger's.
+    `labels` are the item's label names under `github`; state-ref keeps them in
+    its block's `[record]`, so it leaves them empty.
     """
 
     state: ItemState
@@ -255,6 +257,7 @@ class ItemReference:
     is_landing: bool = False
     origin: str | None = None
     author_is_member: bool = False
+    labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

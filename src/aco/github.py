@@ -304,9 +304,9 @@ class GitHubForge:
                     "api",
                     f"repos/{self.repository}/issues/{number}",
                     "--jq",
-                    # The issues endpoint answers for a pull request too, and
-                    # only its `pull_request` member tells the two apart.
-                    '{state,title,body,author_association,is_landing:has("pull_request")}',
+                    # The issues endpoint answers for a pull request too; `pull_request` marks it.
+                    "{state,title,body,author_association,labels:[.labels[].name],"
+                    'is_landing:has("pull_request")}',
                 ]
             )
         except forge.ForgeNotFoundError:

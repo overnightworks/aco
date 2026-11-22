@@ -63,7 +63,7 @@ class World:
             target.write_text(text)
 
     def foreign_issue(self, repository: str, number: int, *, state: str) -> None:
-        answer = f'{{"state":"{state}","title":"Other","body":"","is_landing":false}}'
+        answer = f'{{"state":"{state}","title":"Other","body":"","labels":[],"is_landing":false}}'
         endpoint = f"repos/{repository}/issues/{number}".replace("/", "_")
         (self.answers / endpoint).write_text(answer)
 

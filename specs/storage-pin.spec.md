@@ -160,7 +160,7 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 - [ ] [PIN-22] `aco item edit ITEM --base HASH < body.md` under `storage = "state-ref"` replaces the item's stored body (ITEM-71) and prints `EDITED aco-xxxxxx`, exit `0` (see E-PIN-08).
 - [ ] [PIN-23] `aco item edit ITEM --base HASH` against an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>` (`<repository>`: PIN-28).
-- [ ] [PIN-24] `aco item edit ITEM --base HASH` piping a body with no valid `aco` block refuses with that body's own first defect sentence (`specs/body-block.spec.md`, BODY-01..BODY-50).
+- [ ] [PIN-24] `aco item edit ITEM --base HASH` piping a body with no valid `aco` block refuses with its first defect (`specs/body-block.spec.md`); ITEM-79 excepts an idea item under `storage = "github"`.
 - [ ] [PIN-25] `aco item close ITEM` under `storage = "state-ref"` prints `CLOSED aco-xxxxxx` then a `freed: ` line naming every item `ITEM`'s own close just freed, or `freed: none`, exit `0` (see E-PIN-09).
 - [ ] [PIN-26] `aco item close ITEM` against an item still carrying a live claim refuses `<item-id> has a live claim (<agent> (<role>)); release the claim first`, before any write.
 - [ ] [PIN-27] A second `aco item close ITEM` on an already-closed item refuses `<item-id> is already closed (closed on <closed_at>)`.

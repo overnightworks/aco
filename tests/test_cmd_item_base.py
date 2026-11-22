@@ -180,9 +180,11 @@ def test_a_malformed_body_refuses_before_the_item_is_read(
     arguments = edit_with_base(scenario.argument, capsys)
     reads_before = len(client.issue_reference_lookups)
 
-    result = run_cli([*arguments, "--json"], capsys, stdin="no block here\n")
+    result = run_cli([*arguments, "--json"], capsys, stdin="```aco\nversion = \n```\n")
 
-    defect = "body malformed: aco: no aco block"
+    defect = (
+        "body malformed: aco: aco block is not valid TOML: Invalid value (at line 1, column 11)"
+    )
     assert result.status == 2
     assert json.loads(result.stdout)["reason"] == "body_invalid"
     assert result.stderr == f"ERROR: {defect}\n"
