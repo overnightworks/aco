@@ -74,7 +74,7 @@ def checked(
 def loaded_files() -> list[Path]:
     """The source file of every aco module loaded so far."""
     files: list[Path] = []
-    for module in list(sys.modules.values()):
+    for module in sys.modules.copy().values():
         spec = getattr(module, "__spec__", None)
         if spec is None or not spec.has_location or spec.origin is None:
             continue
