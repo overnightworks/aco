@@ -1,5 +1,5 @@
 """Whether a process loaded one complete install of aco (`specs/mcp.spec.md`,
-MCP-83), driven over a purelib directory the test writes."""
+MCP-83, MCP-88), driven over a purelib directory the test writes."""
 
 import runpy
 import sys

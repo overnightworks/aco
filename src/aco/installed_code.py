@@ -1,5 +1,5 @@
 """Whether the aco a process loaded is one complete install (`specs/mcp.spec.md`,
-MCP-83). The installer rewrites the files of a running tool in place, so a process
+MCP-83, MCP-88). The installer rewrites the files of a running tool in place, so a process
 that imports while it runs could hold modules of two installs. The standard library
 alone is imported here, so this module loads before the rest of aco does."""
 

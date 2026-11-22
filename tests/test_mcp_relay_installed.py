@@ -1,5 +1,5 @@
 """`aco mcp` running from the site-packages of a venv (`specs/mcp.spec.md`,
-MCP-82, MCP-83): an install caught half written is answered loudly and the same
+MCP-82, MCP-83, MCP-88): an install caught half written is answered loudly and the same
 relay answers from the finished install on its next call."""
 
 import os

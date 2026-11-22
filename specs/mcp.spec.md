@@ -15,7 +15,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | the host closed the pipe | MCP-03 | — | — |
 | a message after a reinstall | — | MCP-81 | — |
 | a fresh process that cannot start, exits non-zero, runs past its bound or answers nothing to a request | — | MCP-82 | E-MCP-21 |
-| a fresh process whose loaded code is not one complete install | — | MCP-83 | E-MCP-21 |
+| a fresh process whose loaded code is not one complete install | — | MCP-83, MCP-88 | E-MCP-21 |
 | `aco mcp --direct` | MCP-84 | — | — |
 | the host closed the session while a call ran | MCP-87 | — | — |
 | a change to the relay, or to a tool's schema | — | MCP-85, MCP-86 | — |
