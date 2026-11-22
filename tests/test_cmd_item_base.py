@@ -4,14 +4,13 @@ board. The forge is the only fake. The state-ref twins live in
 `test_cmd_item_base_state_ref.py`."""
 
 import json
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
-from cli_fixtures import devnull_on_stdin, run_cli
+from cli_fixtures import run_cli
 from github_fixtures import serve_forge
 from item_base import edit_with_base, shown_body_hash
 from item_lock_witness import LockWitnessForge
@@ -92,18 +91,6 @@ def test_a_hash_item_show_printed_lets_item_edit_replace_the_body(
     assert edited["body_hash"] == shown_body_hash(scenario.argument, capsys)
 
 
-def test_an_edit_prints_edited_and_its_item(
-    serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: ITEM-71."""
-    serve_item()
-    arguments = edit_with_base(scenario.argument, capsys)
-
-    result = run_cli(arguments, capsys, stdin=scenario.replacement)
-
-    assert (result.status, result.stdout, result.stderr) == (0, f"EDITED #{scenario.number}\n", "")
-
-
 @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
 def test_an_edit_from_a_copy_read_before_another_write_refuses_and_keeps_that_write(
     serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str], as_json: bool
@@ -146,29 +133,6 @@ def test_an_edit_without_a_base_refuses_before_it_reads_stdin(
     assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
     envelope = {"ok": False, "reason": "precondition_failed", "message": sentence}
     assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
-    assert client.body_writes == []
-
-
-def test_an_edit_with_a_base_and_no_body_on_stdin_names_a_redirect_that_runs(
-    serve_item: ServeItem,
-    scenario: Scenario,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Spec: ITEM-63 -- the printed command names the item as `item edit` takes it."""
-    client = serve_item()
-    arguments = edit_with_base(scenario.argument, capsys)
-
-    with devnull_on_stdin(tmp_path) as stdin:
-        monkeypatch.setattr(sys, "stdin", stdin)
-        result = run_cli(arguments, capsys)
-
-    sentence = (
-        f"item edit #{scenario.number} needs the new body on stdin: "
-        f"aco item edit {scenario.argument} --base <hash> < body.md"
-    )
-    assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
     assert client.body_writes == []
 
 

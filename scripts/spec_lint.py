@@ -2,7 +2,8 @@
 """Mechanical style lint for ``specs/*.spec.md``.
 
 The house shape uses a ``- [ ] [ID] ...`` criterion on exactly one physical line (no
-continuation-line joining is needed here), a behaviour table cites criterion IDs by their bare
+continuation-line joining is needed here), or a ``| [ID] | ...`` row of a table-driven
+criterion, read as the criterion of that ID; a behaviour table cites criterion IDs by their bare
 token, and a named example is a ``### E-<PREFIX>-nn`` heading followed by a ``Setup:`` line
 before its first fenced block.
 
@@ -16,7 +17,8 @@ Checks (one finding per hit, each named ``file:line``):
 * ``unresolved_reference``: every ``see ...`` reference list anywhere in a line -- not only
   right after ``(`` -- or a behaviour-table data cell (its row-label column is prose, not a
   citation, and is never scanned), names an ``E-<PREFIX>-nn`` that no ``###`` heading defines,
-  or a plain ``ID-nn`` that no ``- [ ] [ID-nn]`` bullet anywhere in ``specs/`` defines --
+  or a plain ``ID-nn`` that no ``- [ ] [ID-nn]`` bullet or ``| [ID-nn] |`` row anywhere in
+  ``specs/`` defines --
   criteria and examples cite across files routinely, so both namespaces are read tree-wide, not
   per file. A ``see`` list may comma-join several ids (``see A-01, A-02``), shorthand a further
   number under the same prefix with ``/`` (``A-01/99`` means ``A-01`` and ``A-99``), or name an
@@ -60,7 +62,7 @@ MAX_CRITERION_LENGTH = 200
 
 # A criterion is always one physical line in aco's house format: no continuation-line
 # joining, unlike the blueprint's ``_iter_blocks``.
-CRITERION_PATTERN = re.compile(r"^- \[ \] \[([A-Z]+-\d+)\](.*)$")
+CRITERION_PATTERN = re.compile(r"^(?:- \[ \] |\| )\[([A-Z]+-\d+)\](.*)$")
 EXAMPLE_HEADING_PATTERN = re.compile(r"^### (E-[A-Za-z0-9]+-\d+)\b")
 # A retirement note is a checkbox-less bullet naming the retired id(s), e.g.
 # ``- LAND-36 (retired).``.
