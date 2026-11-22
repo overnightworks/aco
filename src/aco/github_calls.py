@@ -1,6 +1,7 @@
 """The record of every `gh` call an aco process starts (`specs/github-calls.spec.md`): one
 JSON line per call in a file of aco's state directory, so the share of GitHub's quota that
 aco spends can be counted across processes after the fact."""
+# ruff: noqa: T201 - the one owner of the one-time warning that the call record failed
 
 import json
 import os
