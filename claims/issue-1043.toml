@@ -1,8 +1,0 @@
-claim_id = "32bdfff764f440dda7d7ea35560057b2"
-agent = "Claude c5111677-6948-459f-a346-aaa090b20fc6"
-role = "builder"
-base = "65f66bc8afaf5f92a14b9f423991c9256e18372b"
-branch = "claude/issue-1043-idea-body-edit"
-scope = ["specs/item.spec.md", "specs/storage-pin.spec.md", "src/aco/cmd_item_common.py", "src/aco/cmd_item_edit.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_issue_payload.py", "tests"]
-opened_commit = "9b461c11543295095d97efc7e5b998a41a536df7"
-whole_reason = "The idea exemption, its refusal for non-ideas, its spec lines and their tests are one change to item edit's body check."
