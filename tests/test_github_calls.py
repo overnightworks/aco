@@ -25,13 +25,16 @@ from aco import (
 )
 
 # Prints `FAKE_GH_OUTPUT_HEX` (bytes in hex) or, when `FAKE_GH_FLOOD_BYTES` is set, that many
-# bytes, and exits with `FAKE_GH_EXIT`; a `rate_limit` read always answers an implausible reset.
+# bytes, and exits with `FAKE_GH_EXIT`, after sleeping `FAKE_GH_SLEEP_SECONDS` when set; a
+# `rate_limit` read always answers an implausible reset.
 FAKE_GH = """#!{python}
-import os, sys
+import os, sys, time
 
 if "rate_limit" in sys.argv[1:]:
     print("soon")
     sys.exit(0)
+if "FAKE_GH_SLEEP_SECONDS" in os.environ:
+    time.sleep(float(os.environ["FAKE_GH_SLEEP_SECONDS"]))
 flood = os.environ.get("FAKE_GH_FLOOD_BYTES")
 if flood:
     sys.stdout.buffer.write(b"x" * int(flood))
@@ -222,6 +225,11 @@ def test_every_call_leaves_exactly_one_line_of_the_declared_keys_and_no_secret(
         {frozenset(declared)},
     )
     assert secret not in (state_directory / github_calls.RECORD_FILE).read_text()
+    first = lines[0]
+    assert list(first) == [field.name for field in dataclasses.fields(github_calls.CallRecord)]
+    assert (first["command"], first["pid"]) == ("item", os.getpid())
+    for moment in (first["at"], first["started"]):
+        assert protocol.RFC3339_TIMESTAMP_PATTERN.fullmatch(str(moment))
 
 
 def test_a_call_outside_a_recording_leaves_no_file(state_directory: Path) -> None:
@@ -346,10 +354,8 @@ def test_a_repository_discovery_that_times_out_records_failed(
 ) -> None:
     """Spec: CALLS-04."""
 
-    def times_out(*_arguments: object, **_options: object) -> process.CapturedResult:
-        raise process.ProcessTimedOutError
-
-    monkeypatch.setattr(process, "run_captured", times_out)
+    monkeypatch.setattr(github, "GH_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setenv("FAKE_GH_SLEEP_SECONDS", "30")
 
     with github_calls.recording(state_directory, "claim"), pytest.raises(protocol.ClaimError):
         github.discover_repository(remote_url="/not/a/github/remote")
