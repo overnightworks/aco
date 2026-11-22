@@ -46,6 +46,7 @@ def _install_finishes(purelib: Path, paths: list[Path]) -> None:
             "RECORD",
         ),
         (lambda purelib, paths: paths[1].unlink(), "RECORD"),
+        (lambda purelib, paths: _rewrite(paths[1], _OLD["cli.py"]), "cli.py"),
     ],
     ids=[
         "an install nothing touched",
@@ -56,6 +57,7 @@ def _install_finishes(purelib: Path, paths: list[Path]) -> None:
         "a record written first and a module replaced after it",
         "a record that went missing",
         "a module that was deleted",
+        "a module replaced with the same bytes",
     ],
 )
 def test_the_loaded_aco_is_refused_unless_it_is_one_complete_install(
@@ -91,6 +93,22 @@ def test_a_loaded_module_with_no_stamp_from_the_first_read_is_refused_though_its
     refused = installed_code.mismatch(unstamped, reading, [module], purelib)
 
     assert refused == str(module)
+
+
+def test_a_loaded_module_is_refused_when_no_record_was_there_from_the_start(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    purelib = tmp_path / "purelib"
+    [_, module] = install_world.install(purelib, _OLD)
+    (purelib / install_world.DISTRIBUTION_DIRECTORY / "RECORD").unlink()
+    first = installed_code.first_read(purelib)
+
+    exit_code = installed_code.checked(
+        first, lambda: _MAIN_RESULT, purelib=purelib, loaded=[module]
+    )
+
+    assert exit_code == 1
+    assert capsys.readouterr().err.strip().endswith("RECORD")
 
 
 def test_a_module_the_record_does_not_list_is_refused(
