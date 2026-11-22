@@ -53,7 +53,7 @@ def _cmd_item_edit_body(parsed: argparse.Namespace, context: RunContext) -> int:
         defects = body_shape_defects(new_body, storage=storage)
         # An idea's body carries no block; whether the item is one is read with the
         # item, under its lock, so that judgement waits for `_replace_whole_body`.
-        awaits_the_idea_label = storage is body.Storage.GITHUB and body.carries_no_block(new_body)
+        awaits_the_idea_label = storage is body.Storage.GITHUB and not body.carries_block(new_body)
         if defects and not awaits_the_idea_label:
             return refuse_item_body_invalid(defects, as_json=as_json)
         replaced = _replace_whole_body(
