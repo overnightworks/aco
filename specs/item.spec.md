@@ -165,7 +165,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - [ ] [ITEM-71] A whole-body `item edit` whose `--base` is the stored body's hash replaces the body and prints `EDITED <item-id>`, exit `0`; github stores it as piped, under both storages (see E-ITEM-19).
 - [ ] [ITEM-72] The compare runs under the item's lock (RULE-40) on a fresh read; a changed body, or under state-ref a store write meanwhile (CAS-20), refuses `stale`, exit `2`, nothing written (see E-ITEM-19).
 - [ ] [ITEM-73] No `--base` refuses `item edit <item-id> needs --base <hash>; aco item show <item> --json prints it`, exit `2`, before stdin is read or any write (see E-ITEM-19).
-- [ ] [ITEM-74] The piped body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock is taken and the item read, and refuses `body_invalid` (ITEM-25) whatever the base is, except the one defect ITEM-79 leaves to the item's labels.
+- [ ] [ITEM-74] The body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock and refuses `body_invalid` (ITEM-25) whatever the base; ITEM-79 excepts one defect.
 - [ ] [ITEM-75] Under `storage = "github"` a body equal to the stored one prints `UNCHANGED <item-id>` (`--json`: `reason: "unchanged"`, ITEM-15's keys), exit `0`, writing nothing; state-ref always writes (ITEM-13).
 - [ ] [ITEM-76] Under `storage = "github"` a write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the body is written.
 - [ ] [ITEM-79] Under `storage = "github"` a piped body with no aco block, and no other defect, is replaced like any body (ITEM-71, ITEM-72) when the item read under the lock carries the board's idea label.
