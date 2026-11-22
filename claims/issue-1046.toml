@@ -1,0 +1,8 @@
+claim_id = "fcea620cd65b4eefb6e7a95abce7d6f1"
+agent = "Claude c5111677-6948-459f-a346-aaa090b20fc6"
+role = "builder"
+base = "28e9dad88de9eedef4be33b92f2d92cdb7da6484"
+branch = "claude/issue-1046-item-spec-table"
+scope = ["quality/baseline.toml", "scripts/spec_lint.py", "specs/item.spec.md", "tests"]
+opened_commit = "032b977b03525ce139372064fe2d1ab073acea17"
+whole_reason = "The table criterion, the one parametrized test replacing the per-sentence tests, the spec lint reading the table and the size baseline it shrinks are one measurement."
