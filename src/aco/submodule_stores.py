@@ -52,12 +52,14 @@ def removal_proof(worktree: Path, *, branch: str) -> RemovalProof:
 
 def _submodules_are_dirty(worktree: Path) -> bool:
     """Whether any populated submodule, at any depth, has changed or untracked files. Each one is
-    asked with the flags that override the configuration of its own repository, which the status
-    of the repository above does not reach."""
-    status = "git status --porcelain --ignore-submodules=none --untracked-files=normal"
+    asked with the status the worktree itself is asked, whose flags override the configuration of
+    its own repository, which the status of the repository above does not reach. The no-fetch
+    option reaches every child git process: a missing object is a read failure."""
+    status = shlex.join(["git", *checkout.DIRTY_STATUS])
     return bool(
         checkout.git_output(
-            ["submodule", "--quiet", "foreach", "--recursive", status], directory=worktree
+            ["submodule", "--quiet", "foreach", "--recursive", status],
+            directory=worktree,
         )
     )
 

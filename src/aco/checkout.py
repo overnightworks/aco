@@ -1696,13 +1696,14 @@ def worktree_cleanup_kept(reason: str) -> WorktreeCleanupOutcome:
 WORKTREE_KEPT_NOT_MERGED_REASON = "not merged into the default branch"
 WORKTREE_KEPT_DIRTY_REASON = "dirty"
 WORKTREE_KEPT_ELSEWHERE_REASON = "branch checked out elsewhere"
+DIRTY_STATUS = ["status", "--porcelain", "--ignore-submodules=none", "--untracked-files=normal"]
 
 
 class RemovalPolicy(NamedTuple):
     """What lets a landed lane's worktree go: its branch is landed when `trunk` contains its tip or
     the tip is one of `proven_tips` (the pull request's recorded head, an adopted lane's `base`);
-    `removal_proof` reads its submodule repositories: whether `--force` must remove them, or why
-    to keep the worktree."""
+    `removal_proof` reads its submodule repositories and the dirt inside them: whether `--force`
+    must remove them, or why to keep the worktree."""
 
     trunk: str
     proven_tips: frozenset[str]
@@ -1724,8 +1725,7 @@ def cleanup_landed_worktree(
     matching_checkout = resolve_path_checkout(matching)
     if matching_checkout is not None and matching_checkout.kind is CheckoutKind.MAIN:
         return worktree_cleanup_kept(WORKTREE_KEPT_ELSEWHERE_REASON)
-    status = ["status", "--porcelain", "--ignore-submodules=none", "--untracked-files=normal"]
-    if git_output(status, directory=matching):
+    if git_output(DIRTY_STATUS, directory=matching):
         return worktree_cleanup_kept(WORKTREE_KEPT_DIRTY_REASON)
     forced, kept_reason = policy.removal_proof(matching)
     if kept_reason is not None:
