@@ -1,8 +1,0 @@
-claim_id = "5f84afe0eaab41d9bb9b9ef5b2fcad01"
-agent = "Claude 46fe7857-8b56-4ea7-a3ee-f805b34349e9"
-role = "builder"
-base = "28e9dad88de9eedef4be33b92f2d92cdb7da6484"
-branch = "claude/issue-1049-quality-v0-24-0"
-scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", ".github/workflows/release.yml", "pyproject.toml", "uv.lock"]
-opened_commit = "05fa491c6d0c716426d4eca72c8d84d2f554cdc4"
-whole_reason = "The quality pins of three workflows and the dev dependency the new release requires move together as one release bump."
