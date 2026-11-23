@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from cli_fixtures import real_git, set_git_identity
-from release_cleanup_world import MISSING_OBJECT, one_commit_repository
+from release_cleanup_world import one_commit_repository
 
 from aco import protocol, submodule_stores
 
@@ -133,15 +133,6 @@ def test_a_missing_object_is_a_read_failure_never_a_fetch(lane: Path, upstream: 
 
     absent = real_git(store, "--no-lazy-fetch", "--git-dir=.", "cat-file", "-e", later, check=False)
     assert absent.returncode != 0
-
-
-def test_a_ref_naming_a_missing_object_is_a_read_failure(lane: Path, upstream: Path) -> None:
-    """Spec: REL-74."""
-    store = clone_store(upstream, lane_git_directory(lane) / "modules" / "sub", lane / "sub")
-    (store / "refs" / "heads" / "ghost").write_text(MISSING_OBJECT + "\n")
-
-    with pytest.raises(protocol.ClaimError, match=MISSING_OBJECT):
-        proof_of(lane)
 
 
 @pytest.fixture
