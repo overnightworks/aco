@@ -91,31 +91,25 @@ def test_a_git_directory_the_worktree_only_points_to_needs_no_proof(
     assert proof_of(lane) == (False, None)
 
 
-def test_a_nested_repository_is_found_and_named(lane: Path, upstream: Path) -> None:
-    """Spec: REL-70, REL-72 -- every depth under `modules` counts."""
-    modules = lane_git_directory(lane) / "modules"
-    outer = clone_store(upstream, modules / "outer", lane / "outer")
-    inner = clone_store(upstream, outer / "modules" / "inner", lane / "inner")
+@pytest.mark.parametrize(
+    "holder_directory",
+    [
+        pytest.param("modules", id="in-the-modules-of-a-repository"),
+        pytest.param("objects", id="below-a-repositorys-object-store"),
+    ],
+)
+def test_a_nested_repository_is_found_and_named(
+    lane: Path, upstream: Path, holder_directory: str
+) -> None:
+    """Spec: REL-70, REL-72 -- every depth counts, an object store's directories included."""
+    outer = clone_store(upstream, lane_git_directory(lane) / "modules" / "outer", lane / "outer")
+    inner = clone_store(upstream, outer / holder_directory / "inner", lane / "inner")
     hold_unique_commit(inner)
 
     kept_reason = proof_of(lane).kept_reason
 
     assert kept_reason is not None
     assert kept_reason.startswith(f"submodule repository {inner} holds")
-
-
-def test_a_repository_below_a_repositorys_object_store_is_proven_too(
-    lane: Path, upstream: Path
-) -> None:
-    """Spec: REL-70 -- every depth counts, an object store's directories included."""
-    outer = clone_store(upstream, lane_git_directory(lane) / "modules" / "sub", lane / "sub")
-    backup = clone_store(upstream, outer / "objects" / "backup.git", lane / "backup")
-    hold_unique_commit(backup)
-
-    kept_reason = proof_of(lane).kept_reason
-
-    assert kept_reason is not None
-    assert kept_reason.startswith(f"submodule repository {backup} holds")
 
 
 def test_a_tag_that_names_no_commit_is_held(lane: Path, upstream: Path) -> None:
