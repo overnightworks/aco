@@ -3,6 +3,6 @@ agent = "Claude 46fe7857-8b56-4ea7-a3ee-f805b34349e9"
 role = "builder"
 base = "2106c91b0a33681d54a4f67697a7082febc316bb"
 branch = "claude/issue-609-aco-land-removes-a-merged-lane-worktree"
-scope = ["quality/baseline.toml", "specs/release.spec.md", "src/aco/checkout.py", "src/aco/landed_worktree.py", "src/aco/submodule_stores.py", "tests/support/release_cleanup_world.py", "tests/test_cmd_adopt_landing.py", "tests/test_cmd_release_cleanup.py", "tests/test_cmd_rescope_checkout.py", "tests/test_submodule_stores.py"]
+scope = ["pyproject.toml", "quality/baseline.toml", "specs/release.spec.md", "src/aco/checkout.py", "src/aco/landed_worktree.py", "src/aco/submodule_stores.py", "tests/support/release_cleanup_world.py", "tests/test_cmd_adopt_landing.py", "tests/test_cmd_release_cleanup.py", "tests/test_cmd_rescope_checkout.py", "tests/test_submodule_stores.py"]
 opened_commit = "d7643367aef4abec1c95f97f821a4a29dc6afd95"
 whole_reason = "The submodule proof, the forced removal it unlocks, the kept line it prints and the spec lines that pin them are one decision about when a store may be deleted."
