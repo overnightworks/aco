@@ -69,10 +69,9 @@ def _stores(worktree: Path) -> tuple[Path, ...]:
 def _git_directories(root: Path) -> Iterator[Path]:
     if not root.is_dir():
         return
-    for directory, subdirectories, _files in os.walk(root, onerror=_refuse_unreadable):
+    for directory, _subdirectories, _files in os.walk(root, onerror=_refuse_unreadable):
         path = Path(directory)
         if checkout.has_plain_git_directory_layout(path):
-            subdirectories.remove("objects")
             yield path
 
 

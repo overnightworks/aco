@@ -104,6 +104,20 @@ def test_a_nested_repository_is_found_and_named(lane: Path, upstream: Path) -> N
     assert kept_reason.startswith(f"submodule repository {inner} holds")
 
 
+def test_a_repository_below_a_repositorys_object_store_is_proven_too(
+    lane: Path, upstream: Path
+) -> None:
+    """Spec: REL-70 -- every depth counts, an object store's directories included."""
+    outer = clone_store(upstream, lane_git_directory(lane) / "modules" / "sub", lane / "sub")
+    backup = clone_store(upstream, outer / "objects" / "backup.git", lane / "backup")
+    hold_unique_commit(backup)
+
+    kept_reason = proof_of(lane).kept_reason
+
+    assert kept_reason is not None
+    assert kept_reason.startswith(f"submodule repository {backup} holds")
+
+
 def test_a_tag_that_names_no_commit_is_held(lane: Path, upstream: Path) -> None:
     """Spec: REL-71 -- a ref whose commit cannot be reached is never proven."""
     store = clone_store(upstream, lane_git_directory(lane) / "modules" / "sub", lane / "sub")
