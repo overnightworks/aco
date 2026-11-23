@@ -32,3 +32,10 @@ reason = "the command specs that own each command's behaviour and printed litera
 path = "tests/test_network_guard.py"
 rule = "test-layout"
 reason = "tests the suite's own network guard plugin (tests/support/network_guard.py), which no src/aco module owns"
+
+[[size.generated]]
+path = "src/aco/board/static/assets/index.js"
+job = "Frontend (svelte-check, lint, knip, vitest, assets fresh)"
+item = "#1058"
+date = 2026-11-23
+reason = "the built board bundle, rebuilt by pnpm --dir frontend build and proven by the step Assets fresh"

@@ -35,6 +35,7 @@ export default defineConfig({
 	},
 	test: {
 		include: ['src/**/*.test.ts'],
+		sequence: { shuffle: true },
 		environment: 'jsdom',
 		setupFiles: ['src/test-setup.ts'],
 		coverage: {
