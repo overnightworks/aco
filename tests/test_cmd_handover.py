@@ -428,12 +428,19 @@ def test_the_new_holder_rescopes_and_releases_a_lane_without_an_override(
 ) -> None:
     """Spec: HANDOVER-18."""
     standpoint = stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    release = ["--repo", REPOSITORY, "release", "--abandoned", "stopped"]
+    refused = run_cli(release, capsys)
     taken = run_cli(lane_handover_arguments(), capsys)
     added = f"{standpoint.directory}/{NEW_FILE}"
 
     rescoped = run_cli(["--repo", REPOSITORY, "rescope", "--add", added], capsys)
-    released = run_cli(["--repo", REPOSITORY, "release", "--abandoned", "stopped"], capsys)
+    released = run_cli(release, capsys)
 
+    assert refused.status == 2
+    assert (
+        f"aco handover --branch '{OUTSIDE_LANE_BRANCH}' --from '{PREDECESSOR}' --reason <text>"
+        in refused.stderr
+    )
     assert (taken.status, rescoped.status, released.status) == (0, 0, 0)
     assert standing_claims(standpoint) == []
 
@@ -514,7 +521,7 @@ def test_a_refused_lane_handover_writes_nothing(
     changes: dict[str, str],
     sentence: str,
 ) -> None:
-    """Spec: HANDOVER-19, HANDOVER-20."""
+    """Spec: HANDOVER-20, HANDOVER-22."""
     standpoint = stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
     tip = state_ref_tip(bare_remote)
     arguments = lane_handover_arguments()
@@ -544,7 +551,7 @@ def test_a_handover_names_an_item_or_a_branch_never_both_nor_neither(
     capsys: pytest.CaptureFixture[str],
     arguments: list[str],
 ) -> None:
-    """Spec: HANDOVER-20."""
+    """Spec: HANDOVER-21."""
     stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
     tip = state_ref_tip(bare_remote)
 

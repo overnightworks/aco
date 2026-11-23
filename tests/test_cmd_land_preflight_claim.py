@@ -727,27 +727,6 @@ class TestLandItemAndClaim:
             ),
             pytest.param(
                 ClaimCase(
-                    "only the original claimant may release; take the claim over "
-                    "with `aco handover --branch 'fix/x' --from Grok --reason <text>`, "
-                    "or use an explicit coordinator override (holder='Grok "
-                    "(builder)', this session='Ada (builder)')",
-                    pull_request=landing_pull_request(body="No-Item: fix", head_ref_name="fix/x"),
-                    intents=(
-                        claim_intent(
-                            identity=protocol.LaneIdentity(),
-                            branch="fix/x",
-                            agent="Grok",
-                            scope=("uv.lock",),
-                        ),
-                    ),
-                    arguments=(),
-                    item_reads=(),
-                    changes_reads=(12,),
-                ),
-                id="foreign-lane-claim",
-            ),
-            pytest.param(
-                ClaimCase(
                     "only the original claimant may release; use an explicit "
                     "coordinator override (holder='Ada "
                     "(coordinator)', this session='Ada (builder)')",

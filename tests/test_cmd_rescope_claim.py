@@ -11,11 +11,11 @@ import pytest
 from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import (
     ISSUE,
+    OUTSIDE_LANE_BRANCH,
     StandIn,
     assert_json_refusal_object,
     assert_no_item_body_written,
     claimed_here,
-    OUTSIDE_LANE_BRANCH,
     held_by_ada,
     lane_held_by_ada,
     make_stand_in,

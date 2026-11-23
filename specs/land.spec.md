@@ -129,7 +129,7 @@ second is the claim check of LANDCMD-10.
 - [ ] [LANDCMD-24] A head `<path>` the pin's own validator refuses prints `pull request #<n> carries an invalid <path>: <detail>`, exit `2`.
 - [ ] [LANDCMD-08] A classified work item that is not open refuses `work item #<n> is not open; it cannot be landed`, exit `2`; an issue-less pull request skips this check.
 - [ ] [LANDCMD-09] The classification's claim, parent and closing rules apply (LAND-14..28, LAND-70..77, LAND-79, LAND-87..90): defects refuse `pull request #<n> <that same defect sentence>`, exit `2`.
-- [ ] [LANDCMD-10] A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence, naming REL-41's `aco handover` route), exit `2`, before the merge.
+- [ ] [LANDCMD-10] A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence, naming REL-41's `aco handover` route, an item's or a lane's), exit `2`, before the merge.
 - [ ] [LANDCMD-11] This checkout must sit on the forge's default branch with nothing uncommitted, or `aco land` refuses `land must run from a clean checkout of the default branch '<branch>'`, exit `2`.
 - [ ] [LANDCMD-25] A checkout without a git identity refuses `land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state`, exit `2`.
 - [ ] [LANDCMD-20] The forge names `<branch>` even where the canonical remote records no `HEAD`; LANDCMD-11 never reads one.
