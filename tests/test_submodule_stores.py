@@ -58,6 +58,13 @@ def hold_unique_commit(store: Path) -> None:
     real_git(store, "--git-dir=.", "update-ref", "refs/heads/work", commit)
 
 
+def make_promisor_clone(store: Path) -> None:
+    """Turn `store` into a partial clone: an object it lacks is fetched from `origin` on demand."""
+    real_git(store, "--git-dir=.", "config", "core.repositoryformatversion", "1")
+    real_git(store, "--git-dir=.", "config", "extensions.partialClone", "origin")
+    real_git(store, "--git-dir=.", "config", "remote.origin.promisor", "true")
+
+
 def proof_of(lane: Path) -> submodule_stores.RemovalProof:
     return submodule_stores.removal_proof(lane, branch=BRANCH)
 
@@ -143,9 +150,7 @@ def test_a_tag_that_names_no_commit_is_held(lane: Path, upstream: Path) -> None:
 def test_a_missing_object_is_a_read_failure_never_a_fetch(lane: Path, upstream: Path) -> None:
     """Spec: REL-74 -- a partial clone's missing object is not fetched from its promisor."""
     store = clone_store(upstream, lane_git_directory(lane) / "modules" / "sub", lane / "sub")
-    real_git(store, "--git-dir=.", "config", "core.repositoryformatversion", "1")
-    real_git(store, "--git-dir=.", "config", "extensions.partialClone", "origin")
-    real_git(store, "--git-dir=.", "config", "remote.origin.promisor", "true")
+    make_promisor_clone(store)
     (upstream / "later.txt").write_text("later\n")
     real_git(upstream, "add", "later.txt")
     real_git(upstream, "commit", "-q", "-m", "later")
@@ -165,9 +170,7 @@ def test_a_missing_tree_in_a_populated_submodule_is_a_read_failure_never_a_fetch
     """Spec: REL-74 -- a populated submodule's dirt check never fetches a missing tree."""
     real_git(lane, *ALLOW_FILE_TRANSPORT, "submodule", "add", "-q", str(upstream), "sub")
     store = lane_git_directory(lane) / "modules" / "sub"
-    real_git(store, "--git-dir=.", "config", "core.repositoryformatversion", "1")
-    real_git(store, "--git-dir=.", "config", "extensions.partialClone", "origin")
-    real_git(store, "--git-dir=.", "config", "remote.origin.promisor", "true")
+    make_promisor_clone(store)
     tree = real_git(store, "--git-dir=.", "rev-parse", "HEAD^{tree}").stdout.strip()
     (store / "objects" / tree[:2] / tree[2:]).unlink()
 
