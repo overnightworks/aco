@@ -48,7 +48,7 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 - [ ] [HANDOVER-17] Only the holder changes, in one state-ref commit with HANDOVER-03's trailers; a lane has no item body, so none is written and the reason lives in that commit alone.
 - [ ] [HANDOVER-18] The new holder then lands, releases and rescopes the lane with no override; their refusals for a lane claim name this route (REL-41, CLAIM-37, CLAIM-38, LANDCMD-10).
 - [ ] [HANDOVER-19] A repeat, the acting session already holding the lane claim and `--from` naming it, prints `ALREADY HANDED OVER lane <branch>: <from> -> <to>`, exit `0`, writing nothing.
-- [ ] [HANDOVER-20] A `--from` that is not the holder of the lane claim, the acting session included once it holds it, refuses `lane '<branch>' is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write.
+- [ ] [HANDOVER-20] A `--from` that is not the lane claim's holder, the acting session included, refuses `lane '<branch>' is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write.
 - [ ] [HANDOVER-21] An ITEM together with `--branch`, or neither, refuses `name either an item or --branch, not both and not neither`, exit `2`, before any read.
 - [ ] [HANDOVER-22] A branch with no live lane claim refuses `lane '<branch>' has no active build claim` (REL-09), exit `2`, before any write.
 - [ ] [HANDOVER-14] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
