@@ -10970,8 +10970,9 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
     captured = capsys.readouterr()
     wrote = bool(client.retyped_items or client.item_bodies)
     refusal = f"ERROR: item edit {flag} reads no stdin; drop the redirect\n"
+    outcome = (exit_code, captured.err, wrote)
     expected = (2, refusal, False) if refused else (0, "", True)
-    assert (exit_code, captured.err, wrote) == expected
+    assert outcome == expected
 
 
 @pytest.mark.parametrize(
