@@ -304,7 +304,7 @@ _NON_UTF8_NAME = b"c\xff"
 # (`git --git-dir=D rev-parse --git-dir`); a `commondir` git dies reading
 # counts as recognized, so rescope refuses it as a git directory (RESC-31).
 # Where a row's layout keeps `HEAD`, `objects/` and `refs/` in the directory
-# itself, the plain layout rule (`checkout._has_plain_git_directory_layout`,
+# itself, the plain layout rule (`checkout.has_plain_git_directory_layout`,
 # kept from before the port of git's recognition) recognizes it whatever git
 # says.
 _GIT_DIRECTORY_RECOGNITION_ROWS = [

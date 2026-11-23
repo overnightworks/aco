@@ -61,7 +61,7 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 | the lane record on the release commit | REL-64 | REL-64 | REL-64 |
 | `--record <file>` | REL-67 | REL-67 | REL-67 |
 | the released claim has stored runs | REL-68 | REL-68 | REL-68 |
-| a successful outcome's own worktree/branch cleanup | — | REL-25..REL-32, REL-34, REL-42..REL-46, REL-52, REL-55, REL-59, REL-61..REL-63 | REL-33 |
+| a successful outcome's own worktree/branch cleanup | — | REL-25..REL-32, REL-34, REL-42..REL-46, REL-52, REL-55, REL-59, REL-61..REL-63, REL-69..REL-74 | REL-33 |
 
 ## Flags and outcome
 
@@ -182,7 +182,7 @@ never a commit; `git branch -u` restores it.
 - [ ] [REL-30] No linked worktree on that branch here reads `worktree: kept -- no linked worktree on <branch> in this checkout; run <rerun> in the checkout that holds it` (see E-REL-13).
 - [ ] [REL-52] `<rerun>` is `aco release`, the item (none for a lane), `--merged` with the pull request or the verified `<sha>`, `--branch <branch>`; there it meets REL-47 (see E-REL-24).
 - [ ] [REL-31] The branch checked out on this repository's own shared main checkout, not a linked worktree, keeps it: `worktree: kept -- branch checked out elsewhere` (see E-REL-14).
-- [ ] [REL-32] A git failure resolving which worktree matches the lane's branch keeps both and reports it: `worktree: kept -- git failure: <detail>`, the release itself stays committed regardless (see E-REL-15).
+- [ ] [REL-32] A git failure finding the lane's worktree or removing it keeps both: `worktree: kept -- git failure: <detail>`, the release itself stays committed regardless (see E-REL-15, E-REL-33).
 - [ ] [REL-33] `--abandoned` never attempts this cleanup at all, the same as it never resolves a forge target (LAND-39).
 - [ ] [REL-34] A git failure deleting the branch after the worktree is removed, by exit or launch, merged or squashed, names both halves: `worktree: removed; branch kept -- git failure: <detail>` (see E-REL-16).
 - [ ] [REL-45] A delete git that timed out after the worktree is removed may have deleted it: `worktree: removed; branch unknown -- git <subcommand> timed out; check git branch --list <branch>` (see E-REL-22).
@@ -190,6 +190,22 @@ never a commit; `git branch -u` restores it.
 - [ ] [REL-61] A clean linked worktree of an adopted lane (a lane claim on no `fix/` or `docs/` branch) whose tip is the released claim's `base` goes with its branch: `worktree: removed` (see E-REL-28).
 - [ ] [REL-62] That branch goes by compare-and-delete on that `base`, and its section goes as REL-42 says; a branch that moved on stays: `worktree: removed; branch kept -- git failure: <detail>` (REL-34).
 - [ ] [REL-63] Any other tip reads REL-29's `kept`, a commit on top included, dirty or not. A dirty worktree on its `base` reads REL-28's. An issue claim and a `fix/` or `docs/` lane never meet REL-61.
+
+- [ ] [REL-69] A clean, merged linked worktree whose submodule repositories hold nothing unique goes with its branch: `worktree: removed`, though git alone refuses it (see E-REL-29).
+- [ ] [REL-70] A worktree's submodule repositories are the git directories at any depth under its git directory's `modules` and those inside the worktree; with none, REL-25's removal runs as before.
+- [ ] [REL-71] A submodule repository holds nothing unique when it has a remote-tracking ref, no stash entry or worktree of its own, and `HEAD` and each other ref are reachable from a remote-tracking ref.
+- [ ] [REL-72] Any other keeps both: `worktree: kept -- submodule repository <path> <what it holds>; after checking it, run: git worktree remove --force <worktree> && git branch -D <branch>` (see E-REL-30).
+- [ ] [REL-73] REL-28's dirt includes a submodule's changed or untracked files and untracked files, whatever `submodule.<name>.ignore`, `diff.ignoreSubmodules`, `status.showUntrackedFiles` say (see E-REL-31).
+- [ ] [REL-74] Reading a submodule repository never fetches: a git failure, a missing object of a partial clone included, keeps both as REL-32 reports it, and no removal step runs (see E-REL-32).
+
+Residuals of REL-69, none built against:
+
+- A commit only in a submodule repository's reflog is lost with it, as it is for a merged lane branch.
+- A remote-tracking ref a force-push upstream left stale counts as the remote's.
+- A submodule repository's own configuration goes with it.
+- A file written into the worktree between the dirty check and the removal is destroyed.
+- A local tag's annotation is lost when only its commit is on the remote.
+- In a shallow repository, only the commits inside its depth are proven.
 
 Residuals of REL-61:
 
@@ -622,3 +638,76 @@ exit 0
 The worktree, the local branch and its `branch.dependabot/uv/x` section are gone; the remote
 branch is untouched. The same lane with one local commit on top reads `worktree: kept -- not
 merged into the default branch`.
+
+### E-REL-29 — a merged lane whose submodule holds nothing unique is removed
+
+Setup: as E-REL-08, the lane's worktree holding a submodule `sub`, populated or deinitialised,
+whose repository sits under the worktree's git directory and has a remote-tracking ref and no ref,
+stash entry or worktree of its own beyond what the remote has
+
+```console
+$ aco release 42 --merged 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+worktree: removed
+exit 0
+```
+
+The worktree, its submodule repository and branch `ada/issue-42` are gone afterward.
+
+### E-REL-30 — a submodule repository holding a commit nobody else has keeps the lane
+
+Setup: as E-REL-29, the submodule repository holding branch `work` that no remote-tracking ref reaches
+
+```console
+$ aco release 42 --merged 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+worktree: kept -- submodule repository /work/agent-coordination/.git/worktrees/issue-42-widget/modules/sub holds refs/heads/work outside its remote-tracking refs; after checking it, run: git worktree remove --force /work/agent-coordination-worktrees/issue-42-widget && git branch -D ada/issue-42
+exit 0
+```
+
+Worktree and branch stay. `holds a stash entry`, `has a linked worktree of its own` and `has no
+remote-tracking ref` take the same place for those causes.
+
+### E-REL-31 — a dirty submodule is dirty whatever the configuration hides
+
+Setup: as E-REL-29, an untracked file in the submodule's working directory, `submodule.sub.ignore`
+set to `all`
+
+```console
+$ aco release 42 --merged 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+worktree: kept -- dirty
+exit 0
+```
+
+### E-REL-32 — a submodule repository git cannot read keeps the lane
+
+Setup: as E-REL-29, a ref in the submodule repository naming an object it lacks
+
+```console
+$ aco release 42 --merged 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+worktree: kept -- git failure: <detail>
+exit 0
+```
+
+### E-REL-33 — a worktree git refuses to remove keeps the lane
+
+Setup: as E-REL-08, the worktree locked with `git worktree lock`
+
+```console
+$ aco release 42 --merged 57
+RELEASED issue #42: <claim-id>
+freed: none
+next: none
+worktree: kept -- git failure: <detail>
+exit 0
+```

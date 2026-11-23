@@ -224,10 +224,10 @@ def test_a_branch_that_moves_between_the_check_and_the_delete_stays_with_its_com
     commits: list[str] = []
 
     def commit_then_remove(
-        path: Path, *, branch: str, landed_head: str | None = None
+        path: Path, *, branch: str, landed_head: str | None = None, force: bool = False
     ) -> checkout.WorktreeCleanupOutcome:
         commits.append(_commit_in_the_worktree(world))
-        return remove(path, branch=branch, landed_head=landed_head)
+        return remove(path, branch=branch, landed_head=landed_head, force=force)
 
     monkeypatch.setattr(checkout, "remove_linked_worktree", commit_then_remove)
 

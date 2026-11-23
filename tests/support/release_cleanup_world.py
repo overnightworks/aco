@@ -135,6 +135,16 @@ class LaunchIntervention:
         target.before(partial(target.fail_launch, arguments, failure))
 
 
+@dataclass(frozen=True)
+class SubmoduleIntervention:
+    """The lane worktree's submodule populated, then `mutation` applied to it."""
+
+    mutation: Mutation
+
+    def install(self, target: CleanupIntervention) -> None:
+        target.before(partial(target.submodule, self.mutation))
+
+
 class Phase(Enum):
     BEFORE = auto()
     WINDOW = auto()
@@ -169,6 +179,8 @@ class CleanupCase:
     lane_status: Present | Absent = Present("")
     landing_branch: str = LANDING_DEFAULT_BRANCH
     workplace: str = "{clone}"
+    trunk_submodule: bool = False
+    nested_submodule: bool = False
 
 
 @dataclass
@@ -210,6 +222,155 @@ def lane_status(lane: Path) -> Observation:
     if not lane.exists():
         return Absent()
     return Present(real_git(lane, "status", "--porcelain").stdout)
+
+
+SUBMODULE = "sub"
+NESTED_SUBMODULE = "inner"
+SUBMODULE_UPSTREAM = "submodule-upstream"
+ALLOW_FILE_TRANSPORT = ("-c", "protocol.file.allow=always")
+
+
+@dataclass(frozen=True)
+class SubmoduleSite:
+    """The lane's populated submodule: its repository under the lane's own git directory, its
+    working directory and the repository it was cloned from."""
+
+    lane: Path
+    store: Path
+    working_directory: Path
+    upstream: Path
+
+    def git(self, *arguments: str) -> str:
+        return real_git(self.working_directory, *arguments).stdout.strip()
+
+    def unique_commit(self) -> str:
+        """A commit on top of the submodule's `HEAD` that no ref names yet."""
+        return self.git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "only here")
+
+
+Mutation = Callable[[SubmoduleSite], None]
+
+
+def one_commit_repository(path: Path) -> Path:
+    """A repository on `main` at `path` holding one commit, which submodule clones start from."""
+    path.mkdir()
+    real_git(path, "init", "-q", "-b", "main")
+    (path / "submodule.txt").write_text("submodule\n")
+    real_git(path, "add", "submodule.txt")
+    real_git(path, "commit", "-q", "-m", "submodule")
+    return path
+
+
+def add_trunk_submodule(clone: Path, *, nested: bool) -> None:
+    """Trunk gains the gitlink `SUBMODULE` on a one-commit repository beside the clone, so every
+    lane branch cut from it holds it unpopulated; with `nested`, that repository holds the gitlink
+    `NESTED_SUBMODULE` itself."""
+    upstream = one_commit_repository(clone.parent / SUBMODULE_UPSTREAM)
+    if nested:
+        inner = one_commit_repository(clone.parent / f"{SUBMODULE_UPSTREAM}-{NESTED_SUBMODULE}")
+        real_git(
+            upstream, *ALLOW_FILE_TRANSPORT, "submodule", "add", "-q", str(inner), NESTED_SUBMODULE
+        )
+        real_git(upstream, "commit", "-q", "-m", "add a nested submodule")
+    real_git(clone, *ALLOW_FILE_TRANSPORT, "submodule", "add", "-q", str(upstream), SUBMODULE)
+    real_git(clone, "commit", "-q", "-m", "add a submodule")
+    real_git(clone, "push", "-q", "origin", "main")
+
+
+def lane_submodule_store(lane: Path) -> Path:
+    git_directory = real_git(lane, "rev-parse", "--absolute-git-dir").stdout.strip()
+    return Path(git_directory) / "modules" / SUBMODULE
+
+
+def populate_submodule(lane: Path) -> SubmoduleSite:
+    real_git(lane, *ALLOW_FILE_TRANSPORT, "submodule", "update", "-q", "--init", "--recursive")
+    return SubmoduleSite(
+        lane=lane,
+        store=lane_submodule_store(lane),
+        working_directory=lane / SUBMODULE,
+        upstream=lane.parent / SUBMODULE_UPSTREAM,
+    )
+
+
+def leave_populated(site: SubmoduleSite) -> None:
+    """Populating the submodule is the whole arrangement."""
+
+
+def deinitialise(site: SubmoduleSite) -> None:
+    real_git(site.lane, "submodule", "deinit", "-q", "-f", SUBMODULE)
+
+
+def clone_nested_store(site: SubmoduleSite) -> None:
+    real_git(site.lane, "clone", "-q", str(site.upstream), str(site.store / "modules" / "inner"))
+
+
+def hold_ref(name: str) -> Mutation:
+    """A commit on the ref `name` that no remote-tracking ref reaches."""
+
+    def update(site: SubmoduleSite) -> None:
+        site.git("update-ref", name, site.unique_commit())
+
+    return update
+
+
+def hold_annotated_tag(site: SubmoduleSite) -> None:
+    site.git("tag", "-a", "-m", "only here", "annotated", site.unique_commit())
+
+
+def hold_note(site: SubmoduleSite) -> None:
+    site.git("notes", "add", "-m", "only here", "HEAD")
+
+
+def hold_stash_entry(site: SubmoduleSite) -> None:
+    (site.working_directory / "submodule.txt").write_text("changed\n")
+    site.git("stash", "push", "-q")
+
+
+def hold_detached_commit_then_deinitialise(site: SubmoduleSite) -> None:
+    site.git("checkout", "-q", "--detach", site.unique_commit())
+    deinitialise(site)
+
+
+def add_linked_worktree(site: SubmoduleSite) -> None:
+    site.git("worktree", "add", "-q", "--detach", str(site.lane.parent / "submodule-worktree"))
+
+
+def drop_remote_tracking_refs(site: SubmoduleSite) -> None:
+    site.git("remote", "remove", "origin")
+
+
+MISSING_OBJECT = "1" * 40
+
+
+def hold_unreadable_ref(site: SubmoduleSite) -> None:
+    (site.store / "refs" / "heads" / "ghost").write_text(MISSING_OBJECT + "\n")
+
+
+def lock_the_lane(site: SubmoduleSite) -> None:
+    real_git(site.lane, "worktree", "lock", "--reason", "in use", str(site.lane))
+
+
+def dirty_the_submodule_despite(
+    *configuration: str, in_lane: bool = True, nested: bool = False
+) -> Mutation:
+    """An untracked file in the submodule (or the one nested in it), with the `git config`
+    arguments `configuration` set to hide it from `git status`: in the lane, or with `in_lane`
+    false in the submodule's own repository."""
+
+    def dirty(site: SubmoduleSite) -> None:
+        directory = site.working_directory / NESTED_SUBMODULE if nested else site.working_directory
+        (directory / "scratch.txt").write_text("uncommitted\n")
+        if in_lane:
+            real_git(site.lane, "config", *configuration)
+        else:
+            site.git("config", *configuration)
+
+    return dirty
+
+
+def hide_untracked_files(site: SubmoduleSite) -> None:
+    (site.lane / "scratch.txt").write_text("uncommitted\n")
+    real_git(site.lane, "config", "status.showUntrackedFiles", "no")
 
 
 @dataclass
@@ -255,10 +416,10 @@ class CleanupIntervention:
         remove = checkout.remove_linked_worktree
 
         def interfere_then_remove(
-            path: Path, *, branch: str, landed_head: str | None = None
+            path: Path, *, branch: str, landed_head: str | None = None, force: bool = False
         ) -> checkout.WorktreeCleanupOutcome:
             self.apply(action, Phase.WINDOW)
-            return remove(path, branch=branch, landed_head=landed_head)
+            return remove(path, branch=branch, landed_head=landed_head, force=force)
 
         self.monkeypatch.setattr(checkout, "remove_linked_worktree", interfere_then_remove)
 
@@ -273,6 +434,9 @@ class CleanupIntervention:
 
     def nothing(self) -> None:
         pass
+
+    def submodule(self, mutation: Mutation) -> None:
+        mutation(populate_submodule(self.world.lane))
 
     def commit(self) -> None:
         real_git(self.world.lane, "commit", "-q", "--allow-empty", "-m", "after the pinned head")
@@ -464,6 +628,8 @@ def verify_cleanup(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    if case.trunk_submodule:
+        add_trunk_submodule(github_clone, nested=case.nested_submodule)
     world = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=allow_squash)
     head = world.landing.head
     lane = "codex/issue-72-claims"
@@ -472,6 +638,7 @@ def verify_cleanup(
     if case.premerge is not None:
         merge_before_run(world, method=case.premerge)
     assert_prepared_state(world, case)
+    store = lane_submodule_store(world.lane)
     record = InterventionRecord()
     case.intervention.install(CleanupIntervention(world, monkeypatch, lane, record))
     capsys.readouterr()
@@ -486,6 +653,7 @@ def verify_cleanup(
         "clone": str(github_clone),
         "bystander": record.bystander,
         "worktree": str(world.lane),
+        "store": str(store),
     }
     assert_intervention(case, record, values)
     observed = {
