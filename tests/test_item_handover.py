@@ -100,10 +100,15 @@ def test_a_written_handover_is_a_valid_block() -> None:
             "aco handover aco-abc123 --from 'Claude af54' --reason <text>",
             id="a-state-ref-item-claim-names-its-id",
         ),
-        pytest.param(protocol.LaneIdentity(), str, None, id="a-lane-claim-has-none"),
+        pytest.param(
+            protocol.LaneIdentity(),
+            str,
+            "aco handover --branch 'dependabot/deps' --from 'Claude af54' --reason <text>",
+            id="a-lane-claim-names-its-branch",
+        ),
     ],
 )
 def test_the_route_names_the_handover_command_of_an_item_claim(
-    identity: protocol.ClaimIdentity, label: protocol.ItemLabel, route: str | None
+    identity: protocol.ClaimIdentity, label: protocol.ItemLabel, route: str
 ) -> None:
-    assert item_handover.handover_route(identity, "Claude af54", label) == route
+    assert item_handover.handover_route(identity, "dependabot/deps", "Claude af54", label) == route

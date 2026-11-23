@@ -7643,6 +7643,25 @@ def test_cli_release_by_another_claimant_names_the_handover_route_without_a_writ
     assert store.fetch_state(worktree=Path("."), remote="origin").claims != {}
 
 
+def test_cli_release_of_a_lane_claim_by_another_claimant_names_the_lane_handover_route(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """REL-12, REL-41: a lane claim's successor is pointed at `aco handover --branch`."""
+    standing = request(
+        "mine", "Ada", issue=None, role="reviewer", branch="docs/lane-72", scope=("src",)
+    )
+    _patch_release_session(monkeypatch, FakeForge(), standing, agent="Other", branch="docs/lane-72")
+
+    released = issue_claim.main(["--repo", REPOSITORY, "release", "--abandoned", "stopped"])
+
+    assert released == 2
+    assert capsys.readouterr().err == (
+        "ERROR: only the original claimant may release; take the claim over with "
+        "`aco handover --branch 'docs/lane-72' --from Ada --reason <text>`, or use an explicit "
+        "coordinator override (holder='Ada (reviewer)', this session='Other (reviewer)')\n"
+    )
+
+
 def test_cli_release_without_a_claim_names_the_github_item_by_its_forge_number(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
