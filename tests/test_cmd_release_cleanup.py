@@ -8,6 +8,7 @@ from release_cleanup_world import (
     MERGED,
     MERGED_BRANCH_KEPT,
     MISSING_OBJECT,
+    NESTED_SUBMODULE,
     OWN_KEYS,
     PREFIX,
     RELEASE_COMMAND,
@@ -24,6 +25,7 @@ from release_cleanup_world import (
     add_linked_worktree,
     clone_nested_store,
     deinitialise,
+    dirty_a_submodule_repository_despite,
     dirty_the_submodule_despite,
     drop_remote_tracking_refs,
     hide_untracked_files,
@@ -441,22 +443,52 @@ def test_a_merged_lane_keeps_its_worktree_for_a_submodule_repository_holding_mor
 
 @pytest.mark.parametrize(
     "case",
-    submodule_rows(
-        [
-            (
-                "submodule-ignored-by-its-own-setting",
-                "kept -- dirty",
-                dirty_the_submodule_despite("submodule.sub.ignore", "all"),
-            ),
-            (
-                "submodule-ignored-by-the-diff-setting",
-                "kept -- dirty",
-                dirty_the_submodule_despite("diff.ignoreSubmodules", "all"),
-            ),
-            ("untracked-file-hidden-by-the-status-setting", "kept -- dirty", hide_untracked_files),
-        ],
-        SUBMODULE_LANE,
-    ),
+    [
+        *submodule_rows(
+            [
+                (
+                    "submodule-ignored-by-its-own-setting",
+                    "kept -- dirty",
+                    dirty_the_submodule_despite("submodule.sub.ignore", "all"),
+                ),
+                (
+                    "submodule-ignored-by-the-diff-setting",
+                    "kept -- dirty",
+                    dirty_the_submodule_despite("diff.ignoreSubmodules", "all"),
+                ),
+                (
+                    "untracked-file-hidden-by-the-status-setting",
+                    "kept -- dirty",
+                    hide_untracked_files,
+                ),
+                (
+                    "untracked-file-in-a-submodule-hidden-by-its-status-setting",
+                    "kept -- dirty",
+                    dirty_a_submodule_repository_despite("status.showUntrackedFiles", "no"),
+                ),
+            ],
+            SUBMODULE_LANE,
+        ),
+        *submodule_rows(
+            [
+                (
+                    "nested-submodule-ignored-by-the-diff-setting",
+                    "kept -- dirty",
+                    dirty_a_submodule_repository_despite(
+                        "diff.ignoreSubmodules", "all", nested=True
+                    ),
+                ),
+                (
+                    "nested-submodule-ignored-by-its-own-setting",
+                    "kept -- dirty",
+                    dirty_a_submodule_repository_despite(
+                        f"submodule.{NESTED_SUBMODULE}.ignore", "all", nested=True
+                    ),
+                ),
+            ],
+            replace(SUBMODULE_LANE, nested_submodule=True),
+        ),
+    ],
 )
 def test_a_merged_lane_is_dirty_whatever_the_configuration_hides(
     case: CleanupCase, cleanup_check: CleanupCheck

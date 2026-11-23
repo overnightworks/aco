@@ -180,6 +180,7 @@ class CleanupCase:
     landing_branch: str = LANDING_DEFAULT_BRANCH
     workplace: str = "{clone}"
     trunk_submodule: bool = False
+    nested_submodule: bool = False
 
 
 @dataclass
@@ -224,6 +225,7 @@ def lane_status(lane: Path) -> Observation:
 
 
 SUBMODULE = "sub"
+NESTED_SUBMODULE = "inner"
 SUBMODULE_UPSTREAM = "submodule-upstream"
 ALLOW_FILE_TRANSPORT = ("-c", "protocol.file.allow=always")
 
@@ -259,10 +261,17 @@ def one_commit_repository(path: Path) -> Path:
     return path
 
 
-def add_trunk_submodule(clone: Path) -> None:
+def add_trunk_submodule(clone: Path, *, nested: bool) -> None:
     """Trunk gains the gitlink `SUBMODULE` on a one-commit repository beside the clone, so every
-    lane branch cut from it holds it unpopulated."""
+    lane branch cut from it holds it unpopulated; with `nested`, that repository holds the gitlink
+    `NESTED_SUBMODULE` itself."""
     upstream = one_commit_repository(clone.parent / SUBMODULE_UPSTREAM)
+    if nested:
+        inner = one_commit_repository(clone.parent / f"{SUBMODULE_UPSTREAM}-{NESTED_SUBMODULE}")
+        real_git(
+            upstream, *ALLOW_FILE_TRANSPORT, "submodule", "add", "-q", str(inner), NESTED_SUBMODULE
+        )
+        real_git(upstream, "commit", "-q", "-m", "add a nested submodule")
     real_git(clone, *ALLOW_FILE_TRANSPORT, "submodule", "add", "-q", str(upstream), SUBMODULE)
     real_git(clone, "commit", "-q", "-m", "add a submodule")
     real_git(clone, "push", "-q", "origin", "main")
@@ -274,7 +283,7 @@ def lane_submodule_store(lane: Path) -> Path:
 
 
 def populate_submodule(lane: Path) -> SubmoduleSite:
-    real_git(lane, *ALLOW_FILE_TRANSPORT, "submodule", "update", "-q", "--init")
+    real_git(lane, *ALLOW_FILE_TRANSPORT, "submodule", "update", "-q", "--init", "--recursive")
     return SubmoduleSite(
         lane=lane,
         store=lane_submodule_store(lane),
@@ -348,6 +357,18 @@ def dirty_the_submodule_despite(*configuration: str) -> Mutation:
     def dirty(site: SubmoduleSite) -> None:
         (site.working_directory / "scratch.txt").write_text("uncommitted\n")
         real_git(site.lane, "config", *configuration)
+
+    return dirty
+
+
+def dirty_a_submodule_repository_despite(*configuration: str, nested: bool = False) -> Mutation:
+    """An untracked file in the submodule (or the one nested in it), with the `git config`
+    arguments `configuration` set in the submodule's own repository to hide it from `git status`."""
+
+    def dirty(site: SubmoduleSite) -> None:
+        directory = site.working_directory / NESTED_SUBMODULE if nested else site.working_directory
+        (directory / "scratch.txt").write_text("uncommitted\n")
+        site.git("config", *configuration)
 
     return dirty
 
@@ -613,7 +634,7 @@ def verify_cleanup(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     if case.trunk_submodule:
-        add_trunk_submodule(github_clone)
+        add_trunk_submodule(github_clone, nested=case.nested_submodule)
     world = landed_world(github_clone, bare_remote, monkeypatch, extra_arrange=allow_squash)
     head = world.landing.head
     lane = "codex/issue-72-claims"

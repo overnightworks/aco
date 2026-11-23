@@ -38,13 +38,28 @@ class _Ref(NamedTuple):
 def removal_proof(worktree: Path, *, branch: str) -> RemovalProof:
     """The proof for removing `worktree`, the lane on `branch`: every repository
     `git worktree remove --force` would delete with it holds nothing outside its remote-tracking
-    refs. A git failure reading one raises `ClaimError`; nothing here fetches."""
+    refs, and no populated submodule's working directory is dirty. A git failure reading one
+    raises `ClaimError`; nothing here fetches."""
     stores = _stores(worktree)
+    if stores and _submodules_are_dirty(worktree):
+        return RemovalProof(False, checkout.WORKTREE_KEPT_DIRTY_REASON)
     for store in stores:
         holding = _holding(store)
         if holding is not None:
             return RemovalProof(False, _kept_reason(store, holding, worktree, branch))
     return RemovalProof(bool(stores), None)
+
+
+def _submodules_are_dirty(worktree: Path) -> bool:
+    """Whether any populated submodule, at any depth, has changed or untracked files. Each one is
+    asked with the flags that override the configuration of its own repository, which the status
+    of the repository above does not reach."""
+    status = "git status --porcelain --ignore-submodules=none --untracked-files=normal"
+    return bool(
+        checkout.git_output(
+            ["submodule", "--quiet", "foreach", "--recursive", status], directory=worktree
+        )
+    )
 
 
 def _kept_reason(store: Path, holding: str, worktree: Path, branch: str) -> str:
