@@ -279,4 +279,5 @@ dev = [
     "vulture==2.16",
     "pyright==1.1.414",
     "pytest-xdist>=3.8.0",
+    "pytest-randomly>=4",
 ]
