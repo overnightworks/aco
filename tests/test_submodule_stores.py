@@ -1,6 +1,7 @@
 """Which submodule repositories a worktree holds and whether deleting them loses a commit."""
 
 import os
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -110,6 +111,21 @@ def test_a_nested_repository_is_found_and_named(
 
     assert kept_reason is not None
     assert kept_reason.startswith(f"submodule repository {inner} holds")
+
+
+def test_a_nested_store_of_a_deinitialised_parent_is_proven_not_a_read_failure(
+    lane: Path, upstream: Path, tmp_path: Path
+) -> None:
+    """Spec: REL-69, REL-71 -- a store whose `core.worktree` names a removed directory is read by
+    its git directory alone."""
+    outer = clone_store(upstream, lane_git_directory(lane) / "modules" / "outer", tmp_path / "gone")
+    gone = tmp_path / "gone-inner"
+    inner = clone_store(upstream, outer / "modules" / "inner", gone)
+    real_git(inner, "--git-dir=.", "config", "core.worktree", os.path.relpath(gone, inner))
+    shutil.rmtree(gone)
+
+    assert proof_of(lane) == (True, None)
+    assert inner.is_dir()
 
 
 def test_a_tag_that_names_no_commit_is_held(lane: Path, upstream: Path) -> None:

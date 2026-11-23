@@ -147,6 +147,8 @@ def _commits_outside_remote_tracking_refs(store: Path) -> frozenset[str]:
 
 
 def _read_only(store: Path) -> list[str]:
-    """The global options of every read: the store itself, not the directory a deinitialised
-    store's `core.worktree` names, and no lazy fetch of an object a partial clone lacks."""
-    return ["--no-lazy-fetch", f"--git-dir={store}"]
+    """The global options of every read: the store itself, with its own directory as the working
+    tree because git changes into the directory `core.worktree` names, which a deinitialised
+    parent's nested store names though it is gone, and no lazy fetch of an object a partial
+    clone lacks."""
+    return ["--no-lazy-fetch", f"--git-dir={store}", f"--work-tree={store}"]
