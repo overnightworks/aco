@@ -350,25 +350,20 @@ def lock_the_lane(site: SubmoduleSite) -> None:
     real_git(site.lane, "worktree", "lock", "--reason", "in use", str(site.lane))
 
 
-def dirty_the_submodule_despite(*configuration: str) -> Mutation:
-    """An untracked file in the submodule, with the `git config` arguments `configuration` set
-    in the lane to hide it from `git status`."""
-
-    def dirty(site: SubmoduleSite) -> None:
-        (site.working_directory / "scratch.txt").write_text("uncommitted\n")
-        real_git(site.lane, "config", *configuration)
-
-    return dirty
-
-
-def dirty_a_submodule_repository_despite(*configuration: str, nested: bool = False) -> Mutation:
+def dirty_the_submodule_despite(
+    *configuration: str, in_lane: bool = True, nested: bool = False
+) -> Mutation:
     """An untracked file in the submodule (or the one nested in it), with the `git config`
-    arguments `configuration` set in the submodule's own repository to hide it from `git status`."""
+    arguments `configuration` set to hide it from `git status`: in the lane, or with `in_lane`
+    false in the submodule's own repository."""
 
     def dirty(site: SubmoduleSite) -> None:
         directory = site.working_directory / NESTED_SUBMODULE if nested else site.working_directory
         (directory / "scratch.txt").write_text("uncommitted\n")
-        site.git("config", *configuration)
+        if in_lane:
+            real_git(site.lane, "config", *configuration)
+        else:
+            site.git("config", *configuration)
 
     return dirty
 

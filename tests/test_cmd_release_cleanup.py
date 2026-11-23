@@ -25,7 +25,6 @@ from release_cleanup_world import (
     add_linked_worktree,
     clone_nested_store,
     deinitialise,
-    dirty_a_submodule_repository_despite,
     dirty_the_submodule_despite,
     drop_remote_tracking_refs,
     hide_untracked_files,
@@ -464,7 +463,7 @@ def test_a_merged_lane_keeps_its_worktree_for_a_submodule_repository_holding_mor
                 (
                     "untracked-file-in-a-submodule-hidden-by-its-status-setting",
                     "kept -- dirty",
-                    dirty_a_submodule_repository_despite("status.showUntrackedFiles", "no"),
+                    dirty_the_submodule_despite("status.showUntrackedFiles", "no", in_lane=False),
                 ),
             ],
             SUBMODULE_LANE,
@@ -474,15 +473,15 @@ def test_a_merged_lane_keeps_its_worktree_for_a_submodule_repository_holding_mor
                 (
                     "nested-submodule-ignored-by-the-diff-setting",
                     "kept -- dirty",
-                    dirty_a_submodule_repository_despite(
-                        "diff.ignoreSubmodules", "all", nested=True
+                    dirty_the_submodule_despite(
+                        "diff.ignoreSubmodules", "all", in_lane=False, nested=True
                     ),
                 ),
                 (
                     "nested-submodule-ignored-by-its-own-setting",
                     "kept -- dirty",
-                    dirty_a_submodule_repository_despite(
-                        f"submodule.{NESTED_SUBMODULE}.ignore", "all", nested=True
+                    dirty_the_submodule_despite(
+                        f"submodule.{NESTED_SUBMODULE}.ignore", "all", in_lane=False, nested=True
                     ),
                 ),
             ],
