@@ -1,0 +1,8 @@
+claim_id = "bcb943bfb3d6412fbcdb59538dc97513"
+agent = "Claude 46fe7857-8b56-4ea7-a3ee-f805b34349e9"
+role = "builder"
+base = "877ed49dcca981a415ce831a6cb26f385c35c37a"
+branch = "claude/issue-1051-a-successor-head-takes-over-a-lane-claim"
+scope = ["specs/claim-record.spec.md", "specs/handover.spec.md", "specs/land.spec.md", "specs/release.spec.md", "src/aco/cmd_handover.py", "src/aco/cmd_release.py", "src/aco/cmd_rescope.py", "src/aco/item_handover.py", "tests/test_cli.py", "tests/test_cmd_handover.py", "tests/test_cmd_land_preflight_claim.py", "tests/test_cmd_rescope_claim.py", "tests/test_item_handover.py"]
+opened_commit = "ea0d23eb362d2d9a63bbcfe38ab966f8bf923068"
+whole_reason = "The lane handover, the refusals that name it and their spec lines are one route; split, a refusal would name a command that does not exist yet."
