@@ -8,14 +8,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from board_fixtures import complete_contract
+from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import (
     ISSUE,
+    OUTSIDE_LANE_BRANCH,
     StandIn,
     assert_json_refusal_object,
     assert_no_item_body_written,
     claimed_here,
     held_by_ada,
+    lane_held_by_ada,
     make_stand_in,
     rescope_arguments,
     serve_body,
@@ -208,6 +210,30 @@ def test_a_rescope_by_another_agent_than_the_claimant_refuses_and_changes_nothin
     assert state_ref_tip(bare_remote) == tip
     assert claimed_here(standpoint).scope == ("src",)
     assert_no_item_body_written(served)
+
+
+def test_a_rescope_of_a_lane_claim_by_another_agent_names_the_lane_handover_route(
+    stand_in: StandIn, bare_remote: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: CLAIM-37, RESC-16."""
+    standpoint = stand_in(
+        branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_ada(OUTSIDE_LANE_BRANCH, ("src",))
+    )
+    tip = state_ref_tip(bare_remote)
+    added = f"{standpoint.directory}/{NEW_FILE}"
+
+    result = run_cli(
+        ["--repo", REPOSITORY, "rescope", "--agent", "Grok 4.6", "--add", added], capsys
+    )
+
+    assert (result.status, result.stdout, result.stderr) == (
+        2,
+        "",
+        "ERROR: only the original claimant may rescope; take the claim over with "
+        f"`aco handover --branch '{OUTSIDE_LANE_BRANCH}' --from Ada --reason <text>` "
+        "(holder='Ada (builder)', this session='Grok 4.6 (builder)')\n",
+    )
+    assert state_ref_tip(bare_remote) == tip
 
 
 def test_a_rescope_with_json_and_no_claim_on_the_item_refuses_as_a_failed_precondition(

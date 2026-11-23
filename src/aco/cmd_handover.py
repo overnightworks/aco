@@ -1,10 +1,12 @@
 """The `handover` command (`specs/handover.spec.md`): the acting session takes over the claim a
-predecessor session held, and the item records who took over from whom and why."""
+predecessor session held; an item records who took over from whom and why, a lane claim has
+only its claim transition."""
 # ruff: noqa: T201 - the handover command writes its result line to stdout
 
 import argparse
 import os
 import uuid
+from collections.abc import Mapping
 from dataclasses import replace
 from enum import StrEnum
 from functools import partial
@@ -47,7 +49,14 @@ _REFUSAL_REASONS: report.RefusalReasons[_HandoverReason] = (
 def add_parser(commands: usage.Subcommands, name: str) -> None:
     parser = commands.add_parser(name, help="take over the claim a predecessor session held")
     parser.add_argument(
-        "item", type=workboard.parse_item_reference, help="the item whose claim is taken over"
+        "item",
+        nargs="?",
+        type=workboard.parse_item_reference,
+        help="the item whose claim is taken over; give it or --branch",
+    )
+    parser.add_argument(
+        "--branch",
+        help="the branch of the issue-less lane whose claim is taken over; give it or the item",
     )
     parser.add_argument(
         "--from",
@@ -71,15 +80,13 @@ def _bounded_reason(reason: str) -> str:
         raise HandoverUsageError(str(error)) from error
 
 
-def _live_claim(context: RunContext, number: int) -> protocol.ActiveClaim:
+def _live_claim(
+    context: RunContext, identity: protocol.ClaimIdentity, branch: str | None
+) -> protocol.ActiveClaim:
     protocol.require_state_ref(context.observation)
     try:
         return workboard.selected_store_claim(
-            context.observation,
-            protocol.IssueIdentity(number),
-            None,
-            None,
-            context.config.storage,
+            context.observation, identity, branch, None, context.config.storage
         )
     except protocol.ClaimError as error:
         raise HandoverRefusedError(str(error)) from error
@@ -113,6 +120,20 @@ def _handed_over_claim(
         body.replace_block(fresh.body, fresh.located, new_data),
         replacing=fresh.body,
     )
+    try:
+        _hand_over_claim(context, holder, record)
+    except protocol.ClaimError as error:
+        label = workboard.item_label(fresh.number, fresh.storage)
+        raise protocol.ClaimUnavailableError(
+            f"{label} records the handover, but the claim was not handed over: {error}; "
+            "run the same command again"
+        ) from error
+
+
+def _hand_over_claim(
+    context: RunContext, holder: protocol.ActiveClaim, record: item_handover.ItemHandover
+) -> None:
+    """The one claim transition of a takeover, the same for an item and a lane."""
     intent = protocol.HandoverIntent(
         claim_id=holder.claim_id,
         previous_agent=record.from_agent,
@@ -128,65 +149,93 @@ def _handed_over_claim(
             f"{item_handover.REASON_KEY}: {record.reason}",
         ),
     )
-    try:
-        context.transition(subject, intent)
-    except protocol.ClaimError as error:
-        label = workboard.item_label(fresh.number, fresh.storage)
-        raise protocol.ClaimUnavailableError(
-            f"{label} records the handover, but the claim was not handed over: {error}; "
-            "run the same command again"
-        ) from error
+    context.transition(subject, intent)
 
 
 def _emit(
     record: item_handover.ItemHandover,
-    number: int,
-    storage: body.Storage,
+    label: str,
+    target: Mapping[str, object],
     *,
     repeated: bool,
     as_json: bool,
 ) -> None:
+    """The success line, or its `--json` object naming `target` (`item` or `lane`)."""
     if as_json:
         reason = _HandoverReason.ALREADY_HANDED_OVER if repeated else _HandoverReason.HANDED_OVER
         report.emit_json(
             True,
             reason,
-            item=number,
+            **target,
             **{item_handover.FROM_KEY: record.from_agent, item_handover.TO_KEY: record.to_agent},
         )
         return
     verb = "ALREADY HANDED OVER" if repeated else "HANDED OVER"
-    label = workboard.item_label(number, storage)
     print(f"{verb} {label}: {record.from_agent} -> {record.to_agent}")
 
 
-def _take_over(parsed: argparse.Namespace, context: RunContext) -> int:
-    """`handover`'s own work, every refusal raised by name for `run` to report."""
+def _take_over_item(
+    parsed: argparse.Namespace, context: RunContext, wanted: item_handover.ItemHandover
+) -> int:
     number = int(parsed.item)
-    wanted = item_handover.ItemHandover(
-        parsed.from_agent, parsed.agent, _bounded_reason(parsed.reason), context.today()
-    )
     afresh = context.observed_afresh()
     with decide.turn(
         afresh, number, command=_COMMAND, environment=os.environ, home=Path.home()
     ) as fresh:
-        holder = _live_claim(afresh, number)
+        holder = _live_claim(afresh, protocol.IssueIdentity(number), None)
         label = workboard.item_label(number, fresh.storage)
         existing = item_handover.parse_handover(fresh.located.data)
         record = _handover_record(existing, wanted)
         if holder.agent == wanted.to_agent:
             if record != existing:
                 raise HandoverRefusedError(f"this session already holds {label}")
-            _emit(record, number, fresh.storage, repeated=True, as_json=parsed.json)
+            _emit(record, label, {"item": number}, repeated=True, as_json=parsed.json)
             return 0
         if holder.agent != wanted.from_agent:
-            raise HandoverRefusedError(
-                f"{label} is held by {holder.agent!r}, not by {wanted.from_agent!r}; "
-                "pass the holder as --from"
-            )
+            raise _not_the_holder(label, holder, wanted)
         _handed_over_claim(afresh, fresh, holder, record)
-    _emit(record, number, fresh.storage, repeated=False, as_json=parsed.json)
+    _emit(record, label, {"item": number}, repeated=False, as_json=parsed.json)
     return 0
+
+
+def _not_the_holder(
+    label: str, holder: protocol.ActiveClaim, wanted: item_handover.ItemHandover
+) -> HandoverRefusedError:
+    return HandoverRefusedError(
+        f"{label} is held by {holder.agent!r}, not by {wanted.from_agent!r}; "
+        "pass the holder as --from"
+    )
+
+
+def _take_over_lane(
+    parsed: argparse.Namespace, context: RunContext, wanted: item_handover.ItemHandover
+) -> int:
+    """A lane claim has no item body: its one claim transition carries the reason, and a
+    session that already holds the claim finds the takeover done."""
+    branch = str(parsed.branch)
+    holder = _live_claim(context.observed_afresh(), protocol.LaneIdentity(), branch)
+    label = f"lane {branch}"
+    target = {"lane": branch}
+    if holder.agent != wanted.from_agent:
+        raise _not_the_holder(f"lane {branch!r}", holder, wanted)
+    if holder.agent == wanted.to_agent:
+        _emit(wanted, label, target, repeated=True, as_json=parsed.json)
+        return 0
+    _hand_over_claim(context, holder, wanted)
+    _emit(wanted, label, target, repeated=False, as_json=parsed.json)
+    return 0
+
+
+def _take_over(parsed: argparse.Namespace, context: RunContext) -> int:
+    """`handover`'s own work, every refusal raised by name for `run` to report."""
+    wanted = item_handover.ItemHandover(
+        parsed.from_agent, parsed.agent, _bounded_reason(parsed.reason), context.today()
+    )
+    if (parsed.item is None) == (parsed.branch is None):
+        raise HandoverUsageError("name either an item or --branch, not both and not neither")
+    if parsed.item is None:
+        return _take_over_lane(parsed, context, wanted)
+    return _take_over_item(parsed, context, wanted)
 
 
 def run(parsed: argparse.Namespace, context: RunContext) -> int:

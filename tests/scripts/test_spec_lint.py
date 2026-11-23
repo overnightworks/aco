@@ -87,6 +87,22 @@ GREEN_WITHOUT_BEHAVIOR_TABLE = GREEN_SPEC.replace(
 GREEN_TABLE_ENDS_THE_FILE = (
     GREEN_WITHOUT_BEHAVIOR_TABLE + f"\n## Behavior table\n\n{_BEHAVIOR_TABLE_BLOCK}"
 )
+_TABLE_ROW_TEXT = "[SAMPLE-02] | `sample --other` | `ok` | exit `0` (see E-SAMPLE-01) |"
+
+
+def _with_table_row(row_text: str) -> str:
+    """GREEN_SPEC with a printed-wording table of one row, `row_text`, ahead of `## Never`."""
+    table = (
+        f"## Printed wording\n\n| ID | When | Prints | Then |\n|---|---|---|---|\n| {row_text}\n\n"
+    )
+    return GREEN_SPEC.replace("## Never", table + "## Never")
+
+
+GREEN_TABLE_ROW = _with_table_row(_TABLE_ROW_TEXT)
+TABLE_ROW_LINE = _line_number(GREEN_TABLE_ROW, _TABLE_ROW_TEXT)
+RED_TABLE_ROW_LENGTH = _with_table_row(_TABLE_ROW_TEXT.replace("`ok`", "`ok" + "x" * 200 + "`"))
+RED_TABLE_ROW_ID_GAP = _with_table_row(_TABLE_ROW_TEXT.replace("SAMPLE-02", "SAMPLE-03"))
+RED_TABLE_ROW_REFERENCE = _with_table_row(_TABLE_ROW_TEXT.replace("E-SAMPLE-01", "E-SAMPLE-99"))
 RED_EXAMPLE_HEADING_ENDS_THE_FILE = (
     GREEN_SPEC[: GREEN_SPEC.index("Setup: bare-remote")].rstrip("\n") + "\n"
 )
@@ -139,6 +155,22 @@ RULE_FAMILY_CASES: tuple[tuple[str, str, tuple[_ExpectedFinding, ...]], ...] = (
         (_ExpectedFinding("criterion_length", CRITERION_LINE, "> 200"),),
     ),
     ("criterion_length:green", GREEN_SPEC, ()),
+    ("table_row:green", GREEN_TABLE_ROW, ()),
+    (
+        "table_row:criterion_length",
+        RED_TABLE_ROW_LENGTH,
+        (_ExpectedFinding("criterion_length", TABLE_ROW_LINE, "> 200"),),
+    ),
+    (
+        "table_row:id_sequence",
+        RED_TABLE_ROW_ID_GAP,
+        (_ExpectedFinding("id_sequence", 1, "SAMPLE-02 is missing"),),
+    ),
+    (
+        "table_row:unresolved_reference",
+        RED_TABLE_ROW_REFERENCE,
+        (_ExpectedFinding("unresolved_reference", TABLE_ROW_LINE, "E-SAMPLE-99"),),
+    ),
     (
         "id_sequence:red",
         RED_ID_SEQUENCE,

@@ -10,6 +10,7 @@ from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import (
     ISSUE,
     LANE_BRANCH,
+    OUTSIDE_LANE_BRANCH,
     StandIn,
     Standing,
     assert_json_refusal_object,
@@ -373,3 +374,211 @@ def test_the_repo_flag_under_state_ref_storage_is_refused_as_invalid_usage(
     message = "--repo is meaningless under storage = state-ref"
     assert (result.status, result.stderr) == (2, f"ERROR: {message}\n")
     assert json.loads(result.stdout) == {"ok": False, "reason": "invalid_usage", "message": message}
+
+
+def lane_held_by_the_predecessor() -> tuple[Standing, ...]:
+    return (Standing(HELD_SCOPE, branch=OUTSIDE_LANE_BRANCH, agent=PREDECESSOR),)
+
+
+def lane_handover_arguments(*flags: str) -> list[str]:
+    """`aco handover` on the lane `OUTSIDE_LANE_BRANCH`, from the predecessor, then `flags`."""
+    return [
+        "--repo",
+        REPOSITORY,
+        "handover",
+        "--branch",
+        OUTSIDE_LANE_BRANCH,
+        "--from",
+        PREDECESSOR,
+        "--reason",
+        REASON,
+        *flags,
+    ]
+
+
+def test_a_lane_handover_makes_the_acting_session_the_holder_in_one_recorded_transition(
+    stand_in: StandIn, bare_remote: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: HANDOVER-16, HANDOVER-17."""
+    standpoint = stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    [before] = standing_claims(standpoint)
+    parent = real_git(bare_remote, "rev-parse", store.STATE_REF).stdout.strip()
+
+    result = run_cli(lane_handover_arguments(), capsys)
+
+    [after] = standing_claims(standpoint)
+    message = real_git(bare_remote, "log", "-1", "--format=%B", store.STATE_REF).stdout
+    behind = real_git(bare_remote, "rev-parse", f"{store.STATE_REF}~1").stdout.strip()
+    assert (result.status, result.stderr) == (0, "")
+    assert (
+        result.stdout == f"HANDED OVER lane {OUTSIDE_LANE_BRANCH}: {PREDECESSOR} -> {SUCCESSOR}\n"
+    )
+    assert (after.agent, after.claim_id, after.branch, after.scope) == (
+        SUCCESSOR,
+        before.claim_id,
+        before.branch,
+        before.scope,
+    )
+    assert f"intent: handover\nfrom: {PREDECESSOR}\nto: {SUCCESSOR}\nreason: {REASON}\n" in message
+    assert behind == parent
+
+
+def test_the_new_holder_rescopes_and_releases_a_lane_without_an_override(
+    stand_in: StandIn, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: HANDOVER-18."""
+    standpoint = stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    release = ["--repo", REPOSITORY, "release", "--abandoned", "stopped"]
+    refused = run_cli(release, capsys)
+    taken = run_cli(lane_handover_arguments(), capsys)
+    added = f"{standpoint.directory}/{NEW_FILE}"
+
+    rescoped = run_cli(["--repo", REPOSITORY, "rescope", "--add", added], capsys)
+    released = run_cli(release, capsys)
+
+    assert refused.status == 2
+    assert (
+        f"aco handover --branch '{OUTSIDE_LANE_BRANCH}' --from '{PREDECESSOR}' --reason <text>"
+        in refused.stderr
+    )
+    assert (taken.status, rescoped.status, released.status) == (0, 0, 0)
+    assert standing_claims(standpoint) == []
+
+
+def test_the_new_holder_lands_the_lane_the_predecessor_left(
+    monkeypatch: pytest.MonkeyPatch,
+    github_clone: Path,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: HANDOVER-18, LANDCMD-10."""
+    assert_github_world(github_clone, bare_remote)
+    branch = "fix/left-behind"
+    world = lane_landing_world(
+        github_clone,
+        bare_remote,
+        monkeypatch,
+        identity=protocol.LaneIdentity(),
+        branch=branch,
+        body="No-Item: fix",
+        methods=None,
+        holder=PREDECESSOR,
+    )
+    refused = run_cli(["land", "12", "--head", world.head], capsys)
+
+    taken = run_cli(
+        ["handover", "--branch", branch, "--from", PREDECESSOR, "--reason", REASON], capsys
+    )
+    landed = run_cli(["land", "12", "--head", world.head], capsys)
+
+    assert (refused.status, taken.status, landed.status) == (2, 0, 0)
+    assert f"aco handover --branch '{branch}' --from '{PREDECESSOR}' --reason <text>" in (
+        refused.stderr
+    )
+    assert f"RELEASED lane {branch}" in landed.stdout
+
+
+def test_a_lane_handover_repeat_changes_nothing_and_succeeds(
+    stand_in: StandIn, bare_remote: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: HANDOVER-19."""
+    stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    first = run_cli(lane_handover_arguments(), capsys)
+    tip = state_ref_tip(bare_remote)
+
+    repeated = run_cli(lane_handover_arguments("--json", "--from", SUCCESSOR), capsys)
+
+    assert (first.status, repeated.status) == (0, 0)
+    assert json.loads(repeated.stdout) == {
+        "ok": True,
+        "reason": "already_handed_over",
+        "lane": OUTSIDE_LANE_BRANCH,
+        "from": SUCCESSOR,
+        "to": SUCCESSOR,
+    }
+    assert state_ref_tip(bare_remote) == tip
+
+
+@pytest.mark.parametrize("wrong_from", ["Someone Else", PREDECESSOR])
+def test_a_lane_handover_repeat_naming_neither_holder_nor_session_refuses(
+    stand_in: StandIn,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+    wrong_from: str,
+) -> None:
+    """Spec: HANDOVER-19."""
+    stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    run_cli(lane_handover_arguments(), capsys)
+    tip = state_ref_tip(bare_remote)
+
+    repeated = run_cli(lane_handover_arguments("--from", wrong_from), capsys)
+
+    assert (repeated.status, repeated.stdout) == (2, "")
+    assert f"not by {wrong_from!r}" in repeated.stderr
+    assert state_ref_tip(bare_remote) == tip
+
+
+@pytest.mark.parametrize(
+    ("changes", "sentence"),
+    [
+        pytest.param(
+            {"--from": "Someone Else"},
+            f"lane '{OUTSIDE_LANE_BRANCH}' is held by {PREDECESSOR!r}, not by 'Someone Else'",
+            id="from-is-not-the-holder",
+        ),
+        pytest.param(
+            {"--branch": "docs/nobody-holds-it"},
+            "lane 'docs/nobody-holds-it' has no active build claim",
+            id="no-live-lane-claim",
+        ),
+    ],
+)
+def test_a_refused_lane_handover_writes_nothing(
+    stand_in: StandIn,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+    changes: dict[str, str],
+    sentence: str,
+) -> None:
+    """Spec: HANDOVER-20, HANDOVER-22."""
+    standpoint = stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    tip = state_ref_tip(bare_remote)
+    arguments = lane_handover_arguments()
+    for flag, value in changes.items():
+        arguments[arguments.index(flag) + 1] = value
+
+    result = run_cli(arguments, capsys)
+
+    assert (result.status, result.stdout) == (2, "")
+    assert sentence in result.stderr
+    assert state_ref_tip(bare_remote) == tip
+    assert [held.agent for held in standing_claims(standpoint)] == [PREDECESSOR]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        pytest.param(
+            ["handover", str(ISSUE), "--branch", OUTSIDE_LANE_BRANCH], id="item-and-branch"
+        ),
+        pytest.param(["handover"], id="neither"),
+    ],
+)
+def test_a_handover_names_an_item_or_a_branch_never_both_nor_neither(
+    stand_in: StandIn,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+    arguments: list[str],
+) -> None:
+    """Spec: HANDOVER-21."""
+    stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    tip = state_ref_tip(bare_remote)
+
+    result = run_cli(
+        ["--repo", REPOSITORY, *arguments, "--from", PREDECESSOR, "--reason", REASON, "--json"],
+        capsys,
+    )
+
+    assert result.status == 2
+    assert_json_refusal_object(result.stderr, result.stdout, reason="invalid_usage")
+    assert state_ref_tip(bare_remote) == tip

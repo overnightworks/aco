@@ -4,14 +4,13 @@ board. The forge is the only fake. The state-ref twins live in
 `test_cmd_item_base_state_ref.py`."""
 
 import json
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from board_fixtures import MINIMAL_BLOCK_TOML, block_body
-from cli_fixtures import devnull_on_stdin, run_cli
+from cli_fixtures import run_cli
 from github_fixtures import serve_forge
 from item_base import edit_with_base, shown_body_hash
 from item_lock_witness import LockWitnessForge
@@ -92,18 +91,6 @@ def test_a_hash_item_show_printed_lets_item_edit_replace_the_body(
     assert edited["body_hash"] == shown_body_hash(scenario.argument, capsys)
 
 
-def test_an_edit_prints_edited_and_its_item(
-    serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: ITEM-71."""
-    serve_item()
-    arguments = edit_with_base(scenario.argument, capsys)
-
-    result = run_cli(arguments, capsys, stdin=scenario.replacement)
-
-    assert (result.status, result.stdout, result.stderr) == (0, f"EDITED #{scenario.number}\n", "")
-
-
 @pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
 def test_an_edit_from_a_copy_read_before_another_write_refuses_and_keeps_that_write(
     serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str], as_json: bool
@@ -129,46 +116,17 @@ def test_an_edit_from_a_copy_read_before_another_write_refuses_and_keeps_that_wr
     assert client.body_writes == []
 
 
-@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
-def test_an_edit_without_a_base_refuses_before_it_reads_stdin(
-    serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str], as_json: bool
+def test_an_edit_without_a_base_reports_precondition_failed_and_writes_nothing(
+    serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: ITEM-73 -- no `--base` names the way to get one and writes nothing; it refuses ahead
-    of the stdin rule, so a missing redirect is not what the person is told."""
+    """Spec: ITEM-73 -- no `--base` refuses ahead of the stdin rule with `--json` reason
+    `precondition_failed`; the sentence is the printed-wording table's."""
     client = serve_item()
 
-    result = run_cli(["item", "edit", scenario.argument, *(["--json"] * as_json)], capsys)
+    result = run_cli(["item", "edit", scenario.argument, "--json"], capsys)
 
-    sentence = (
-        f"item edit #{scenario.number} needs --base <hash>; "
-        f"aco item show {scenario.argument} --json prints it"
-    )
-    assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
-    envelope = {"ok": False, "reason": "precondition_failed", "message": sentence}
-    assert result.stdout == (json.dumps(envelope) + "\n" if as_json else "")
-    assert client.body_writes == []
-
-
-def test_an_edit_with_a_base_and_no_body_on_stdin_names_a_redirect_that_runs(
-    serve_item: ServeItem,
-    scenario: Scenario,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Spec: ITEM-63 -- the printed command names the item as `item edit` takes it."""
-    client = serve_item()
-    arguments = edit_with_base(scenario.argument, capsys)
-
-    with devnull_on_stdin(tmp_path) as stdin:
-        monkeypatch.setattr(sys, "stdin", stdin)
-        result = run_cli(arguments, capsys)
-
-    sentence = (
-        f"item edit #{scenario.number} needs the new body on stdin: "
-        f"aco item edit {scenario.argument} --base <hash> < body.md"
-    )
-    assert (result.status, result.stderr) == (2, f"ERROR: {sentence}\n")
+    assert result.status == 2
+    assert json.loads(result.stdout)["reason"] == "precondition_failed"
     assert client.body_writes == []
 
 
@@ -195,14 +153,14 @@ def test_a_malformed_body_refuses_before_the_item_is_read(
 def test_a_body_equal_to_the_stored_one_writes_nothing(
     serve_item: ServeItem, scenario: Scenario, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: ITEM-75 -- `UNCHANGED`, exit 0, no write, `--json` `reason: "unchanged"`."""
+    """Spec: ITEM-75 -- exit 0, no write, `--json` `reason: "unchanged"`; the text sentence is the
+    printed-wording table's."""
     client = serve_item()
     arguments = edit_with_base(scenario.argument, capsys)
 
-    text = run_cli(arguments, capsys, stdin=scenario.stored)
     envelope = run_cli([*arguments, "--json"], capsys, stdin=scenario.stored)
 
-    assert (text.status, text.stdout) == (0, f"UNCHANGED #{scenario.number}\n")
+    assert envelope.status == 0
     assert json.loads(envelope.stdout)["reason"] == "unchanged"
     assert client.body_writes == []
 

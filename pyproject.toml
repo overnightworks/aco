@@ -13,7 +13,7 @@ authors = [{name = "aco contributors"}]
 # aco is installed without a lock (`uv tool install` reads none), so the pin is
 # the release tag's full commit, the tag named beside it.
 dependencies = [
-    "overnightworks-logline @ git+https://github.com/overnightworks/logline@b7c00890474ce10df2ec4c1106c26700f43c3ae0",  # v1.5.0
+    "overnightworks-logline @ git+https://github.com/overnightworks/logline@cca495315f8fb25dae85851592a2c42376052c58",  # v1.9.0
 ]
 
 [project.scripts]
@@ -100,6 +100,7 @@ layers = [
     "session",
     "ahead_of_caller",
     "state_export | state_history | state_runs",
+    "submodule_stores",
     "checkout | store",
     "github_probe",
     "github | state_board | github_search",
@@ -283,4 +284,5 @@ dev = [
     "vulture==2.16",
     "pyright==1.1.414",
     "pytest-xdist>=3.8.0",
+    "pytest-randomly>=4",
 ]
