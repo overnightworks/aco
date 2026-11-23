@@ -58,7 +58,7 @@ def _submodules_are_dirty(worktree: Path) -> bool:
     status = shlex.join(["git", *checkout.DIRTY_STATUS])
     return bool(
         checkout.git_output(
-            ["submodule", "--quiet", "foreach", "--recursive", status],
+            ["--no-lazy-fetch", "submodule", "--quiet", "foreach", "--recursive", status],
             directory=worktree,
         )
     )

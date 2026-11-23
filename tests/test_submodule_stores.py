@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from cli_fixtures import real_git, set_git_identity
-from release_cleanup_world import one_commit_repository
+from release_cleanup_world import ALLOW_FILE_TRANSPORT, one_commit_repository
 
 from aco import protocol, submodule_stores
 
@@ -140,6 +140,25 @@ def test_a_missing_object_is_a_read_failure_never_a_fetch(lane: Path, upstream: 
         proof_of(lane)
 
     absent = real_git(store, "--no-lazy-fetch", "--git-dir=.", "cat-file", "-e", later, check=False)
+    assert absent.returncode != 0
+
+
+def test_a_missing_tree_in_a_populated_submodule_is_a_read_failure_never_a_fetch(
+    lane: Path, upstream: Path
+) -> None:
+    """Spec: REL-74 -- a populated submodule's dirt check never fetches a missing tree."""
+    real_git(lane, *ALLOW_FILE_TRANSPORT, "submodule", "add", "-q", str(upstream), "sub")
+    store = lane_git_directory(lane) / "modules" / "sub"
+    real_git(store, "--git-dir=.", "config", "core.repositoryformatversion", "1")
+    real_git(store, "--git-dir=.", "config", "extensions.partialClone", "origin")
+    real_git(store, "--git-dir=.", "config", "remote.origin.promisor", "true")
+    tree = real_git(store, "--git-dir=.", "rev-parse", "HEAD^{tree}").stdout.strip()
+    (store / "objects" / tree[:2] / tree[2:]).unlink()
+
+    with pytest.raises(protocol.ClaimError):
+        proof_of(lane)
+
+    absent = real_git(store, "--no-lazy-fetch", "--git-dir=.", "cat-file", "-e", tree, check=False)
     assert absent.returncode != 0
 
 
