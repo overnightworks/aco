@@ -216,11 +216,11 @@ def _take_over_lane(
     holder = _live_claim(context.observed_afresh(), protocol.LaneIdentity(), branch)
     label = f"lane {branch}"
     target = {"lane": branch}
+    if holder.agent != wanted.from_agent:
+        raise _not_the_holder(f"lane {branch!r}", holder, wanted)
     if holder.agent == wanted.to_agent:
         _emit(wanted, label, target, repeated=True, as_json=parsed.json)
         return 0
-    if holder.agent != wanted.from_agent:
-        raise _not_the_holder(f"lane {branch!r}", holder, wanted)
     _hand_over_claim(context, holder, wanted)
     _emit(wanted, label, target, repeated=False, as_json=parsed.json)
     return 0

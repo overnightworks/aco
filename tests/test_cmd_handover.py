@@ -486,16 +486,35 @@ def test_a_lane_handover_repeat_changes_nothing_and_succeeds(
     first = run_cli(lane_handover_arguments(), capsys)
     tip = state_ref_tip(bare_remote)
 
-    repeated = run_cli(lane_handover_arguments("--json"), capsys)
+    repeated = run_cli(lane_handover_arguments("--json", "--from", SUCCESSOR), capsys)
 
     assert (first.status, repeated.status) == (0, 0)
     assert json.loads(repeated.stdout) == {
         "ok": True,
         "reason": "already_handed_over",
         "lane": OUTSIDE_LANE_BRANCH,
-        "from": PREDECESSOR,
+        "from": SUCCESSOR,
         "to": SUCCESSOR,
     }
+    assert state_ref_tip(bare_remote) == tip
+
+
+@pytest.mark.parametrize("wrong_from", ["Someone Else", PREDECESSOR])
+def test_a_lane_handover_repeat_naming_neither_holder_nor_session_refuses(
+    stand_in: StandIn,
+    bare_remote: Path,
+    capsys: pytest.CaptureFixture[str],
+    wrong_from: str,
+) -> None:
+    """Spec: HANDOVER-19."""
+    stand_in(branch=OUTSIDE_LANE_BRANCH, standing=lane_held_by_the_predecessor())
+    run_cli(lane_handover_arguments(), capsys)
+    tip = state_ref_tip(bare_remote)
+
+    repeated = run_cli(lane_handover_arguments("--from", wrong_from), capsys)
+
+    assert (repeated.status, repeated.stdout) == (2, "")
+    assert f"not by {wrong_from!r}" in repeated.stderr
     assert state_ref_tip(bare_remote) == tip
 
 
