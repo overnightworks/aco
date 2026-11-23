@@ -1,0 +1,8 @@
+claim_id = "84dd41d542ca4ff999367c38571271c3"
+agent = "Claude 46fe7857-8b56-4ea7-a3ee-f805b34349e9"
+role = "builder"
+base = "da49029cfaba9c9057bfcf2b698f978b49e4e66e"
+branch = "claude/issue-1058-aco-pins-quality-v0-25-0"
+scope = [".github/workflows/ci.yml", ".github/workflows/codeql.yml", ".github/workflows/release.yml", "frontend/vite.config.ts", "quality/baseline.toml", "quality/config.toml"]
+opened_commit = "c87cb01dee90513077573300c5e99080ff66a607"
+whole_reason = "One quality release pin moves every gate workflow together with the fixes and the generated-file declaration that release asks for."
