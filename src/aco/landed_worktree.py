@@ -3,8 +3,9 @@
 import argparse
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from functools import partial
 
-from . import body, checkout, forge, protocol, store, workboard
+from . import body, checkout, forge, protocol, store, submodule_stores, workboard
 from .session import RunContext
 
 
@@ -110,8 +111,11 @@ def cleanup_landed_worktree(
         return checkout.cleanup_landed_worktree(
             matching,
             branch,
-            trunk=fetched_trunk_ref(),
-            proven_tips=lane.proven_tips,
+            policy=checkout.RemovalPolicy(
+                fetched_trunk_ref(),
+                lane.proven_tips,
+                partial(submodule_stores.removal_proof, branch=branch),
+            ),
             directory=toplevel,
         )
     except protocol.ClaimError as error:

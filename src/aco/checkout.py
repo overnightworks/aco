@@ -713,15 +713,15 @@ def _is_repository_marker(dot_git: Path, *, discovery_start: Path) -> bool:
 def _is_git_directory(suspect: Path, *, discovery_start: Path) -> bool:
     """A directory counts when git 2.43 recognizes it
     (`_recognized_by_git_2_43`) or the layout this repository always accepted
-    does (`_has_plain_git_directory_layout`): the port may differ from git
+    does (`has_plain_git_directory_layout`): the port may differ from git
     somewhere, never by failing to recognize a repository directory the
     plain layout names."""
-    return _has_plain_git_directory_layout(suspect) or _recognized_by_git_2_43(
+    return has_plain_git_directory_layout(suspect) or _recognized_by_git_2_43(
         suspect, discovery_start=discovery_start
     )
 
 
-def _has_plain_git_directory_layout(candidate: Path) -> bool:
+def has_plain_git_directory_layout(candidate: Path) -> bool:
     """The layout git's own discovery takes for a repository directory:
     `HEAD` beside `objects/` and `refs/`. Kept as a floor beneath the port of
     git's recognition, so a gap in that port cannot make a path inside such a
@@ -1698,54 +1698,54 @@ WORKTREE_KEPT_DIRTY_REASON = "dirty"
 WORKTREE_KEPT_ELSEWHERE_REASON = "branch checked out elsewhere"
 
 
+class RemovalPolicy(NamedTuple):
+    """What lets a landed lane's worktree go: its branch is landed when `trunk` contains its tip or
+    the tip is one of `proven_tips` (the pull request's recorded head, an adopted lane's `base`);
+    `removal_proof` reads its submodule repositories: whether `--force` must remove them, or why
+    to keep the worktree."""
+
+    trunk: str
+    proven_tips: frozenset[str]
+    removal_proof: Callable[[Path], tuple[bool, str | None]]
+
+
 def cleanup_landed_worktree(
-    matching: Path, branch: str, *, trunk: str, proven_tips: frozenset[str], directory: Path
+    matching: Path, branch: str, *, policy: RemovalPolicy, directory: Path
 ) -> WorktreeCleanupOutcome:
-    """`release --merged`'s own cleanup policy once a lane's linked worktree
-    is already found: merged check, then
-    checked-out-elsewhere check, then a dirty check, then the worktree
-    removal itself, then the branch deletion -- in that order, since
-    removing a dirty or still-needed worktree is unsafe and the two git
-    writes below it are each worth reporting apart. A branch counts as
-    landed when the trunk contains its tip, or when its tip, read once, is
-    one of `proven_tips`: the merged pull request's recorded head (a squash
-    commit is no descendant of that tip, so ancestry alone would keep every
-    squashed lane) and an adopted lane's `base`. That tip is what
-    `remove_linked_worktree` receives as `landed_head`, so either proof
-    ends in the same compare-and-delete. `release`'s own cwd-equality guard and its "no
-    worktree matches this branch" decision run before this and stay the
-    caller's own job (they need the process's own cwd and worktree listing,
-    neither of which this function reads)."""
+    """`release --merged`'s own cleanup once a lane's linked worktree is found: the merged check,
+    the checked-out-elsewhere check, a dirty check that counts submodule content and untracked
+    files whatever the configuration says, the submodule proof, the worktree removal, then the
+    branch deletion, in that order. A proven tip is the `landed_head` the branch is deleted on.
+    `release`'s own cwd guard and no-matching-worktree decision stay the caller's job."""
     tip = resolved_commit(f"refs/heads/{branch}", directory=directory)
-    merged = branch_merged_into_default(branch, trunk=trunk, directory=directory)
-    if not merged and tip not in proven_tips:
+    merged = branch_merged_into_default(branch, trunk=policy.trunk, directory=directory)
+    if not merged and tip not in policy.proven_tips:
         return worktree_cleanup_kept(WORKTREE_KEPT_NOT_MERGED_REASON)
     matching_checkout = resolve_path_checkout(matching)
     if matching_checkout is not None and matching_checkout.kind is CheckoutKind.MAIN:
         return worktree_cleanup_kept(WORKTREE_KEPT_ELSEWHERE_REASON)
-    dirty = git_output(["status", "--porcelain"], directory=matching)
-    if dirty:
+    status = ["status", "--porcelain", "--ignore-submodules=none", "--untracked-files=normal"]
+    if git_output(status, directory=matching):
         return worktree_cleanup_kept(WORKTREE_KEPT_DIRTY_REASON)
-    return remove_linked_worktree(matching, branch=branch, landed_head=None if merged else tip)
+    forced, kept_reason = policy.removal_proof(matching)
+    if kept_reason is not None:
+        return worktree_cleanup_kept(kept_reason)
+    return remove_linked_worktree(
+        matching, branch=branch, landed_head=None if merged else tip, force=forced
+    )
 
 
 def remove_linked_worktree(
-    path: Path, *, branch: str, landed_head: str | None = None
+    path: Path, *, branch: str, landed_head: str | None = None, force: bool = False
 ) -> WorktreeCleanupOutcome:
     """Remove a landed lane's linked worktree and its own local branch, or the pair a refused
-    `start` had just created: `git worktree remove` first -- git refuses to delete a
-    branch still checked out anywhere -- then the branch deletion
-    (`_delete_branch`), both through this module's own `_git_run`
-    chokepoint. Never called on the calling
-    process's own checkout: `release`'s own cwd-equality guard runs first,
-    since a worktree cannot remove its own cwd, and `start` removes only a
-    worktree it created, never the one it runs in. A worktree-removal failure
-    still raises loud (nothing on disk has changed yet); a branch-deletion
-    failure once the worktree is already gone returns a typed outcome
-    instead, so that success is never lost behind a bare `kept`. `landed_head`
-    is the proven tip the branch is compare-and-deleted on: the merged pull
-    request's recorded head, or an adopted lane's `base`."""
-    result = _git_run(["worktree", "remove", str(path)])
+    `start` had just created: `git worktree remove` first -- git refuses to delete a branch still
+    checked out anywhere -- then `_delete_branch`. Never called on the calling process's own
+    checkout. A worktree-removal failure raises loud (nothing on disk has changed yet); a
+    branch-deletion failure once the worktree is gone returns a typed outcome. `landed_head` is
+    the proven tip the branch is compare-and-deleted on. `force` passes git's `--force`, which
+    skips git's own clean check and deletes submodule repositories: only after a proof."""
+    result = _git_run(["worktree", "remove", *(["--force"] if force else []), str(path)])
     if result.exit_status != 0:
         raise ClaimError(process.git_failure_detail(result))
     return WorktreeCleanupOutcome(
