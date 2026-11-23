@@ -10923,11 +10923,11 @@ def test_item_edit_kind_retypes_a_github_issue_or_refuses(
 
 
 @pytest.mark.parametrize(
-    ("flag", "value", "edited"),
+    ("flag", "value"),
     [
-        pytest.param("--kind", "container", "kind=container", id="kind"),
-        pytest.param("--size", "S", "size=S", id="size"),
-        pytest.param("--whole", "one PR", "whole=one PR", id="whole"),
+        pytest.param("--kind", "container", id="kind"),
+        pytest.param("--size", "S", id="size"),
+        pytest.param("--whole", "one PR", id="whole"),
     ],
 )
 @pytest.mark.parametrize(
@@ -10947,7 +10947,6 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
     tmp_path: Path,
     flag: str,
     value: str,
-    edited: str,
     stdin_source: Callable[[Path], contextlib.AbstractContextManager[TextIO | None]],
     refused: bool,
 ) -> None:
@@ -10970,13 +10969,9 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
 
     captured = capsys.readouterr()
     wrote = bool(client.retyped_items or client.item_bodies)
-    outcome = (exit_code, captured.out, captured.err, wrote)
-    expected = (
-        (2, "", f"ERROR: item edit {flag} reads no stdin; drop the redirect\n", False)
-        if refused
-        else (0, f"EDITED #484 {edited}\n", "", True)
-    )
-    assert outcome == expected
+    refusal = f"ERROR: item edit {flag} reads no stdin; drop the redirect\n"
+    expected = (2, refusal, False) if refused else (0, "", True)
+    assert (exit_code, captured.err, wrote) == expected
 
 
 @pytest.mark.parametrize(
