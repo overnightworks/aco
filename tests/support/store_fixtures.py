@@ -8,7 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from cli_fixtures import fresh_observation, real_git
+from board_fixtures import write_repository_config
+from cli_fixtures import fresh_observation, real_git, stub_board_config_tracked
 
 from aco import items, lineage_stamp, process, protocol, store
 
@@ -379,3 +380,23 @@ def path_without_gh(tmp_path: Path) -> str:
         assert executable is not None, f"this test needs a real {tool} on PATH to symlink"
         (bin_directory / tool).symlink_to(executable)
     return str(bin_directory)
+
+
+def seed_state_ref_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    bare_remote: Path,
+    worktree_path: Path,
+    item_files: dict[str, bytes],
+) -> None:
+    """Pin `worktree_path` to `storage = "state-ref"` over `bare_remote` with `item_files`
+    seeded on the state ref and `origin/HEAD` set, make it this run's cwd, and leave no `gh` on
+    `PATH`."""
+    push_item_tree(bare_remote, worktree_path, item_files)
+    real_git(worktree_path, "remote", "add", "origin", f"file://{bare_remote}")
+    real_git(worktree_path, "push", "origin", "main")
+    real_git(worktree_path, "remote", "set-head", "origin", "main")
+    write_repository_config(worktree_path, 'storage = "state-ref"\ncanonical_remote = "origin"\n')
+    stub_board_config_tracked(monkeypatch)
+    monkeypatch.setenv("PATH", path_without_gh(tmp_path))
+    monkeypatch.chdir(worktree_path)

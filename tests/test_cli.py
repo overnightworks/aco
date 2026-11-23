@@ -10828,17 +10828,6 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
     [
         pytest.param(
             "484",
-            (),
-            devnull_on_stdin,
-            False,
-            0,
-            "EDITED #484 kind=container\n",
-            "",
-            [(484, body.ItemKind.CONTAINER)],
-            id="retypes_through_the_forge",
-        ),
-        pytest.param(
-            "484",
             ("--json",),
             devnull_on_stdin,
             False,

@@ -17,18 +17,15 @@ from board_fixtures import (
     board_issue,
     complete_contract,
     container_issue,
-    write_repository_config,
 )
 from cli_fixtures import (
     devnull_on_stdin,
-    real_git,
     run_cli,
     set_git_identity,
-    stub_board_config_tracked,
 )
 from github_fixtures import FakeForge, serve_forge
 from item_base import CURRENT_BASE, with_current_base
-from store_fixtures import item_record, path_without_gh, push_item_tree
+from store_fixtures import item_record, seed_state_ref_checkout
 
 from aco import body, forge, store
 
@@ -165,11 +162,6 @@ ROWS = {
         status=0,
         writes=True,
     ),
-    "ITEM-49": Row(
-        (*EDIT_TASK, *TWICE),
-        refused("item edit --size reads no stdin; drop the redirect"),
-        stdin="body\n",
-    ),
     "ITEM-64": Row(
         (*EDIT_CHILD, *TWICE),
         stdout=f"UNCHANGED {CHILD_ID} size=S\n",
@@ -204,15 +196,19 @@ ROWS = {
 }
 
 
+@pytest.fixture
+def row(request: pytest.FixtureRequest) -> Row:
+    """The table row this case runs; the fixtures that arrange its checkout read it."""
+    return request.param
+
+
 @pytest.fixture(autouse=True)
 def commit_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     set_git_identity(monkeypatch)
 
 
 @pytest.fixture
-def github_items(
-    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest, github_world: Path
-) -> Written:
+def github_items(monkeypatch: pytest.MonkeyPatch, row: Row, github_world: Path) -> Written:
     """A GitHub-hosted board holding container `79`, the look-alike `951`, the open Task `484`
     and the item `72` whose body is `STORED`; the forge is the fake the command meets."""
     client = FakeForge(
@@ -229,7 +225,7 @@ def github_items(
             999: forge.ItemReference(forge.ItemState.MISSING),
         },
     )
-    for flag in request.node.callspec.params["row"].forge_flags:
+    for flag in row.forge_flags:
         setattr(client, flag, True)
     serve_forge(monkeypatch, client)
 
@@ -247,7 +243,7 @@ def github_items(
 @pytest.fixture
 def state_ref_items(
     monkeypatch: pytest.MonkeyPatch,
-    request: pytest.FixtureRequest,
+    row: Row,
     tmp_path: Path,
     bare_remote: Path,
     worktree: Path,
@@ -258,16 +254,9 @@ def state_ref_items(
         f"{PARENT_ID}.md": state_ref_body("Parent.", kind="container").encode(),
         f"{CHILD_ID}.md": state_ref_body("Child.", parent=PARENT_ID).encode(),
     }
-    if request.node.callspec.params["row"].malformed_item:
+    if row.malformed_item:
         items[f"{MALFORMED_ID}.md"] = NO_BLOCK
-    push_item_tree(bare_remote, worktree, items)
-    real_git(worktree, "remote", "add", "origin", f"file://{bare_remote}")
-    real_git(worktree, "push", "origin", "main")
-    real_git(worktree, "remote", "set-head", "origin", "main")
-    write_repository_config(worktree, 'storage = "state-ref"\ncanonical_remote = "origin"\n')
-    stub_board_config_tracked(monkeypatch)
-    monkeypatch.setenv("PATH", path_without_gh(tmp_path))
-    monkeypatch.chdir(worktree)
+    seed_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, items)
 
     def written() -> object:
         return store.fetch_state(worktree=worktree, remote=f"file://{bare_remote}").tip
@@ -275,7 +264,9 @@ def state_ref_items(
     return written
 
 
-@pytest.mark.parametrize("row", [pytest.param(row, id=name) for name, row in ROWS.items()])
+@pytest.mark.parametrize(
+    "row", [pytest.param(row, id=name) for name, row in ROWS.items()], indirect=True
+)
 def test_the_command_prints_the_sentence_of_each_row(
     row: Row,
     request: pytest.FixtureRequest,

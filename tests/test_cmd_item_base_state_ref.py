@@ -9,16 +9,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from board_fixtures import MINIMAL_BLOCK_TOML, block_body, write_repository_config
-from cli_fixtures import (
-    fresh_observation,
-    real_git,
-    run_cli,
-    set_git_identity,
-    stub_board_config_tracked,
-)
+from board_fixtures import MINIMAL_BLOCK_TOML, block_body
+from cli_fixtures import fresh_observation, run_cli, set_git_identity
 from item_base import edit_item, edit_with_base, shown_body_hash
-from store_fixtures import item_record, path_without_gh, push_item_tree
+from store_fixtures import item_record, seed_state_ref_checkout
 
 from aco import body, protocol, store
 from aco.state_board import StateRefBoard
@@ -58,14 +52,9 @@ def seed_item(
     and seeds the state ref with item `ITEM_ID` holding the given bytes."""
 
     def seed(content: bytes) -> None:
-        push_item_tree(bare_remote, worktree, {f"{ITEM_ID}.md": content})
-        real_git(worktree, "remote", "add", "origin", f"file://{bare_remote}")
-        real_git(worktree, "push", "origin", "main")
-        real_git(worktree, "remote", "set-head", "origin", "main")
-        write_repository_config(worktree, 'storage = "state-ref"\ncanonical_remote = "origin"\n')
-        stub_board_config_tracked(monkeypatch)
-        monkeypatch.setenv("PATH", path_without_gh(tmp_path))
-        monkeypatch.chdir(worktree)
+        seed_state_ref_checkout(
+            monkeypatch, tmp_path, bare_remote, worktree, {f"{ITEM_ID}.md": content}
+        )
 
     return seed
 
