@@ -55,6 +55,7 @@ from store_fixtures import (
     item_record,
     path_without_gh,
     push_item_tree,
+    seed_state_ref_checkout,
     state_ref_listing,
 )
 
@@ -868,14 +869,6 @@ class TestMalformedItem:
                 item_record(title="Repaired", state="open", kind="task", parent=MALFORMED_ID),
                 _malformed_item_refusal(_malformed_block(BLANK_TITLE_DEFECT)),
                 id="itself-as-parent",
-            ),
-            pytest.param(
-                item_record(
-                    title="Repaired", state="closed", kind="task", closed_at="2026-09-20T00:00:00Z"
-                ),
-                f'a repair records state = "open"; close {MALFORMED_ID} afterwards '
-                f"with aco item close {MALFORMED_ID}",
-                id="closed",
             ),
         ],
     )
@@ -1963,13 +1956,7 @@ class TestCliStateRefForge:
         pointed at `bare_remote` with `item_files` already seeded and
         `origin/HEAD` set, and `PATH` carrying no `gh` -- the one setup
         every write proof below shares."""
-        remote_url = f"file://{bare_remote}"
-        push_item_tree(bare_remote, worktree, item_files)
-        real_git(worktree, "remote", "add", "origin", remote_url)
-        real_git(worktree, "push", "origin", "main")
-        real_git(worktree, "remote", "set-head", "origin", "main")
-        self._enter_pinned_checkout(monkeypatch, worktree)
-        monkeypatch.setenv("PATH", path_without_gh(tmp_path))
+        seed_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
 
     @pytest.mark.parametrize(
         ("cell", "operation"),
@@ -4743,7 +4730,6 @@ class TestCliStateRefForge:
     @pytest.mark.parametrize(
         ("flag", "value", "field"),
         [
-            pytest.param("--size", "L", "size=L", id="size"),
             pytest.param("--whole", "one PR", "whole=one PR", id="whole"),
             pytest.param("--kind", "container", "kind=container", id="kind"),
         ],

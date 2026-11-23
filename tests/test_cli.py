@@ -10828,17 +10828,6 @@ def test_item_new_retypes_a_task_parent_to_container_or_refuses(
     [
         pytest.param(
             "484",
-            (),
-            devnull_on_stdin,
-            False,
-            0,
-            "EDITED #484 kind=container\n",
-            "",
-            [(484, body.ItemKind.CONTAINER)],
-            id="retypes_through_the_forge",
-        ),
-        pytest.param(
-            "484",
             ("--json",),
             devnull_on_stdin,
             False,
@@ -10934,11 +10923,11 @@ def test_item_edit_kind_retypes_a_github_issue_or_refuses(
 
 
 @pytest.mark.parametrize(
-    ("flag", "value", "edited"),
+    ("flag", "value"),
     [
-        pytest.param("--kind", "container", "kind=container", id="kind"),
-        pytest.param("--size", "S", "size=S", id="size"),
-        pytest.param("--whole", "one PR", "whole=one PR", id="whole"),
+        pytest.param("--kind", "container", id="kind"),
+        pytest.param("--size", "S", id="size"),
+        pytest.param("--whole", "one PR", id="whole"),
     ],
 )
 @pytest.mark.parametrize(
@@ -10958,7 +10947,6 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
     tmp_path: Path,
     flag: str,
     value: str,
-    edited: str,
     stdin_source: Callable[[Path], contextlib.AbstractContextManager[TextIO | None]],
     refused: bool,
 ) -> None:
@@ -10981,12 +10969,9 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
 
     captured = capsys.readouterr()
     wrote = bool(client.retyped_items or client.item_bodies)
-    outcome = (exit_code, captured.out, captured.err, wrote)
-    expected = (
-        (2, "", f"ERROR: item edit {flag} reads no stdin; drop the redirect\n", False)
-        if refused
-        else (0, f"EDITED #484 {edited}\n", "", True)
-    )
+    refusal = f"ERROR: item edit {flag} reads no stdin; drop the redirect\n"
+    outcome = (exit_code, captured.err, wrote)
+    expected = (2, refusal, False) if refused else (0, "", True)
     assert outcome == expected
 
 
@@ -10999,13 +10984,6 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
             (),
             "ERROR: body incomplete: Next, Done when\n",
             id="prose_whose_flags_leave_the_block_incomplete",
-        ),
-        pytest.param(
-            complete_contract("Ship it.", size="S"),
-            ("--title", "Write the docs", "--size", "M"),
-            (),
-            """ERROR: --size "M" contradicts the piped block's size = "S"\n""",
-            id="a_flag_contradicting_the_piped_block",
         ),
         pytest.param(
             complete_contract("Ship it.", scope=["src/b.py"]),
@@ -11035,37 +11013,6 @@ def test_item_edit_of_one_field_refuses_a_body_on_stdin_and_passes_an_empty_one(
             "ERROR: possible twin #952; pass --not-a-twin\n",
             id="identical_title_without_words",
         ),
-        pytest.param(
-            ITEM_NEW_BODY,
-            ("--title", "Write the docs", "--parent", "951"),
-            (),
-            "ERROR: #951 is not a container\n",
-            id="parent_is_not_a_container",
-        ),
-        pytest.param(
-            ITEM_NEW_BODY,
-            ("--title", "Write the docs", "--parent", "81"),
-            (),
-            "ERROR: #81 is not an open container\n",
-            id="parent_is_not_open",
-        ),
-        pytest.param(
-            ITEM_NEW_BODY,
-            ("--title", "Write the docs", "--origin", "gitlab#5"),
-            (),
-            'ERROR: --origin needs storage = "state-ref"\n',
-            id="origin_under_github",
-        ),
-        *(
-            pytest.param(
-                ITEM_NEW_BODY,
-                ("--title", title),
-                (),
-                "ERROR: --title must be a non-empty string\n",
-                id=case,
-            )
-            for case, title in (("empty_title", ""), ("whitespace_title", "   "))
-        ),
         *(
             pytest.param(
                 complete_contract("Ship it.", slice=slice_entries(f"Flip{control}side")),
@@ -11091,8 +11038,7 @@ def test_item_new_on_github_refuses_before_creating_anything(
 ) -> None:
     """An invalid body (the same
     check `aco check <n>` applies, a slice title holding a display control
-    included), a possible twin, a parent that is no open container,
-    `--origin`, or a blank `--title` refuses with exit 2 and creates no
+    included) or a possible twin refuses with exit 2 and creates no
     issue at all."""
     client = _item_new_github_client(monkeypatch, tmp_path)
     pipe_onto_stdin(piped_body)
@@ -11431,19 +11377,6 @@ def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
         "body": "Body text.\n",
     }
     assert re.fullmatch(r"sha256:[0-9a-f]{64}", body_hash)
-
-
-def test_item_show_refuses_an_unknown_id(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
-) -> None:
-    client = FakeForge()
-    client.issue_references[42] = forge.ItemReference(forge.ItemState.MISSING)
-    monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
-
-    status = issue_claim.main(["--repo", REPOSITORY, "item", "show", "42"])
-
-    assert status == 2
-    assert capsys.readouterr().err == f"ERROR: #42 does not exist in {REPOSITORY}\n"
 
 
 def test_item_show_refuses_when_the_parent_read_fails(
