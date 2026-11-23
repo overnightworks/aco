@@ -155,8 +155,8 @@ Setup: bare-remote, bootstrapped, a live claim on the issue-less lane `docs/deps
 $ aco handover --branch docs/deps --from 'Claude af547fd1' --reason 'restart order of the operator'
 HANDED OVER lane docs/deps: Claude af547fd1 -> Ada
 exit 0
-$ aco handover --branch docs/deps --from 'Claude af547fd1' --reason 'restart order of the operator'
-ALREADY HANDED OVER lane docs/deps: Claude af547fd1 -> Ada
+$ aco handover --branch docs/deps --from 'Ada' --reason 'restart order of the operator'
+ALREADY HANDED OVER lane docs/deps: Ada -> Ada
 exit 0
 $ aco handover --branch docs/deps --from 'Someone Else' --reason 'restart order of the operator' --json
 {"ok": false, "reason": "precondition_failed", "message": "lane 'docs/deps' is held by 'Ada', not by 'Someone Else'; pass the holder as --from"}
@@ -170,4 +170,4 @@ $ aco handover 42 --branch docs/deps --from 'Claude af547fd1' --reason 'restart 
 exit 2
 ```
 
-The claim on `docs/deps` is held by `Ada` as `builder`, one state-ref commit away from the one before, and no item body changed.
+The claim on `docs/deps` is held by `Ada` as `builder`, one state-ref commit away from the one before, and no item body changed. A lane repeat names the holder as `--from` (HANDOVER-19, HANDOVER-20), so the original `--from` refuses once Ada holds the claim; an item repeat (E-HANDOVER-01, HANDOVER-10) still accepts the original `--from`.
