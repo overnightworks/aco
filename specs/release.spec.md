@@ -193,7 +193,7 @@ never a commit; `git branch -u` restores it.
 
 - [ ] [REL-69] A clean, merged linked worktree whose submodule repositories hold nothing unique goes with its branch: `worktree: removed`, though git alone refuses it (see E-REL-29).
 - [ ] [REL-70] A worktree's submodule repositories are the git directories at any depth under its git directory's `modules` and those inside the worktree; with none, REL-25's removal runs as before.
-- [ ] [REL-71] A submodule repository holds nothing unique when it has a remote-tracking ref, no stash entry and no worktree of its own, and its `HEAD` and every ref outside `refs/remotes/` are reachable from a remote-tracking ref.
+- [ ] [REL-71] A submodule repository holds nothing unique when it has a remote-tracking ref, no stash entry or worktree of its own, and `HEAD` and each other ref are reachable from a remote-tracking ref.
 - [ ] [REL-72] Any other keeps both: `worktree: kept -- submodule repository <path> <what it holds>; after checking it, run: git worktree remove --force <worktree> && git branch -D <branch>` (see E-REL-30).
 - [ ] [REL-73] REL-28's dirt includes a submodule's changed or untracked files and untracked files, whatever `submodule.<name>.ignore`, `diff.ignoreSubmodules`, `status.showUntrackedFiles` say (see E-REL-31).
 - [ ] [REL-74] Reading a submodule repository never fetches: a git failure, a missing object of a partial clone included, keeps both as REL-32 reports it, and no removal step runs (see E-REL-32).
