@@ -1,5 +1,5 @@
 claim_id = "62f6d8e85f244781852e5144a114a437"
-agent = "Claude c5111677-6948-459f-a346-aaa090b20fc6"
+agent = "Claude 46fe7857-8b56-4ea7-a3ee-f805b34349e9"
 role = "builder"
 base = "65f66bc8afaf5f92a14b9f423991c9256e18372b"
 branch = "claude/issue-1042-mcp-relay"
