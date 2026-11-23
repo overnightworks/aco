@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.14.*"
 
 [[package]]
@@ -122,7 +122,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "overnightworks-logline", git = "https://github.com/overnightworks/logline?rev=b7c00890474ce10df2ec4c1106c26700f43c3ae0" }]
+requires-dist = [{ name = "overnightworks-logline", git = "https://github.com/overnightworks/logline?rev=cca495315f8fb25dae85851592a2c42376052c58" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -137,8 +137,8 @@ dev = [
 
 [[package]]
 name = "overnightworks-logline"
-version = "1.5.0"
-source = { git = "https://github.com/overnightworks/logline?rev=b7c00890474ce10df2ec4c1106c26700f43c3ae0#b7c00890474ce10df2ec4c1106c26700f43c3ae0" }
+version = "1.9.0"
+source = { git = "https://github.com/overnightworks/logline?rev=cca495315f8fb25dae85851592a2c42376052c58#cca495315f8fb25dae85851592a2c42376052c58" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "structlog" },
