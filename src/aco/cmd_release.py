@@ -351,7 +351,7 @@ def authorize_releaser(
     parsed: argparse.Namespace, selected: protocol.ActiveClaim, item_label: protocol.ItemLabel
 ) -> _ResolvedRelease:
     """This session's right to release `selected`: its own claimant, or an
-    explicit coordinator override. An item's claim held by another session
+    explicit coordinator override. A claim held by another session
     names `aco handover` as the successor's route before the override."""
     role = parsed.role
     if not parsed.coordinator_override:
@@ -359,7 +359,9 @@ def authorize_releaser(
             role = selected.role
         if (parsed.agent, role) != (selected.agent, selected.role):
             route = (
-                item_handover.handover_route(selected.identity, selected.agent, item_label)
+                item_handover.handover_route(
+                    selected.identity, selected.branch, selected.agent, item_label
+                )
                 if parsed.agent != selected.agent
                 else None
             )

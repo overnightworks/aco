@@ -1,18 +1,19 @@
 # `aco handover`
 
-`aco handover ITEM --from AGENT --reason TEXT [--agent AGENT] [--json]` makes the
-acting session the holder of the live claim on an item that `AGENT` holds. A head
+`aco handover (ITEM | --branch BRANCH) --from AGENT --reason TEXT [--agent AGENT] [--json]`
+makes the acting session the holder of the live claim on an item, or on an issue-less lane
+named by its branch, that `AGENT` holds. A head
 started by the operator's restart order takes over its dead predecessor's claim this
 way, so it lands, releases and rescopes as the holder without an override and without
-naming the predecessor as itself. The takeover is one claim transition plus one record
-on the item. `--help` lists `--from`, `--reason`, `--agent` and `--json`, each with a
-help line. This file owns the `HANDED OVER` line, `handover`'s own refusals and its
+naming the predecessor as itself. The takeover is one claim transition, plus one record
+on the item for an item's claim. `--help` lists `--branch`, `--from`, `--reason`, `--agent`
+and `--json`, each with a help line. This file owns the `HANDED OVER` line, `handover`'s own refusals and its
 `reason` vocabulary; `specs/claim-record.spec.md` owns the claim (CLAIM-75 the acting
 agent), `specs/body-block.spec.md` the `handover` table (BODY-114..BODY-117),
 `specs/output.spec.md` the `--json` envelope itself (OUT-01) and
 `specs/storage-pin.spec.md` the state-ref forge gate (PIN-04). `<label>` is the item as
 its storage names it: `#<n>` under `storage = "github"`, the item id under
-`storage = "state-ref"` (PIN-30). A claim on a lane has no item and no handover.
+`storage = "state-ref"` (PIN-30). `<label>` of a lane claim is `lane <branch>`.
 
 ## Behavior table
 
@@ -25,6 +26,9 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 | `--reason` blank, over one line or too long | HANDOVER-09 | HANDOVER-13 |
 | the claim write fails after the record | HANDOVER-11 | HANDOVER-13 |
 | `--repo` given, `storage = "state-ref"` | HANDOVER-14 | HANDOVER-13 |
+| `--branch` names a lane whose claim `AGENT` holds | HANDOVER-16..HANDOVER-18 | HANDOVER-12 |
+| the lane's claim is already the acting session's | HANDOVER-19 | HANDOVER-12 |
+| `--branch`: `AGENT` is not the holder, no live lane claim, or an ITEM given with it or neither | HANDOVER-20..HANDOVER-22 | HANDOVER-13 |
 
 - [ ] [HANDOVER-01] `aco handover ITEM --from AGENT --reason TEXT` makes the acting session, by CLAIM-75, the holder of the item's live claim, prints `HANDED OVER <label>: <from> -> <to>`, exit `0` (see E-HANDOVER-01).
 - [ ] [HANDOVER-02] Only the holder changes: the claim's role, id, branch, scope, resource and opened commit stay, and the claim is one state-ref commit away from the one before.
@@ -38,8 +42,15 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 - [ ] [HANDOVER-09] A `--reason` that is blank, spans more than one line or exceeds 512 characters refuses `reason must be one bounded non-empty line`, exit `2`, before any read of the item.
 - [ ] [HANDOVER-10] A repeat of a standing takeover (the acting session holds the claim, the item records the same `--from` and `--reason`) prints `ALREADY HANDED OVER <label>: <from> -> <to>`, exit `0`, writing nothing.
 - [ ] [HANDOVER-11] A claim write that fails after the record refuses `<label> records the handover, but the claim was not handed over: <detail>; run the same command again`, exit `2`; the same command finishes it.
-- [ ] [HANDOVER-12] `--json` on a success prints the envelope with `reason: "handed_over"`, or `"already_handed_over"` for HANDOVER-10, then `"item": <n>, "from": "<agent>", "to": "<agent>"` (see E-HANDOVER-01).
+- [ ] [HANDOVER-12] `--json` on a success prints the envelope with `reason: "handed_over"`, or `"already_handed_over"` for HANDOVER-10, then `"item": <n>` or `"lane": "<branch>"`, `"from"`, `"to"` (see E-HANDOVER-01).
 - [ ] [HANDOVER-13] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2`.
+- [ ] [HANDOVER-16] `aco handover --branch BRANCH --from AGENT --reason TEXT` makes the acting session the holder of the lane's live claim, prints `HANDED OVER lane <branch>: <from> -> <to>`, exit `0` (E-HANDOVER-05).
+- [ ] [HANDOVER-17] Only the holder changes, in one state-ref commit with HANDOVER-03's trailers; a lane has no item body, so none is written and the reason lives in that commit alone.
+- [ ] [HANDOVER-18] The new holder then lands, releases and rescopes the lane with no override; their refusals for a lane claim name this route (REL-41, CLAIM-37, CLAIM-38, LANDCMD-10).
+- [ ] [HANDOVER-19] A repeat, the acting session already holding the lane claim and `--from` naming it, prints `ALREADY HANDED OVER lane <branch>: <from> -> <to>`, exit `0`, writing nothing.
+- [ ] [HANDOVER-20] A `--from` that is not the lane claim's holder, the acting session included, refuses `lane '<branch>' is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write.
+- [ ] [HANDOVER-21] An ITEM together with `--branch`, or neither, refuses `name either an item or --branch, not both and not neither`, exit `2`, before any read.
+- [ ] [HANDOVER-22] A branch with no live lane claim refuses `lane '<branch>' has no active build claim` (REL-09), exit `2`, before any write.
 - [ ] [HANDOVER-14] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
 
 `reason`, by which refusal fired:
@@ -47,9 +58,9 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 | refusal | `reason` |
 |---|---|
 | (the successes) | `handed_over`, `already_handed_over` |
-| HANDOVER-06, HANDOVER-07, HANDOVER-08 | `precondition_failed` |
+| HANDOVER-06, HANDOVER-07, HANDOVER-08, HANDOVER-20, HANDOVER-22 | `precondition_failed` |
 | a missing item, a pull request or a malformed body, as `rule` | `invalid_item` |
-| HANDOVER-09, HANDOVER-14, the parser's own refusals | `invalid_usage` |
+| HANDOVER-09, HANDOVER-14, HANDOVER-21, the parser's own refusals | `invalid_usage` |
 | HANDOVER-11, a forge failure | `unavailable` |
 
 ## Never
@@ -58,7 +69,7 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 - A predecessor that is still alive finds its next `land`, `release` or `rescope` refused as a non-holder (HANDOVER-05); aco takes nothing from it by force.
 - `aco handover` never makes the acting session claim another agent's identity: `--agent` names the acting session, never the predecessor, and the predecessor's name appears only as `--from`.
 - `aco handover` never changes a claim's role, scope, branch or id, and never moves a claim between items.
-- `aco handover` never takes a lane claim: it names an item.
+- `aco handover` never takes an item's claim by `--branch`, nor a lane's by an item: it names one or the other.
 - `aco handover` never keeps an earlier handover in the item: the block holds the latest, and the state ref's history holds every one (HANDOVER-03).
 
 ## Examples
@@ -135,3 +146,28 @@ exit 0
 ```
 
 The issue body is written once; the record keeps the first call's `on`.
+
+### E-HANDOVER-05 — a successor takes a lane claim over
+
+Setup: bare-remote, bootstrapped, a live claim on the issue-less lane `docs/deps` held by `Claude af547fd1`, role `builder`
+
+```console
+$ aco handover --branch docs/deps --from 'Claude af547fd1' --reason 'restart order of the operator'
+HANDED OVER lane docs/deps: Claude af547fd1 -> Ada
+exit 0
+$ aco handover --branch docs/deps --from 'Ada' --reason 'restart order of the operator'
+ALREADY HANDED OVER lane docs/deps: Ada -> Ada
+exit 0
+$ aco handover --branch docs/deps --from 'Someone Else' --reason 'restart order of the operator' --json
+{"ok": false, "reason": "precondition_failed", "message": "lane 'docs/deps' is held by 'Ada', not by 'Someone Else'; pass the holder as --from"}
+2> ERROR: lane 'docs/deps' is held by 'Ada', not by 'Someone Else'; pass the holder as --from
+exit 2
+$ aco handover --branch docs/none --from 'Claude af547fd1' --reason 'restart order of the operator'
+2> ERROR: lane 'docs/none' has no active build claim
+exit 2
+$ aco handover 42 --branch docs/deps --from 'Claude af547fd1' --reason 'restart order of the operator'
+2> ERROR: name either an item or --branch, not both and not neither
+exit 2
+```
+
+The claim on `docs/deps` is held by `Ada` as `builder`, one state-ref commit away from the one before, and no item body changed. A lane repeat names the holder as `--from` (HANDOVER-19, HANDOVER-20), so the original `--from` refuses once Ada holds the claim; an item repeat (E-HANDOVER-01, HANDOVER-10) still accepts the original `--from`.

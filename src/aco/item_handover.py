@@ -97,12 +97,17 @@ def render_handover(data: Mapping[str, object]) -> list[str]:
 
 
 def handover_route(
-    identity: protocol.ClaimIdentity, holder: str, item_label: protocol.ItemLabel
-) -> str | None:
-    """The command a successor takes the claim of `identity`, held by `holder`, over with,
-    the item named as `item_label` prints it without a leading `#`: only an item's claim
-    has one."""
-    if not isinstance(identity, protocol.IssueIdentity):
-        return None
-    item = item_label(identity.issue).removeprefix("#")
-    return f"aco handover {item} --{FROM_KEY} {shlex.quote(holder)} --{REASON_KEY} <text>"
+    identity: protocol.ClaimIdentity,
+    branch: str,
+    holder: str,
+    item_label: protocol.ItemLabel,
+) -> str:
+    """The command a successor takes the claim of `identity` on `branch`, held by `holder`,
+    over with: an item's claim by the item as `item_label` prints it without a leading `#`,
+    a lane's by its branch."""
+    target = (
+        f"--branch {branch!r}"
+        if isinstance(identity, protocol.LaneIdentity)
+        else item_label(identity.issue).removeprefix("#")
+    )
+    return f"aco handover {target} --{FROM_KEY} {shlex.quote(holder)} --{REASON_KEY} <text>"

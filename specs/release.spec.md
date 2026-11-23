@@ -87,8 +87,8 @@ REL-58 resolve it from the explicit `--branch` or the checkout branch.
 - [ ] [REL-09] An identity/branch pair with no matching live claim refuses `<identity> has no active build claim`, exit `2`, unless REL-47 applies.
 - [ ] [REL-10] A `--claim-id` mismatching the one claim already resolved refuses that same `has no active build claim` sentence: never a second selector among several claims.
 - [ ] [REL-11] `--branch` and `--claim-id` naming different branches refuses, quoting both and the claim's own branch, exit `2` (see E-REL-04).
-- [ ] [REL-12] A `release` by the wrong agent/role, no coordinator override, refuses before any write, naming the successor's `aco handover` route (REL-41) before the override (see E-REL-19).
-- [ ] [REL-41] The route is `aco handover <n> --from <holder> --reason <text>`, the holder shell-quoted, for an item's claim; a lane claim or the session's own agent names none (HANDOVER-01).
+- [ ] [REL-12] A `release` by the wrong agent/role, no coordinator override, refuses before any write, naming the successor's `aco handover` route (REL-41) before the override (see E-REL-19, E-REL-34).
+- [ ] [REL-41] The route is `aco handover <n> --from <holder> --reason <text>`, the holder shell-quoted, or `--branch '<branch>'` for `<n>` on a lane claim; the session's own agent names none (HANDOVER-16).
 - [ ] [REL-13] `--coordinator-override --role coordinator` releases a foreign claim with no agent/role match (CLAIM-40's outcome, for release specifically).
 - [ ] [REL-14] Omitting `--role` -- unlike `claim`'s own default `builder` -- reports the claim's own stored role, in text and in `--json` alike.
 - [ ] [REL-15] A release before `aco bootstrap` has created `refs/aco/state` refuses (CAS-03's sentence), before any transition is attempted.
@@ -710,4 +710,14 @@ freed: none
 next: none
 worktree: kept -- git failure: <detail>
 exit 0
+```
+
+### E-REL-34 — a release of a lane claim names the lane handover route
+
+Setup: bare-remote, a live claim on the issue-less lane `docs/deps` held by `claude-head`, role `builder`; this session's `ACO_AGENT` is `Claude s-1`
+
+```console
+$ aco release --branch docs/deps --abandoned stopped
+2> ERROR: only the original claimant may release; take the claim over with `aco handover --branch 'docs/deps' --from claude-head --reason <text>`, or use an explicit coordinator override (holder='claude-head (builder)', this session='Claude s-1 (builder)')
+exit 2
 ```
