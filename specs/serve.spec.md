@@ -655,8 +655,8 @@ Setup: a root holding one checkout; `/api/board` is called once with the token o
 $ aco serve
 http://127.0.0.1:<port>/#t=<board token>
 {"event": "server_listen.started", "logger": "aco.board.cli", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": null}
-{"outcome": "ok", "method": "GET", "route": "/api/board", "status": 403, "duration_ms": <ms>, "sub": null, "ip": "127.0.0.1", "event": "request.ended", "logger": "logline.request", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": "<32 hex digits>"}
-{"outcome": "ok", "method": "GET", "route": "/api/board", "status": 200, "duration_ms": <ms>, "sub": null, "ip": "127.0.0.1", "event": "request.ended", "logger": "logline.request", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": "<32 hex digits>"}
+{"outcome": "ok", "method": "GET", "route": "/api/board", "status": 403, "duration_ms": <ms>, "sub": null, "ip": "127.0.0.1", "span_id": "<16 hex digits>", "parent_span_id": null, "event": "request.ended", "logger": "logline.request", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": "<32 hex digits>"}
+{"outcome": "ok", "method": "GET", "route": "/api/board", "status": 200, "duration_ms": <ms>, "sub": null, "ip": "127.0.0.1", "span_id": "<16 hex digits>", "parent_span_id": null, "event": "request.ended", "logger": "logline.request", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": "<32 hex digits>"}
 ^C
 {"event": "server_process.finished", "logger": "aco.board.cli", "level": "info", "ts": "<time>", "service": "aco-board", "version": "<aco version>", "trace_id": null}
 exit 0
