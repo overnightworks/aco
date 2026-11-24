@@ -94,24 +94,10 @@ def test_a_repo_counts_the_items_that_wait_on_the_operator(
     assert progress["waiting"] == 1
 
 
-def test_a_failed_parent_read_shows_its_sentence_and_no_counts(
-    repository: BoardForge, board: BoardClient
-) -> None:
-    """ABRD-134. Example: E-ABRD-21."""
-    repository.put_item(
-        10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
-    )
-    repository.fail_parent_reads("GitHub is down")
-
-    repo = _repo(board)
-
-    assert (repo["error"], repo["progress"]) == (None, {"error": "GitHub is down"})
-
-
 def test_a_failed_child_read_shows_its_sentence_and_no_counts(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-134."""
+    """ABRD-134. Example: E-ABRD-21."""
     repository.put_item(
         10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
     )
@@ -141,7 +127,7 @@ def test_a_container_lists_the_open_children_that_wait_on_the_operator(
 def test_a_read_asks_the_forge_for_the_listing_then_each_top_level_container_once(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-131. Example: E-ABRD-20."""
+    """ABRD-194. Example: E-ABRD-20."""
     repository.put_item(
         10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
     )
@@ -160,8 +146,6 @@ def test_a_read_asks_the_forge_for_the_listing_then_each_top_level_container_onc
     ) == [
         ForgeRequest(ForgeOperation.LIST_CHILDREN, 10),
         ForgeRequest(ForgeOperation.LIST_OPEN_ISSUES),
-        ForgeRequest(ForgeOperation.READ_PARENT, 10),
-        ForgeRequest(ForgeOperation.READ_PARENT, 11),
     ]
 
 

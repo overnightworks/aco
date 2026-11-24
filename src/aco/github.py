@@ -306,7 +306,7 @@ class GitHubForge:
                     "--jq",
                     # The issues endpoint answers for a pull request too; `pull_request` marks it.
                     "{state,title,body,author_association,labels:[.labels[].name],"
-                    'is_landing:has("pull_request")}',
+                    'parent:(.parent_issue_url // null),is_landing:has("pull_request")}',
                 ]
             )
         except forge.ForgeNotFoundError:
@@ -799,10 +799,6 @@ class GitHubForge:
             body,
             github_issue_payload.issue_kind(kind_raw),
         )
-
-    def parent_number(self, number: int) -> int | None:
-        parent = self.parent_issue(number)
-        return None if parent is None else parent.reference.number
 
     def list_children(self, number: int) -> workboard.ChildList:
         """Every sub-issue GitHub records under `number`, open or closed.

@@ -139,10 +139,10 @@ class Issue:
     open_dependents: int = 0
     # Whether a writer of the repository wrote it; a store that does not say counts as no member's.
     author_is_member: bool = False
-    # Why the store could not read this item at all: the board names it with this
-    # defect instead of parsing `body`, and the item's other fields are only what
-    # could still be read.
+    # Why the store could not read this item at all: the board names this defect instead of
+    # parsing `body`, and the item's other fields are only what could still be read.
     unreadable: ContractDefect | None = None
+    parent: IssueReference | None = None
 
     @property
     def has_open_child(self) -> bool:

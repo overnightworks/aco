@@ -89,6 +89,11 @@ class ItemRecord:
     updated_at: str
     closed_at: str | None
 
+    @property
+    def parent_number(self) -> int | None:
+        """The number of the record's parent, named without reading it."""
+        return None if self.parent is None else item_number(self.parent)
+
 
 def open_dependents(records: Iterable[ItemRecord], item_id: str) -> int:
     """How many of `records` are open and name `item_id` in their `blocked_by`."""

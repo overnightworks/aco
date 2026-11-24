@@ -35,7 +35,6 @@ _REQUEST_LOG = "board-forge-requests.jsonl"
 _ITEMS = "items"
 _LISTING_FAILURE = "listing_failure"
 _ITEM_READ_FAILURE = "item_read_failure"
-_PARENT_READ_FAILURE = "parent_read_failure"
 _CHILD_READ_FAILURE = "child_read_failure"
 _WRITE_FAILURE = "write_failure"
 _WRITE_ANSWER = "write_answer"
@@ -48,7 +47,6 @@ RULING_DAY = date(2026, 10, 3)
 
 class ForgeOperation(StrEnum):
     LIST_OPEN_ISSUES = "list_open_board_issues"
-    READ_PARENT = "parent_issue"
     LIST_CHILDREN = "list_children"
     READ_ITEM = "item_reference"
     WRITE_BODY = "update_item_body"
@@ -98,7 +96,6 @@ class _ForgeState:
     items: dict[int, StoredItem] = field(default_factory=dict[int, StoredItem])
     listing_failure: str | None = None
     item_read_failure: str | None = None
-    parent_read_failure: str | None = None
     child_read_failure: str | None = None
     write_failure: str | None = None
     write_answer: _CheckAnswer | None = None
@@ -113,7 +110,6 @@ class _ForgeState:
             {int(number): _stored_item(item) for number, item in stored[_ITEMS].items()},
             stored[_LISTING_FAILURE],
             stored[_ITEM_READ_FAILURE],
-            stored[_PARENT_READ_FAILURE],
             stored[_CHILD_READ_FAILURE],
             stored[_WRITE_FAILURE],
             _answer_from_json(stored[_WRITE_ANSWER]),
@@ -128,7 +124,6 @@ class _ForgeState:
                 _ITEMS: {number: asdict(item) for number, item in self.items.items()},
                 _LISTING_FAILURE: self.listing_failure,
                 _ITEM_READ_FAILURE: self.item_read_failure,
-                _PARENT_READ_FAILURE: self.parent_read_failure,
                 _CHILD_READ_FAILURE: self.child_read_failure,
                 _WRITE_FAILURE: self.write_failure,
                 _WRITE_ANSWER: _answer_to_json(self.write_answer),
@@ -232,12 +227,6 @@ class BoardForge:
         state.item_read_failure = message
         self._replace_state(state)
 
-    def fail_parent_reads(self, message: str) -> None:
-        """Every later read of an item's parent raises a forge failure carrying `message`."""
-        state = self._state()
-        state.parent_read_failure = message
-        self._replace_state(state)
-
     def fail_child_reads(self, message: str) -> None:
         """Every later read of a container's sub-issues raises a failure carrying `message`."""
         state = self._state()
@@ -327,6 +316,9 @@ class BoardForge:
     def lists_pull_requests(self) -> bool:
         return False
 
+    def _parent_reference(self, parent: int | None) -> workboard.IssueReference | None:
+        return None if parent is None else workboard.IssueReference(str(self.repository), parent)
+
     def list_open_board_issues(self) -> tuple[workboard.Issue, ...]:
         self._log(ForgeRequest(ForgeOperation.LIST_OPEN_ISSUES))
         state = self._state()
@@ -342,6 +334,7 @@ class BoardForge:
                 author_is_member=item.author_is_member,
                 children_closed=_closed_count(item),
                 children_total=None if item.children is None else len(item.children),
+                parent=self._parent_reference(item.parent),
             )
             for number, item in state.items.items()
             if number not in state.closed
@@ -411,19 +404,7 @@ class BoardForge:
         _unsupported("pull_request_changes")
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
-        self._log(ForgeRequest(ForgeOperation.READ_PARENT, number))
-        state = self._state()
-        if state.parent_read_failure is not None:
-            raise forge.ForgeTransientError(state.parent_read_failure)
-        parent = state.items[number].parent
-        if parent is None:
-            return None
-        return workboard.ParentIssue(
-            workboard.IssueReference(str(self.repository), parent), state.items[parent].body
-        )
-
-    def parent_number(self, number: int) -> int | None:
-        _unsupported("parent_number")
+        _unsupported("parent_issue")
 
     def default_branch(self) -> str:
         _unsupported("default_branch")

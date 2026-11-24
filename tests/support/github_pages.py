@@ -110,6 +110,7 @@ def raw_board_issue(**overrides: object) -> dict[str, object]:
         "updatedAt": "2026-08-20T00:00:00Z",
         "isPullRequest": False,
         "kind": None,
+        "parent": None,
         "childrenClosed": None,
         "childrenTotal": None,
         "blockedByCount": 0,

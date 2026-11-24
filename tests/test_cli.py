@@ -201,9 +201,6 @@ class _MinimalForgeReader:
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         return None
 
-    def parent_number(self, number: int) -> int | None:
-        return None
-
     def default_branch(self) -> str:
         return "main"
 
@@ -11338,7 +11335,7 @@ def test_item_show_reads_the_fake_forge_body_under_github_storage(
     refuses it only under `storage = "state-ref"`."""
     client = FakeForge()
     client.issue_references[number] = forge.ItemReference(
-        forge.ItemState.OPEN, "Title", "Body text.\n", False
+        forge.ItemState.OPEN, "Title", "Body text.\n", False, parent=7
     )
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
 
@@ -11348,7 +11345,8 @@ def test_item_show_reads_the_fake_forge_body_under_github_storage(
     expected_id = items.format_item_id(number)
     assert (
         capsys.readouterr().out
-        == f"{expected_id} · #{number} · open · parent none · origin none\nBody text.\n"
+        == f"{expected_id} · #{number} · open · parent {items.format_item_id(7)} · origin none\n"
+        "Body text.\n"
     )
 
 
@@ -11357,7 +11355,7 @@ def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
 ) -> None:
     client = FakeForge()
     client.issue_references[42] = forge.ItemReference(
-        forge.ItemState.OPEN, "Title", "Body text.\n", False
+        forge.ItemState.OPEN, "Title", "Body text.\n", False, parent=7
     )
     monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
 
@@ -11372,20 +11370,20 @@ def test_item_show_as_json_reads_the_fake_forge_body_under_github_storage(
         "item": items.format_item_id(42),
         "number": 42,
         "state": "open",
-        "parent": None,
+        "parent": items.format_item_id(7),
         "origin": None,
         "body": "Body text.\n",
     }
     assert re.fullmatch(r"sha256:[0-9a-f]{64}", body_hash)
 
 
-def test_item_show_refuses_when_the_parent_read_fails(
+def test_item_show_refuses_when_the_item_read_fails(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], empty_checkout: Path
 ) -> None:
-    """The parent read the header needs is inside `item
+    """The read the header needs is inside `item
     show`'s own refusal boundary, so a forge that fails it reports the same
     envelope, never an error escaping past every `--json` printer."""
-    sentence = "GitHub returned a malformed parent issue"
+    sentence = "GitHub returned a malformed parent issue url"
 
     def prepare() -> FakeForge:
         client = FakeForge()
@@ -11393,10 +11391,10 @@ def test_item_show_refuses_when_the_parent_read_fails(
             forge.ItemState.OPEN, "Title", "Body text.\n", False
         )
 
-        def failing_parent_read(_number: int) -> int | None:
+        def failing_read(_number: int) -> forge.ItemReference:
             raise forge.ForgeMalformedResponseError(sentence)
 
-        monkeypatch.setattr(client, "parent_number", failing_parent_read)
+        monkeypatch.setattr(client, "item_reference", failing_read)
         monkeypatch.setattr(github, "GitHubForge", lambda _repository: client)
         return client
 

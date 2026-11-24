@@ -1,15 +1,13 @@
 """Forge adapter over `refs/aco/state`'s `items/` tree.
 
-`StateRefBoard` sits beside `github.GitHubForge` behind the same `forge`
-port: both talk to a different backend for the same board data, and
-neither imports the other. Unlike `GitHubForge`, this adapter performs no
-IO of its own -- the Layers contract puts `store` above this module, so
+`StateRefBoard` sits beside `github.GitHubForge` behind the same `forge` port: both talk to a
+different backend for the same board data, and neither imports the other. Unlike `GitHubForge`,
+this adapter performs no IO of its own -- the Layers contract puts `store` above this module, so
 `session._state_ref_forge` reads `items/`'s raw bytes and blob oids through
-`store.read_item_files`/`ClaimState.items` and hands them to the
-constructor; every read method below is a pure projection over that
-already-fetched data. Every write (`create_item`, `create_child`,
-`update_item_body`, `close_item`, `link_child`) instead calls the injected `ItemWriter`
-port: one compare-and-swap write to `items/<id>.md`, implemented in
+`store.read_item_files`/`ClaimState.items` and hands them to the constructor; every read method
+below is a pure projection over that already-fetched data. Every write (`create_item`,
+`create_child`, `update_item_body`, `close_item`, `link_child`) instead calls the injected
+`ItemWriter` port: one compare-and-swap write to `items/<id>.md`, implemented in
 `session._StoreItemWriter` over `store` (hash-object once, then one
 `commit_transition` with an `ItemWriteIntent`; `close_item` through the port's own
 `close_item` and an `ItemCloseIntent`) -- so this module never imports `store` itself.
@@ -131,16 +129,15 @@ class _DecodedItem:
 
 @dataclass(frozen=True)
 class _MalformedItem:
-    """An item file whose bytes decode to no valid `aco` block with a `[record]` table: kept
-    aside rather than refusing the store at decode, so a read of any other item still answers
-    while this item's own read refuses, and `board`/`next` list it by `defect` rather than
-    refusing the whole store. `problem` completes the sentence `item <id> ...`; `oid` is the
-    CAS `expected` a repairing `update_item_body` writes over; `body_hash` hashes the stored
-    bytes, the base that repair names; `text` is whatever of the file still decodes; `title`
-    is the record's title when it alone still reads, for the twin search and the board's row;
-    `parent` is the record's parent when it alone still reads, so that container counts this
-    item as an open child, `None` for a top-level record, and `UnreadParent.UNREAD` when the
-    record or its parent does not read."""
+    """An item file whose bytes decode to no valid `aco` block with a `[record]` table: kept aside
+    rather than refusing the store at decode, so a read of any other item still answers while this
+    item's own read refuses, and `board`/`next` list it by `defect` rather than refusing the whole
+    store. `problem` completes the sentence `item <id> ...`; `oid` is the CAS `expected` a repairing
+    `update_item_body` writes over; `body_hash` hashes the stored bytes, the base that repair
+    names; `text` is whatever of the file still decodes; `title` is the record's title when it
+    alone still reads, for the twin search and the board's row; `parent` is the record's parent
+    when it alone still reads, so that container counts this item as an open child, `None` for a
+    top-level record, and `UnreadParent.UNREAD` when the record or its parent does not read."""
 
     problem: str
     defect: ContractDefect
@@ -151,11 +148,10 @@ class _MalformedItem:
     parent: str | UnreadParent | None = UnreadParent.UNREAD
 
     def may_be_child_of(self, item_id: str, kind: ItemKind | None) -> bool:
-        """Whether this item may be `item_id`'s child, `kind` being
-        `item_id`'s own: its readable parent names it, or its parent does not
-        read and `item_id` is a Container, the one kind that takes children
-        (ITEM-45, ITEM-54). The one answer the board's child count and a
-        close or retype's refusal both ask."""
+        """Whether this item may be `item_id`'s child, `kind` being `item_id`'s own: its readable
+        parent names it, or its parent does not read and `item_id` is a Container, the one kind that
+        takes children (ITEM-45, ITEM-54). The one answer the board's child count and a close or
+        retype's refusal both ask."""
         if self.parent is UnreadParent.UNREAD:
             return kind is ItemKind.CONTAINER
         return self.parent == item_id
@@ -392,10 +388,9 @@ class StateRefBoard:
         )
 
     def _parent_pin(self, record: items.ItemRecord) -> ItemPin | None:
-        """The blob of `record`'s parent as this instance last saw it -- its
-        own retype's blob once `set_item_kind` wrote one (CAS-70/71) -- else
-        `None` for a parentless item. A parent outside `_items` was never judged
-        a container, so it raises `KeyError` rather than pin its blob."""
+        """The blob of `record`'s parent as this instance last saw it -- its own retype's blob once
+        `set_item_kind` wrote one (CAS-70/71) -- else `None` for a parentless item. A parent outside
+        `_items` was never judged a container, so it raises `KeyError` rather than pin its blob."""
         if record.parent is None:
             return None
         parent = self._items[record.parent]
@@ -456,6 +451,9 @@ class StateRefBoard:
             len(record.blocked_by),
             items.open_dependents((held.record for held in self._items.values()), item_id),
             author_is_member=True,
+            parent=None
+            if record.parent_number is None
+            else workboard.IssueReference(self.repository.path, record.parent_number),
         )
 
     def item_reference(self, number: int) -> forge.ItemReference:
@@ -466,14 +464,17 @@ class StateRefBoard:
         is_open = record.state is items.RecordState.OPEN
         state = forge.ItemState.OPEN if is_open else forge.ItemState.CLOSED
         return forge.ItemReference(
-            state, record.title, decoded.body, False, record.origin, author_is_member=True
+            state,
+            record.title,
+            decoded.body,
+            origin=record.origin,
+            author_is_member=True,
+            parent=record.parent_number,
         )
 
     def item_references(self, numbers: Iterable[int]) -> Mapping[int, forge.ItemReference]:
-        """Every one of `numbers`, read straight from the already-fetched
-        `items/` tree: this adapter performs no IO of its own at
-        all (module docstring), so there is no round trip here to batch --
-        `item_reference` per number costs the same as this already does."""
+        """Every one of `numbers`, read from the already-fetched `items/` tree, which costs
+        no round trip to batch."""
         return {number: self.item_reference(number) for number in numbers}
 
     def pull_request_changes(self, number: int) -> forge.PullRequestChanges:
@@ -483,21 +484,19 @@ class StateRefBoard:
         raise forge.ForgeUnsupportedError(NO_PULL_REQUEST_LANDINGS)
 
     def parent_number(self, number: int) -> int | None:
-        """`number`'s recorded parent, off its own record alone: never
-        decoding that parent, so `item show` still names a malformed one,
-        while PIN-16 still refuses one `items/` lacks."""
+        """`number`'s recorded parent off its own record alone, never decoding that parent, so
+        `item show` still names a malformed one; PIN-16 refuses one `items/` lacks."""
         decoded = self._decoded(number)
-        if decoded is None or decoded.record.parent is None:
+        parent_id = None if decoded is None else decoded.record.parent
+        if parent_id is None:
             return None
-        parent_id = decoded.record.parent
         if not self._carries(parent_id):
             raise MalformedStateTreeError(_missing_parent_sentence(parent_id))
         return items.item_number(parent_id)
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
-        """`number`'s parent as the board reads it; an unreadable parent is answered by
-        its reference and what of its text still decodes, its kind unknown, so the child
-        still reads as nested rather than refusing the whole board."""
+        """`number`'s parent as the board reads it; an unreadable parent is answered by its
+        reference and what of its text still decodes, its kind unknown, so the child is nested."""
         parent_number = self.parent_number(number)
         if parent_number is None:
             return None

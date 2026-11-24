@@ -232,6 +232,7 @@ def board_issue(
     author_is_member: bool = True,
     children_closed: int | None = None,
     children_total: int | None = None,
+    parent: workboard.IssueReference | None = None,
 ) -> workboard.Issue:
     return workboard.Issue(
         number,
@@ -246,6 +247,7 @@ def board_issue(
         author_is_member=author_is_member,
         children_closed=children_closed,
         children_total=children_total,
+        parent=parent,
     )
 
 

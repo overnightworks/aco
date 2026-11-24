@@ -197,20 +197,19 @@ def of(
     *,
     storage: body.Storage,
     marks: Marks,
-    parent_of: Callable[[int], workboard.ParentIssue | None],
     children_of: Callable[[int], workboard.ChildList],
 ) -> Progress | ProgressUnavailable:
-    """The progress of `issues`, which are listed once: the containers none of
-    whose `parent_of` is a parent, in whichever repository it sits, counted
+    """The progress of `issues`, which are listed once: the containers whose listed row names
+    no parent, in whichever repository it sits, counted
     from their `children_of` lists, with the `marks` of its items, from which each gets the
-    work left. A failed read of a parent or of children leaves the repository unknown rather
+    work left. A failed read of children leaves the repository unknown rather
     than counted wrong."""
     listed = tuple(issues)
     open_items = {issue.number: issue for issue in listed}
     counted = _counted_containers(listed)
 
     def read(issue: workboard.Issue) -> workboard.ChildList | None:
-        if parent_of(issue.number) is not None:
+        if issue.parent is not None:
             return None
         return children_of(issue.number)
 

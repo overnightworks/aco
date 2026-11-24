@@ -564,3 +564,23 @@ def test_a_read_without_progress_reads_neither_the_sub_issues_nor_the_trunk(
 @pytest.mark.parametrize("record", [inbox.Reading, board.RepoSnapshot])
 def test_record_annotations_resolve_at_runtime(record: type) -> None:
     assert "progress" in get_type_hints(record)
+
+
+def test_a_nested_container_is_no_top_level_container_in_the_progress_read(
+    tmp_path: Path, isolated_global_git_config: Path
+) -> None:
+    """ABRD-194."""
+    del isolated_global_git_config
+    repository = _repository_with_a_container(tmp_path)
+    repository.put_item(
+        20,
+        complete_contract("Build."),
+        kind=ItemKind.CONTAINER,
+        children=child_list(closed=[21]),
+        parent=10,
+    )
+
+    shown = _progress_read(repository).progress
+
+    assert isinstance(shown, progress.Progress)
+    assert [container.number for container in shown.containers] == [10]

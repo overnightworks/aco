@@ -17,22 +17,22 @@
 "src/aco/checkout.py" = 2019
 "src/aco/cli.py" = 820
 "src/aco/cmd_claim.py" = 1132
-"src/aco/github.py" = 1134
+"src/aco/github.py" = 1130
 "src/aco/protocol.py" = 1517
-"src/aco/state_board.py" = 921
+"src/aco/state_board.py" = 920
 "src/aco/store.py" = 1534
 "src/aco/workboard.py" = 2619
 "tests/support/cli_fixtures.py" = 888
 "tests/test_board.py" = 3567
 "tests/test_checkout.py" = 2037
-"tests/test_cli.py" = 11854
+"tests/test_cli.py" = 11852
 "tests/test_cmd_adopt.py" = 1418
 "tests/test_cmd_cut.py" = 1066
 "tests/test_cmd_land_after_merge_rerun.py" = 862
 "tests/test_cmd_land_preflight_claim.py" = 850
 "tests/test_cmd_rescope_checkout.py" = 1085
 "tests/test_cmd_reset.py" = 950
-"tests/test_github.py" = 2463
+"tests/test_github.py" = 2462
 "tests/test_state_board.py" = 5820
 "tests/test_store.py" = 4233
 
