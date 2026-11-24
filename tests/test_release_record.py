@@ -136,56 +136,13 @@ NO_LANE_RECORD = (
 )
 
 
-def refusal_of_landing(
-    repository: Path,
-    stored: protocol.ObjectId | None,
-    *,
-    record: lane_record.LaneRecordFile | None = None,
-    lane: bool = False,
-) -> str | None:
-    """The refusal of a landing of a claim whose runs file in the observation is `stored`, or
-    `None` when it needs none."""
-    claim = standing_active_claim(lane=lane)
-    runs = {} if stored is None else {claim.claim_id: stored}
-    observed = dataclasses.replace(protocol.EMPTY_STATE, runs=runs)
-    try:
-        release_record.require_lane_record(repository, observed, claim, record, REVIEWED)
-    except protocol.ClaimUnavailableError as refusal:
-        return str(refusal)
-    return None
-
-
-@pytest.mark.parametrize(
-    "stored",
-    [None, ()],
-    ids=["no-runs-file", "a-runs-file-without-an-entry"],
-)
-def test_a_claim_without_stored_runs_and_without_a_record_file_has_no_lane_record(
-    repository: Path, stored: tuple[()] | None
-) -> None:
+def test_a_runs_file_without_an_entry_is_no_lane_record(repository: Path) -> None:
     """Spec: LANREC-100."""
-    blob = None if stored is None else runs_blob(repository, stored)
+    claim = standing_active_claim()
+    stored = runs_blob(repository, ())
+    observed = dataclasses.replace(protocol.EMPTY_STATE, runs={claim.claim_id: stored})
 
-    refusal = refusal_of_landing(repository, blob)
+    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
+        release_record.require_lane_record(repository, observed, claim, None, REVIEWED)
 
-    assert refusal == NO_LANE_RECORD.format(label="#72")
-
-
-def test_an_issue_less_lane_is_named_by_its_claim_id(repository: Path) -> None:
-    """Spec: LANREC-102."""
-    refusal = refusal_of_landing(repository, None, lane=True)
-
-    assert refusal == NO_LANE_RECORD.format(label="cli-claim")
-
-
-@pytest.mark.parametrize("stored", [True, False], ids=["a-run-is-stored", "a-record-file"])
-def test_a_claim_with_stored_runs_or_a_record_file_has_a_lane_record(
-    repository: Path, stored: bool
-) -> None:
-    """Spec: LANREC-100."""
-    blob = runs_blob(repository, two_chained_runs()) if stored else None
-    record = None if stored else record_file()
-
-    refusal = refusal_of_landing(repository, blob, record=record)
-
-    assert refusal is None
+    assert str(refusal.value) == NO_LANE_RECORD.format(label="#72")

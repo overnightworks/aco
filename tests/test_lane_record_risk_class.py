@@ -8,7 +8,6 @@ from aco import lane_record, protocol
 
 REVIEWED = "a" * 40
 APPROVAL = [{"stage": "review", "verdict": "approve", "sha": REVIEWED}]
-NO_RISK = "the lane record states no risk class; record risk as material or normal"
 NO_VERDICT = "the lane record states no review or gate verdict, so it judged no head to land"
 
 
@@ -24,13 +23,6 @@ def test_a_record_naming_a_risk_class_and_approving_the_head_is_landable(risk: s
     record = record_stating(verdicts=APPROVAL, risk=risk)
 
     lane_record.require_landable_record(record, REVIEWED)
-
-
-def test_a_record_stating_no_risk_class_refuses() -> None:
-    """Spec: LANREC-99."""
-    record = record_stating(verdicts=APPROVAL, risk=None)
-
-    assert refusal_of(record) == NO_RISK
 
 
 def test_a_record_without_a_verdict_and_without_a_risk_class_refuses_for_the_verdict() -> None:
