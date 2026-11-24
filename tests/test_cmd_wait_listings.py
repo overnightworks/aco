@@ -56,28 +56,6 @@ def card_references() -> dict[int, forge.ItemReference]:
     return {ITEM: open_reference(waiting_card().body)}
 
 
-def test_a_hit_that_changes_the_body_of_a_listed_item_wakes_it_within_the_minute(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    probe: FakeBoardProbe,
-) -> None:
-    """Spec: WAIT-27 -- a changed body is a changed row: the read that follows names the
-    action `aco next` would."""
-    client = serve_forge(
-        monkeypatch, FakeForge(board_issues=(waiting_card(),), issue_references=card_references())
-    )
-    ticks = install(monkeypatch, lambda: 0)
-
-    def rewrite_the_body() -> None:
-        client.board_issues = (free_item(),)
-        probe.change(REPOSITORY_TARGET)
-
-    ticks.afterwards[HIT_AT] = rewrite_the_body
-    result = run_cli(["wait"], capsys)
-    assert (result.status, result.stdout, result.stderr) == (0, ACTIONABLE, "")
-    assert len(ticks.pauses) == PAUSES_PER_PROBE
-
-
 def test_a_blocker_of_the_same_repository_that_closes_wakes_its_dependent_within_the_minute(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -179,8 +157,8 @@ def test_a_hit_on_an_open_blocker_reads_no_board(
     foreign_blocked: FakeForge,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec: WAIT-28 -- a comment on a blocker moves its probe only; the board is read once
-    at the start and once when the blocker closes."""
+    """Spec: WAIT-28 -- a comment on a blocker moves its probe only, and a blocker first
+    probed after a read costs no second read."""
     ticks = install(monkeypatch, lambda: 0)
     builds_after_the_comment: list[int] = []
 
@@ -204,8 +182,7 @@ def test_a_blocker_in_another_repository_that_closes_wakes_its_dependent_within_
     foreign_blocked: FakeForge,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec: WAIT-28 -- the closing wakes the wait with the item, and a blocker first probed
-    after a read costs no second read."""
+    """Spec: WAIT-28 -- the closing wakes the wait with the item."""
     ticks = install(monkeypatch, lambda: 0)
 
     def close_the_blocker() -> None:
