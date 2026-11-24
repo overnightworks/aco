@@ -2167,7 +2167,7 @@ class TestCliStateRefForge:
         content: bytes,
         problem: str,
     ) -> None:
-        """Spec: CUT-40, CLAIM-73, PIN-14, PIN-15, PIN-43, ITEM-38, E-CUT-10.
+        """Spec: CUT-40, CLAIM-73, PIN-14, PIN-15, PIN-43, ITEM-38. Example: E-CUT-10.
         E2: matrix B cells 1 to 9."""
         self._live_state_ref_checkout(
             monkeypatch, tmp_path, bare_remote, worktree, {f"{MALFORMED_ID}.md": content}
@@ -2526,7 +2526,7 @@ class TestCliStateRefForge:
         worktree: Path,
         stored_blockers: tuple[str, ...],
     ) -> None:
-        """ITEM-43/44 never re-judge a stored list delivered
+        """ITEM-43, ITEM-44 never re-judge a stored list delivered
         unchanged, so a container already carrying a self, unknown or
         repeated blocker still has its cut row removed -- never CUT-18's
         partial write that a re-run could not finish."""
@@ -3855,10 +3855,10 @@ class TestCliStateRefForge:
         piped_body: str | None,
         printed: str,
     ) -> None:
-        """PIN-35, CAS-61, E-PIN-39: beside a non-id
+        """PIN-35, CAS-61: beside a non-id
         name and a bare id without `.md`, a write to one healthy item --
         `item close`, `item edit`, `rule` -- lands, and both entries
-        keep their name, mode, and blob."""
+        keep their name, mode, and blob. Example: E-PIN-39."""
         foreign = {"NOTANID": b"anything", "aco-000001": b"a bare id\n"}
         item_files = {**_item_files(), **_rulable_item_files(), **foreign}
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)
@@ -4323,7 +4323,7 @@ class TestCliStateRefForge:
         err: str,
         stored_kind: str,
     ) -> None:
-        """ITEM-47/ITEM-48: `item edit --kind`
+        """ITEM-47, ITEM-48: `item edit --kind`
         moves only `record.kind` (and `updated_at`) between task and
         container, reading no stdin; a container with an open child keeps
         its kind and nothing is written."""
@@ -5661,7 +5661,7 @@ class TestCliStateRefForge:
         argv: list[str],
         rows_left: int,
     ) -> None:
-        """CAS-70/72: the retype lands first, so the child is refused with
+        """CAS-70, CAS-72: the retype lands first, so the child is refused with
         CAS-20's sentence naming the parent, no child exists, and a linked
         row stays."""
         self._live_state_ref_checkout(monkeypatch, tmp_path, bare_remote, worktree, item_files)

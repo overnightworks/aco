@@ -60,8 +60,8 @@ def _assert_no_call(port: RecordedPort, repository: BoardForge) -> None:
 def test_the_board_lists_every_ruled_yes_no_line_under_its_item_in_acos_order(
     repository: BoardForge, board: BoardClient, port: RecordedPort, listed_items: Lister
 ) -> None:
-    """ABRD-34, E-ABRD-03: each line is `aco rulings --json`'s line, with no
-    `default`, no unset card key and no fingerprint."""
+    """ABRD-34: each line is `aco rulings --json`'s line, with no
+    `default`, no unset card key and no fingerprint. Example: E-ABRD-03."""
     guests = _ruled_yes_no("Guests?", "yes", question="Gäste?", example="Ja", picture="<svg/>")
     hosts = _ruled_yes_no("Hosts?", "no")
     repository.put_item(42, item_body(guests, hosts), title="Share page")

@@ -1631,7 +1631,7 @@ def test_landing_rows_refuses_a_recently_merged_pull_request_with_no_merge_date(
 
 
 def test_landing_rows_leaves_a_touched_but_not_closed_epic_unattributed() -> None:
-    """LAND-41/45 credit a Landungen row only
+    """LAND-41, LAND-45 credit a Landungen row only
     to a closing or landing keyword, never to a bare `Refs`/`Part of` touch
     -- unlike `Stage.CODE_LANDED`, which does credit a corroborated touch
     (`test_an_epic_inherits_the_landed_stage_of_a_slice_that_did_not_close_it`).

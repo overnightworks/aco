@@ -439,7 +439,9 @@ class TestOptionLineCheck:
     def test_a_defective_option_line_is_refused(
         self, capsys: pytest.CaptureFixture[str], line: str, defects: list[str]
     ) -> None:
-        """Spec: BODY-69..BODY-84, BODY-86, BODY-87, BODY-90, BODY-91, BODY-93 -- one sentence per
+        """Spec: BODY-69, BODY-70, BODY-71, BODY-72, BODY-73, BODY-74, BODY-75, BODY-76,
+        BODY-77, BODY-78, BODY-79, BODY-80, BODY-81, BODY-82, BODY-83, BODY-84,
+        BODY-86, BODY-87, BODY-90, BODY-91, BODY-93 -- one sentence per
         refusal, in entry order."""
         assert check_defects(capsys, card_body(line)) == (2, defects)
 
@@ -542,7 +544,8 @@ class TestOptionLineRulings:
     def test_rulings_json_carries_every_card_field_and_the_card_hash(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], newline: str
     ) -> None:
-        """Spec: RUL-10, RUL-12..RUL-15, BODY-89 -- a mixed item, the golden hash."""
+        """Spec: RUL-10, RUL-12, RUL-13, RUL-14, RUL-15,
+        BODY-89 -- a mixed item, the golden hash."""
         yes_no = '[[expectation]]\ntext = "Alt"\nruling = "no"\nruled_on = 2026-10-01\n'
         raw_body = card_body(card(), before="\n" + yes_no, newline=newline)
         serve_forge(monkeypatch, FakeForge(board_issues=(board_issue(7, "Karte", raw_body),)))

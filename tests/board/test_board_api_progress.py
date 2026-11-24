@@ -28,7 +28,7 @@ def _repo(board: BoardClient) -> dict[str, Any]:
 def test_a_repo_lists_closed_and_planned_per_top_level_container_and_for_itself(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-131, ABRD-132, E-ABRD-20."""
+    """ABRD-131, ABRD-132. Example: E-ABRD-20."""
     repository.put_item(
         10,
         complete_contract("Build.", slice=slice_entries("S1", "S2")),
@@ -97,7 +97,7 @@ def test_a_repo_counts_the_items_that_wait_on_the_operator(
 def test_a_failed_parent_read_shows_its_sentence_and_no_counts(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-134, E-ABRD-21."""
+    """ABRD-134. Example: E-ABRD-21."""
     repository.put_item(
         10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
     )
@@ -141,7 +141,7 @@ def test_a_container_lists_the_open_children_that_wait_on_the_operator(
 def test_a_read_asks_the_forge_for_the_listing_then_each_top_level_container_once(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """E-ABRD-20."""
+    """ABRD-131. Example: E-ABRD-20."""
     repository.put_item(
         10, complete_contract("Build."), kind=ItemKind.CONTAINER, children=child_list(closed=[1])
     )

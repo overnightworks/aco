@@ -84,7 +84,7 @@ def test_a_stored_card_the_forge_check_kept_answers_with_its_item_and_a_note(
 def test_a_card_changed_since_the_page_read_answers_without_an_item(
     repository: BoardForge, board: BoardClient, listed_items: Lister
 ) -> None:
-    """ABRD-09, E-ABRD-04."""
+    """ABRD-09. Example: E-ABRD-04."""
     repository.put_item(_ITEM, item_body(open_option_entry()), title=_TITLE)
     [shown] = _listed_item(board, listed_items)["lines"]
     repository.put_item(_ITEM, group_body(), title=_TITLE)

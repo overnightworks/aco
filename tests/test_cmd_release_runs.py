@@ -87,7 +87,7 @@ def abandon(
 def test_two_stored_runs_write_the_summed_trailers_and_the_runs_file_goes(
     world: World, capsys: pytest.CaptureFixture[str], reason: str
 ) -> None:
-    """Spec: LANREC-90, E-LANREC-17, REL-67."""
+    """Spec: LANREC-90, REL-67. Example: E-LANREC-17."""
     store_two_runs(world, capsys)
 
     status, _stdout, stderr = abandon(world, capsys, reason)
@@ -149,7 +149,7 @@ def test_stored_runs_beside_a_record_file_refuse_before_anything_is_written(
     capsys: pytest.CaptureFixture[str],
     arrange: Callable[[World, pytest.CaptureFixture[str]], object],
 ) -> None:
-    """Spec: LANREC-91, LANREC-93, E-LANREC-18."""
+    """Spec: LANREC-91, LANREC-93. Example: E-LANREC-18."""
     arrange(world, capsys)
     tip = world.state_tip()
     flags = ("--record", str(world.record_file()), "--json")
@@ -200,7 +200,7 @@ def test_a_lane_with_a_lost_run_writes_the_stage_lines_the_rules_know_and_no_cou
     arrange: Callable[[World, pytest.CaptureFixture[str]], object],
     expected: tuple[str, ...],
 ) -> None:
-    """Spec: LANREC-94, E-LANREC-19."""
+    """Spec: LANREC-94. Example: E-LANREC-19."""
     arrange(world, capsys)
 
     status, _stdout, stderr = abandon(world, capsys, ROUTING)

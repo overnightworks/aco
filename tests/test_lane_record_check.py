@@ -234,7 +234,8 @@ MALFORMED_RECORDS = [
 def test_a_valid_record_file_is_accepted_and_left_as_it_is(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str
 ) -> None:
-    """Spec: LANREC-30, LANREC-32..LANREC-37, LANREC-48."""
+    """Spec: LANREC-30, LANREC-32, LANREC-33, LANREC-34, LANREC-35, LANREC-36,
+    LANREC-37, LANREC-48."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
@@ -252,7 +253,8 @@ def test_a_valid_record_file_is_accepted_and_left_as_it_is(
 def test_a_malformed_record_file_is_refused_with_its_defect(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str, defect: str
 ) -> None:
-    """Spec: LANREC-31..LANREC-37, LANREC-48, LANREC-49."""
+    """Spec: LANREC-31, LANREC-32, LANREC-33, LANREC-34, LANREC-35, LANREC-36,
+    LANREC-37, LANREC-48, LANREC-49."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 

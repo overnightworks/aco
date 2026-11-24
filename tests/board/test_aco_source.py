@@ -142,7 +142,7 @@ def test_a_listing_that_fails_after_the_page_read_does_not_fail_a_decision(
 def test_an_item_read_that_fails_during_a_decision_is_relayed_and_nothing_written(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-41, E-ABRD-06: the read's own sentence, with no prefix."""
+    """ABRD-41: the read's own sentence, with no prefix. Example: E-ABRD-06."""
     repository.put_item(_ITEM, item_body(open_option_entry()))
     shown = first_listed_line(board)
     repository.fail_item_reads("the item read is down")

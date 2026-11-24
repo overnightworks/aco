@@ -140,7 +140,7 @@ def test_a_claim_without_runs_shows_none_and_a_null_lane(
 def test_one_run_that_ran_build_and_review_shows_its_record_and_the_lane_computed_from_it(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-71, LANREC-84..LANREC-86."""
+    """Spec: LANREC-71, LANREC-84, LANREC-85, LANREC-86."""
     head = play(world, capsys, Step(FIRST_RUN))
 
     shown = shown_json(world, capsys)
@@ -256,14 +256,14 @@ def test_a_lost_run_makes_the_lane_incomplete_and_the_figures_it_could_state_unk
     steps: tuple[Step, ...],
     expected: dict[str, object],
 ) -> None:
-    """Spec: LANREC-75..LANREC-78, LANREC-82."""
+    """Spec: LANREC-75, LANREC-76, LANREC-77, LANREC-78, LANREC-82."""
     assert_shown(world, capsys, steps, expected)
 
 
 def test_two_chained_runs_show_the_first_build_the_last_review_summed_counts_and_both_verdicts(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-76..LANREC-78, LANREC-80, LANREC-81, LANREC-83."""
+    """Spec: LANREC-76, LANREC-77, LANREC-78, LANREC-80, LANREC-81, LANREC-83."""
     steps = (
         Step(
             FIRST_RUN,
@@ -407,7 +407,7 @@ def test_the_text_prints_a_line_per_run_then_the_lane_and_each_record_as_compact
     steps: tuple[Step, ...],
     lines: list[str],
 ) -> None:
-    """Spec: LANREC-73, LANREC-74, E-LANREC-16."""
+    """Spec: LANREC-73, LANREC-74. Example: E-LANREC-16."""
     head = play(world, capsys, *steps)
     shown = shown_json(world, capsys)
 

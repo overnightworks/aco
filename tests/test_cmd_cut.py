@@ -404,7 +404,7 @@ def no_twin(
     ],
 )
 def test_cut_requires_an_open_container(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-01, CUT-02, CUT-33, OUT-05, OUT-06, E-CUT-01."""
+    """Spec: CUT-01, CUT-02, CUT-33, OUT-05, OUT-06. Example: E-CUT-01."""
     cut_check(case)
 
 
@@ -523,7 +523,7 @@ def test_cut_requires_an_open_container(case: CutCase, cut_check: CutCheck) -> N
     ],
 )
 def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-05, CUT-39, BODY-68, E-CUT-03."""
+    """Spec: CUT-05, CUT-39, BODY-68. Example: E-CUT-03."""
     cut_check(case)
 
 
@@ -618,7 +618,7 @@ def test_cut_requires_a_valid_block_for_the_row_it_cuts(case: CutCase, cut_check
     ],
 )
 def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-06, CUT-07, CUT-08, CUT-09, CUT-35, E-CUT-02, E-CUT-03, E-CUT-04."""
+    """Spec: CUT-06, CUT-07, CUT-08, CUT-09, CUT-35. Example: E-CUT-02, E-CUT-03, E-CUT-04."""
     cut_check(case)
 
 
@@ -702,7 +702,7 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
     ],
 )
 def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-06, CUT-10, CUT-11, CUT-12, CUT-24, CUT-25, CUT-37, CUT-48, E-CUT-02, E-CUT-04."""
+    """Spec: CUT-06, CUT-10, CUT-11, CUT-12, CUT-24, CUT-25, CUT-37, CUT-48. E-CUT-02, E-CUT-04."""
     cut_check(case)
 
 
@@ -761,7 +761,7 @@ def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: Cut
     ],
 )
 def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-20, CUT-21, CUT-22, CUT-23, E-CUT-06."""
+    """Spec: CUT-20, CUT-21, CUT-22, CUT-23. Example: E-CUT-06."""
     cut_check(case)
 
 
@@ -835,7 +835,7 @@ def test_cut_fills_inherits_or_refuses_the_scope(case: CutCase, cut_check: CutCh
 def test_cut_adopts_the_open_child_instead_of_creating_one(
     case: CutCase, cut_check: CutCheck
 ) -> None:
-    """Spec: CUT-13, CUT-14, CUT-15, CUT-16, CUT-31, CUT-38, E-CUT-05."""
+    """Spec: CUT-13, CUT-14, CUT-15, CUT-16, CUT-31, CUT-38. Example: E-CUT-05."""
     cut_check(case)
 
 
@@ -867,7 +867,7 @@ def created_beside(issue: workboard.Issue) -> CutCase:
 def test_cut_never_adopts_an_issue_that_is_not_its_own_recovery_orphan(
     case: CutCase, cut_check: CutCheck
 ) -> None:
-    """Spec: CUT-16, CUT-31, E-CUT-05."""
+    """Spec: CUT-16, CUT-31. Example: E-CUT-05."""
     cut_check(case)
 
 
@@ -928,7 +928,7 @@ def test_cut_never_adopts_an_issue_that_is_not_its_own_recovery_orphan(
 def test_cut_refuses_a_child_whose_title_twins_an_open_or_recently_closed_issue(
     case: CutCase, cut_check: CutCheck
 ) -> None:
-    """Spec: CUT-29, CUT-30, CUT-31, E-CUT-05, E-CUT-09."""
+    """Spec: CUT-29, CUT-30, CUT-31. Example: E-CUT-05, E-CUT-09."""
     cut_check(case)
 
 
@@ -970,7 +970,7 @@ TYPE_DROPPED = (
 def test_cut_names_the_child_it_created_when_a_later_write_fails(
     case: CutCase, cut_check: CutCheck
 ) -> None:
-    """Spec: CUT-17, CUT-18, CUT-28, CUT-32, E-CUT-08."""
+    """Spec: CUT-17, CUT-18, CUT-28, CUT-32. Example: E-CUT-08."""
     cut_check(case)
 
 

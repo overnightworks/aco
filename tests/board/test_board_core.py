@@ -168,7 +168,7 @@ def test_card_posts_on_two_items_at_once_are_both_stored_one_at_a_time(
 def test_a_decision_waiting_for_its_turn_is_refused_once_stopping_begins(
     repository: BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ABRD-17/18/77: one write turn spans every configured repo, and a staged,
+    """ABRD-17, ABRD-18, ABRD-77: one write turn spans every configured repo, and a staged,
     event-driven drain refuses a still-waiting decision the moment stopping
     begins, without waiting for the decision already being written."""
     decisions, running = _card_held_in(repository, _LABEL)

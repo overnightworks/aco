@@ -3789,7 +3789,7 @@ def test_apply_item_write_intent_refuses_a_conflicting_expected_oid(
 def test_apply_item_write_intent_checks_its_parent_pin_alone(
     items_before: dict[str, str], pinned_oid: str, refusal: str | None
 ) -> None:
-    """CAS-70/72/73: only the pinned parent's own blob decides, not whatever
+    """CAS-70, CAS-72, CAS-73: only the pinned parent's own blob decides, not whatever
     else was written to `items/` since the command read it."""
     state = replace(
         STATE_WITH_TIP, items={k: protocol.ObjectId(v * 40) for k, v in items_before.items()}

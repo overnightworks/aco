@@ -3927,7 +3927,7 @@ def _one_slice_container() -> Issue:
 def test_the_container_a_cut_empties_of_rows_still_passes_check_stdin(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    """Spec: BODY-49, BODY-67, E-BODY-08.
+    """Spec: BODY-49, BODY-67. Example: E-BODY-08.
 
     The emptied container with a ruled expectation still passes check -.
     """
@@ -6239,7 +6239,7 @@ def test_cli_board_family_reports_invalid_usage_when_repo_is_given_under_state_r
     empty_checkout: Path,
     command: list[str],
 ) -> None:
-    """Spec: BOARD-42, PIN-04, RUL-09, E-RUL-06 -- state-ref refuses --repo.
+    """Spec: BOARD-42, PIN-04, RUL-09 -- state-ref refuses --repo. Example: E-RUL-06.
 
     PIN-04, cited by BOARD-01/02 (`specs/board.spec.md`) and reused by
     `rulings`/`next`: all three resolve the same `RunContext.forge`
@@ -6470,7 +6470,7 @@ def test_release_merged_closes_and_releases_atomically_under_the_state_ref_pin(
     landing_ref: str,
     use_sha: bool,
 ) -> None:
-    """LAND-47/LAND-52: a merge, squash, or rebase
+    """LAND-47, LAND-52: a merge, squash, or rebase
     landing carrying `Work-Item:`/`aco-xxxxxx` in the trunk closes its item
     and releases its claim in one commit, one CAS, whether `--merged` names
     the exact sha or is given bare (the newest trunk commit naming this

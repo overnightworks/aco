@@ -35,7 +35,7 @@ def world(lane_record_runs_world: World) -> World:
 def test_a_begin_then_an_add_store_the_run_under_the_claims_id_and_say_so(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-52, LANREC-55, LANREC-60, E-LANREC-12."""
+    """Spec: LANREC-52, LANREC-55, LANREC-60. Example: E-LANREC-12."""
     began = world.run(capsys, *begin_arguments(world))
     added = world.run(capsys, *add_arguments(world))
 
@@ -61,7 +61,7 @@ def test_a_begin_then_an_add_store_the_run_under_the_claims_id_and_say_so(
 def test_two_runs_are_stored_in_begin_order_and_the_add_count_counts_added_runs(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-52, LANREC-55, E-LANREC-12."""
+    """Spec: LANREC-52, LANREC-55. Example: E-LANREC-12."""
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     world.run(capsys, *add_arguments(world, FIRST_RUN))
     world.run(capsys, *begin_arguments(world, SECOND_RUN, "--start-tip", END_TIP))
@@ -207,7 +207,7 @@ def test_another_entry_under_an_added_run_id_refuses_and_writes_nothing(
 def test_an_add_of_a_run_that_was_not_begun_refuses_naming_the_begin_command(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-57, E-LANREC-14."""
+    """Spec: LANREC-57. Example: E-LANREC-14."""
     refused = world.run(capsys, *add_arguments(world))
 
     assert (refused.status, refused.stdout) == (2, "")
@@ -248,7 +248,7 @@ def test_an_add_of_a_file_that_check_refuses_refuses_with_the_same_sentence(
 def test_a_non_holder_is_refused_a_begin_and_an_add_naming_the_holder_and_itself(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-63, E-LANREC-13."""
+    """Spec: LANREC-63. Example: E-LANREC-13."""
     world.run(capsys, *begin_arguments(world))
     tip = world.state_tip()
 
@@ -385,7 +385,7 @@ def reclaim(world: World, released: protocol.ActiveClaim, claim_id: str) -> prot
 def test_a_start_tip_that_merges_trunk_onto_the_earlier_end_tip_follows(
     world: World, capsys: pytest.CaptureFixture[str], github_clone: Path
 ) -> None:
-    """Spec: LANREC-54, E-LANREC-12."""
+    """Spec: LANREC-54. Example: E-LANREC-12."""
     earlier_end = commit_on(world.directory, "lane.txt")
     world.run(capsys, *begin_arguments(world, FIRST_RUN))
     world.run(capsys, *add_arguments(world, FIRST_RUN, end_tip=earlier_end))

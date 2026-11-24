@@ -178,7 +178,8 @@ class TestSeveralLinesInOneWrite:
         via: str,
         envelope: dict[str, object],
     ) -> None:
-        """Spec: RULE-32, E-RULE-14 -- `lines` replaces `index` and `ruling`, beside one date."""
+        """Spec: RULE-32 -- `lines` replaces `index` and `ruling`, beside one date.
+        Example: E-RULE-14."""
         freeze_cli_now(monkeypatch)
         serve_item(monkeypatch, group_body())
         arguments = lines_of(kind, (2, letters[0], HASH_2), (3, letters[1], HASH_3), via=via)
@@ -192,7 +193,8 @@ class TestSeveralLinesInOneWrite:
     def test_lines_are_sent_back_to_their_head_in_one_write(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], note: str | None
     ) -> None:
-        """Spec: RULE-29, RULE-31, RULE-32, RULE-36, E-RULE-14 -- one note for every line."""
+        """Spec: RULE-29, RULE-31, RULE-32, RULE-36 -- one note for every line.
+        Example: E-RULE-14."""
         freeze_cli_now(monkeypatch)
         client = serve_item(monkeypatch, group_body())
         arguments = lines_of("unclear", (2, "", HASH_2), (3, "", HASH_3))
@@ -211,7 +213,8 @@ class TestSeveralLinesInOneWrite:
     def test_a_returned_pair_is_then_ruled_with_the_one_text(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: RULE-36, RULE-25, E-RULE-14 -- the text goes to both and the head keys go."""
+        """Spec: RULE-36, RULE-25 -- the text goes to both and the head keys go.
+        Example: E-RULE-14."""
         freeze_cli_now(monkeypatch)
         client = serve_item(monkeypatch, group_body())
         sent = run_cli(
@@ -681,7 +684,8 @@ class TestOneRefusedLineStoresNone:
         refused: int,
         position: str,
     ) -> None:
-        """Spec: RULE-29, RULE-04..05, RULE-16..19, RULE-24, RULE-27, RULE-09 -- all or nothing."""
+        """Spec: RULE-29, RULE-04, RULE-05, RULE-16, RULE-17, RULE-18, RULE-19,
+        RULE-24, RULE-27, RULE-09 -- all or nothing."""
         client = serve_item(monkeypatch, group_body(third))
         arguments = refusal_call(kind, shown, letter, via, refused, position)
         assert_refusal_writes_nothing(client, capsys, arguments, message, reason)
