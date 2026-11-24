@@ -702,7 +702,9 @@ def test_cut_selects_a_row_and_requires_its_title(case: CutCase, cut_check: CutC
     ],
 )
 def test_cut_creates_the_child_and_removes_its_row(case: CutCase, cut_check: CutCheck) -> None:
-    """Spec: CUT-06, CUT-10, CUT-11, CUT-12, CUT-24, CUT-25, CUT-37, CUT-48. E-CUT-02, E-CUT-04."""
+    """Spec: CUT-06, CUT-10, CUT-11, CUT-12, CUT-24, CUT-25, CUT-37, CUT-48.
+    Example: E-CUT-02, E-CUT-04.
+    """
     cut_check(case)
 
 
