@@ -37,42 +37,42 @@ it, `<k>` an expectation line's 1-based index.
 
 ## Rows and lines
 
-- [ ] [RUL-01] Each listed item prints one header, `<label> <open>/<total>: <title>`, then one line per expectation entry -- ruled or withdrawn ones too -- in block order (see E-RUL-01, E-RUL-05).
-- [ ] [RUL-02] An open line prints `  <k> open: <summary>`, ruled `  <k> ruled <outcome> <date>: <summary>`, `<outcome>` a letter, `other`, `yes`, `no`, `later`; `<summary>` caps at 100, `…` if cut (see E-RUL-01).
-- [ ] [RUL-11] Text shows `<title>` and `<summary>` with each display control escaped (NEXT-37), `<summary>` after its cap; `--json` carries both as stored.
-- [ ] [RUL-03] Rows with a dated open option line come first, newest `asked_on` first; then fully ruled rows (RUL-04); ties and groups by descending `<n>` (see E-RUL-02).
-- [ ] [RUL-04] An item whose every expectation line is already ruled or withdrawn is listed, in text and `--json`, in the fully-ruled group RUL-03 orders last (see E-RUL-02, E-RUL-05, E-RUL-08).
-- [ ] [RUL-22] A withdrawn line prints `  <k> withdrawn <date>: <summary>`, capped and escaped as RUL-02 and RUL-11; it counts in `<total>`, never in `<open>` (see E-RUL-08).
-- [ ] [RUL-20] An item whose block is malformed, or which the store cannot read (PIN-14, PIN-15), is listed in neither text nor `--json`.
-- [ ] [RUL-21] Under `storage = "state-ref"`, `aco rulings` validates no record link: a missing `record.parent`/`blocked_by` id or a doubled blocker still lists the item; a foreign file name refuses (PIN-36).
+- RUL-01: Each listed item prints one header, `<label> <open>/<total>: <title>`, then one line per expectation entry -- ruled or withdrawn ones too -- in block order (see E-RUL-01, E-RUL-05).
+- RUL-02: An open line prints `  <k> open: <summary>`, ruled `  <k> ruled <outcome> <date>: <summary>`, `<outcome>` a letter, `other`, `yes`, `no`, `later`; `<summary>` caps at 100, `…` if cut (see E-RUL-01).
+- RUL-11: Text shows `<title>` and `<summary>` with each display control escaped (NEXT-37), `<summary>` after its cap; `--json` carries both as stored.
+- RUL-03: Rows with a dated open option line come first, newest `asked_on` first; then fully ruled rows (RUL-04); ties and groups by descending `<n>` (see E-RUL-02).
+- RUL-04: An item whose every expectation line is already ruled or withdrawn is listed, in text and `--json`, in the fully-ruled group RUL-03 orders last (see E-RUL-02, E-RUL-05, E-RUL-08).
+- RUL-22: A withdrawn line prints `  <k> withdrawn <date>: <summary>`, capped and escaped as RUL-02 and RUL-11; it counts in `<total>`, never in `<open>` (see E-RUL-08).
+- RUL-20: An item whose block is malformed, or which the store cannot read (PIN-14, PIN-15), is listed in neither text nor `--json`.
+- RUL-21: Under `storage = "state-ref"`, `aco rulings` validates no record link: a missing `record.parent`/`blocked_by` id or a doubled blocker still lists the item; a foreign file name refuses (PIN-36).
 
 ## One named item
 
-- [ ] [RUL-24] `aco rulings <item>` reads that one issue, open or closed, and prints it alone in RUL-01's and RUL-05's shapes; with no expectation line, RUL-07's or RUL-08's empty output (see E-RUL-09).
-- [ ] [RUL-25] An `<item>` in neither number space prints `REFUSED: <label> does not exist in <repository>` on stderr, exit `2`; `--json` is CHECK-03's `missing` envelope (see E-RUL-10).
-- [ ] [RUL-26] An `<item>` naming a pull request prints `ERROR: #<n> is a pull request, not an issue; rulings needs an issue`, exit `2`; `--json` reason `invalid_item` (see E-RUL-10).
+- RUL-24: `aco rulings <item>` reads that one issue, open or closed, and prints it alone in RUL-01's and RUL-05's shapes; with no expectation line, RUL-07's or RUL-08's empty output (see E-RUL-09).
+- RUL-25: An `<item>` in neither number space prints `REFUSED: <label> does not exist in <repository>` on stderr, exit `2`; `--json` is CHECK-03's `missing` envelope (see E-RUL-10).
+- RUL-26: An `<item>` naming a pull request prints `ERROR: #<n> is a pull request, not an issue; rulings needs an issue`, exit `2`; `--json` reason `invalid_item` (see E-RUL-10).
 
 ## `--json`
 
-- [ ] [RUL-05] `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
-- [ ] [RUL-10] A row is `{"number", "title", "open", "total", "lines"}`; a yes/no line is `{"index", "text", "ruling", "ruled_on"}` (see E-RUL-03).
-- [ ] [RUL-12] Only an option line can be open, and an open line has `ruling`/`ruled_on` `null`; a yes/no line is always ruled (see E-RUL-03, E-RUL-05, E-RUL-07).
-- [ ] [RUL-06] A yes/no line's `question`/`example`/`picture` each add their own key, present only when that field was given; an option line's `picture` and `caption` and an option's result likewise (RUL-10).
-- [ ] [RUL-13] An option line adds `question` to `reason` and `options`, each option keyed as listed below, its `letter` derived from its position (see E-RUL-07).
-- [ ] [RUL-14] An option line also starts with `"form": "options"`, `"card_hash"` (the card now, BODY-89) and `"stored_card_hash"` (its ruling's, `null` while open); a ruled line's two are equal (BODY-87).
-- [ ] [RUL-15] An option line carries `"via"` (`board`, `chat` or `default`, BODY-90) right after `"stored_card_hash"`, `null` while open; a yes/no line never carries it (see E-RUL-07).
-- [ ] [RUL-16] An option line carries `"other"` after `"via"`: the answer verbatim once ruled `other`, else `null`; text prints `other` as `<outcome>` and the answer as `<summary>` (see E-RUL-07).
-- [ ] [RUL-17] An option line carries `"returned_on"` and `"returned_note"` after `"other"`: its date and note while with its head, else `null`; a yes/no line never carries them (see E-RUL-07).
-- [ ] [RUL-18] Text prints a line with its head `  <k> with head <date>: <summary>`, `<summary>` its note, else its text, capped and escaped as RUL-02 and RUL-11; it still counts as open (see E-RUL-07).
-- [ ] [RUL-19] An option line carries `"asked_on"` right after `"text"`: the day its head asked it (its head or `ask` writes it), `null` only on a ruled line stored without it; a yes/no line never has it (E-RUL-07).
-- [ ] [RUL-23] A withdrawn line is exactly `{"index", "form": "withdrawn", "text", "withdrawn_on"}`; it never carries `ruling`, which would read as open (see E-RUL-08).
+- RUL-05: `rulings --json` wraps OUT-nn (`reason: "listed"`) around a `rulings` array (see E-RUL-03, E-RUL-05).
+- RUL-10: A row is `{"number", "title", "open", "total", "lines"}`; a yes/no line is `{"index", "text", "ruling", "ruled_on"}` (see E-RUL-03).
+- RUL-12: Only an option line can be open, and an open line has `ruling`/`ruled_on` `null`; a yes/no line is always ruled (see E-RUL-03, E-RUL-05, E-RUL-07).
+- RUL-06: A yes/no line's `question`/`example`/`picture` each add their own key, present only when that field was given; an option line's `picture` and `caption` and an option's result likewise (RUL-10).
+- RUL-13: An option line adds `question` to `reason` and `options`, each option keyed as listed below, its `letter` derived from its position (see E-RUL-07).
+- RUL-14: An option line also starts with `"form": "options"`, `"card_hash"` (the card now, BODY-89) and `"stored_card_hash"` (its ruling's, `null` while open); a ruled line's two are equal (BODY-87).
+- RUL-15: An option line carries `"via"` (`board`, `chat` or `default`, BODY-90) right after `"stored_card_hash"`, `null` while open; a yes/no line never carries it (see E-RUL-07).
+- RUL-16: An option line carries `"other"` after `"via"`: the answer verbatim once ruled `other`, else `null`; text prints `other` as `<outcome>` and the answer as `<summary>` (see E-RUL-07).
+- RUL-17: An option line carries `"returned_on"` and `"returned_note"` after `"other"`: its date and note while with its head, else `null`; a yes/no line never carries them (see E-RUL-07).
+- RUL-18: Text prints a line with its head `  <k> with head <date>: <summary>`, `<summary>` its note, else its text, capped and escaped as RUL-02 and RUL-11; it still counts as open (see E-RUL-07).
+- RUL-19: An option line carries `"asked_on"` right after `"text"`: the day its head asked it (its head or `ask` writes it), `null` only on a ruled line stored without it; a yes/no line never has it (E-RUL-07).
+- RUL-23: A withdrawn line is exactly `{"index", "form": "withdrawn", "text", "withdrawn_on"}`; it never carries `ruling`, which would read as open (see E-RUL-08).
 
 An option line's keys after `returned_note` are `question`, `problem`, `picture` and
 `caption` (each only when given), `decision_kind`, `area`, `topic`, `recommended`, `reason`,
 `options`; each option is `{"letter", "name", "effect", "picture"` or
 `"same_as_today": true` (neither when the option gives no result), `"caption"` when stored, `"notice", "cost", "undo",
 "undo_how", "contract"}`.
-- [ ] [RUL-09] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-RUL-06).
+- RUL-09: `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-RUL-06).
 
 `reason`, by which refusal fired:
 
@@ -85,8 +85,8 @@ An option line's keys after `returned_note` are `question`, `problem`, `picture`
 
 ## Empty board
 
-- [ ] [RUL-07] With no item on the whole board carrying an expectation line, text output is exactly `No expectation lines.`, exit `0` (see E-RUL-04).
-- [ ] [RUL-08] The same board's `--json` prints `{"ok": true, "reason": "listed", "rulings": []}`, exit `0` (see E-RUL-04).
+- RUL-07: With no item on the whole board carrying an expectation line, text output is exactly `No expectation lines.`, exit `0` (see E-RUL-04).
+- RUL-08: The same board's `--json` prints `{"ok": true, "reason": "listed", "rulings": []}`, exit `0` (see E-RUL-04).
 
 ## Never
 

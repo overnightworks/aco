@@ -36,21 +36,21 @@ import {
 } from './optionCard';
 
 describe('dates', () => {
-	test('[ABRD-54] displayDate writes an ISO date as day, month and year', () => {
+	test('ABRD-54: displayDate writes an ISO date as day, month and year', () => {
 		expect(displayDate('2026-10-05')).toBe('05.10.2026');
 	});
 
-	test('[ABRD-106] displayDay writes it as day and month with a closing dot', () => {
+	test('ABRD-106: displayDay writes it as day and month with a closing dot', () => {
 		expect(displayDay('2026-10-05')).toBe('05.10.');
 	});
 
-	test('[ABRD-106] askedText ends the meta in the label and the full date', () => {
+	test('ABRD-106: askedText ends the meta in the label and the full date', () => {
 		expect(askedText('2026-10-05')).toBe(`${META_LABEL.asked} 05.10.2026`);
 	});
 });
 
 describe('newestAskedOn', () => {
-	test('[ABRD-106] a card of points takes the newest day of its points', () => {
+	test('ABRD-106: a card of points takes the newest day of its points', () => {
 		const points = [
 			optionLine({ asked_on: '2026-10-05' }),
 			optionLine({ asked_on: '2026-10-12' }),
@@ -60,13 +60,13 @@ describe('newestAskedOn', () => {
 		expect(newestAskedOn(points)).toBe('2026-10-12');
 	});
 
-	test('[ABRD-106] points without an asked day have none', () => {
+	test('ABRD-106: points without an asked day have none', () => {
 		expect(newestAskedOn([optionLine({ asked_on: null })])).toBeNull();
 	});
 });
 
 describe('cardMeta', () => {
-	test('[ABRD-106] names repository and area, the kind, and reversible when no option is final', () => {
+	test('ABRD-106: names repository and area, the kind, and reversible when no option is final', () => {
 		const meta = cardMeta('songmaker', optionLine({ area: 'Song page', decision_kind: 'money' }));
 
 		expect(meta).toEqual({
@@ -77,7 +77,7 @@ describe('cardMeta', () => {
 		});
 	});
 
-	test('[ABRD-61] marks a returned line as with head', () => {
+	test('ABRD-61: marks a returned line as with head', () => {
 		const meta = cardMeta('songmaker', optionLine({ returned_on: '2026-10-27' }));
 
 		expect(meta.withHead).toBe(true);
@@ -106,13 +106,13 @@ describe('cardMeta', () => {
 	});
 });
 
-test('[ABRD-84] a point warns when one of its options cannot be taken back', () => {
+test('ABRD-84: a point warns when one of its options cannot be taken back', () => {
 	const final = optionLine({ options: [cardOption(), cardOption({ letter: 'B', undo: 'final' })] });
 
 	expect([hasFinalOption(final), hasFinalOption(optionLine())]).toEqual([true, false]);
 });
 
-test('[ABRD-61] a card is with its head while any of its points is', () => {
+test('ABRD-61: a card is with its head while any of its points is', () => {
 	const open = optionLine();
 	const back = optionLine({ returned_on: '2026-10-27' });
 
@@ -120,7 +120,7 @@ test('[ABRD-61] a card is with its head while any of its points is', () => {
 });
 
 describe('pointsMeta', () => {
-	test('[ABRD-83] joins the areas, the distinct kinds in point order and names final if any option of any point is', () => {
+	test('ABRD-83: joins the areas, the distinct kinds in point order and names final if any option of any point is', () => {
 		const points = [
 			optionLine({ area: 'Song-Seite', decision_kind: 'product' }),
 			optionLine({ area: 'Bibliothek', decision_kind: 'technical' }),
@@ -139,7 +139,7 @@ describe('pointsMeta', () => {
 		});
 	});
 
-	test('[ABRD-106] the asked day is the newest of the points, whatever their order', () => {
+	test('ABRD-106: the asked day is the newest of the points, whatever their order', () => {
 		const points = [
 			optionLine({ asked_on: '2026-10-05' }),
 			optionLine({ asked_on: '2026-10-12' }),
@@ -149,7 +149,7 @@ describe('pointsMeta', () => {
 		expect(pointsMeta('songmaker', points).asked).toBe('2026-10-12');
 	});
 
-	test('[ABRD-83] says with head as soon as one point is', () => {
+	test('ABRD-83: says with head as soon as one point is', () => {
 		const points = [optionLine(), optionLine({ returned_on: '2026-10-27' })];
 
 		expect(pointsMeta('songmaker', points).withHead).toBe(true);
@@ -176,12 +176,12 @@ describe('the chosen option', () => {
 	});
 });
 
-test('[ABRD-67] the strip text of an Other answer names Other and the point’s topic', () => {
+test('ABRD-67: the strip text of an Other answer names Other and the point’s topic', () => {
 	expect(pendingOtherText('Song-Seite')).toBe('Other · Song-Seite');
 });
 
 describe('the words of a card of points', () => {
-	test('[ABRD-84] the point rows, the count and Accept all have their one owner', () => {
+	test('ABRD-84: the point rows, the count and Accept all have their one owner', () => {
 		expect([
 			GROUP_LABEL.points,
 			GROUP_LABEL.count,
@@ -197,12 +197,12 @@ describe('the words of a card of points', () => {
 		]);
 	});
 
-	test('[ABRD-88] a point’s line in a confirm starts with its number', () => {
+	test('ABRD-88: a point’s line in a confirm starts with its number', () => {
 		expect(pointPrefix(2)).toBe('Point 2: ');
 		expect(pointGroupLabel(2)).toBe('Point 2');
 	});
 
-	test('[ABRD-82] areas join in point order with a slash, each once', () => {
+	test('ABRD-82: areas join in point order with a slash, each once', () => {
 		const areas = ['Song-Seite', 'Bibliothek', 'Song-Seite'];
 
 		expect(joinedAreas(areas.map((area) => optionLine({ area })))).toBe('Song-Seite / Bibliothek');
@@ -249,7 +249,7 @@ describe('the detail rows of an option', () => {
 		);
 	});
 
-	test('[ABRD-37] name the source of a yes/no line the same way', () => {
+	test('ABRD-37: name the source of a yes/no line the same way', () => {
 		expect(sourceLine('songmaker', 42, line({ index: 3 }))).toBe('songmaker · Item 42 · Line 3');
 	});
 
@@ -275,7 +275,7 @@ describe('nextOpen', () => {
 		['closes the open option', 'B', 'B', null],
 		['opens a closed point', null, 3, 3],
 		['closes the open point', 3, 3, null]
-	])('[ABRD-85] %s', (_name, open, id, expected) => {
+	])('ABRD-85: %s', (_name, open, id, expected) => {
 		expect(nextOpen(open, id)).toBe(expected);
 	});
 });
@@ -286,7 +286,7 @@ describe('isStuck', () => {
 		['the card ends 1 px below the view', 101, false],
 		['the card ends level with the view', 100, false],
 		['the card ends above the view', 90, false]
-	])('[ABRD-52] %s', (_name, containerBottom, expected) => {
+	])('ABRD-52: %s', (_name, containerBottom, expected) => {
 		expect(isStuck(containerBottom, 100)).toBe(expected);
 	});
 });
@@ -295,12 +295,12 @@ describe('escapeKinds', () => {
 	const open = optionLine();
 	const back = optionLine({ returned_on: '2026-10-27' });
 
-	test('[ABRD-154] a point offers Other, and Unclear unless it is with its head', () => {
+	test('ABRD-154: a point offers Other, and Unclear unless it is with its head', () => {
 		expect(escapeKinds([open], true)).toEqual(['other', 'unclear']);
 		expect(escapeKinds([back], true)).toEqual(['other']);
 	});
 
-	test('[ABRD-92] the card row of points offers Unclear alone, and nothing while with its head', () => {
+	test('ABRD-92: the card row of points offers Unclear alone, and nothing while with its head', () => {
 		expect(escapeKinds([open, open], false)).toEqual(['unclear']);
 		expect(escapeKinds([open, back], false)).toEqual([]);
 	});

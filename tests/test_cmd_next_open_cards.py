@@ -83,7 +83,7 @@ class TestNextWithOpenCards:
     def test_text_cuts_no_container_that_waits_on_its_card(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: NEXT-70, E-NEXT-24 -- the free item comes first, the container waits."""
+        """Spec: NEXT-70 -- the free item comes first, the container waits. Example: E-NEXT-24."""
         serve_container_with_open_card_and_free_item(monkeypatch)
 
         lines = run_cli(["next"], capsys).stdout.splitlines()
@@ -93,7 +93,7 @@ class TestNextWithOpenCards:
     def test_json_cuts_no_container_that_waits_on_its_card(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: NEXT-70, E-NEXT-24 -- --json names the free item, not a cut."""
+        """Spec: NEXT-70 -- --json names the free item, not a cut. Example: E-NEXT-24."""
         serve_container_with_open_card_and_free_item(monkeypatch)
 
         payload = json.loads(run_cli(["next", "--json"], capsys).stdout)

@@ -19,34 +19,34 @@ The list of code built ahead of its caller: one entry per piece of code, naming 
 
 ## The file
 
-- [ ] [AHEAD-01] The file is `.aco/ahead-of-caller.toml`. A missing file, an empty file, or a file without `code` holds no entries.
-- [ ] [AHEAD-02] A trunk path that holds no file (a directory, say) or a file git cannot show, or whose bytes are no UTF-8, makes the list unavailable with `<list> cannot be read: <error>`.
-- [ ] [AHEAD-20] `<error>` is the failure's text.
-- [ ] [AHEAD-15] A trunk that does not resolve refuses `aco next` whole as `unavailable` with git's text (`specs/next.spec.md`, Refusals), so the list is never read as no file.
-- [ ] [AHEAD-03] Only the trunk's copy counts: a file that exists only in the worktree is ignored.
-- [ ] [AHEAD-04] The top level holds only `code`, an array of tables. Bad TOML refuses `<list> is not valid TOML: <error>`, `<error>` the parser's text.
-- [ ] [AHEAD-16] Another top-level key (`[[cod]]` too) refuses `<list> has the unknown top-level key '<key>'`, `<key>` the first in sorted order.
-- [ ] [AHEAD-21] A `code` that is no array of tables refuses `<list>: 'code' must be an array of tables`.
-- [ ] [AHEAD-05] Each entry has exactly `path`, `item` and `reason`, all strings. In that order the first failing key refuses `<list>: code entry <n> lacks '<key>'` or `... has '<key>' that is not a string`.
-- [ ] [AHEAD-17] Then an extra key refuses `<list>: code entry <n> has the unknown key '<key>'`, `<key>` the first in sorted order.
-- [ ] [AHEAD-06] `path` is repository-relative with forward slashes. An empty path, a leading `/` or a backslash refuses `<list>: code entry <n> has a path that is not repository-relative with forward slashes`.
-- [ ] [AHEAD-18] A `..` segment refuses `<list>: code entry <n> has a path that holds a '..' segment`. Whether the path exists is not checked.
-- [ ] [AHEAD-07] `reason` is one non-empty line; an empty, blank or multi-line reason refuses `<list>: code entry <n> has a reason that is not one non-empty line`.
-- [ ] [AHEAD-08] `item` is `aco-xxxxxx`, `#n` or `n` for this repository, or `<owner>/<repo>#<n>` for another.
-- [ ] [AHEAD-22] Any other `item` form refuses `<list>: code entry <n> has an item '<item>' that is not aco-xxxxxx, #n, n or OWNER/REPO#n`.
-- [ ] [AHEAD-09] Two entries with the same `path` and the same item refuse `<list>: code entry <n> repeats the path and item of an earlier entry`, `<n>` the later one.
-- [ ] [AHEAD-19] A malformed file is unavailable as a whole: the first sentence in file order is the one. Per entry the checks run keys, path, reason, item.
+- AHEAD-01: The file is `.aco/ahead-of-caller.toml`. A missing file, an empty file, or a file without `code` holds no entries.
+- AHEAD-02: A trunk path that holds no file (a directory, say) or a file git cannot show, or whose bytes are no UTF-8, makes the list unavailable with `<list> cannot be read: <error>`.
+- AHEAD-20: `<error>` is the failure's text.
+- AHEAD-15: A trunk that does not resolve refuses `aco next` whole as `unavailable` with git's text (`specs/next.spec.md`, Refusals), so the list is never read as no file.
+- AHEAD-03: Only the trunk's copy counts: a file that exists only in the worktree is ignored.
+- AHEAD-04: The top level holds only `code`, an array of tables. Bad TOML refuses `<list> is not valid TOML: <error>`, `<error>` the parser's text.
+- AHEAD-16: Another top-level key (`[[cod]]` too) refuses `<list> has the unknown top-level key '<key>'`, `<key>` the first in sorted order.
+- AHEAD-21: A `code` that is no array of tables refuses `<list>: 'code' must be an array of tables`.
+- AHEAD-05: Each entry has exactly `path`, `item` and `reason`, all strings. In that order the first failing key refuses `<list>: code entry <n> lacks '<key>'` or `... has '<key>' that is not a string`.
+- AHEAD-17: Then an extra key refuses `<list>: code entry <n> has the unknown key '<key>'`, `<key>` the first in sorted order.
+- AHEAD-06: `path` is repository-relative with forward slashes. An empty path, a leading `/` or a backslash refuses `<list>: code entry <n> has a path that is not repository-relative with forward slashes`.
+- AHEAD-18: A `..` segment refuses `<list>: code entry <n> has a path that holds a '..' segment`. Whether the path exists is not checked.
+- AHEAD-07: `reason` is one non-empty line; an empty, blank or multi-line reason refuses `<list>: code entry <n> has a reason that is not one non-empty line`.
+- AHEAD-08: `item` is `aco-xxxxxx`, `#n` or `n` for this repository, or `<owner>/<repo>#<n>` for another.
+- AHEAD-22: Any other `item` form refuses `<list>: code entry <n> has an item '<item>' that is not aco-xxxxxx, #n, n or OWNER/REPO#n`.
+- AHEAD-09: Two entries with the same `path` and the same item refuse `<list>: code entry <n> repeats the path and item of an earlier entry`, `<n>` the later one.
+- AHEAD-19: A malformed file is unavailable as a whole: the first sentence in file order is the one. Per entry the checks run keys, path, reason, item.
 
 ## Reading items
 
-- [ ] [AHEAD-10] An item of this repository is read through this repository's own board, under both storages.
-- [ ] [AHEAD-11] `<owner>/<repo>#<n>` is always that repository's GitHub issue.
-- [ ] [AHEAD-13] Each distinct item is read once, however many entries name it.
-- [ ] [AHEAD-14] A forge failure on one item makes only that entry `unreadable` with the failure's text; the other entries are judged.
+- AHEAD-10: An item of this repository is read through this repository's own board, under both storages.
+- AHEAD-11: `<owner>/<repo>#<n>` is always that repository's GitHub issue.
+- AHEAD-13: Each distinct item is read once, however many entries name it.
+- AHEAD-14: A forge failure on one item makes only that entry `unreadable` with the failure's text; the other entries are judged.
 
 ## Red
 
-- [ ] [AHEAD-12] An entry is red unless its item is open: closed, missing (`not found or not accessible`), a pull request or unreadable. The released `aco` that does not read the file is unaffected.
+- AHEAD-12: An entry is red unless its item is open: closed, missing (`not found or not accessible`), a pull request or unreadable. The released `aco` that does not read the file is unaffected.
 
 ## Never
 

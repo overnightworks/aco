@@ -189,7 +189,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Decided`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-30] Decided lists the ruled lines per project with the Decided shape and shows the selected card', async ({
+		test('ABRD-30: Decided lists the ruled lines per project with the Decided shape and shows the selected card', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -247,7 +247,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-37] [ABRD-54] [ABRD-57] [ABRD-106] the decided card says what was decided, how and when', async ({
+		test('ABRD-37, ABRD-54, ABRD-57, ABRD-106: the decided card says what was decided, how and when', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repository } = readBoardRuntime();
@@ -296,7 +296,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-31] a repository lists the newest date first', async ({ page }) => {
+		test('ABRD-31: a repository lists the newest date first', async ({ page }) => {
 			const { appUrl, token } = readBoardRuntime();
 			await arrange([
 				item(8, 'Alt', yesNoEntry('Zweiter Oktober?', 'yes', '2026-10-02')),
@@ -315,7 +315,7 @@ for (const viewport of [
 				.toEqual(['Dritter Oktober?', 'Zweiter Oktober?']);
 		});
 
-		test('[ABRD-31] with nothing ruled Decided reads Nothing decided yet', async ({
+		test('ABRD-31: with nothing ruled Decided reads Nothing decided yet', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -331,7 +331,7 @@ for (const viewport of [
 			await shootWithShapes(page, testInfo.outputPath.bind(testInfo), 'decided-empty');
 		});
 
-		test('[ABRD-31] a failed repository with nothing ruled shows its alert and no Nothing decided yet', async ({
+		test('ABRD-31: a failed repository with nothing ruled shows its alert and no Nothing decided yet', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -351,7 +351,7 @@ for (const viewport of [
 			await expect(page.getByText(/Nothing open/)).toBeHidden();
 		});
 
-		test('[ABRD-32] Open keeps its row, list position and phone view across Decided, which starts at its first row again', async ({
+		test('ABRD-32: Open keeps its row, list position and phone view across Decided, which starts at its first row again', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -422,7 +422,7 @@ for (const viewport of [
 			expect(writes).toBe(0);
 		});
 
-		test('[ABRD-33] a pick waiting out its undo window is not in Decided, and once stored it is', async ({
+		test('ABRD-33: a pick waiting out its undo window is not in Decided, and once stored it is', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();

@@ -65,33 +65,33 @@ in quoting the lane's branch: `issue <label>` or `lane '<branch>'`. A refusal re
 
 ## Flags and outcome
 
-- [ ] [REL-01] `aco release` with neither `--merged PULL_REQUEST` nor `--abandoned REASON`, or with both, is refused by the parser itself before anything runs, exit `2`; with `--json`, through OUT-06.
-- [ ] [REL-02] An `--abandoned` value blank, padded, with a control character or display control (NEXT-37), multiline, or over 512 characters refuses `abandoned reason must be one bounded non-empty line`, exit `2`.
+- REL-01: `aco release` with neither `--merged PULL_REQUEST` nor `--abandoned REASON`, or with both, is refused by the parser itself before anything runs, exit `2`; with `--json`, through OUT-06.
+- REL-02: An `--abandoned` value blank, padded, with a control character or display control (NEXT-37), multiline, or over 512 characters refuses `abandoned reason must be one bounded non-empty line`, exit `2`.
 
 ## Identity and branch resolution
 
 Omitting the positional issue number selects lane mode; REL-03, REL-57 and
 REL-58 resolve it from the explicit `--branch` or the checkout branch.
 
-- [ ] [REL-03] A lane branch outside `docs/`/`fix/` refuses `branch '<branch>' is not an issueless lane; pass an issue number, or check out a branch prefixed 'docs/' or 'fix/'`, exit `2`, except as REL-57/58 say.
-- [ ] [REL-57] A lane-mode release on a branch holding a live lane claim selects that claim whatever the branch's prefix; `aco claim` still refuses that branch (CLM-07).
-- [ ] [REL-58] A github `--merged <pr>` lane release without `--claim-id`, on such a branch that no live claim holds, issue or lane, is REL-47's rerun once its merge verifies (REL-16, REL-17, REL-54).
-- [ ] [REL-04] An explicit `--branch <branch>` selects that claim by name and never reads the checkout's current branch at all (see E-REL-01).
-- [ ] [REL-05] `--branch` omitted together with an issue number and `--claim-id` skips reading the checkout branch entirely, the same as an explicit `--branch` would.
-- [ ] [REL-06] `--branch` omitted, no issue, empty branch refuses `lane release requires a non-empty current branch; check out the docs/ or fix/ lane branch, or pass an issue number`, exit `2`.
-- [ ] [REL-07] `--branch` omitted, issue given without `--claim-id`, empty current branch refuses `release without --claim-id requires a non-empty current branch; pass --claim-id`, exit `2`.
-- [ ] [REL-08] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence) before the checkout branch, git, or the forge are ever read.
+- REL-03: A lane branch outside `docs/`/`fix/` refuses `branch '<branch>' is not an issueless lane; pass an issue number, or check out a branch prefixed 'docs/' or 'fix/'`, exit `2`, except as REL-57/58 say.
+- REL-57: A lane-mode release on a branch holding a live lane claim selects that claim whatever the branch's prefix; `aco claim` still refuses that branch (CLM-07).
+- REL-58: A github `--merged <pr>` lane release without `--claim-id`, on such a branch that no live claim holds, issue or lane, is REL-47's rerun once its merge verifies (REL-16, REL-17, REL-54).
+- REL-04: An explicit `--branch <branch>` selects that claim by name and never reads the checkout's current branch at all (see E-REL-01).
+- REL-05: `--branch` omitted together with an issue number and `--claim-id` skips reading the checkout branch entirely, the same as an explicit `--branch` would.
+- REL-06: `--branch` omitted, no issue, empty branch refuses `lane release requires a non-empty current branch; check out the docs/ or fix/ lane branch, or pass an issue number`, exit `2`.
+- REL-07: `--branch` omitted, issue given without `--claim-id`, empty current branch refuses `release without --claim-id requires a non-empty current branch; pass --claim-id`, exit `2`.
+- REL-08: `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence) before the checkout branch, git, or the forge are ever read.
 
 ## Claim selection
 
-- [ ] [REL-09] An identity/branch pair with no matching live claim refuses `<identity> has no active build claim`, exit `2`, unless REL-47 applies.
-- [ ] [REL-10] A `--claim-id` mismatching the one claim already resolved refuses that same `has no active build claim` sentence: never a second selector among several claims.
-- [ ] [REL-11] `--branch` and `--claim-id` naming different branches refuses, quoting both and the claim's own branch, exit `2` (see E-REL-04).
-- [ ] [REL-12] A `release` by the wrong agent/role, no coordinator override, refuses before any write, naming the successor's `aco handover` route (REL-41) before the override (see E-REL-19, E-REL-34).
-- [ ] [REL-41] The route is `aco handover <n> --from <holder> --reason <text>`, the holder shell-quoted, or `--branch '<branch>'` for `<n>` on a lane claim; the session's own agent names none (HANDOVER-16).
-- [ ] [REL-13] `--coordinator-override --role coordinator` releases a foreign claim with no agent/role match (CLAIM-40's outcome, for release specifically).
-- [ ] [REL-14] Omitting `--role` -- unlike `claim`'s own default `builder` -- reports the claim's own stored role, in text and in `--json` alike.
-- [ ] [REL-15] A release before `aco bootstrap` has created `refs/aco/state` refuses (CAS-03's sentence), before any transition is attempted.
+- REL-09: An identity/branch pair with no matching live claim refuses `<identity> has no active build claim`, exit `2`, unless REL-47 applies.
+- REL-10: A `--claim-id` mismatching the one claim already resolved refuses that same `has no active build claim` sentence: never a second selector among several claims.
+- REL-11: `--branch` and `--claim-id` naming different branches refuses, quoting both and the claim's own branch, exit `2` (see E-REL-04).
+- REL-12: A `release` by the wrong agent/role, no coordinator override, refuses before any write, naming the successor's `aco handover` route (REL-41) before the override (see E-REL-19, E-REL-34).
+- REL-41: The route is `aco handover <n> --from <holder> --reason <text>`, the holder shell-quoted, or `--branch '<branch>'` for `<n>` on a lane claim; the session's own agent names none (HANDOVER-16).
+- REL-13: `--coordinator-override --role coordinator` releases a foreign claim with no agent/role match (CLAIM-40's outcome, for release specifically).
+- REL-14: Omitting `--role` -- unlike `claim`'s own default `builder` -- reports the claim's own stored role, in text and in `--json` alike.
+- REL-15: A release before `aco bootstrap` has created `refs/aco/state` refuses (CAS-03's sentence), before any transition is attempted.
 
 ## A `--merged` release with nothing left to release
 
@@ -100,23 +100,23 @@ rerun, or REL-52's `<rerun>` from the checkout that holds the lane -- finds
 no live claim. Its trigger is that missing claim, never a closed item:
 GitHub closes the item at merge time through `Closes #<n>`.
 
-- [ ] [REL-47] A `--merged` release without `--claim-id` whose identity has no live claim, once its landing verifies (REL-16, REL-17), closes nothing, releases nothing, and exits `0` (see E-REL-24).
-- [ ] [REL-54] An issue-less lane's pull request merged from a branch other than the release's own is no such rerun: REL-09 refuses.
-- [ ] [REL-49] Its text is `LANDED <landing> already; nothing left to release`, `<landing>` `pull request #<n>` or, under `storage = "state-ref"`, `commit <sha>`, then its `worktree:` line (REL-65).
-- [ ] [REL-50] Its cleanup (REL-25..REL-34) acts on the pull request's own source branch, or under `storage = "state-ref"` on the release's own branch (REL-04, REL-06).
-- [ ] [REL-51] Its `--json` prints `specs/output.spec.md`'s envelope, `reason` `merged`, then `outcome` `"nothing left to release"`, `issue`, `lane`, `branch` (REL-66), `worktree` (REL-65).
-- [ ] [REL-65] A rerun with no claim and no local lane branch (the default branch is never one) prints no `worktree:` line, `worktree` `null` even with `--keep-worktree`; with the branch, REL-30.
-- [ ] [REL-66] That rerun on the default branch, given or current, has no lane branch: its `--json` `branch` is `null`, the trunk never standing in for one.
-- [ ] [REL-55] It reads the claim state afresh right before that cleanup; a claim on the identity found then keeps both: `worktree: kept -- claimed again while this release ran`.
-- [ ] [REL-59] That rerun reads the claim state afresh right before its cleanup (REL-55): any live claim then on the branch, issue or lane, keeps both: `worktree: kept -- claimed again while this release ran`.
+- REL-47: A `--merged` release without `--claim-id` whose identity has no live claim, once its landing verifies (REL-16, REL-17), closes nothing, releases nothing, and exits `0` (see E-REL-24).
+- REL-54: An issue-less lane's pull request merged from a branch other than the release's own is no such rerun: REL-09 refuses.
+- REL-49: Its text is `LANDED <landing> already; nothing left to release`, `<landing>` `pull request #<n>` or, under `storage = "state-ref"`, `commit <sha>`, then its `worktree:` line (REL-65).
+- REL-50: Its cleanup (REL-25..REL-34) acts on the pull request's own source branch, or under `storage = "state-ref"` on the release's own branch (REL-04, REL-06).
+- REL-51: Its `--json` prints `specs/output.spec.md`'s envelope, `reason` `merged`, then `outcome` `"nothing left to release"`, `issue`, `lane`, `branch` (REL-66), `worktree` (REL-65).
+- REL-65: A rerun with no claim and no local lane branch (the default branch is never one) prints no `worktree:` line, `worktree` `null` even with `--keep-worktree`; with the branch, REL-30.
+- REL-66: That rerun on the default branch, given or current, has no lane branch: its `--json` `branch` is `null`, the trunk never standing in for one.
+- REL-55: It reads the claim state afresh right before that cleanup; a claim on the identity found then keeps both: `worktree: kept -- claimed again while this release ran`.
+- REL-59: That rerun reads the claim state afresh right before its cleanup (REL-55): any live claim then on the branch, issue or lane, keeps both: `worktree: kept -- claimed again while this release ran`.
 
 Accepted residual: a claim taken between that read and the removal is not seen; the worktree
 removed is clean and merged into the default branch, so nothing is lost, and `aco start` builds it
 again for that claim.
 
-- [ ] [REL-48] A live claim off the landing's branch refuses `<identity> is claimed on '<branch>', not on <landing>'s branch '<source>'; release that claim by itself`, exit `2` (see E-REL-25, E-REL-26).
-- [ ] [REL-56] `<landing>` is REL-49's; `<source>` is the pull request's source branch or, under `storage = "state-ref"`, an explicit `--branch` (REL-04), else the claim's own branch.
-- [ ] [REL-53] A claim on that branch based on the landing commit or a later trunk commit (START-01) refuses `<identity> was claimed on '<branch>' after <landing> landed; release that claim by itself`.
+- REL-48: A live claim off the landing's branch refuses `<identity> is claimed on '<branch>', not on <landing>'s branch '<source>'; release that claim by itself`, exit `2` (see E-REL-25, E-REL-26).
+- REL-56: `<landing>` is REL-49's; `<source>` is the pull request's source branch or, under `storage = "state-ref"`, an explicit `--branch` (REL-04), else the claim's own branch.
+- REL-53: A claim on that branch based on the landing commit or a later trunk commit (START-01) refuses `<identity> was claimed on '<branch>' after <landing> landed; release that claim by itself`.
 
 Both storages judge REL-48 and REL-53 alike, before anything is written, closed or removed.
 
@@ -126,13 +126,13 @@ claim and closes its reopened item.
 
 ## What a `--merged` release verifies and never checks
 
-- [ ] [REL-16] `release --merged <pr>`'s forge verification runs before any write; it is `specs/landing-grammar.spec.md`'s grammar (LAND-29..39, LAND-49/50, LAND-55, LAND-62..64, LAND-66/67/85), nothing added.
-- [ ] [REL-37] Under `storage = "github"`, that verification walks `<remote>/<branch>` for the forge's default branch `<branch>` once the canonical remote `<remote>` is fetched, as `aco land` does.
-- [ ] [REL-38] Under `storage = "github"`, the release's board report and its worktree cleanup (REL-25, REL-29) walk that same `<remote>/<branch>`.
-- [ ] [REL-39] A canonical `<remote>` with no URL configured refuses before any write: `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-REL-18).
-- [ ] [REL-17] `release --merged` under `storage = "state-ref"` reads `<sha|empty>` against the local trunk walk, never a pull request or forge (LAND-47, LAND-52, LAND-56, LAND-59, `specs/landing-grammar.spec.md`).
-- [ ] [REL-60] Under `storage = "github"`, `--merged` takes only a bare ASCII number of at most 18 digits; else it refuses `--merged requires a pull request number under storage = github`, exit `2` (see E-REL-27).
-- [ ] [REL-23] `release` never reads the released item's own body contract, unlike issue-mode `claim` (`specs/body-block.spec.md` BODY-52).
+- REL-16: `release --merged <pr>`'s forge verification runs before any write; it is `specs/landing-grammar.spec.md`'s grammar (LAND-29..39, LAND-49/50, LAND-55, LAND-62..64, LAND-66/67/85), nothing added.
+- REL-37: Under `storage = "github"`, that verification walks `<remote>/<branch>` for the forge's default branch `<branch>` once the canonical remote `<remote>` is fetched, as `aco land` does.
+- REL-38: Under `storage = "github"`, the release's board report and its worktree cleanup (REL-25, REL-29) walk that same `<remote>/<branch>`.
+- REL-39: A canonical `<remote>` with no URL configured refuses before any write: `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-REL-18).
+- REL-17: `release --merged` under `storage = "state-ref"` reads `<sha|empty>` against the local trunk walk, never a pull request or forge (LAND-47, LAND-52, LAND-56, LAND-59, `specs/landing-grammar.spec.md`).
+- REL-60: Under `storage = "github"`, `--merged` takes only a bare ASCII number of at most 18 digits; else it refuses `--merged requires a pull request number under storage = github`, exit `2` (see E-REL-27).
+- REL-23: `release` never reads the released item's own body contract, unlike issue-mode `claim` (`specs/body-block.spec.md` BODY-52).
 
 ## The `RELEASED` line and `--json`
 
@@ -142,18 +142,18 @@ follows this section; one with nothing left to release (REL-47) prints no
 `RELEASED` line, no `claim_id`, `agent` or `role`, and REL-49..REL-51's shape
 instead.
 
-- [ ] [REL-18] Without `--json`, a successful release of a claim always prints `RELEASED <subject>: <claim-id>` first; `--abandoned`, that line is the whole output (see E-REL-01).
-- [ ] [REL-19] `--json` on a success prints `specs/output.spec.md`'s envelope, `reason` `merged`/`abandoned`, then `outcome`, `issue`, `lane`, `branch`, `claim_id`, `agent`, `role` (see E-REL-05).
-- [ ] [REL-36] `outcome` is `"merged #<n>"`, `"abandoned: <explanation>"`, `"landed <sha>"` (`storage = "state-ref"`), or REL-51's -- `reason` still reads `merged` for the last two.
-- [ ] [REL-35] A `--merged` release's `--json` object also carries `worktree`, the identical text its printed `worktree:` line shows (REL-25..REL-34), present only for `--merged` (see E-REL-17).
-- [ ] [REL-20] A resolved `--merged` landing adds LAND-49's `freed:`/`next:` lines after `RELEASED` in text, or its keys to `--json`, present only then (see E-REL-02).
-- [ ] [REL-40] The text `next:` line shows `<title>` with each display control escaped (NEXT-37): `a\u202eb` prints as typed, `Größe` and TAB as they are.
-- [ ] [REL-21] `--abandoned` never resolves the forge, reads the board, or prints `freed`/`next`/`hint` (LAND-39); its `--json` object carries neither key.
-- [ ] [REL-22] A `--merged` release whose post-commit board read fails prints LAND-38's `hint:` line, on stdout in text or stderr with `--json`; `freed`/`next` omitted (LAND-50) (see E-REL-06).
-- [ ] [REL-24] A release refusal past the parser (every ID but REL-01) prints `specs/output.spec.md`'s envelope, `reason` `precondition_failed`, exit `2`; REL-06..08 through OUT-05 (see E-REL-07).
-- [ ] [REL-64] A release writes `specs/lane-record.spec.md`'s record on its own release commit, from the claim's stored runs when it has any (LANREC-90); a figure it cannot compute is left out (LANREC-21).
-- [ ] [REL-67] Without stored runs, `--abandoned REASON --record <file>` writes the file's record, not REASON's routing figures; with stored runs it refuses (LANREC-91); with `--merged` it refuses (LANREC-41).
-- [ ] [REL-68] A release or a landing of a claim with stored runs (LANREC-52) removes the claim's runs file in the release's own commit, and `runs/` with the last file (LANREC-67, CAS-84).
+- REL-18: Without `--json`, a successful release of a claim always prints `RELEASED <subject>: <claim-id>` first; `--abandoned`, that line is the whole output (see E-REL-01).
+- REL-19: `--json` on a success prints `specs/output.spec.md`'s envelope, `reason` `merged`/`abandoned`, then `outcome`, `issue`, `lane`, `branch`, `claim_id`, `agent`, `role` (see E-REL-05).
+- REL-36: `outcome` is `"merged #<n>"`, `"abandoned: <explanation>"`, `"landed <sha>"` (`storage = "state-ref"`), or REL-51's -- `reason` still reads `merged` for the last two.
+- REL-35: A `--merged` release's `--json` object also carries `worktree`, the identical text its printed `worktree:` line shows (REL-25..REL-34), present only for `--merged` (see E-REL-17).
+- REL-20: A resolved `--merged` landing adds LAND-49's `freed:`/`next:` lines after `RELEASED` in text, or its keys to `--json`, present only then (see E-REL-02).
+- REL-40: The text `next:` line shows `<title>` with each display control escaped (NEXT-37): `a\u202eb` prints as typed, `Größe` and TAB as they are.
+- REL-21: `--abandoned` never resolves the forge, reads the board, or prints `freed`/`next`/`hint` (LAND-39); its `--json` object carries neither key.
+- REL-22: A `--merged` release whose post-commit board read fails prints LAND-38's `hint:` line, on stdout in text or stderr with `--json`; `freed`/`next` omitted (LAND-50) (see E-REL-06).
+- REL-24: A release refusal past the parser (every ID but REL-01) prints `specs/output.spec.md`'s envelope, `reason` `precondition_failed`, exit `2`; REL-06..08 through OUT-05 (see E-REL-07).
+- REL-64: A release writes `specs/lane-record.spec.md`'s record on its own release commit, from the claim's stored runs when it has any (LANREC-90); a figure it cannot compute is left out (LANREC-21).
+- REL-67: Without stored runs, `--abandoned REASON --record <file>` writes the file's record, not REASON's routing figures; with stored runs it refuses (LANREC-91); with `--merged` it refuses (LANREC-41).
+- REL-68: A release or a landing of a claim with stored runs (LANREC-52) removes the claim's runs file in the release's own commit, and `runs/` with the last file (LANREC-67, CAS-84).
 
 ## `--merged`'s own worktree/branch cleanup
 
@@ -171,32 +171,32 @@ section stayed (REL-42) -- one owner for all five shapes so they can never drift
 creates between its compare-and-delete and the section removal can lose its upstream setting,
 never a commit; `git branch -u` restores it.
 
-- [ ] [REL-25] A clean linked worktree whose branch is in the canonical remote's trunk, or whose tip is the merged pull request's recorded head, goes with that local branch: `worktree: removed` (see E-REL-08).
-- [ ] [REL-42] A squashed branch goes by compare-and-delete on its recorded head, a moved one stays (REL-34); its section goes only while no such branch exists, and a refused removal reads `section kept`.
-- [ ] [REL-43] A rerun of `aco land` or `release --merged` after a squash judges the lane by that recorded head too: a clean lane on it reads `worktree: removed`, never `kept` (see E-REL-20).
-- [ ] [REL-44] A value under `branch.*` in git config that is no UTF-8 never stops the squashed branch's section removal: only key names are read (see E-REL-21).
-- [ ] [REL-26] `--keep-worktree` skips that removal outright: `worktree: kept -- --keep-worktree was given`, worktree and branch both left exactly as found (see E-REL-09).
-- [ ] [REL-27] A release run from inside the lane's own worktree cannot remove its own cwd: `worktree: kept -- release ran from inside it`, and keeps both (see E-REL-10).
-- [ ] [REL-28] A tracked change or an untracked, not git-ignored file makes the worktree dirty: `worktree: kept -- dirty`, exit code unaffected; a git-ignored file is no dirt (see E-REL-11).
-- [ ] [REL-29] A branch neither provably merged into the default branch nor REL-61's adopted lane on its `base` keeps it: `worktree: kept -- not merged into the default branch` (see E-REL-12).
-- [ ] [REL-30] No linked worktree on that branch here reads `worktree: kept -- no linked worktree on <branch> in this checkout; run <rerun> in the checkout that holds it` (see E-REL-13).
-- [ ] [REL-52] `<rerun>` is `aco release`, the item (none for a lane), `--merged` with the pull request or the verified `<sha>`, `--branch <branch>`; there it meets REL-47 (see E-REL-24).
-- [ ] [REL-31] The branch checked out on this repository's own shared main checkout, not a linked worktree, keeps it: `worktree: kept -- branch checked out elsewhere` (see E-REL-14).
-- [ ] [REL-32] A git failure finding the lane's worktree or removing it keeps both: `worktree: kept -- git failure: <detail>`, the release itself stays committed regardless (see E-REL-15, E-REL-33).
-- [ ] [REL-33] `--abandoned` never attempts this cleanup at all, the same as it never resolves a forge target (LAND-39).
-- [ ] [REL-34] A git failure deleting the branch after the worktree is removed, by exit or launch, merged or squashed, names both halves: `worktree: removed; branch kept -- git failure: <detail>` (see E-REL-16).
-- [ ] [REL-45] A delete git that timed out after the worktree is removed may have deleted it: `worktree: removed; branch unknown -- git <subcommand> timed out; check git branch --list <branch>` (see E-REL-22).
-- [ ] [REL-46] A git step that timed out names itself wherever its `<detail>` stands: `git <subcommand> timed out`, never a step it did not run (see E-REL-23).
-- [ ] [REL-61] A clean linked worktree of an adopted lane (a lane claim on no `fix/` or `docs/` branch) whose tip is the released claim's `base` goes with its branch: `worktree: removed` (see E-REL-28).
-- [ ] [REL-62] That branch goes by compare-and-delete on that `base`, and its section goes as REL-42 says; a branch that moved on stays: `worktree: removed; branch kept -- git failure: <detail>` (REL-34).
-- [ ] [REL-63] Any other tip reads REL-29's `kept`, a commit on top included, dirty or not. A dirty worktree on its `base` reads REL-28's. An issue claim and a `fix/` or `docs/` lane never meet REL-61.
+- REL-25: A clean linked worktree whose branch is in the canonical remote's trunk, or whose tip is the merged pull request's recorded head, goes with that local branch: `worktree: removed` (see E-REL-08).
+- REL-42: A squashed branch goes by compare-and-delete on its recorded head, a moved one stays (REL-34); its section goes only while no such branch exists, and a refused removal reads `section kept`.
+- REL-43: A rerun of `aco land` or `release --merged` after a squash judges the lane by that recorded head too: a clean lane on it reads `worktree: removed`, never `kept` (see E-REL-20).
+- REL-44: A value under `branch.*` in git config that is no UTF-8 never stops the squashed branch's section removal: only key names are read (see E-REL-21).
+- REL-26: `--keep-worktree` skips that removal outright: `worktree: kept -- --keep-worktree was given`, worktree and branch both left exactly as found (see E-REL-09).
+- REL-27: A release run from inside the lane's own worktree cannot remove its own cwd: `worktree: kept -- release ran from inside it`, and keeps both (see E-REL-10).
+- REL-28: A tracked change or an untracked, not git-ignored file makes the worktree dirty: `worktree: kept -- dirty`, exit code unaffected; a git-ignored file is no dirt (see E-REL-11).
+- REL-29: A branch neither provably merged into the default branch nor REL-61's adopted lane on its `base` keeps it: `worktree: kept -- not merged into the default branch` (see E-REL-12).
+- REL-30: No linked worktree on that branch here reads `worktree: kept -- no linked worktree on <branch> in this checkout; run <rerun> in the checkout that holds it` (see E-REL-13).
+- REL-52: `<rerun>` is `aco release`, the item (none for a lane), `--merged` with the pull request or the verified `<sha>`, `--branch <branch>`; there it meets REL-47 (see E-REL-24).
+- REL-31: The branch checked out on this repository's own shared main checkout, not a linked worktree, keeps it: `worktree: kept -- branch checked out elsewhere` (see E-REL-14).
+- REL-32: A git failure finding the lane's worktree or removing it keeps both: `worktree: kept -- git failure: <detail>`, the release itself stays committed regardless (see E-REL-15, E-REL-33).
+- REL-33: `--abandoned` never attempts this cleanup at all, the same as it never resolves a forge target (LAND-39).
+- REL-34: A git failure deleting the branch after the worktree is removed, by exit or launch, merged or squashed, names both halves: `worktree: removed; branch kept -- git failure: <detail>` (see E-REL-16).
+- REL-45: A delete git that timed out after the worktree is removed may have deleted it: `worktree: removed; branch unknown -- git <subcommand> timed out; check git branch --list <branch>` (see E-REL-22).
+- REL-46: A git step that timed out names itself wherever its `<detail>` stands: `git <subcommand> timed out`, never a step it did not run (see E-REL-23).
+- REL-61: A clean linked worktree of an adopted lane (a lane claim on no `fix/` or `docs/` branch) whose tip is the released claim's `base` goes with its branch: `worktree: removed` (see E-REL-28).
+- REL-62: That branch goes by compare-and-delete on that `base`, and its section goes as REL-42 says; a branch that moved on stays: `worktree: removed; branch kept -- git failure: <detail>` (REL-34).
+- REL-63: Any other tip reads REL-29's `kept`, a commit on top included, dirty or not. A dirty worktree on its `base` reads REL-28's. An issue claim and a `fix/` or `docs/` lane never meet REL-61.
 
-- [ ] [REL-69] A clean, merged linked worktree whose submodule repositories hold nothing unique goes with its branch: `worktree: removed`, though git alone refuses it (see E-REL-29).
-- [ ] [REL-70] A worktree's submodule repositories are the git directories at any depth under its git directory's `modules` and those inside the worktree; with none, REL-25's removal runs as before.
-- [ ] [REL-71] A submodule repository holds nothing unique when it has a remote-tracking ref, no stash entry or worktree of its own, and `HEAD` and each other ref are reachable from a remote-tracking ref.
-- [ ] [REL-72] Any other keeps both: `worktree: kept -- submodule repository <path> <what it holds>; after checking it, run: git worktree remove --force <worktree> && git branch -D <branch>` (see E-REL-30).
-- [ ] [REL-73] REL-28's dirt includes a submodule's changed or untracked files and untracked files, whatever `submodule.<name>.ignore`, `diff.ignoreSubmodules`, `status.showUntrackedFiles` say (see E-REL-31).
-- [ ] [REL-74] Reading a submodule repository never fetches: a git failure, a missing object of a partial clone included, keeps both as REL-32 reports it, and no removal step runs (see E-REL-32).
+- REL-69: A clean, merged linked worktree whose submodule repositories hold nothing unique goes with its branch: `worktree: removed`, though git alone refuses it (see E-REL-29).
+- REL-70: A worktree's submodule repositories are the git directories at any depth under its git directory's `modules` and those inside the worktree; with none, REL-25's removal runs as before.
+- REL-71: A submodule repository holds nothing unique when it has a remote-tracking ref, no stash entry or worktree of its own, and `HEAD` and each other ref are reachable from a remote-tracking ref.
+- REL-72: Any other keeps both: `worktree: kept -- submodule repository <path> <what it holds>; after checking it, run: git worktree remove --force <worktree> && git branch -D <branch>` (see E-REL-30).
+- REL-73: REL-28's dirt includes a submodule's changed or untracked files and untracked files, whatever `submodule.<name>.ignore`, `diff.ignoreSubmodules`, `status.showUntrackedFiles` say (see E-REL-31).
+- REL-74: Reading a submodule repository never fetches: a git failure, a missing object of a partial clone included, keeps both as REL-32 reports it, and no removal step runs (see E-REL-32).
 
 Residuals of REL-69, none built against:
 

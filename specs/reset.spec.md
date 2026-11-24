@@ -43,36 +43,36 @@ documents. `<repo>`/`<sha>`/`<tip>`/`<remote>` are the runner's own values;
 
 ## A canonical remote with no URL configured
 
-- [ ] [RESET-18] A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before any read, export or write (see E-RESET-07).
+- RESET-18: A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before any read, export or write (see E-RESET-07).
 
 ## Before any ref exists
 
-- [ ] [RESET-01] `aco reset` against a remote that never carried `refs/aco/state` prints `would: nothing to export: refs/aco/state does not exist on <remote>` (see E-RESET-01).
-- [ ] [RESET-02] That same run's second line is `would: nothing to delete on <remote>: refs/aco/state does not exist`, exit `0` (see E-RESET-01).
-- [ ] [RESET-03] `aco reset --confirm` in that same state prints RESET-01/02's own two sentences without the `would:` prefix, then CAS-44's own steps still run unmodified (see E-RESET-01).
+- RESET-01: `aco reset` against a remote that never carried `refs/aco/state` prints `would: nothing to export: refs/aco/state does not exist on <remote>` (see E-RESET-01).
+- RESET-02: That same run's second line is `would: nothing to delete on <remote>: refs/aco/state does not exist`, exit `0` (see E-RESET-01).
+- RESET-03: `aco reset --confirm` in that same state prints RESET-01/02's own two sentences without the `would:` prefix, then CAS-44's own steps still run unmodified (see E-RESET-01).
 
 ## A failed export or delete
 
-- [ ] [RESET-04] A bundle write failure -- an unwritable `--export-dir`, or any other write failure -- refuses `cannot export refs/aco/state at <tip> to <destination>: <detail>`, before any deletion (see E-RESET-02).
-- [ ] [RESET-05] `--force-with-lease` rejected, tip unchanged, refuses `cannot delete refs/aco/state on <remote> (lease <tip>): <detail>`, naming `still present`, fix `re-run aco reset --confirm` (see E-RESET-05).
-- [ ] [RESET-06] The same rejection, remote tip moved, refuses that same prefix, naming `the remote moved to <current>`, fix `re-run aco reset --confirm`, never a manual lease (see E-RESET-03).
-- [ ] [RESET-07] The same rejection when the remote cannot be reached at all to confirm the outcome refuses that same prefix, naming `outcome unknown`, fix `verify with git ls-remote` (see E-RESET-04).
-- [ ] [RESET-08] A rejected `--force-with-lease` push whose commit actually landed (a lost response) is re-probed as already deleted: `reset` reports no failure for it and continues.
-- [ ] [RESET-09] `aco reset --confirm` against a local `refs/aco/state` a foreign tool left behind prints `deleted local refs/aco/state` as its own third line.
-- [ ] [RESET-13] That local delete itself failing (a stale `.lock` file, or any other local git failure) refuses `cannot delete local refs/aco/state: <detail>`, after the remote step already succeeded.
+- RESET-04: A bundle write failure -- an unwritable `--export-dir`, or any other write failure -- refuses `cannot export refs/aco/state at <tip> to <destination>: <detail>`, before any deletion (see E-RESET-02).
+- RESET-05: `--force-with-lease` rejected, tip unchanged, refuses `cannot delete refs/aco/state on <remote> (lease <tip>): <detail>`, naming `still present`, fix `re-run aco reset --confirm` (see E-RESET-05).
+- RESET-06: The same rejection, remote tip moved, refuses that same prefix, naming `the remote moved to <current>`, fix `re-run aco reset --confirm`, never a manual lease (see E-RESET-03).
+- RESET-07: The same rejection when the remote cannot be reached at all to confirm the outcome refuses that same prefix, naming `outcome unknown`, fix `verify with git ls-remote` (see E-RESET-04).
+- RESET-08: A rejected `--force-with-lease` push whose commit actually landed (a lost response) is re-probed as already deleted: `reset` reports no failure for it and continues.
+- RESET-09: `aco reset --confirm` against a local `refs/aco/state` a foreign tool left behind prints `deleted local refs/aco/state` as its own third line.
+- RESET-13: That local delete itself failing (a stale `.lock` file, or any other local git failure) refuses `cannot delete local refs/aco/state: <detail>`, after the remote step already succeeded.
 
 ## A schema this aco cannot read
 
-- [ ] [RESET-14] `aco reset` over a state whose schema this aco cannot read prints `schema <n> not readable by this aco; live claims unknown (--confirm needs --force-unreadable)`, then CAS-39's lines (see E-RESET-06).
-- [ ] [RESET-15] `aco reset --confirm` over that state refuses with RESET-14's own sentence, exit `2`, before any export or deletion (see E-RESET-06).
-- [ ] [RESET-16] `aco reset --confirm --force-unreadable` over that state exports its tip, deletes it with the lease, clears stamps, and bootstraps, exactly as CAS-41..44 (see E-RESET-06).
-- [ ] [RESET-17] `--force-unreadable` over a readable state changes nothing: a live claim still refuses as CAS-40 says, and a claim-free state resets as `--confirm` alone.
+- RESET-14: `aco reset` over a state whose schema this aco cannot read prints `schema <n> not readable by this aco; live claims unknown (--confirm needs --force-unreadable)`, then CAS-39's lines (see E-RESET-06).
+- RESET-15: `aco reset --confirm` over that state refuses with RESET-14's own sentence, exit `2`, before any export or deletion (see E-RESET-06).
+- RESET-16: `aco reset --confirm --force-unreadable` over that state exports its tip, deletes it with the lease, clears stamps, and bootstraps, exactly as CAS-41..44 (see E-RESET-06).
+- RESET-17: `--force-unreadable` over a readable state changes nothing: a live claim still refuses as CAS-40 says, and a claim-free state resets as `--confirm` alone.
 
 ## The command's own argument shape
 
-- [ ] [RESET-10] `aco reset` followed by any argument outside `--confirm`/`--no-export`/`--export-dir`/`--force-unreadable`, abbreviations included (OUT-09), is refused by the parser before any read, as BOOT-02.
-- [ ] [RESET-11] `aco --repo OWNER/REPO reset` behaves exactly as with no `--repo`, forge-free like `aco bootstrap` (`specs/bootstrap.spec.md` BOOT-03): a non-GitHub canonical remote is no error either.
-- [ ] [RESET-12] `--export-dir` omitted writes the bundle under the repository's own parent directory, the default its own `--export-dir DIR` help text names.
+- RESET-10: `aco reset` followed by any argument outside `--confirm`/`--no-export`/`--export-dir`/`--force-unreadable`, abbreviations included (OUT-09), is refused by the parser before any read, as BOOT-02.
+- RESET-11: `aco --repo OWNER/REPO reset` behaves exactly as with no `--repo`, forge-free like `aco bootstrap` (`specs/bootstrap.spec.md` BOOT-03): a non-GitHub canonical remote is no error either.
+- RESET-12: `--export-dir` omitted writes the bundle under the repository's own parent directory, the default its own `--export-dir DIR` help text names.
 
 ## Never
 

@@ -47,29 +47,29 @@ object. A refusal reaching the shared collection point prints
 
 ## The four sections, always in this order
 
-- [ ] [BRIEF-01] `aco brief <item>` prints the body (as BRIEF-29 to BRIEF-31 show it), a blank line, `CLAIM`, a blank line, `TIP`, a blank line, `TOUCHED` -- always these four headings in order (see E-BRIEF-01).
-- [ ] [BRIEF-02] Under a live issue claim, `CLAIM` is followed by one line `<agent> (<role>) branch=<branch> base=<base>[ <age>]`, branch before base (see E-BRIEF-01).
-- [ ] [BRIEF-11] That claim line's indented lines are one per scope path, then `  whole: <reason>` only when the claim carries one (see E-BRIEF-01).
-- [ ] [BRIEF-26] After them, `  lane-shared: <entry>, <entry>` names what the claim may write beside its scope, in `aco status`'s own form (STAT-19, STAT-20, STAT-21); none configured, no such line.
-- [ ] [BRIEF-03] With no live issue claim, `CLAIM` prints exactly `no active claim`; `TIP` prints no value line at all; `TOUCHED` lists nothing (see E-BRIEF-02).
-- [ ] [BRIEF-04] With a live claim whose branch resolves neither locally nor as `origin/<branch>` -- git itself answering "no such ref" -- `TIP` prints `branch not found` and `TOUCHED` lists nothing (see E-BRIEF-03).
-- [ ] [BRIEF-05] With a live claim whose branch resolves, `TIP` prints that branch's own commit id, and `TOUCHED` lists one path per line from `git diff --name-only <trunk>...<tip>` (see E-BRIEF-01, E-BRIEF-14).
-- [ ] [BRIEF-18] A live claim's branch read failing instead of answering not-found, or its `<trunk>...<tip>` diff failing, refuses with git's own detail, exit `2`, `reason: unavailable` (see E-BRIEF-12).
-- [ ] [BRIEF-20] A found tip with no `<trunk>` refuses `cannot determine the trunk: none of <remote>/HEAD, <remote>/main, <remote>/master, main or master resolves`, exit `2` (see E-BRIEF-16).
-- [ ] [BRIEF-21] A `<remote>` with branches refuses instead `cannot determine the trunk: no <remote>/HEAD, <remote>/main or <remote>/master resolves; run git remote set-head <remote> -a`, exit `2` (see E-BRIEF-15).
-- [ ] [BRIEF-22] A `<remote>` with no URL configured refuses instead `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-BRIEF-17).
-- [ ] [BRIEF-08] `<item>` naming no item at all prints one empty line for the missing body, then every section exactly as BRIEF-01..06 describe with no live claim -- never a refusal (see E-BRIEF-06).
-- [ ] [BRIEF-29] Text prints a ruled option line of a valid body as its `text`, `ruling`, `ruled_on`, `via`, `question` and the chosen option's `name` and `contract` only; bytes outside the block stay (E-BRIEF-19).
-- [ ] [BRIEF-30] Text prints an option line ruled `other` as its `text`, `ruling`, `ruled_on`, `via`, the operator's `other` answer and `question`, and no option.
-- [ ] [BRIEF-31] Text prints open, returned, withdrawn and yes/no lines in full, content unchanged; a body not valid or with no ruled option line prints byte for byte. `--json`'s `"body"` is as stored.
-- [ ] [BRIEF-23] Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `"body"` keeps it as stored.
+- BRIEF-01: `aco brief <item>` prints the body (as BRIEF-29 to BRIEF-31 show it), a blank line, `CLAIM`, a blank line, `TIP`, a blank line, `TOUCHED` -- always these four headings in order (see E-BRIEF-01).
+- BRIEF-02: Under a live issue claim, `CLAIM` is followed by one line `<agent> (<role>) branch=<branch> base=<base>[ <age>]`, branch before base (see E-BRIEF-01).
+- BRIEF-11: That claim line's indented lines are one per scope path, then `  whole: <reason>` only when the claim carries one (see E-BRIEF-01).
+- BRIEF-26: After them, `  lane-shared: <entry>, <entry>` names what the claim may write beside its scope, in `aco status`'s own form (STAT-19, STAT-20, STAT-21); none configured, no such line.
+- BRIEF-03: With no live issue claim, `CLAIM` prints exactly `no active claim`; `TIP` prints no value line at all; `TOUCHED` lists nothing (see E-BRIEF-02).
+- BRIEF-04: With a live claim whose branch resolves neither locally nor as `origin/<branch>` -- git itself answering "no such ref" -- `TIP` prints `branch not found` and `TOUCHED` lists nothing (see E-BRIEF-03).
+- BRIEF-05: With a live claim whose branch resolves, `TIP` prints that branch's own commit id, and `TOUCHED` lists one path per line from `git diff --name-only <trunk>...<tip>` (see E-BRIEF-01, E-BRIEF-14).
+- BRIEF-18: A live claim's branch read failing instead of answering not-found, or its `<trunk>...<tip>` diff failing, refuses with git's own detail, exit `2`, `reason: unavailable` (see E-BRIEF-12).
+- BRIEF-20: A found tip with no `<trunk>` refuses `cannot determine the trunk: none of <remote>/HEAD, <remote>/main, <remote>/master, main or master resolves`, exit `2` (see E-BRIEF-16).
+- BRIEF-21: A `<remote>` with branches refuses instead `cannot determine the trunk: no <remote>/HEAD, <remote>/main or <remote>/master resolves; run git remote set-head <remote> -a`, exit `2` (see E-BRIEF-15).
+- BRIEF-22: A `<remote>` with no URL configured refuses instead `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-BRIEF-17).
+- BRIEF-08: `<item>` naming no item at all prints one empty line for the missing body, then every section exactly as BRIEF-01..06 describe with no live claim -- never a refusal (see E-BRIEF-06).
+- BRIEF-29: Text prints a ruled option line of a valid body as its `text`, `ruling`, `ruled_on`, `via`, `question` and the chosen option's `name` and `contract` only; bytes outside the block stay (E-BRIEF-19).
+- BRIEF-30: Text prints an option line ruled `other` as its `text`, `ruling`, `ruled_on`, `via`, the operator's `other` answer and `question`, and no option.
+- BRIEF-31: Text prints open, returned, withdrawn and yes/no lines in full, content unchanged; a body not valid or with no ruled option line prints byte for byte. `--json`'s `"body"` is as stored.
+- BRIEF-23: Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `"body"` keeps it as stored.
 
 ## `--json`
 
-- [ ] [BRIEF-06] `aco brief <item> --json` prints `specs/output.spec.md`'s envelope, `reason: "composed"`, `"body", "claim", "tip", "touched"` (as `TOUCHED`), `"claim"` `null` without a live claim (see E-BRIEF-14).
-- [ ] [BRIEF-27] `"outside_claim"`, after `"touched"`, lists each touched path, in order, that LAND-88 leaves uncovered, `[]` when none, `null` without a live claim (see E-BRIEF-04).
-- [ ] [BRIEF-28] Text `aco brief` shows each display control in the `CLAIM` line's agent, role, branch and in its `whole:` line as NEXT-37 does; `--json`'s `claim` carries them as stored.
-- [ ] [BRIEF-10] A non-`null` `"claim"` object is `{"agent", "role", "branch", "base", "scope", "whole", "age"}` then STAT-22's keys, `"whole"` `null` without one (see E-BRIEF-04).
+- BRIEF-06: `aco brief <item> --json` prints `specs/output.spec.md`'s envelope, `reason: "composed"`, `"body", "claim", "tip", "touched"` (as `TOUCHED`), `"claim"` `null` without a live claim (see E-BRIEF-14).
+- BRIEF-27: `"outside_claim"`, after `"touched"`, lists each touched path, in order, that LAND-88 leaves uncovered, `[]` when none, `null` without a live claim (see E-BRIEF-04).
+- BRIEF-28: Text `aco brief` shows each display control in the `CLAIM` line's agent, role, branch and in its `whole:` line as NEXT-37 does; `--json`'s `claim` carries them as stored.
+- BRIEF-10: A non-`null` `"claim"` object is `{"agent", "role", "branch", "base", "scope", "whole", "age"}` then STAT-22's keys, `"whole"` `null` without one (see E-BRIEF-04).
 
 ## `--step`
 
@@ -79,19 +79,19 @@ object. A refusal reaching the shared collection point prints
 | no tracked `.aco/brief.toml` | BRIEF-15 | BRIEF-15 |
 | a tracked `.aco/brief.toml` naming an unknown key | BRIEF-24 | BRIEF-24 |
 
-- [ ] [BRIEF-12] `--step <step>` prints the four sections, then a blank line, `RULES`, one line per `[<step>].rules` entry, empty when it names none (see E-BRIEF-07).
-- [ ] [BRIEF-13] `RULES`' own lines are followed by a blank line, `CHECKS`, one line per `[<step>].checks` entry, empty when it names none (see E-BRIEF-07).
-- [ ] [BRIEF-14] `aco brief <item> --step <step> --json` adds `"rules"` and `"checks"` string-list keys to BRIEF-06/BRIEF-10's own object (see E-BRIEF-08).
-- [ ] [BRIEF-15] `--step <step>` refuses `no .aco/brief.toml in the repository`, exit `2`, before reading the body or claim, when the repository tracks no such file (see E-BRIEF-09).
-- [ ] [BRIEF-25] Text shows each `RULES` and `CHECKS` entry on one line, every display control escaped (NEXT-37): a line feed prints as `\n`; `--json`'s `"rules"` and `"checks"` keep each entry as stored.
-- [ ] [BRIEF-24] An unknown key refuses `brief configuration <path> has unknown top-level key <keys>` or `... [<step>] has unknown key <keys>`, each display control escaped (NEXT-37), exit `2` (see E-BRIEF-18).
+- BRIEF-12: `--step <step>` prints the four sections, then a blank line, `RULES`, one line per `[<step>].rules` entry, empty when it names none (see E-BRIEF-07).
+- BRIEF-13: `RULES`' own lines are followed by a blank line, `CHECKS`, one line per `[<step>].checks` entry, empty when it names none (see E-BRIEF-07).
+- BRIEF-14: `aco brief <item> --step <step> --json` adds `"rules"` and `"checks"` string-list keys to BRIEF-06/BRIEF-10's own object (see E-BRIEF-08).
+- BRIEF-15: `--step <step>` refuses `no .aco/brief.toml in the repository`, exit `2`, before reading the body or claim, when the repository tracks no such file (see E-BRIEF-09).
+- BRIEF-25: Text shows each `RULES` and `CHECKS` entry on one line, every display control escaped (NEXT-37): a line feed prints as `\n`; `--json`'s `"rules"` and `"checks"` keep each entry as stored.
+- BRIEF-24: An unknown key refuses `brief configuration <path> has unknown top-level key <keys>` or `... [<step>] has unknown key <keys>`, each display control escaped (NEXT-37), exit `2` (see E-BRIEF-18).
 
 ## Forge resolution
 
-- [ ] [BRIEF-07] `aco brief <item>` on a canonical remote whose host has no forge adapter refuses `no forge adapter for host <host>`, exit `2`, before any forge resolution (see E-BRIEF-05).
-- [ ] [BRIEF-09] Under `storage = "state-ref"`, `aco brief <item>` resolves the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
-- [ ] [BRIEF-17] `--json` on a dispatched refusal (see BRIEF-07/09/15/18/19/20/24) prints `specs/output.spec.md`'s envelope, the sentence as `message`, `reason` from the table below (see E-BRIEF-11).
-- [ ] [BRIEF-19] A forge failure reading the item refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, or `"unreachable"` when it could not be reached or is rate limited (OUT-12) (see E-BRIEF-13).
+- BRIEF-07: `aco brief <item>` on a canonical remote whose host has no forge adapter refuses `no forge adapter for host <host>`, exit `2`, before any forge resolution (see E-BRIEF-05).
+- BRIEF-09: Under `storage = "state-ref"`, `aco brief <item>` resolves the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
+- BRIEF-17: `--json` on a dispatched refusal (see BRIEF-07/09/15/18/19/20/24) prints `specs/output.spec.md`'s envelope, the sentence as `message`, `reason` from the table below (see E-BRIEF-11).
+- BRIEF-19: A forge failure reading the item refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, or `"unreachable"` when it could not be reached or is rate limited (OUT-12) (see E-BRIEF-13).
 
 `reason`, by which refusal fired:
 
@@ -109,7 +109,7 @@ object. A refusal reaching the shared collection point prints
 - `aco brief` never writes: it is a pure composition of the item's body, the store's live claims, and one local `git diff` -- plus, only with `--step`, the tracked brief configuration -- never a new data source and never a transition against the state ref.
 - `aco brief`'s claim line is never `aco status`'s own `CLAIMED`/`CONFLICT` line (CLAIM-01): it carries no verb, no identity prefix, no `claim=` field, and orders `branch=` before `base=`, the reverse of `status`'s own order.
 - `aco brief --json`'s claim object is never `aco status --json`'s own claim object (STAT-07, STAT-09): no `claim_id`, `resource`, `resource_value`, `overlaps`, or `old` key.
-- [ ] [BRIEF-16] Without `--step`, `.aco/brief.toml`'s presence or content changes nothing: `brief` prints exactly BRIEF-01..06's sections either way (see E-BRIEF-10).
+- BRIEF-16: Without `--step`, `.aco/brief.toml`'s presence or content changes nothing: `brief` prints exactly BRIEF-01..06's sections either way (see E-BRIEF-10).
 - `aco brief --step` never writes: `.aco/brief.toml` is one more existing read, never a write, and never a new claim or state-ref transition.
 
 ## Examples

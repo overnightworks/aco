@@ -36,24 +36,24 @@ left, never a withdrawn one.
 | two writers of one item on this machine | WITHDRAW-15 | — |
 | a withdrawal written | WITHDRAW-18 | — |
 
-- [ ] [WITHDRAW-01] An open or returned option line makes `aco withdraw ITEM --line N` print `WITHDRAWN #<n> line <k>; <m> line(s) still open`, exit `0` (see E-WITHDRAW-01).
-- [ ] [WITHDRAW-02] That line's entry becomes its `text` and today's UTC `withdrawn_on`, nothing else, at the same index; every other entry keeps its values (BODY-88, BODY-104).
-- [ ] [WITHDRAW-03] `--json` on the same call prints the envelope with `reason: "withdrawn"`, then `"item": <n>, "index": <k>, "withdrawn_on": "<date>", "open": <m>` (see E-WITHDRAW-01).
-- [ ] [WITHDRAW-04] `--line` may repeat: each named line is checked in the order written by WITHDRAW-06..08, and all are written in one body write with one UTC date, or none is.
-- [ ] [WITHDRAW-05] Several lines print `WITHDRAWN #<n> lines <k>, …; <m> line(s) still open`; their `--json` carries `"lines": [{"index": <k>}, …]` in place of `index` (see E-WITHDRAW-02).
-- [ ] [WITHDRAW-06] `--line N` outside the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write; `<m>` counts withdrawn lines.
-- [ ] [WITHDRAW-07] A line already withdrawn refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after WITHDRAW-06 (see E-WITHDRAW-03).
-- [ ] [WITHDRAW-08] A ruled line, an option line or a yes/no line, refuses `line <k> is already ruled; a ruled line stays as it is`, exit `2`, before any write, after WITHDRAW-07 (see E-WITHDRAW-03).
-- [ ] [WITHDRAW-09] A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call.
-- [ ] [WITHDRAW-10] A missing item refuses `<label> does not exist`, a pull request `#<n> is a pull request, not an issue; withdraw needs an issue`, exit `2`, before any write.
-- [ ] [WITHDRAW-11] A MALFORMED item body refuses `<label> <body defect sentence>; withdraw needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref`.
-- [ ] [WITHDRAW-12] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
-- [ ] [WITHDRAW-17] A withdrawal write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the withdrawal is written (see E-WITHDRAW-06).
-- [ ] [WITHDRAW-13] Every other forge failure, the read and the write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
-- [ ] [WITHDRAW-15] Every withdrawal runs in the item's turn (RULE-40): writers of one item on this machine are serialized, so a withdrawal and a ruling on distinct lines both land; a held lock prints RULE-42's line.
-- [ ] [WITHDRAW-16] A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
-- [ ] [WITHDRAW-18] A verified withdrawal touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
-- [ ] [WITHDRAW-14] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
+- WITHDRAW-01: An open or returned option line makes `aco withdraw ITEM --line N` print `WITHDRAWN #<n> line <k>; <m> line(s) still open`, exit `0` (see E-WITHDRAW-01).
+- WITHDRAW-02: That line's entry becomes its `text` and today's UTC `withdrawn_on`, nothing else, at the same index; every other entry keeps its values (BODY-88, BODY-104).
+- WITHDRAW-03: `--json` on the same call prints the envelope with `reason: "withdrawn"`, then `"item": <n>, "index": <k>, "withdrawn_on": "<date>", "open": <m>` (see E-WITHDRAW-01).
+- WITHDRAW-04: `--line` may repeat: each named line is checked in the order written by WITHDRAW-06..08, and all are written in one body write with one UTC date, or none is.
+- WITHDRAW-05: Several lines print `WITHDRAWN #<n> lines <k>, …; <m> line(s) still open`; their `--json` carries `"lines": [{"index": <k>}, …]` in place of `index` (see E-WITHDRAW-02).
+- WITHDRAW-06: `--line N` outside the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write; `<m>` counts withdrawn lines.
+- WITHDRAW-07: A line already withdrawn refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after WITHDRAW-06 (see E-WITHDRAW-03).
+- WITHDRAW-08: A ruled line, an option line or a yes/no line, refuses `line <k> is already ruled; a ruled line stays as it is`, exit `2`, before any write, after WITHDRAW-07 (see E-WITHDRAW-03).
+- WITHDRAW-09: A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call.
+- WITHDRAW-10: A missing item refuses `<label> does not exist`, a pull request `#<n> is a pull request, not an issue; withdraw needs an issue`, exit `2`, before any write.
+- WITHDRAW-11: A MALFORMED item body refuses `<label> <body defect sentence>; withdraw needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref`.
+- WITHDRAW-12: Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
+- WITHDRAW-17: A withdrawal write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the withdrawal is written (see E-WITHDRAW-06).
+- WITHDRAW-13: Every other forge failure, the read and the write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
+- WITHDRAW-15: Every withdrawal runs in the item's turn (RULE-40): writers of one item on this machine are serialized, so a withdrawal and a ruling on distinct lines both land; a held lock prints RULE-42's line.
+- WITHDRAW-16: A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
+- WITHDRAW-18: A verified withdrawal touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
+- WITHDRAW-14: `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
 
 `reason`, by which refusal fired:
 

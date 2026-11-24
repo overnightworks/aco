@@ -41,66 +41,66 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | no item, a failure that is not transient | WAIT-20 | WAIT-20 |
 | `--line` without an item, or an item without `--line` | WAIT-21 | WAIT-21 |
 
-- [ ] [WAIT-01] `aco wait ITEM --line N` ends, exit `0`, as soon as one named line is no longer open, printing `CHANGED <label> line <k>: <state>` for each such named line (see E-WAIT-01).
+- WAIT-01: `aco wait ITEM --line N` ends, exit `0`, as soon as one named line is no longer open, printing `CHANGED <label> line <k>: <state>` for each such named line (see E-WAIT-01).
   - The lines come in the item's order; a line named twice counts once.
   - `<state>` is the text `aco rulings` prints after the index (RUL-02, RUL-18, RUL-22): `ruled <ruling> <date>`, `with head <date>` or `withdrawn <date>`.
-- [ ] [WAIT-02] `--json` on the same call prints the envelope with `reason: "changed"`, then `"item": <n>, "lines": [{"index": <k>, "state": "<state>"}, …]`, the lines as WAIT-01 names them (see E-WAIT-01).
-- [ ] [WAIT-03] A named line that is not open when the command starts ends it at once, the same way as WAIT-01; a yes/no line is never open (see E-WAIT-02).
-- [ ] [WAIT-04] A missing item, a pull request, a closed item or a MALFORMED body refuses, exit `2`, before any waiting, once the first read answers (WAIT-22) (see E-WAIT-03):
+- WAIT-02: `--json` on the same call prints the envelope with `reason: "changed"`, then `"item": <n>, "lines": [{"index": <k>, "state": "<state>"}, …]`, the lines as WAIT-01 names them (see E-WAIT-01).
+- WAIT-03: A named line that is not open when the command starts ends it at once, the same way as WAIT-01; a yes/no line is never open (see E-WAIT-02).
+- WAIT-04: A missing item, a pull request, a closed item or a MALFORMED body refuses, exit `2`, before any waiting, once the first read answers (WAIT-22) (see E-WAIT-03):
   - a missing item: `<label> does not exist`; a pull request: `#<n> is a pull request, not an issue; wait needs an issue`
   - a closed item: `<label> is closed; there is nothing to wait for`
   - a MALFORMED body: `<label> <body defect sentence>; wait needs a valid aco block`; PIN-14/PIN-15's sentence replaces it under `state-ref`
-- [ ] [WAIT-05] `--line N` beyond the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any waiting but a rate limit's (WAIT-22).
+- WAIT-05: `--line N` beyond the item's lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any waiting but a rate limit's (WAIT-22).
   - `<m>` counts withdrawn lines (see E-WAIT-03)
-- [ ] [WAIT-06] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
-- [ ] [WAIT-07] The command reads the item once at its start (again under a rate limit, WAIT-22), then only the modification time of the signal file (WAIT-12), every two seconds; waiting costs no forge read.
+- WAIT-06: Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
+- WAIT-07: The command reads the item once at its start (again under a rate limit, WAIT-22), then only the modification time of the signal file (WAIT-12), every two seconds; waiting costs no forge read.
   - It reads the item again when that time has moved, and ends or goes on waiting by WAIT-01; every read is fresh from the store, under `state-ref` a new fetch of the state ref.
-- [ ] [WAIT-08] Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too; after a rate limit the next read is WAIT-22's.
-- [ ] [WAIT-09] The command has no timeout and no other end of its own; the session that started it stops it.
-- [ ] [WAIT-10] A forge failure at the start, other than a rate limit (WAIT-22), refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, as do an unreadable signal and a later non-transient failure:
+- WAIT-08: Every ten minutes it reads the item again whether or not the signal moved, so a line changed outside aco (a hand edit, another machine) ends it too; after a rate limit the next read is WAIT-22's.
+- WAIT-09: The command has no timeout and no other end of its own; the session that started it stops it.
+- WAIT-10: A forge failure at the start, other than a rate limit (WAIT-22), refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`, as do an unreadable signal and a later non-transient failure:
   - `cannot watch the item's signal at <signal path>: <detail>`, before the item is read
   - a later read that fails transiently prints one `WARNING: the item could not be read, still waiting: <sentence>` to stderr for a run of failed reads; the wait goes on and the next read that answers decides (WAIT-01, WAIT-04)
-- [ ] [WAIT-11] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
-- [ ] [WAIT-12] Every write of a ruled, returned or withdrawn line that aco makes touches one file per item, after the write has been verified (see E-WAIT-04):
+- WAIT-11: `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
+- WAIT-12: Every write of a ruled, returned or withdrawn line that aco makes touches one file per item, after the write has been verified (see E-WAIT-04):
   - the writers are `aco rule`, `aco withdraw`, the board's decision and the `record_answer` tool
   - the file is `item-signals/<digest>` under aco's state directory, `<digest>` the one that names the item's lock file (RULE-40)
   - `ask`, `step`, the board's step answer, `aco rescope` and `aco item edit` never touch it
-- [ ] [WAIT-13] A signal that cannot be created or touched leaves the write standing, its result and exit status unchanged, and prints one warning line to stderr (see E-WAIT-04):
+- WAIT-13: A signal that cannot be created or touched leaves the write standing, its result and exit status unchanged, and prints one warning line to stderr (see E-WAIT-04):
   - `WARNING: the ruling stands, but its signal at <signal path> could not be touched: <detail>`
   - a waiting session then learns the answer by WAIT-08
-- [ ] [WAIT-14] `aco wait [--json]` without an item ends, exit `0`, when `aco next` names an action or a line that waited on the operator at its previous read no longer does (see E-WAIT-05, E-WAIT-06).
+- WAIT-14: `aco wait [--json]` without an item ends, exit `0`, when `aco next` names an action or a line that waited on the operator at its previous read no longer does (see E-WAIT-05, E-WAIT-06).
   - It ends at once when `aco next` names an action at its start; it has no timeout (WAIT-09).
   - A line of an item that is no longer open is not reported.
-- [ ] [WAIT-26] An item that waits on the operator by NEXT-70 is no action: `aco wait` without an item does not end on it, and ends once one of its lines is ruled or sent back.
-- [ ] [WAIT-15] It prints `ACTIONABLE <label>` for the item `aco next` names, then `CHANGED <label> line <k>: <state>` (the WAIT-01 shape) for each changed line, in board order (see E-WAIT-05, E-WAIT-06).
-- [ ] [WAIT-16] `--json` prints `reason: "actionable"` with `"item": <n>` when an action is named, else `reason: "changed"`, and `"lines": [{"item": <n>, "index": <k>, "state": "<state>"}, …]` (see E-WAIT-05).
+- WAIT-26: An item that waits on the operator by NEXT-70 is no action: `aco wait` without an item does not end on it, and ends once one of its lines is ruled or sent back.
+- WAIT-15: It prints `ACTIONABLE <label>` for the item `aco next` names, then `CHANGED <label> line <k>: <state>` (the WAIT-01 shape) for each changed line, in board order (see E-WAIT-05, E-WAIT-06).
+- WAIT-16: `--json` prints `reason: "actionable"` with `"item": <n>` when an action is named, else `reason: "changed"`, and `"lines": [{"item": <n>, "index": <k>, "state": "<state>"}, …]` (see E-WAIT-05).
   - An `actionable` envelope carries `lines` only when lines changed too; a `changed` one always does (see E-WAIT-06).
-- [ ] [WAIT-17] Every two seconds it looks at the signal (WAIT-12) of each item with a line that waited on the operator at its last read, and reads only that item again when its signal moved (see E-WAIT-05).
+- WAIT-17: Every two seconds it looks at the signal (WAIT-12) of each item with a line that waited on the operator at its last read, and reads only that item again when its signal moved (see E-WAIT-05).
   - A ruling through the board, `record_answer` or `aco rule` thus ends it in about two seconds, with the lines of that item that no longer wait; the board read is not needed and `aco next` is not asked.
   - A signal is first looked at after the read that found its item, so the item is read once more then: a ruling in between is not lost.
   - An item that is closed is not reported; one that no longer reads as an item is left to the next board read.
-- [ ] [WAIT-18] Every minute it checks whether the board changed, and reads it when it did:
+- WAIT-18: Every minute it checks whether the board changed, and reads it when it did:
   - under `storage = "github"`: one conditional request each for the repository's most recently updated issue and for each open blocker in another repository
   - under either storage: a read of the state ref's tip; under `state-ref` it is the only check
   - an open blocker in another repository that a read found for the first time is read once more after its first probe, for it may have closed in between
-- [ ] [WAIT-19] It reads the board every hour, and on the first tick on or after 00:00 UTC of the earliest `until` date still ahead; the date is compared on each tick and found again after each read.
-- [ ] [WAIT-20] A forge answer "not modified" means unchanged, whatever the exit status of the call; "modified" means changed and its tag is sent back as it came (see E-WAIT-08):
+- WAIT-19: It reads the board every hour, and on the first tick on or after 00:00 UTC of the earliest `until` date still ahead; the date is compared on each tick and found again after each read.
+- WAIT-20: A forge answer "not modified" means unchanged, whatever the exit status of the call; "modified" means changed and its tag is sent back as it came (see E-WAIT-08):
   - a transient forge failure, or a failed read of the state ref's tip, prints one `WARNING: the board could not be read, still waiting: <sentence>` to stderr per run of failures; the wait goes on
   - a failure at the start other than a rate limit (WAIT-22), or any other failure, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`
-- [ ] [WAIT-21] `--line` without an item, or an item without `--line`, refuses `wait needs an item together with --line, or neither of them`, exit `2`, `--json` `reason: "invalid_usage"` (see E-WAIT-07).
+- WAIT-21: `--line` without an item, or an item without `--line`, refuses `wait needs an item together with --line, or neither of them`, exit `2`, `--json` `reason: "invalid_usage"` (see E-WAIT-07).
   - `aco wait ITEM --line N` is WAIT-01 to WAIT-13 unchanged.
-- [ ] [WAIT-22] A read or check refused under a rate limit (OUT-13), at the start or while it waits, prints the WAIT-10 or WAIT-20 warning with its sentence once per run of failures and goes on (see E-WAIT-09):
+- WAIT-22: A read or check refused under a rate limit (OUT-13), at the start or while it waits, prints the WAIT-10 or WAIT-20 warning with its sentence once per run of failures and goes on (see E-WAIT-09):
   - the next call to GitHub's REST API, a probe included, comes no earlier than the reset the sentence names and at least a minute later; a minute later when no reset was read
   - a run that began with another failure prints the warning once more when it meets the rate limit
   - a later failure without a reset never moves that time earlier; a moved signal causes no read before it; the state ref's own check goes on
   - the first read of the board stays owed to that time; the item's own first read answers before WAIT-04 and WAIT-05 apply
-- [ ] [WAIT-23] `aco wait` without an item also ends, exit `0`, when a recurring audit of `.aco/board.toml` is due as `aco next` names it (NEXT-62; see E-WAIT-10).
+- WAIT-23: `aco wait` without an item also ends, exit `0`, when a recurring audit of `.aco/board.toml` is due as `aco next` names it (NEXT-62; see E-WAIT-10).
   - an audit that is not due or unavailable (NEXT-67) does not end it
   - `aco wait ITEM --line N` is unchanged.
-- [ ] [WAIT-24] Each board read lists an entry's anchor (NEXT-65) only when the newest trunk landing's commit or the day differs from the last complete listing's.
+- WAIT-24: Each board read lists an entry's anchor (NEXT-65) only when the newest trunk landing's commit or the day differs from the last complete listing's.
   - the due audits stay under that key
   - a listing with an unavailable audit is not kept, so the next read lists again; without an `audit` entry nothing is listed
-- [ ] [WAIT-25] It prints `AUDIT <name>` per due audit, in entry order, before `ACTIONABLE` and `CHANGED` (see E-WAIT-10).
+- WAIT-25: It prints `AUDIT <name>` per due audit, in entry order, before `ACTIONABLE` and `CHANGED` (see E-WAIT-10).
   - `--json` always carries `"audits": [<name>, …]` last, `[]` when none is due
   - `--json` prints `reason: "audit_due"` when an audit is due and no action is named
   - `lines` follows WAIT-16 under every reason, so a due audit beside changed lines and no action prints `AUDIT` before `CHANGED`, with `reason: "audit_due"` and the `lines`; without an `audit` entry the output is WAIT-15's and WAIT-16's with the empty `audits` key only.

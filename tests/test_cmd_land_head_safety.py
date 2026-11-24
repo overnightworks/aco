@@ -103,7 +103,8 @@ def lane(
 def test_land_refuses_a_head_it_must_not_act_on_before_any_write(
     lane: LaneLandingWorld, capsys: pytest.CaptureFixture[str], case: Refused
 ) -> None:
-    """Spec: LANDCMD-50..53 -- an unsafe head name refuses on both paths and a merged
+    """Spec: LANDCMD-50, LANDCMD-51, LANDCMD-52, LANDCMD-53
+    -- an unsafe head name refuses on both paths and a merged
     pull request of another repository refuses on rerun, before anything is written,
     the unsafe name first."""
     landing = lane.forge.landings[12]

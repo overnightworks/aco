@@ -292,8 +292,8 @@ def test_refusal_writes_nothing(
     reason: str,
     as_json: bool,
 ) -> None:
-    """Spec: WITHDRAW-04, WITHDRAW-06..08, WITHDRAW-10, WITHDRAW-11, WITHDRAW-13,
-    WITHDRAW-14, Never 1 -- the first refusal in written order, and no write."""
+    """Spec: WITHDRAW-04, WITHDRAW-06, WITHDRAW-07, WITHDRAW-08, WITHDRAW-10, WITHDRAW-11,
+    WITHDRAW-13, WITHDRAW-14, Never 1 -- the first refusal in written order, and no write."""
     client = serve_forge(monkeypatch, served())
     named = [flag for index in lines for flag in ("--line", index)]
     result = run_cli(["withdraw", "7", *named, *(["--json"] if as_json else [])], capsys)

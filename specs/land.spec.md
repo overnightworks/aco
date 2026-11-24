@@ -98,93 +98,93 @@ the pull request's head branch is checked (LANDCMD-50), for the stored runs of L
 missing or unreadable state ref refuses before the pull request's checks of LANDCMD-02 on; the
 second is the claim check of LANDCMD-10.
 
-- [ ] [LANDCMD-50] On a first run and a rerun alike, a head branch that is no safe branch name refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2` (E-LANDCMD-50).
-- [ ] [LANDCMD-51] A merged or queued pull request from another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
-- [ ] [LANDCMD-52] LANDCMD-50 and LANDCMD-51 refuse after the first read, before LANDCMD-02 (a queued or queue-merged one: after the reads of LANDCMD-69); LANDCMD-50 shows `<branch>` escaped, cut to 200 characters.
-- [ ] [LANDCMD-53] LANDCMD-51 comes before LANDCMD-11 and after LANDCMD-50, and the wait of LANDCMD-69 after both; a first run meets the same sentence at LANDCMD-07 (LAND-12).
-- [ ] [LANDCMD-33] A `--head` that is not 7 to 40 hex digits refuses `--head must be 7 to 40 hex digits`, exit `2`, at the argument parse: before any read, PIN-32, or LANDCMD-01, on a rerun too (E-LANDCMD-33).
-- [ ] [LANDCMD-44] An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
-- [ ] [LANDCMD-01] Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
-- [ ] [LANDCMD-19] `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
-- [ ] [LANDCMD-77] `--record <file>` is checked before any merge or write, a rerun too: LANREC-31 at the argument parse, LANREC-38, 39, 44 after LANDCMD-19, LANREC-98 after LANDCMD-50; it writes its record (LANREC-42).
-- [ ] [LANDCMD-31] `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
-- [ ] [LANDCMD-32] Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
-- [ ] [LANDCMD-02] A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
-- [ ] [LANDCMD-74] A draft pull request refuses `pull request #<n> is a draft; mark it ready with gh pr ready <n>`, exit `2`, after LANDCMD-02 and before LANDCMD-43, on the queue path (LANDCMD-60) too (E-LANDCMD-74).
-- [ ] [LANDCMD-43] If `<branch>`'s config has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
-- [ ] [LANDCMD-03] A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
-- [ ] [LANDCMD-45] While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
-- [ ] [LANDCMD-46] A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`.
+- LANDCMD-50: On a first run and a rerun alike, a head branch that is no safe branch name refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2` (E-LANDCMD-50).
+- LANDCMD-51: A merged or queued pull request from another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified`, exit `2`, nothing written.
+- LANDCMD-52: LANDCMD-50 and LANDCMD-51 refuse after the first read, before LANDCMD-02 (a queued or queue-merged one: after the reads of LANDCMD-69); LANDCMD-50 shows `<branch>` escaped, cut to 200 characters.
+- LANDCMD-53: LANDCMD-51 comes before LANDCMD-11 and after LANDCMD-50, and the wait of LANDCMD-69 after both; a first run meets the same sentence at LANDCMD-07 (LAND-12).
+- LANDCMD-33: A `--head` that is not 7 to 40 hex digits refuses `--head must be 7 to 40 hex digits`, exit `2`, at the argument parse: before any read, PIN-32, or LANDCMD-01, on a rerun too (E-LANDCMD-33).
+- LANDCMD-44: An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
+- LANDCMD-01: Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
+- LANDCMD-19: `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
+- LANDCMD-77: `--record <file>` is checked before any merge or write, a rerun too: LANREC-31 at the argument parse, LANREC-38, 39, 44 after LANDCMD-19, LANREC-98 after LANDCMD-50; it writes its record (LANREC-42).
+- LANDCMD-31: `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
+- LANDCMD-32: Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
+- LANDCMD-02: A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
+- LANDCMD-74: A draft pull request refuses `pull request #<n> is a draft; mark it ready with gh pr ready <n>`, exit `2`, after LANDCMD-02 and before LANDCMD-43, on the queue path (LANDCMD-60) too (E-LANDCMD-74).
+- LANDCMD-43: If `<branch>`'s config has a `gate` key, no `quality / verdict` check refuses `pull request #<n> has no quality / verdict check; <branch> adopts the quality gate (quality/config.toml)`, exit `2`.
+- LANDCMD-03: A pull request whose own `mergeable_state` is not `clean` refuses `pull request #<n> is not mergeable (<state>)`, exit `2`.
+- LANDCMD-45: While an open pull request's `mergeable_state` is `unknown`, `land` waits 3 seconds and reads the readiness again, at most 10 times; the last read is judged (LANDCMD-03), any other state at once.
+- LANDCMD-46: A GitHub read before the merge failing unclassified, transiently or malformed refuses `pull request #<n> was not merged: reading <what> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`.
   - a GitHub rate limit is such a transient failure: `<error>` is the sentence of OUT-13
-- [ ] [LANDCMD-49] `was not merged` means this run merged nothing: it also holds when an earlier run merged the pull request and a read of this rerun fails (LANDCMD-18).
-- [ ] [LANDCMD-47] `<what>` is `the pull request`, `its landing preconditions`, `its merge rules` or `its merge queue state`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
-- [ ] [LANDCMD-48] `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable or invalid `quality/config.toml` takes LANDCMD-46).
-- [ ] [LANDCMD-04] A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
-- [ ] [LANDCMD-05] A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
-- [ ] [LANDCMD-06] Once all checks completed, one neither successful nor skipped refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
-- [ ] [LANDCMD-56] Of several check runs with one name on the head, only the newest (highest id) counts: a red run a later green one replaced never refuses, a newer red one always does.
-- [ ] [LANDCMD-07] This pull request's own shape decides its classification, exactly as `check <pr>` reads it (LAND-06..13, 32, 91): a shape defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
-- [ ] [LANDCMD-22] After LANDCMD-07, a head without `<path>` refuses `pull request #<n> removes <path>; aco land cannot release its claim across that change`, exit `2` (E-LANDCMD-22).
-- [ ] [LANDCMD-23] A head changing `storage` or `canonical_remote` in `<path>` refuses `pull request #<n> changes <setting> in <path>; aco land cannot release its claim across that change`, exit `2`.
-- [ ] [LANDCMD-24] A head `<path>` the pin's own validator refuses prints `pull request #<n> carries an invalid <path>: <detail>`, exit `2`.
-- [ ] [LANDCMD-08] A classified work item that is not open refuses `work item #<n> is not open; it cannot be landed`, exit `2`; an issue-less pull request skips this check.
-- [ ] [LANDCMD-09] The classification's claim, parent and closing rules apply (LAND-14..28, LAND-70..77, LAND-79, LAND-87..90): defects refuse `pull request #<n> <that same defect sentence>`, exit `2`.
-- [ ] [LANDCMD-10] A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence, naming REL-41's `aco handover` route, an item's or a lane's), exit `2`, before the merge.
-- [ ] [LANDCMD-11] This checkout must sit on the forge's default branch with nothing uncommitted, or `aco land` refuses `land must run from a clean checkout of the default branch '<branch>'`, exit `2`.
-- [ ] [LANDCMD-25] A checkout without a git identity refuses `land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state`, exit `2`.
-- [ ] [LANDCMD-20] The forge names `<branch>` even where the canonical remote records no `HEAD`; LANDCMD-11 never reads one.
+- LANDCMD-49: `was not merged` means this run merged nothing: it also holds when an earlier run merged the pull request and a read of this rerun fails (LANDCMD-18).
+- LANDCMD-47: `<what>` is `the pull request`, `its landing preconditions`, `its merge rules` or `its merge queue state`; `<error>` is escaped and cut alone to keep the refusal within 200 characters (E-LANDCMD-46).
+- LANDCMD-48: `land` never repeats a failed read itself; a not-found, a permission or an unsupported answer keeps its own text (LANDCMD-43's unreadable or invalid `quality/config.toml` takes LANDCMD-46).
+- LANDCMD-04: A pull request exposing no CI checks against its own head commit refuses `pull request #<n> exposes no CI checks; cannot verify green CI`, exit `2`.
+- LANDCMD-05: A pull request with one or more checks not yet completed refuses `pull request #<n> has checks still running: <name>, <name>; wait for every check to succeed`, exit `2`.
+- LANDCMD-06: Once all checks completed, one neither successful nor skipped refuses `pull request #<n> has non-successful checks: <name> (<conclusion>); land only after every check succeeds`, exit `2`.
+- LANDCMD-56: Of several check runs with one name on the head, only the newest (highest id) counts: a red run a later green one replaced never refuses, a newer red one always does.
+- LANDCMD-07: This pull request's own shape decides its classification, exactly as `check <pr>` reads it (LAND-06..13, 32, 91): a shape defect refuses `pull request #<n> <that same defect sentence>`, exit `2`.
+- LANDCMD-22: After LANDCMD-07, a head without `<path>` refuses `pull request #<n> removes <path>; aco land cannot release its claim across that change`, exit `2` (E-LANDCMD-22).
+- LANDCMD-23: A head changing `storage` or `canonical_remote` in `<path>` refuses `pull request #<n> changes <setting> in <path>; aco land cannot release its claim across that change`, exit `2`.
+- LANDCMD-24: A head `<path>` the pin's own validator refuses prints `pull request #<n> carries an invalid <path>: <detail>`, exit `2`.
+- LANDCMD-08: A classified work item that is not open refuses `work item #<n> is not open; it cannot be landed`, exit `2`; an issue-less pull request skips this check.
+- LANDCMD-09: The classification's claim, parent and closing rules apply (LAND-14..28, LAND-70..77, LAND-79, LAND-87..90): defects refuse `pull request #<n> <that same defect sentence>`, exit `2`.
+- LANDCMD-10: A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence, naming REL-41's `aco handover` route, an item's or a lane's), exit `2`, before the merge.
+- LANDCMD-11: This checkout must sit on the forge's default branch with nothing uncommitted, or `aco land` refuses `land must run from a clean checkout of the default branch '<branch>'`, exit `2`.
+- LANDCMD-25: A checkout without a git identity refuses `land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state`, exit `2`.
+- LANDCMD-20: The forge names `<branch>` even where the canonical remote records no `HEAD`; LANDCMD-11 never reads one.
 
 ## Merge, composed by `aco land`
 
-- [ ] [LANDCMD-12] `aco land` merges pinned to the head sha read during preflight, never an unpinned re-read, with the method LANDCMD-27 picks: a merge commit or one squash commit, never a rebase.
-- [ ] [LANDCMD-27] `merge_method` `"merge"`/`"squash"` in `<path>` picks the method; else a squash if GitHub's allowed methods (LANDCMD-39) include one, else a merge commit (E-LANDCMD-27).
-- [ ] [LANDCMD-39] GitHub's allowed methods are `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge` (all three where withheld), narrowed by every rule on `<branch>` (LANDCMD-42).
-- [ ] [LANDCMD-42] A `pull_request` rule narrows them to its `allowed_merge_methods` (not at all without that list), a `required_linear_history` rule drops `merge`, and a plan without rulesets narrows nothing.
-- [ ] [LANDCMD-40] A pin non-empty allowed methods exclude refuses `board.toml merge_method <m> is not allowed on <branch>: GitHub allows <list>`, exit `2`, before any write, after LANDCMD-28 (E-LANDCMD-40).
-- [ ] [LANDCMD-41] Rules narrowing the settings to no method, or an unpinned land's to only a rebase, refuse `GitHub allows no merge method aco can use on <branch>`, exit `2`, before any write (E-LANDCMD-41).
-- [ ] [LANDCMD-28] Settings allowing neither refuse `pull request #<n> cannot land: this repository allows neither a merge commit nor a squash merge`, exit `2`, before any write (E-LANDCMD-28).
-- [ ] [LANDCMD-30] Any other `merge_method` refuses `board configuration <path> merge_method must be 'merge' or 'squash'`, exit `2`; a head carrying one refuses as LANDCMD-24.
-- [ ] [LANDCMD-29] The landed commit's title is `Merge pull request #<n>` for a merge commit and `<title> (#<n>)` for a squash commit.
-- [ ] [LANDCMD-13] Its message is the pull request body with its classification line removed, then that classification as the message's last line, nothing after it, for a merge and a squash commit alike (E-LANDCMD-13).
-- [ ] [LANDCMD-34] When that body ends in a trailer paragraph as git's trailer parsing reads it, the classification joins it as its last line, no blank line between, where git then reads both.
-- [ ] [LANDCMD-36] Any other body takes a blank line, then the classification alone as its last paragraph.
-- [ ] [LANDCMD-35] Removing the classification line leaves no run of blank lines where it stood: a paragraph it alone made goes with it, and a whitespace-only line counts as blank.
-- [ ] [LANDCMD-14] A pull request whose head changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run aco land <n> --head <sha>`, exit `2`.
-- [ ] [LANDCMD-37] A merge GitHub refuses (HTTP 405 other than LANDCMD-71's "Merge already in progress") refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
-- [ ] [LANDCMD-71] A merge call with HTTP 5xx or a 405 `Merge already in progress` refuses `pull request #<n> may still be merging (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept (E-LANDCMD-71).
-- [ ] [LANDCMD-72] After a 5xx, one read of the pull request comes first: merged at the pinned head, `aco land` goes on as after a merge (LANDCMD-15); open or unreadable, it refuses as LANDCMD-71; a 405 reads nothing.
-- [ ] [LANDCMD-73] LANDCMD-71's `<error>` is escaped and cut alone like LANDCMD-47's; a rerun of a pull request merged in between resumes without a second merge (LANDCMD-18).
+- LANDCMD-12: `aco land` merges pinned to the head sha read during preflight, never an unpinned re-read, with the method LANDCMD-27 picks: a merge commit or one squash commit, never a rebase.
+- LANDCMD-27: `merge_method` `"merge"`/`"squash"` in `<path>` picks the method; else a squash if GitHub's allowed methods (LANDCMD-39) include one, else a merge commit (E-LANDCMD-27).
+- LANDCMD-39: GitHub's allowed methods are `allow_merge_commit`/`allow_squash_merge`/`allow_rebase_merge` (all three where withheld), narrowed by every rule on `<branch>` (LANDCMD-42).
+- LANDCMD-42: A `pull_request` rule narrows them to its `allowed_merge_methods` (not at all without that list), a `required_linear_history` rule drops `merge`, and a plan without rulesets narrows nothing.
+- LANDCMD-40: A pin non-empty allowed methods exclude refuses `board.toml merge_method <m> is not allowed on <branch>: GitHub allows <list>`, exit `2`, before any write, after LANDCMD-28 (E-LANDCMD-40).
+- LANDCMD-41: Rules narrowing the settings to no method, or an unpinned land's to only a rebase, refuse `GitHub allows no merge method aco can use on <branch>`, exit `2`, before any write (E-LANDCMD-41).
+- LANDCMD-28: Settings allowing neither refuse `pull request #<n> cannot land: this repository allows neither a merge commit nor a squash merge`, exit `2`, before any write (E-LANDCMD-28).
+- LANDCMD-30: Any other `merge_method` refuses `board configuration <path> merge_method must be 'merge' or 'squash'`, exit `2`; a head carrying one refuses as LANDCMD-24.
+- LANDCMD-29: The landed commit's title is `Merge pull request #<n>` for a merge commit and `<title> (#<n>)` for a squash commit.
+- LANDCMD-13: Its message is the pull request body with its classification line removed, then that classification as the message's last line, nothing after it, for a merge and a squash commit alike (E-LANDCMD-13).
+- LANDCMD-34: When that body ends in a trailer paragraph as git's trailer parsing reads it, the classification joins it as its last line, no blank line between, where git then reads both.
+- LANDCMD-36: Any other body takes a blank line, then the classification alone as its last paragraph.
+- LANDCMD-35: Removing the classification line leaves no run of blank lines where it stood: a paragraph it alone made goes with it, and a whitespace-only line counts as blank.
+- LANDCMD-14: A pull request whose head changed since preflight (HTTP 409) refuses the pinned merge with `pull request #<n> changed while it was checked; re-run aco land <n> --head <sha>`, exit `2`.
+- LANDCMD-37: A merge GitHub refuses (HTTP 405 other than LANDCMD-71's "Merge already in progress") refuses `GitHub refused the merge of pull request #<n>: <forge message>`, exit `2`; nothing merges (E-LANDCMD-37).
+- LANDCMD-71: A merge call with HTTP 5xx or a 405 `Merge already in progress` refuses `pull request #<n> may still be merging (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept (E-LANDCMD-71).
+- LANDCMD-72: After a 5xx, one read of the pull request comes first: merged at the pinned head, `aco land` goes on as after a merge (LANDCMD-15); open or unreadable, it refuses as LANDCMD-71; a 405 reads nothing.
+- LANDCMD-73: LANDCMD-71's `<error>` is escaped and cut alone like LANDCMD-47's; a rerun of a pull request merged in between resumes without a second merge (LANDCMD-18).
 
 ## Merge, through the merge queue
 
-- [ ] [LANDCMD-59] Where a `merge_queue` rule applies to the pull request's target branch, `aco land` queues it (LANDCMD-61..68) instead of LANDCMD-12; no flag or setting chooses, and it merges nothing directly.
-- [ ] [LANDCMD-60] The preflight and the checkout check run unchanged before any write, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
-- [ ] [LANDCMD-61] After the checks passed, the body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue squash takes; a body already that message, apart from a trailing newline, is not written.
-- [ ] [LANDCMD-62] A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; nothing is queued.
-- [ ] [LANDCMD-63] `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 with the re-run hint, exit `2`.
-- [ ] [LANDCMD-64] Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; `aco land` never repeats an enqueue.
-- [ ] [LANDCMD-65] Then `aco land` reads the pull request's queue state every 60 seconds or slower; merged, it runs the steps after the merge (LANDCMD-15..17, LANDCMD-54..58) unchanged, and the claim stays until then.
-- [ ] [LANDCMD-75] A wait that begins with the pull request queued writes `waiting for pull request #<n> in the merge queue` once to stderr; one already merged writes nothing; stdout and exit codes stay.
-- [ ] [LANDCMD-66] An open pull request the queue removed after its last addition or absent twice refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n> --head <sha>`, exit `2`.
-- [ ] [LANDCMD-67] A pull request closed after such a removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's or `no reason recorded`.
-- [ ] [LANDCMD-68] A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept.
-- [ ] [LANDCMD-69] A rerun reads the queue state before the preflight: queued, it waits (LANDCMD-65) unless LANDCMD-76 refuses, writing nothing; merged, it releases (LANDCMD-18); else it preflights.
-- [ ] [LANDCMD-76] A queued rerun (LANDCMD-69) whose `--head` is no prefix of its head refuses `pull request #<n> is queued at head <queued>, not the pinned <pinned>; the queue lands the queued head`, exit `2`.
-- [ ] [LANDCMD-70] LANDCMD-60's preflight follows LANDCMD-69's reads; the branch rules are read once, serving LANDCMD-42 without a queue; a failed read refuses as LANDCMD-46 (`its merge rules`, `its merge queue state`).
+- LANDCMD-59: Where a `merge_queue` rule applies to the pull request's target branch, `aco land` queues it (LANDCMD-61..68) instead of LANDCMD-12; no flag or setting chooses, and it merges nothing directly.
+- LANDCMD-60: The preflight and the checkout check run unchanged before any write, the head pin included; the merge method (LANDCMD-27..28, LANDCMD-39..42) is the queue's own and is never read.
+- LANDCMD-61: After the checks passed, the body becomes the message LANDCMD-13, LANDCMD-34..36 compose, which the queue squash takes; a body already that message, apart from a trailing newline, is not written.
+- LANDCMD-62: A body write that fails or is not verified refuses `pull request #<n> was not queued: writing its landing message failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; nothing is queued.
+- LANDCMD-63: `aco land` enqueues once, pinned to the head the preflight read; a pull request whose head moved refuses as LANDCMD-14 with the re-run hint, exit `2`.
+- LANDCMD-64: Any other enqueue failure refuses `pull request #<n> was not queued: enqueueing it failed (<error>); re-run aco land <n> --head <sha>`, exit `2`; `aco land` never repeats an enqueue.
+- LANDCMD-65: Then `aco land` reads the pull request's queue state every 60 seconds or slower; merged, it runs the steps after the merge (LANDCMD-15..17, LANDCMD-54..58) unchanged, and the claim stays until then.
+- LANDCMD-75: A wait that begins with the pull request queued writes `waiting for pull request #<n> in the merge queue` once to stderr; one already merged writes nothing; stdout and exit codes stay.
+- LANDCMD-66: An open pull request the queue removed after its last addition or absent twice refuses `pull request #<n> was removed from the merge queue (<reason>); re-run aco land <n> --head <sha>`, exit `2`.
+- LANDCMD-67: A pull request closed after such a removal refuses `pull request #<n> was removed from the merge queue and closed (<reason>)`, exit `2`; `<reason>` is GitHub's or `no reason recorded`.
+- LANDCMD-68: A queue state read that fails while waiting refuses `reading the merge queue state of pull request #<n> failed (<error>); re-run aco land <n> --head <sha>`, exit `2`, claim kept.
+- LANDCMD-69: A rerun reads the queue state before the preflight: queued, it waits (LANDCMD-65) unless LANDCMD-76 refuses, writing nothing; merged, it releases (LANDCMD-18); else it preflights.
+- LANDCMD-76: A queued rerun (LANDCMD-69) whose `--head` is no prefix of its head refuses `pull request #<n> is queued at head <queued>, not the pinned <pinned>; the queue lands the queued head`, exit `2`.
+- LANDCMD-70: LANDCMD-60's preflight follows LANDCMD-69's reads; the branch rules are read once, serving LANDCMD-42 without a queue; a failed read refuses as LANDCMD-46 (`its merge rules`, `its merge queue state`).
 
 ## After the merge
 
-- [ ] [LANDCMD-15] A failed branch delete, fast-forward, or delegated `release --merged` prints `MERGED pull request #<n> as <sha>; follow-up incomplete: <step> (<error>); re-run aco land <n> --head <sha>`, exit `2`.
-- [ ] [LANDCMD-26] LANDCMD-15's `<error>` is the failed step's own sentence (for `release`, the one `release --merged` would print, without `ERROR: `), display controls escaped as NEXT-37 shows them.
-- [ ] [LANDCMD-21] The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
-- [ ] [LANDCMD-16] Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
-- [ ] [LANDCMD-17] In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing after LANDCMD-54's line.
-- [ ] [LANDCMD-18] A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25, 33 and LANREC-97, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
-- [ ] [LANDCMD-38] A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-57, LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
-- [ ] [LANDCMD-57] After every RELEASED ending, first landing or resumed rerun, `merged: <sha>` (the full 40-hex merge commit) follows the release's lines, before LANDCMD-54's and LANDCMD-17's.
-- [ ] [LANDCMD-54] After a RELEASED ending, a red trunk at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)` for its first failed check, not skipped or neutral; else nothing (E-LANDCMD-54).
-- [ ] [LANDCMD-55] A trunk check read, or its workflow-run read, that fails after the merge prints `trunk: unreadable at <sha7>: <error>` instead and keeps exit `0`; the merge and release stand.
-- [ ] [LANDCMD-58] LANDCMD-54 counts an Actions check run only when its workflow run was triggered by `push`, every other check and status always, and picks the newest per name after (E-LANDCMD-58a, E-LANDCMD-58b).
+- LANDCMD-15: A failed branch delete, fast-forward, or delegated `release --merged` prints `MERGED pull request #<n> as <sha>; follow-up incomplete: <step> (<error>); re-run aco land <n> --head <sha>`, exit `2`.
+- LANDCMD-26: LANDCMD-15's `<error>` is the failed step's own sentence (for `release`, the one `release --merged` would print, without `ERROR: `), display controls escaped as NEXT-37 shows them.
+- LANDCMD-21: The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
+- LANDCMD-16: Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
+- LANDCMD-17: In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing after LANDCMD-54's line.
+- LANDCMD-18: A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25, 33 and LANREC-97, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
+- LANDCMD-38: A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-57, LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
+- LANDCMD-57: After every RELEASED ending, first landing or resumed rerun, `merged: <sha>` (the full 40-hex merge commit) follows the release's lines, before LANDCMD-54's and LANDCMD-17's.
+- LANDCMD-54: After a RELEASED ending, a red trunk at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)` for its first failed check, not skipped or neutral; else nothing (E-LANDCMD-54).
+- LANDCMD-55: A trunk check read, or its workflow-run read, that fails after the merge prints `trunk: unreadable at <sha7>: <error>` instead and keeps exit `0`; the merge and release stand.
+- LANDCMD-58: LANDCMD-54 counts an Actions check run only when its workflow run was triggered by `push`, every other check and status always, and picks the newest per name after (E-LANDCMD-58a, E-LANDCMD-58b).
 
 Accepted residual: a squash-landed local branch behind or ahead of the pull request's recorded
 head is no clean lane on it (REL-42, REL-43), so its worktree still reads `kept -- not merged into

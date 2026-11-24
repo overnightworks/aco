@@ -529,7 +529,8 @@ def check_trunk(
 def test_a_trunk_commit_is_classified_by_its_own_trailer(
     case: TrunkCase, flags: Flags, check_trunk: TrunkCheck
 ) -> None:
-    """Spec: LAND-03, LAND-48, LAND-57, LAND-58, LAND-60, LAND-83, LAND-84, CHECK-12..14"""
+    """Spec: LAND-03, LAND-48, LAND-57, LAND-58, LAND-60, LAND-83, LAND-84,
+    CHECK-12, CHECK-13, CHECK-14"""
     check_trunk(case, flags)
 
 

@@ -47,7 +47,7 @@ including the surviving refusal, is `specs/landing-grammar.spec.md`'s own
 
 ## The pin and its precondition
 
-- [ ] [PIN-32] Without `<path>`, a store command refuses removal while this branch's merge base with `<trunk>` and `<trunk>` itself track `<path>`, merge while `<trunk>` alone does, else adoption (sentences below).
+- PIN-32: Without `<path>`, a store command refuses removal while this branch's merge base with `<trunk>` and `<trunk>` itself track `<path>`, merge while `<trunk>` alone does, else adoption (sentences below).
 
 It writes nothing (see E-PIN-32, E-PIN-33, E-PIN-36, E-PIN-37). The merge
 base decides, so a branch that removed `<path>` itself is still told to
@@ -71,10 +71,10 @@ at all -- tracks nothing, so the adoption sentence answers, never the trunk's ow
 So does a `<trunk>` fetched before the adoption landed; the sentence's
 parenthesis names that fetch, since no fetch runs here (see E-PIN-35).
 
-- [ ] [PIN-01] Any store command with a present but untracked or ignored `<path>` refuses `<path> is not tracked in this checkout, so its storage pin cannot be trusted: git add -f <path>` (E-PIN-01).
-- [ ] [PIN-02] A tracked `.aco/board.toml` naming no `storage` key pins `storage = "github"`, the default every existing repository already reads.
-- [ ] [PIN-03] A tracked `.aco/board.toml` naming a `storage` value outside `github`/`state-ref` refuses `board configuration <path> storage must be 'github' or 'state-ref'` (see E-PIN-02).
-- [ ] [PIN-33] A tracked `.aco/board.toml` naming a key it does not define refuses `board configuration <path> has unknown top-level key <keys>`, each display control escaped (NEXT-37) (see E-PIN-11).
+- PIN-01: Any store command with a present but untracked or ignored `<path>` refuses `<path> is not tracked in this checkout, so its storage pin cannot be trusted: git add -f <path>` (E-PIN-01).
+- PIN-02: A tracked `.aco/board.toml` naming no `storage` key pins `storage = "github"`, the default every existing repository already reads.
+- PIN-03: A tracked `.aco/board.toml` naming a `storage` value outside `github`/`state-ref` refuses `board configuration <path> storage must be 'github' or 'state-ref'` (see E-PIN-02).
+- PIN-33: A tracked `.aco/board.toml` naming a key it does not define refuses `board configuration <path> has unknown top-level key <keys>`, each display control escaped (NEXT-37) (see E-PIN-11).
 
 ## `lane_shared`, the paths a lane may change beyond its scope
 
@@ -83,49 +83,49 @@ mechanically -- a dead-code whitelist -- and directories such as the tests, so
 no lane can know in advance whether it needs one. `status` and `brief` list
 them.
 
-- [ ] [PIN-37] A tracked `.aco/board.toml` may name `lane_shared = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one file; absent, no path is lane-shared.
-- [ ] [PIN-38] A `lane_shared` value that is no list of unique strings refuses `board configuration <path> lane_shared must be a list of unique repository paths` (see E-PIN-40).
-- [ ] [PIN-39] An absolute, `..`-climbing, or non-canonical entry refuses `board configuration <path> lane_shared entry '<entry>' is not a canonical path inside the repository` (see E-PIN-41).
-- [ ] [PIN-40] Only the trunk's committed copy counts, as the last fetch left it, never a worktree's own; no trunk copy means no path is lane-shared, while a trunk copy git fails to read is a git failure.
-- [ ] [PIN-41] An entry counts when the trunk tracks a path it names: the file itself, or at least one path below a directory entry; any other, a bare directory or a missing file included, covers nothing.
-- [ ] [PIN-42] A trunk copy that refuses costs only the lane-shared answer: `status` and `brief` name its defect (STAT-21).
+- PIN-37: A tracked `.aco/board.toml` may name `lane_shared = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one file; absent, no path is lane-shared.
+- PIN-38: A `lane_shared` value that is no list of unique strings refuses `board configuration <path> lane_shared must be a list of unique repository paths` (see E-PIN-40).
+- PIN-39: An absolute, `..`-climbing, or non-canonical entry refuses `board configuration <path> lane_shared entry '<entry>' is not a canonical path inside the repository` (see E-PIN-41).
+- PIN-40: Only the trunk's committed copy counts, as the last fetch left it, never a worktree's own; no trunk copy means no path is lane-shared, while a trunk copy git fails to read is a git failure.
+- PIN-41: An entry counts when the trunk tracks a path it names: the file itself, or at least one path below a directory entry; any other, a bare directory or a missing file included, covers nothing.
+- PIN-42: A trunk copy that refuses costs only the lane-shared answer: `status` and `brief` name its defect (STAT-21).
 
 ## Dependency paths
 
-- [ ] [PIN-44] A tracked `<path>` may name `dependency_paths = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one path; absent, none is a dependency path.
-- [ ] [PIN-48] A listed path CLAIM-19 or CLAIM-20 would refuse as a scope, or one not in normal form, is covered by no entry.
-- [ ] [PIN-45] A `dependency_paths` value that is no list of unique strings refuses `board configuration <path> dependency_paths must be a list of unique repository paths`.
-- [ ] [PIN-46] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> dependency_paths entry '<entry>' is not a canonical path inside the repository`.
-- [ ] [PIN-47] Only the run's own tracked `<path>` decides; `aco land` reads the default branch's clean checkout (LANDCMD-11), never the pull request head's copy.
-- [ ] [PIN-49] Without an `idea_label` entry the label is `idea`; a value that is no non-empty string without surrounding space refuses `board configuration idea_label must be a non-empty label`.
-- [ ] [PIN-50] Without a `canonical_remote` entry the canonical remote is `origin`; a named one is taken as written.
-- [ ] [PIN-51] A blank, padded or non-string `canonical_remote`, or one starting with `-`, refuses `board configuration <path> canonical_remote must be a non-empty remote name not starting with '-'`.
-- [ ] [PIN-52] A parent, child, blocker or pull request head naming another repository refuses `GitHub renamed <old> to <new>; point the canonical remote at <new>` (after a write: LAND-38; see E-PIN-42).
-- [ ] [PIN-53] Under `github` storage a forge target other than the canonical remote's refuses `forge target <t> does not match canonical remote <c>; run aco from that repository's checkout`, exit `2`.
-- [ ] [PIN-54] A tracked `<path>` may name `production_paths = ["<entry>", ...]`, in `dependency_paths`'s form (PIN-44, PIN-48): a path is production when an entry covers it and no `dependency_paths` entry does.
-- [ ] [PIN-55] A `production_paths` value that is no list of unique strings refuses `board configuration <path> production_paths must be a list of unique repository paths`.
-- [ ] [PIN-56] An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> production_paths entry '<entry>' is not a canonical path inside the repository`.
-- [ ] [PIN-57] `item new` alone resolves a `--repo` naming another discovered repository to that checkout, under either storage, so PIN-04 and PIN-53 judge its own remote (ITEM-67).
-- [ ] [PIN-58] `<path>` may hold `[[audit]]` tables with `name`, `label`, `landings`, `days`, `run`; an `audit` that is no array of tables refuses `board configuration <path> audit must be an array of tables`.
-- [ ] [PIN-59] An entry with another key refuses `<entry> has unknown key <keys>`, one missing a key `<entry> is missing <keys>`.
-- [ ] [PIN-60] A `name` that is not plain refuses `<entry> name must be a unique non-empty name`, a `label` that is not plain `<entry> label must be a unique non-empty label without a comma`.
-- [ ] [PIN-61] `landings` outside 1 to 5000 or `days` below 1 refuses `<entry> landings must be a positive integer up to 5000` (see E-PIN-43) or `<entry> days must be a positive integer`; a boolean is no integer.
-- [ ] [PIN-62] A `run` that is no text with a visible character refuses `<entry> run must be non-empty text`.
+- PIN-44: A tracked `<path>` may name `dependency_paths = ["<entry>", ...]`: an entry ending `/` covers every path below it, any other exactly one path; absent, none is a dependency path.
+- PIN-48: A listed path CLAIM-19 or CLAIM-20 would refuse as a scope, or one not in normal form, is covered by no entry.
+- PIN-45: A `dependency_paths` value that is no list of unique strings refuses `board configuration <path> dependency_paths must be a list of unique repository paths`.
+- PIN-46: An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> dependency_paths entry '<entry>' is not a canonical path inside the repository`.
+- PIN-47: Only the run's own tracked `<path>` decides; `aco land` reads the default branch's clean checkout (LANDCMD-11), never the pull request head's copy.
+- PIN-49: Without an `idea_label` entry the label is `idea`; a value that is no non-empty string without surrounding space refuses `board configuration idea_label must be a non-empty label`.
+- PIN-50: Without a `canonical_remote` entry the canonical remote is `origin`; a named one is taken as written.
+- PIN-51: A blank, padded or non-string `canonical_remote`, or one starting with `-`, refuses `board configuration <path> canonical_remote must be a non-empty remote name not starting with '-'`.
+- PIN-52: A parent, child, blocker or pull request head naming another repository refuses `GitHub renamed <old> to <new>; point the canonical remote at <new>` (after a write: LAND-38; see E-PIN-42).
+- PIN-53: Under `github` storage a forge target other than the canonical remote's refuses `forge target <t> does not match canonical remote <c>; run aco from that repository's checkout`, exit `2`.
+- PIN-54: A tracked `<path>` may name `production_paths = ["<entry>", ...]`, in `dependency_paths`'s form (PIN-44, PIN-48): a path is production when an entry covers it and no `dependency_paths` entry does.
+- PIN-55: A `production_paths` value that is no list of unique strings refuses `board configuration <path> production_paths must be a list of unique repository paths`.
+- PIN-56: An absolute, `..`-climbing or non-canonical entry refuses `board configuration <path> production_paths entry '<entry>' is not a canonical path inside the repository`.
+- PIN-57: `item new` alone resolves a `--repo` naming another discovered repository to that checkout, under either storage, so PIN-04 and PIN-53 judge its own remote (ITEM-67).
+- PIN-58: `<path>` may hold `[[audit]]` tables with `name`, `label`, `landings`, `days`, `run`; an `audit` that is no array of tables refuses `board configuration <path> audit must be an array of tables`.
+- PIN-59: An entry with another key refuses `<entry> has unknown key <keys>`, one missing a key `<entry> is missing <keys>`.
+- PIN-60: A `name` that is not plain refuses `<entry> name must be a unique non-empty name`, a `label` that is not plain `<entry> label must be a unique non-empty label without a comma`.
+- PIN-61: `landings` outside 1 to 5000 or `days` below 1 refuses `<entry> landings must be a positive integer up to 5000` (see E-PIN-43) or `<entry> days must be a positive integer`; a boolean is no integer.
+- PIN-62: A `run` that is no text with a visible character refuses `<entry> run must be non-empty text`.
 
 In PIN-59..62 `<entry>` is `board configuration <path> audit entry <i>`, `<i>` counting from 1. A `name` or `label` is plain when it is non-empty, unpadded, free of display controls and no other entry's; a label is also free of commas.
 
 ## `storage = "state-ref"` is forge-free
 
-- [ ] [PIN-04] Under `storage = "state-ref"`, a forge command refuses an OWNER/REPO `--repo` with `--repo is meaningless under storage = state-ref`, bar PIN-57's `item new`; other `--repo`s refuse first (OUT-08).
-- [ ] [PIN-05] Under `storage = "state-ref"`, that command without a resolvable canonical `<remote>/HEAD` refuses `cannot resolve the default branch; run aco from a checkout with <remote>/HEAD set`.
+- PIN-04: Under `storage = "state-ref"`, a forge command refuses an OWNER/REPO `--repo` with `--repo is meaningless under storage = state-ref`, bar PIN-57's `item new`; other `--repo`s refuse first (OUT-08).
+- PIN-05: Under `storage = "state-ref"`, that command without a resolvable canonical `<remote>/HEAD` refuses `cannot resolve the default branch; run aco from a checkout with <remote>/HEAD set`.
 
 ## Item identity: `aco-xxxxxx` versus `#n`
 
-- [ ] [PIN-06] `aco item new --title TITLE` under `storage = "state-ref"` prints exactly one line, the minted id `aco-` plus six lowercase hex characters, exit `0` (see E-PIN-03).
-- [ ] [PIN-07] `aco item new --title TITLE --json` prints `specs/output.spec.md`'s envelope: `{"ok": true, "reason": "created", "item": "aco-xxxxxx", "number": n}`.
-- [ ] [PIN-30] Under `storage = "state-ref"` a printed sentence or string `--json` field names an item `aco-xxxxxx`, never `#<n>`; the paragraph below names its two exceptions.
-- [ ] [PIN-08] An id argument matching none of `aco-xxxxxx`, `#n`, or the bare number `n` refuses `'<value>' is not an item reference; use aco-xxxxxx, #n, or the bare number n` (see E-PIN-04).
-- [ ] [PIN-31] Under `storage = "state-ref"` an id argument past `aco-ffffff` refuses `<n> names no state-ref item; an item id ends at aco-ffffff` before any lookup, under `--json` OUT-06's envelope.
+- PIN-06: `aco item new --title TITLE` under `storage = "state-ref"` prints exactly one line, the minted id `aco-` plus six lowercase hex characters, exit `0` (see E-PIN-03).
+- PIN-07: `aco item new --title TITLE --json` prints `specs/output.spec.md`'s envelope: `{"ok": true, "reason": "created", "item": "aco-xxxxxx", "number": n}`.
+- PIN-30: Under `storage = "state-ref"` a printed sentence or string `--json` field names an item `aco-xxxxxx`, never `#<n>`; the paragraph below names its two exceptions.
+- PIN-08: An id argument matching none of `aco-xxxxxx`, `#n`, or the bare number `n` refuses `'<value>' is not an item reference; use aco-xxxxxx, #n, or the bare number n` (see E-PIN-04).
+- PIN-31: Under `storage = "state-ref"` an id argument past `aco-ffffff` refuses `<n> names no state-ref item; an item id ends at aco-ffffff` before any lookup, under `--json` OUT-06's envelope.
 
 PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which prints the forge number beside the item's id; and a number past `aco-ffffff` a stored claim still carries, which names no item (PIN-31) and so is never dressed as an id no command takes back.
 
@@ -133,38 +133,38 @@ PIN-30's two exceptions keep `#<n>`: `item show`'s header (ITEM-07), which print
 
 - PIN-09 (retired).
 - PIN-10 (retired).
-- [ ] [PIN-11] `aco item close ITEM` under `storage = "github"` refuses `the forge closes its issues; aco never governs them`.
+- PIN-11: `aco item close ITEM` under `storage = "github"` refuses `the forge closes its issues; aco never governs them`.
 - PIN-12 (retired).
 
 ## The state-ref item file, one layer above the block
 
-- [ ] [PIN-13] An `items/` entry whose file name is not `aco-` plus six lowercase hex characters plus `.md` makes a whole-store read refuse `items/<name> is not a valid item file name` (E-PIN-39).
-- [ ] [PIN-35] A command on one item goes past such an entry, which stays byte for byte (CAS-61): `item show`, `item edit`, `item close`, `rule`, `brief`, `check`, and `start` up to its fresh claim (PIN-36).
-- [ ] [PIN-36] A command over the whole store refuses with PIN-13's sentence: `board`, `next`, `rulings`, `cut`, `item new` (`--not-a-twin` too), a fresh `claim`, `release --merged`.
-- [ ] [PIN-14] A read of an `items/<id>.md` entry whose bytes are not valid UTF-8 refuses `item <id> is not valid UTF-8`, then ITEM-38's repair clause.
-- [ ] [PIN-15] A read of an `items/<id>.md` entry with no valid `aco` block and `[record]` refuses `item <id> has a malformed aco block (<defect>)`, then ITEM-38's repair clause (see E-PIN-07).
-- [ ] [PIN-43] PIN-15's `<defect>` shows each display control escaped as NEXT-37 does, in the sentence and in `--json`'s `message`.
-- [ ] [PIN-16] An item whose own `record.parent` names an id no `items/` entry carries refuses `item <parent-id> is referenced as a parent but does not exist`, except in `aco rulings` (RUL-21).
-- [ ] [PIN-17] An item whose own `record.blocked_by` names an id no `items/` entry carries refuses, naming itself, `item <item-id> lists blocker <blocker-id>, which does not exist`, except in `aco rulings` (RUL-21).
-- [ ] [PIN-34] An item whose own `record.blocked_by` names one id twice refuses ITEM-43's `item <item-id> lists blocker <blocker-id> more than once` (see E-PIN-38), except in `aco rulings` (RUL-21).
-- [ ] [PIN-29] While PIN-14/PIN-15 refuse an item, only the `item close` and `item edit --kind` ITEM-53 names, a child as ITEM-54 decides, refuse, lowest id, before any write (E-PIN-07).
+- PIN-13: An `items/` entry whose file name is not `aco-` plus six lowercase hex characters plus `.md` makes a whole-store read refuse `items/<name> is not a valid item file name` (E-PIN-39).
+- PIN-35: A command on one item goes past such an entry, which stays byte for byte (CAS-61): `item show`, `item edit`, `item close`, `rule`, `brief`, `check`, and `start` up to its fresh claim (PIN-36).
+- PIN-36: A command over the whole store refuses with PIN-13's sentence: `board`, `next`, `rulings`, `cut`, `item new` (`--not-a-twin` too), a fresh `claim`, `release --merged`.
+- PIN-14: A read of an `items/<id>.md` entry whose bytes are not valid UTF-8 refuses `item <id> is not valid UTF-8`, then ITEM-38's repair clause.
+- PIN-15: A read of an `items/<id>.md` entry with no valid `aco` block and `[record]` refuses `item <id> has a malformed aco block (<defect>)`, then ITEM-38's repair clause (see E-PIN-07).
+- PIN-43: PIN-15's `<defect>` shows each display control escaped as NEXT-37 does, in the sentence and in `--json`'s `message`.
+- PIN-16: An item whose own `record.parent` names an id no `items/` entry carries refuses `item <parent-id> is referenced as a parent but does not exist`, except in `aco rulings` (RUL-21).
+- PIN-17: An item whose own `record.blocked_by` names an id no `items/` entry carries refuses, naming itself, `item <item-id> lists blocker <blocker-id>, which does not exist`, except in `aco rulings` (RUL-21).
+- PIN-34: An item whose own `record.blocked_by` names one id twice refuses ITEM-43's `item <item-id> lists blocker <blocker-id> more than once` (see E-PIN-38), except in `aco rulings` (RUL-21).
+- PIN-29: While PIN-14/PIN-15 refuse an item, only the `item close` and `item edit --kind` ITEM-53 names, a child as ITEM-54 decides, refuse, lowest id, before any write (E-PIN-07).
 
 ## Writing a fresh state-ref item
 
-- [ ] [PIN-18] `aco item new --title TITLE --parent PARENT` against a `PARENT` no `items/` entry carries refuses `<parent-id> does not exist`, before any write.
-- [ ] [PIN-19] Three failed random-hex mint attempts against an already-full six-character neighbourhood refuse `could not mint a fresh item id in 3 attempts; retry`, before any write.
-- [ ] [PIN-20] `aco item new --title TITLE --origin gitlab#42` stores that reference in `record.origin`, so `aco item show <item-id>` ends its header `origin gitlab#42`, never `origin none`.
-- [ ] [PIN-21] `aco item new` under `storage = "state-ref"` writes through the same one CAS write path `aco cut`'s own child creation uses (`specs/ref-store-cas.spec.md`, CAS-19..CAS-21).
+- PIN-18: `aco item new --title TITLE --parent PARENT` against a `PARENT` no `items/` entry carries refuses `<parent-id> does not exist`, before any write.
+- PIN-19: Three failed random-hex mint attempts against an already-full six-character neighbourhood refuse `could not mint a fresh item id in 3 attempts; retry`, before any write.
+- PIN-20: `aco item new --title TITLE --origin gitlab#42` stores that reference in `record.origin`, so `aco item show <item-id>` ends its header `origin gitlab#42`, never `origin none`.
+- PIN-21: `aco item new` under `storage = "state-ref"` writes through the same one CAS write path `aco cut`'s own child creation uses (`specs/ref-store-cas.spec.md`, CAS-19..CAS-21).
 
 ## Editing and closing a state-ref item
 
-- [ ] [PIN-22] `aco item edit ITEM --base HASH < body.md` under `storage = "state-ref"` replaces the item's stored body (ITEM-71) and prints `EDITED aco-xxxxxx`, exit `0` (see E-PIN-08).
-- [ ] [PIN-23] `aco item edit ITEM --base HASH` against an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>` (`<repository>`: PIN-28).
-- [ ] [PIN-24] `aco item edit ITEM --base HASH` piping a body with no valid `aco` block refuses with its first defect (`specs/body-block.spec.md`); ITEM-79 excepts an idea item under `storage = "github"`.
-- [ ] [PIN-25] `aco item close ITEM` under `storage = "state-ref"` prints `CLOSED aco-xxxxxx` then a `freed: ` line naming every item `ITEM`'s own close just freed, or `freed: none`, exit `0` (see E-PIN-09).
-- [ ] [PIN-26] `aco item close ITEM` against an item still carrying a live claim refuses `<item-id> has a live claim (<agent> (<role>)); release the claim first`, before any write.
-- [ ] [PIN-27] A second `aco item close ITEM` on an already-closed item refuses `<item-id> is already closed (closed on <closed_at>)`.
-- [ ] [PIN-28] `aco item close ITEM` for an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>`: `owner/repo` on a forge host, a forge-less remote's path less `.git` (E-PIN-10).
+- PIN-22: `aco item edit ITEM --base HASH < body.md` under `storage = "state-ref"` replaces the item's stored body (ITEM-71) and prints `EDITED aco-xxxxxx`, exit `0` (see E-PIN-08).
+- PIN-23: `aco item edit ITEM --base HASH` against an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>` (`<repository>`: PIN-28).
+- PIN-24: `aco item edit ITEM --base HASH` piping a body with no valid `aco` block refuses with its first defect (`specs/body-block.spec.md`); ITEM-79 excepts an idea item under `storage = "github"`.
+- PIN-25: `aco item close ITEM` under `storage = "state-ref"` prints `CLOSED aco-xxxxxx` then a `freed: ` line naming every item `ITEM`'s own close just freed, or `freed: none`, exit `0` (see E-PIN-09).
+- PIN-26: `aco item close ITEM` against an item still carrying a live claim refuses `<item-id> has a live claim (<agent> (<role>)); release the claim first`, before any write.
+- PIN-27: A second `aco item close ITEM` on an already-closed item refuses `<item-id> is already closed (closed on <closed_at>)`.
+- PIN-28: `aco item close ITEM` for an `ITEM` no `items/` entry carries refuses `<item-id> does not exist in <repository>`: `owner/repo` on a forge host, a forge-less remote's path less `.git` (E-PIN-10).
 
 ## Never
 

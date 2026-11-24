@@ -81,7 +81,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Unclear`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-73] Unclear opens a focused optional note panel whose Send is enabled while blank', async ({
+		test('ABRD-73: Unclear opens a focused optional note panel whose Send is enabled while blank', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards(true);
@@ -105,7 +105,7 @@ for (const viewport of [
 			await expect(page.getByRole('textbox', { name: 'Your answer' })).toBeVisible();
 		});
 
-		test('[ABRD-74] Send shows the grey With head strip with focus on Undo, and Undo posts nothing and reopens the note', async ({
+		test('ABRD-74: Send shows the grey With head strip with focus on Undo, and Undo posts nothing and reopens the note', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards(true);
@@ -130,7 +130,7 @@ for (const viewport of [
 			await expect(noteField(page)).toHaveValue(NOTE);
 		});
 
-		test('[ABRD-75, ABRD-76] after the window the stage moves to the next open card, and the sent card lists with its head, and selecting it again leaves the stage alone', async ({
+		test('ABRD-75, ABRD-76: after the window the stage moves to the next open card, and the sent card lists with its head, and selecting it again leaves the stage alone', async ({
 			page
 		}) => {
 			await arrangeCards(true);
@@ -153,7 +153,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-72, ABRD-76] with no other open card the stage stays, and the card reads with head, offers no Unclear and keeps its picks and Other…', async ({
+		test('ABRD-72, ABRD-76: with no other open card the stage stays, and the card reads with head, offers no Unclear and keeps its picks and Other…', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards(false);

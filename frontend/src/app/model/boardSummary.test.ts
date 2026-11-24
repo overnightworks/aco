@@ -38,7 +38,7 @@ test('first selection is the first row shown, skipping unread repos and ruled-on
 });
 
 describe('openList', () => {
-	test('[ABRD-101] groups tied on day and item keep configured order, a failed repository without cards a group after them with its sentence', () => {
+	test('ABRD-101: groups tied on day and item keep configured order, a failed repository without cards a group after them with its sentence', () => {
 		const { groups } = openList([
 			repo({ name: 'zeta', items: [item({ number: 1, lines: [optionLine({ index: 1 })] })] }),
 			repo({ name: 'broken', error: 'aco failed', items: [] }),
@@ -49,7 +49,7 @@ describe('openList', () => {
 		expect(groups[2]).toEqual({ repo: 'broken', error: 'aco failed', readAt: null, rows: [] });
 	});
 
-	test('[ABRD-28] [ABRD-106] a row carries its key, state, label and the full question as its title', () => {
+	test('ABRD-28, ABRD-106: a row carries its key, state, label and the full question as its title', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -93,7 +93,7 @@ describe('openList', () => {
 		]);
 	});
 
-	test('[ABRD-82] the open option lines of one item are one row named by area and count, its title the same', () => {
+	test('ABRD-82: the open option lines of one item are one row named by area and count, its title the same', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -142,7 +142,7 @@ describe('openList', () => {
 		]);
 	});
 
-	test('[ABRD-82] a ruled option line is no point of its item’s row', () => {
+	test('ABRD-82: a ruled option line is no point of its item’s row', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -162,7 +162,7 @@ describe('openList', () => {
 		expect(group && 'rows' in group ? group.rows.map((row) => row.label) : []).toEqual(['Sprung']);
 	});
 
-	test('[ABRD-61] a card with a returned line is a back row ranked after open', () => {
+	test('ABRD-61: a card with a returned line is a back row ranked after open', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -185,7 +185,7 @@ describe('openList', () => {
 		expect(STATE_LABEL.back).toBe('With head');
 	});
 
-	test('[ABRD-61] a card is with its head while any of its points is', () => {
+	test('ABRD-61: a card is with its head while any of its points is', () => {
 		const { groups } = openList([
 			repo({
 				name: 'a',
@@ -207,7 +207,7 @@ describe('openList', () => {
 		expect(group?.rows[1]?.state).toBe('back');
 	});
 
-	test('[ABRD-49] readable repositories with no open line are quiet, a ruled-only one included', () => {
+	test('ABRD-49: readable repositories with no open line are quiet, a ruled-only one included', () => {
 		const { groups, quiet } = openList([
 			repo({ name: 'open', items: [item({ lines: [optionLine()] })] }),
 			repo({ name: 'empty', items: [] }),
@@ -224,7 +224,7 @@ describe('openList', () => {
 });
 
 describe('openList with a failed repository', () => {
-	test('[ABRD-101] a failed repository is one group with sentence, time and kept rows; one without cards a group with its sentence; a quiet one stays under Nothing open', () => {
+	test('ABRD-101: a failed repository is one group with sentence, time and kept rows; one without cards a group with its sentence; a quiet one stays under Nothing open', () => {
 		const readAt = new Date(2026, 9, 31, 9, 41);
 		const { groups, quiet } = openList([
 			{
@@ -254,7 +254,7 @@ describe('decidedList', () => {
 		return group?.rows.map((row) => row.key) ?? [];
 	}
 
-	test('[ABRD-30] groups ruled lines per repository, tied groups in configured order, a failed one as a group with its kept rows and a repository with nothing ruled absent', () => {
+	test('ABRD-30: groups ruled lines per repository, tied groups in configured order, a failed one as a group with its kept rows and a repository with nothing ruled absent', () => {
 		const { groups, quiet } = decidedList([
 			repo({
 				name: 'first',
@@ -282,7 +282,7 @@ describe('decidedList', () => {
 		expect(quiet).toEqual([]);
 	});
 
-	test('[ABRD-30] a row is done, keyed by its line, labelled with the option topic or the yes/no question, and titled with the question', () => {
+	test('ABRD-30: a row is done, keyed by its line, labelled with the option topic or the yes/no question, and titled with the question', () => {
 		const { groups } = decidedList([
 			repo({
 				items: [
@@ -339,7 +339,7 @@ describe('decidedList', () => {
 		]);
 	});
 
-	test('[ABRD-30] open lines are never listed', () => {
+	test('ABRD-30: open lines are never listed', () => {
 		const { groups } = decidedList([
 			repo({
 				items: [
@@ -353,7 +353,7 @@ describe('decidedList', () => {
 	});
 
 	test.each(['first', 'last'] as const)(
-		'[ABRD-31] a repository lists the newest date first, then item number and line index descending, from %s input',
+		'ABRD-31: a repository lists the newest date first, then item number and line index descending, from %s input',
 		(position) => {
 			const entries = [
 				[2, 1, '2026-10-02'],
@@ -382,7 +382,7 @@ describe('decidedList', () => {
 });
 
 describe('firstDecidedKey', () => {
-	test('[ABRD-32] is the first row of the decided list', () => {
+	test('ABRD-32: is the first row of the decided list', () => {
 		const repos = [
 			repo({ name: 'broken', error: 'down', items: [] }),
 			repo({ name: 'open', items: [item({ lines: [optionLine()] })] }),
@@ -403,7 +403,7 @@ describe('firstDecidedKey', () => {
 		expect(firstDecidedKey(repos)).toBe('ruled:3:2');
 	});
 
-	test('[ABRD-32] is null with nothing ruled or only failed repositories', () => {
+	test('ABRD-32: is null with nothing ruled or only failed repositories', () => {
 		expect(firstDecidedKey([])).toBeNull();
 		expect(firstDecidedKey([repo({ error: 'down', items: [] })])).toBeNull();
 		expect(firstDecidedKey([repo({ items: [item({ lines: [optionLine()] })] })])).toBeNull();
@@ -476,7 +476,7 @@ describe('findSelection', () => {
 		expect(findSelection(repos, 'b:1:1')).toBeNull();
 	});
 
-	test('[ABRD-101] a card key resolves a card a failed repo kept', () => {
+	test('ABRD-101: a card key resolves a card a failed repo kept', () => {
 		const kept = item({ number: 7, lines: [optionPoint] });
 
 		expect(
@@ -484,7 +484,7 @@ describe('findSelection', () => {
 		).toMatchObject({ kind: 'card', repo: 'c', item: kept });
 	});
 
-	test('[ABRD-82] a card key resolves the open option lines of its item as the card’s points', () => {
+	test('ABRD-82: a card key resolves the open option lines of its item as the card’s points', () => {
 		const other = optionLine({ index: 3 });
 		const grouped = item({ number: 42, lines: [optionPoint, other] });
 
@@ -496,7 +496,7 @@ describe('findSelection', () => {
 		});
 	});
 
-	test('[ABRD-50] a card key selects nothing once its item has no open option line', () => {
+	test('ABRD-50: a card key selects nothing once its item has no open option line', () => {
 		const ruled = item({
 			number: 42,
 			lines: [
@@ -529,7 +529,7 @@ describe('findSelection', () => {
 describe('selectionHeading', () => {
 	const members = item({ number: 42, lines: [] });
 
-	test('[ABRD-83] a one-point card is headed by its question, a card of points by its name', () => {
+	test('ABRD-83: a one-point card is headed by its question, a card of points by its name', () => {
 		const single = optionLine({ index: 2, question: 'Keep the song open?' });
 		const points = [
 			optionLine({ index: 2, area: 'Song-Seite' }),
@@ -568,11 +568,11 @@ describe('decidedKeyOf', () => {
 		})
 	];
 
-	test('[ABRD-130] names the first ruled line of the card as the stage shows it decided', () => {
+	test('ABRD-130: names the first ruled line of the card as the stage shows it decided', () => {
 		expect(decidedKeyOf(ruledCard, 'repo:7:card')).toBe('repo:7:1');
 	});
 
-	test('[ABRD-130] names nothing for a card whose item holds no ruled line or is gone', () => {
+	test('ABRD-130: names nothing for a card whose item holds no ruled line or is gone', () => {
 		const stillOpen = [repo({ items: [item({ number: 7, lines: [optionLine({ index: 1 })] })] })];
 
 		expect(decidedKeyOf(stillOpen, 'repo:7:card')).toBeNull();
@@ -587,11 +587,11 @@ describe('nextOpenAfter', () => {
 		})
 	];
 
-	test('[ABRD-50] the decided card is skipped, so from the last card the first one comes next', () => {
+	test('ABRD-50: the decided card is skipped, so from the last card the first one comes next', () => {
 		expect(nextOpenAfter(cardRepos, 'repo:3:card')).toBe('repo:1:card');
 	});
 
-	test('[ABRD-61] a card with its head comes after an open card', () => {
+	test('ABRD-61: a card with its head comes after an open card', () => {
 		const withHead = [
 			repo({
 				items: [
@@ -623,7 +623,7 @@ describe('nextOpenAfter', () => {
 		expect(nextOpenAfter(allRuled, 'repo:42:1')).toBeNull();
 	});
 
-	test('[ABRD-101] lands on the kept card of a failed repo when it is the next open one', () => {
+	test('ABRD-101: lands on the kept card of a failed repo when it is the next open one', () => {
 		const withAKeptCard = [
 			repo({ items: [item({ number: 1, lines: [optionLine()] })] }),
 			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
@@ -648,7 +648,7 @@ describe('nextOpenAfter', () => {
 });
 
 describe('tabCounts', () => {
-	test('[ABRD-51] counts the open list rows and the ruled lines', () => {
+	test('ABRD-51: counts the open list rows and the ruled lines', () => {
 		const repos = [
 			repo({
 				items: [
@@ -667,13 +667,13 @@ describe('tabCounts', () => {
 		expect(tabCounts(repos)).toEqual({ open: 2, decided: 1 });
 	});
 
-	test('[ABRD-51] a failed repository without cards adds to neither count', () => {
+	test('ABRD-51: a failed repository without cards adds to neither count', () => {
 		const repos = [repo({ name: 'broken', error: 'down', items: [] })];
 
 		expect(tabCounts(repos)).toEqual({ open: 0, decided: 0 });
 	});
 
-	test('[ABRD-101] a failed repository counts the cards it kept', () => {
+	test('ABRD-101: a failed repository counts the cards it kept', () => {
 		const repos = [
 			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
 		];
@@ -681,7 +681,7 @@ describe('tabCounts', () => {
 		expect(tabCounts(repos)).toEqual({ open: 1, decided: 0 });
 	});
 
-	test('[ABRD-51] an empty board counts nothing', () => {
+	test('ABRD-51: an empty board counts nothing', () => {
 		expect(tabCounts([])).toEqual({ open: 0, decided: 0 });
 	});
 });
@@ -710,19 +710,19 @@ describe('stageAfterRuled', () => {
 		})
 	];
 
-	test('[ABRD-155] the stage stays while the card still has an open point, noted or not', () => {
+	test('ABRD-155: the stage stays while the card still has an open point, noted or not', () => {
 		expect(stageAfterRuled(twoOpen, 'repo:7:card', false)).toEqual({ kind: 'keep' });
 		expect(stageAfterRuled(twoOpen, 'repo:7:card', true)).toEqual({ kind: 'keep' });
 	});
 
-	test('[ABRD-155] once its last point is stored the stage moves to the next open card', () => {
+	test('ABRD-155: once its last point is stored the stage moves to the next open card', () => {
 		expect(stageAfterRuled(lastLeft, 'repo:7:card', false)).toEqual({
 			kind: 'select',
 			key: 'repo:8:card'
 		});
 	});
 
-	test('[ABRD-155] a noted last point shows its decided card, in the Decided view when nothing else is open', () => {
+	test('ABRD-155: a noted last point shows its decided card, in the Decided view when nothing else is open', () => {
 		const alone = [repo({ items: [lastLeft[0]?.items[0] as ReturnType<typeof item>] })];
 
 		expect(stageAfterRuled(lastLeft, 'repo:7:card', true)).toEqual({
@@ -741,7 +741,7 @@ describe('stageAfterReturned', () => {
 		repo({ items: members.map((member, number) => item({ number: number + 1, lines: [member] })) })
 	];
 
-	test('[ABRD-76] the first other open card comes next, skipping cards with their head', () => {
+	test('ABRD-76: the first other open card comes next, skipping cards with their head', () => {
 		const repos = cards(
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
 			optionLine({ index: 1 }),
@@ -751,7 +751,7 @@ describe('stageAfterReturned', () => {
 		expect(stageAfterReturned(repos, 'repo:3:card')).toBe('repo:2:card');
 	});
 
-	test('[ABRD-76] with no other open card the stage stays on the card itself', () => {
+	test('ABRD-76: with no other open card the stage stays on the card itself', () => {
 		const repos = cards(
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
 			optionLine({ index: 1, returned_on: '2026-10-27' }),
@@ -761,7 +761,7 @@ describe('stageAfterReturned', () => {
 		expect(stageAfterReturned(repos, 'repo:2:card')).toBe('repo:2:card');
 	});
 
-	test('[ABRD-101] the next open card may be the kept card of a failed repository', () => {
+	test('ABRD-101: the next open card may be the kept card of a failed repository', () => {
 		const repos = [
 			repo({ items: [item({ number: 1, lines: [optionLine({ returned_on: '2026-10-27' })] })] }),
 			repo({ name: 'broken', error: 'down', items: [item({ number: 9, lines: [optionLine()] })] })
@@ -777,7 +777,7 @@ describe('clockTime', () => {
 		{ moment: new Date(2026, 9, 31, 9, 41), expected: '09:41' },
 		{ moment: new Date(2026, 9, 31, 0, 7), expected: '00:07' }
 	])(
-		'[ABRD-101] a read at $expected reads as HH:MM on the 24-hour clock',
+		'ABRD-101: a read at $expected reads as HH:MM on the 24-hour clock',
 		({ moment, expected }) => {
 			expect(clockTime(moment)).toBe(expected);
 		}

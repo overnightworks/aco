@@ -98,7 +98,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px open list`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-28] [ABRD-48] option card rows stand in one group per repository, each with the shape naming its state and its question as title', async ({
+		test('ABRD-28, ABRD-48: option card rows stand in one group per repository, each with the shape naming its state and its question as title', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -121,14 +121,14 @@ for (const viewport of [
 			);
 			if (viewport.width < 760)
 				for (const height of rowHeights) expect(height).toBeGreaterThanOrEqual(44);
-			expect(new Set(rowHeights).size, '[ABRD-126] one row height').toBe(1);
+			expect(new Set(rowHeights).size, 'ABRD-126: one row height').toBe(1);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
 				viewport.width
 			);
 			await shoot(page, (name) => testInfo.outputPath(name), 'open-list');
 		});
 
-		test('[ABRD-29] first load selects the first row, desktop shows its card and phones the list', async ({
+		test('ABRD-29: first load selects the first row, desktop shows its card and phones the list', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -147,7 +147,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-29] the pane that took focus on load shows no frame, and the next control keeps its ring', async ({
+		test('ABRD-29: the pane that took focus on load shows no frame, and the next control keeps its ring', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -166,7 +166,7 @@ for (const viewport of [
 			await expect(control).toHaveCSS('outline-style', 'solid');
 		});
 
-		test('[ABRD-107] the repository with the newest card leads and first load selects its first row', async ({
+		test('ABRD-107: the repository with the newest card leads and first load selects its first row', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -195,7 +195,7 @@ for (const viewport of [
 			await expect(first).toHaveAttribute('aria-current', 'true');
 		});
 
-		test('[ABRD-49] an empty board reads All decided, a failure beside an empty repository does not', async ({
+		test('ABRD-49: an empty board reads All decided, a failure beside an empty repository does not', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -223,7 +223,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('failed-and-quiet.png') });
 		});
 
-		test('[ABRD-28] Tab moves from the first row to the second, Enter opens it and focuses the stage', async ({
+		test('ABRD-28: Tab moves from the first row to the second, Enter opens it and focuses the stage', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();

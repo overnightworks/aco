@@ -288,7 +288,8 @@ def test_no_entries_print_no_line_and_carry_empty_keys(
 def test_a_malformed_file_prints_the_unavailable_line_and_the_rest_of_the_output(
     world: World, capsys: pytest.CaptureFixture[str], text: str, sentence: str
 ) -> None:
-    """Spec: AHEAD-04..AHEAD-09, AHEAD-16..AHEAD-18, AHEAD-21, AHEAD-22, NEXT-50, NEXT-52
+    """Spec: AHEAD-04, AHEAD-05, AHEAD-06, AHEAD-07, AHEAD-08, AHEAD-09,
+    AHEAD-16, AHEAD-17, AHEAD-18, AHEAD-21, AHEAD-22, NEXT-50, NEXT-52
     (matrix row 10)."""
     assert unavailable_line_after(world, capsys, text) == sentence
 

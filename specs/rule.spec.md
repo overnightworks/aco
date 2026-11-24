@@ -68,30 +68,30 @@ withdrawn one.
 
 ## Ruling a line
 
-- [ ] [RULE-01] A still-open option line makes `aco rule ITEM --line N` with `--option` or `--other` print `RULED #<n> line <k> <ruling>; <m> line(s) still open` on stdout, exit `0` (see E-RULE-01).
-- [ ] [RULE-02] `--json` on the same call prints `specs/output.spec.md`'s envelope with `reason: "ruled"`, then `"item": <n>, "index": <k>, "ruling": "<ruling>", "ruled_on": "<date>", "open": <m>`.
+- RULE-01: A still-open option line makes `aco rule ITEM --line N` with `--option` or `--other` print `RULED #<n> line <k> <ruling>; <m> line(s) still open` on stdout, exit `0` (see E-RULE-01).
+- RULE-02: `--json` on the same call prints `specs/output.spec.md`'s envelope with `reason: "ruled"`, then `"item": <n>, "index": <k>, "ruling": "<ruling>", "ruled_on": "<date>", "open": <m>`.
 - RULE-03 (retired).
-- [ ] [RULE-12] A ruling retains the card's `question`, `problem`, `picture`, `caption` unchanged, invents none, and adds only RULE-14's keys, plus `other` for `--other` (E-RULE-08).
-- [ ] [RULE-14] `--option X` on an open option line prints RULE-01/RULE-02 with `X` as `<ruling>`; the line gains `ruling`, today's UTC `ruled_on`, `card_hash` and `via`, no other key changes (see E-RULE-10).
-- [ ] [RULE-22] `--unclear` on an open option line prints `RETURNED #<n> line <k> to its head; <m> line(s) still open`, exit `0`; `--json` is `reason: "returned"` with `"item"`, `"index"`, `"returned_on"`, `"open"`.
-- [ ] [RULE-23] `--unclear` adds today's UTC `returned_on` and, with `--note TEXT`, `returned_note` TEXT verbatim; no other key changes and the line stays open (see E-RULE-12).
-- [ ] [RULE-25] `--option` or `--other` on a line with its head rules it as RULE-14 or RULE-20 and drops `returned_on` and `returned_note` (see E-RULE-12).
-- [ ] [RULE-20] `--other TEXT` on an open option line prints RULE-01/RULE-02 with `other` as `<ruling>`; the line gains RULE-14's four keys with `ruling = "other"`, then `other`, TEXT verbatim (see E-RULE-11).
-- [ ] [RULE-29] `--line` may repeat: each named line is checked in the order written by its own refusals, and all are written in one body write with one UTC date, or none is (see E-RULE-13).
-- [ ] [RULE-30] With several `--line`, each `--option` and `--card-hash` belongs to the `--line` written just before it; with one `--line` they may stand anywhere (see E-RULE-13).
-- [ ] [RULE-31] Several lines print, in the order written, `RULED #<n> lines <k> <ruling>, …; <m> line(s) still open` or `RETURNED #<n> lines <k>, … to its head; <m> line(s) still open`, exit `0` (see E-RULE-13).
-- [ ] [RULE-32] Their `--json` carries `"lines": [{"index", "ruling"}, …]` in place of RULE-02's `index` and `ruling`, or `"lines": [{"index"}, …]` in place of RULE-22's `index` (see E-RULE-14).
-- [ ] [RULE-36] `--via`, `--other` and `--note` are given once and apply to every named line; so does `--unclear` (see E-RULE-14).
+- RULE-12: A ruling retains the card's `question`, `problem`, `picture`, `caption` unchanged, invents none, and adds only RULE-14's keys, plus `other` for `--other` (E-RULE-08).
+- RULE-14: `--option X` on an open option line prints RULE-01/RULE-02 with `X` as `<ruling>`; the line gains `ruling`, today's UTC `ruled_on`, `card_hash` and `via`, no other key changes (see E-RULE-10).
+- RULE-22: `--unclear` on an open option line prints `RETURNED #<n> line <k> to its head; <m> line(s) still open`, exit `0`; `--json` is `reason: "returned"` with `"item"`, `"index"`, `"returned_on"`, `"open"`.
+- RULE-23: `--unclear` adds today's UTC `returned_on` and, with `--note TEXT`, `returned_note` TEXT verbatim; no other key changes and the line stays open (see E-RULE-12).
+- RULE-25: `--option` or `--other` on a line with its head rules it as RULE-14 or RULE-20 and drops `returned_on` and `returned_note` (see E-RULE-12).
+- RULE-20: `--other TEXT` on an open option line prints RULE-01/RULE-02 with `other` as `<ruling>`; the line gains RULE-14's four keys with `ruling = "other"`, then `other`, TEXT verbatim (see E-RULE-11).
+- RULE-29: `--line` may repeat: each named line is checked in the order written by its own refusals, and all are written in one body write with one UTC date, or none is (see E-RULE-13).
+- RULE-30: With several `--line`, each `--option` and `--card-hash` belongs to the `--line` written just before it; with one `--line` they may stand anywhere (see E-RULE-13).
+- RULE-31: Several lines print, in the order written, `RULED #<n> lines <k> <ruling>, …; <m> line(s) still open` or `RETURNED #<n> lines <k>, … to its head; <m> line(s) still open`, exit `0` (see E-RULE-13).
+- RULE-32: Their `--json` carries `"lines": [{"index", "ruling"}, …]` in place of RULE-02's `index` and `ruling`, or `"lines": [{"index"}, …]` in place of RULE-22's `index` (see E-RULE-14).
+- RULE-36: `--via`, `--other` and `--note` are given once and apply to every named line; so does `--unclear` (see E-RULE-14).
 
 ## Refusals this command owns
 
-- [ ] [RULE-04] `--line N` naming an already-ruled entry refuses `line <k> is already ruled; a changed ruling is a new line`, exit `2`, before any write (see E-RULE-03).
-- [ ] [RULE-05] `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04); `<m>` counts withdrawn lines.
+- RULE-04: `--line N` naming an already-ruled entry refuses `line <k> is already ruled; a changed ruling is a new line`, exit `2`, before any write (see E-RULE-03).
+- RULE-05: `--line N` outside the item's own expectation lines refuses `line <k> out of range: this item has <m> expectation line(s)`, exit `2`, before any write (see E-RULE-04); `<m>` counts withdrawn lines.
 - RULE-06 (retired).
-- [ ] [RULE-07] An item no reference resolves refuses `#<n> does not exist`, exit `2`, before any write.
-- [ ] [RULE-08] An item that is a pull request refuses `#<n> is a pull request, not an issue; rule needs an issue`, exit `2`, before any write.
+- RULE-07: An item no reference resolves refuses `#<n> does not exist`, exit `2`, before any write.
+- RULE-08: An item that is a pull request refuses `#<n> is a pull request, not an issue; rule needs an issue`, exit `2`, before any write.
 - RULE-13 (retired).
-- [ ] [RULE-15] A flag combination below refuses its sentence, exit `2`, before any forge call, after RULE-33 and RULE-34 (see E-RULE-10, E-RULE-13):
+- RULE-15: A flag combination below refuses its sentence, exit `2`, before any forge call, after RULE-33 and RULE-34 (see E-RULE-10, E-RULE-13):
   - with several `--line` and `--option` given, a named line without its own `--option` after it: `line <k> needs its own --option after it`
   - with several `--line`, a named line without its own `--card-hash` after it: `line <k> needs its own --card-hash after it`; the two count bullets are judged line by line in written order, `--option` before `--card-hash`, so line 2 without a hash refuses before line 3 without an option
   - `--option` without `--via` or `--card-hash`: `--option needs --via and --card-hash`
@@ -101,33 +101,33 @@ withdrawn one.
   - `--via default` with `--other`: `--via default keeps only the recommended option, not --other`
   - `--unclear` without `--card-hash`: `--unclear needs --card-hash`
   - `--via` with `--unclear`: `--via does not go with --unclear; nothing is decided`
-- [ ] [RULE-16] `--option`, `--other` or `--unclear` naming a yes/no line refuses `line <k> is a yes/no line; <flag> rules only an option line`, `returns` for `--unclear`, exit `2`, after RULE-05, before RULE-04.
-- [ ] [RULE-17] A `--card-hash` other than the card's current hash refuses `line <k> changed since its card was shown; show it again and rule what it shows now`, exit `2`, before any write, after RULE-04.
-- [ ] [RULE-18] A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
-- [ ] [RULE-19] `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
-- [ ] [RULE-45] `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, exit `2`, before any write, after RULE-19.
-- [ ] [RULE-21] A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
-- [ ] [RULE-38] `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
-- [ ] [RULE-24] `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
-- [ ] [RULE-26] A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
-- [ ] [RULE-27] `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
-- [ ] [RULE-28] A MALFORMED item body refuses `#<n> <body defect sentence>; rule needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref` (see E-OUT-02).
-- [ ] [RULE-09] `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 38, 45, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
-- [ ] [RULE-10] Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `brief`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
-- [ ] [RULE-33] A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call, after RULE-35 (see E-RULE-13).
-- [ ] [RULE-34] A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
+- RULE-16: `--option`, `--other` or `--unclear` naming a yes/no line refuses `line <k> is a yes/no line; <flag> rules only an option line`, `returns` for `--unclear`, exit `2`, after RULE-05, before RULE-04.
+- RULE-17: A `--card-hash` other than the card's current hash refuses `line <k> changed since its card was shown; show it again and rule what it shows now`, exit `2`, before any write, after RULE-04.
+- RULE-18: A letter not on the card refuses `line <k> has no option <X>; its options are <L>`, exit `2`, before any write, after RULE-17 (see E-RULE-10).
+- RULE-19: `--via default` with a letter other than the card's `recommended` refuses `--via default keeps only the recommended option <R>, not <X>`, exit `2`, before any write, after RULE-18.
+- RULE-45: `--via default` on a final option or a money, access or data-risk line refuses `line <k> cannot be ruled --via default: <reason>; the operator rules it`, exit `2`, before any write, after RULE-19.
+- RULE-21: A blank or all-whitespace `--other` refuses `--other needs a non-empty answer`, exit `2`, before any forge call, after RULE-15 (see E-RULE-11).
+- RULE-38: `--option` or `--other` on a line asked after today's UTC date refuses, naming line `<k>`, its `asked_on` and today (see E-RULE-16), exit `2`, before any write, after RULE-19.
+- RULE-24: `--unclear` on a line already with its head refuses `line <k> is already with its head; it comes back once revised`, exit `2`, before any write, after RULE-04, before RULE-17.
+- RULE-26: A blank or all-whitespace `--note` beside `--unclear` refuses `a blank --note says nothing; leave it out`, exit `2`, before any forge call, after RULE-15 (see E-RULE-12).
+- RULE-27: `--via default` on a line with its head refuses `line <k> was answered Unclear; --via default records no answer`, exit `2`, before any write, after RULE-04, before RULE-17.
+- RULE-28: A MALFORMED item body refuses `#<n> <body defect sentence>; rule needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref` (see E-OUT-02).
+- RULE-09: `--json` on a refusal (RULE-04/05/07/08, 10, 15..19, 21, 38, 45, 24, 26..28, 33..35, 37) prints the envelope with the table's `reason` and the sentence as `message`, exit `2` (see E-RULE-05).
+- RULE-10: Under `storage = "state-ref"`, `aco rule` resolves the state-ref forge like `brief`; `--repo` there refuses the same as PIN-04 (see E-RULE-06).
+- RULE-33: A `--line` naming a line an earlier `--line` named refuses `line <k> is named twice`, exit `2`, before any forge call, after RULE-35 (see E-RULE-13).
+- RULE-34: A misplaced `--option` or `--card-hash` refuses its sentence below, exit `2`, before any forge call, after RULE-35; it and RULE-33 judge the flags in the order written (see E-RULE-13):
   - with several `--line`, one written before the first `--line`: `<flag> before the first --line belongs to no line`
   - a second one for the same line, with one `--line` too: `line <k> has a second <flag>`; `--line 2 --option A --option B` refuses `line 2 has a second --option`
-- [ ] [RULE-35] A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call (see E-RULE-13):
+- RULE-35: A second `--other`, `--note` or `--via` refuses `<flag> is given twice; give it once`, exit `2`, with one `--line` too, before any forge call (see E-RULE-13):
   - and before every other refusal of this file but RULE-39 and the parser's own
-- [ ] [RULE-39] `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
-- [ ] [RULE-37] `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
-- [ ] [RULE-43] A ruling write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; a re-run reads the body fresh (see E-RULE-19).
-- [ ] [RULE-11] Every other forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
-- [ ] [RULE-40] Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
-- [ ] [RULE-41] A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
-- [ ] [RULE-42] A writer that finds the item's lock held prints `waiting for the item lock at <lock path>` once to stderr, then waits and goes on; stdout and `--json` do not change (see E-RULE-18).
-- [ ] [RULE-44] A verified ruling or return touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
+- RULE-39: `--via board` refuses as an invalid `--via` choice, exit `2`, before any forge call and any other refusal of this file, RULE-35 included; the choices are `chat` and `default` (see E-RULE-10).
+- RULE-37: `--option`, `--other` or `--unclear` naming a withdrawn line refuses `line <k> was withdrawn by its head`, exit `2`, before any write, after RULE-05, before RULE-16 (see E-RULE-15).
+- RULE-43: A ruling write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; a re-run reads the body fresh (see E-RULE-19).
+- RULE-11: Every other forge failure ruling the line -- the body write itself included -- refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"` (see E-RULE-07).
+- RULE-40: Every ruling write runs in the item's turn: writers of one item through aco on this machine, `aco rule` and the board included, are serialized, so rulings on distinct lines both land.
+- RULE-41: A lock that the item's turn cannot take refuses `ERROR: cannot lock the item at <lock path>: <detail>`, exit `2`, `--json` `reason: "unavailable"`, nothing read or written (see E-RULE-17).
+- RULE-42: A writer that finds the item's lock held prints `waiting for the item lock at <lock path>` once to stderr, then waits and goes on; stdout and `--json` do not change (see E-RULE-18).
+- RULE-44: A verified ruling or return touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
 - The turn is a per-machine lock: on `github` a hand edit (`gh issue edit`, the browser) or another machine's write is found by the check when it lands between aco's read and the check right after its write, and refuses with its sentence (RULE-43); a hand edit saved later over an older copy still overwrites the write unseen; under `state-ref` that write refuses (CAS-20).
 
 `reason`, by which refusal fired:

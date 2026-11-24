@@ -43,7 +43,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-test('[ABRD-44] a one-point card’s pick sends nothing before the window ends, then exactly the card with the picked letter', async () => {
+test('ABRD-44: a one-point card’s pick sends nothing before the window ends, then exactly the card with the picked letter', async () => {
 	const send = sender(storedAnswer(storedCard));
 	const store = new DecisionStore('token', readyBoard().wiring, send);
 
@@ -60,7 +60,7 @@ test('[ABRD-44] a one-point card’s pick sends nothing before the window ends, 
 	});
 });
 
-test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is no longer pending', async () => {
+test('ABRD-33: undoing a pick inside the window sends nothing, and the card is no longer pending', async () => {
 	const send = sender(storedAnswer(storedCard));
 	const { wiring, reads } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
@@ -75,7 +75,7 @@ test('[ABRD-33] undoing a pick inside the window sends nothing, and the card is 
 	expect(reads()).toBe(0);
 });
 
-test('[ABRD-44] a stored pick shows its item in place and names the card as just ruled', async () => {
+test('ABRD-44: a stored pick shows its item in place and names the card as just ruled', async () => {
 	const { store: board, wiring, reads } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 	const store = new DecisionStore('token', wiring, sender(storedAnswer(storedCard)));
 
@@ -105,7 +105,7 @@ test.each([
 	expect(store.justRuled).toBeNull();
 });
 
-test('[ABRD-44] a pending pick names its letter, option and topic for the strip', () => {
+test('ABRD-44: a pending pick names its letter, option and topic for the strip', () => {
 	const store = new DecisionStore('token', readyBoard().wiring, sender(storedAnswer(storedCard)));
 
 	store.choose('repo', 42, points, { shown: card, option: optionB });

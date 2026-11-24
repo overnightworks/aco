@@ -57,7 +57,7 @@ function renderCard(
 	return handlers;
 }
 
-test('[ABRD-83] the card is titled by its name, carries the meta of its points and has no Problem row of its own', () => {
+test('ABRD-83: the card is titled by its name, carries the meta of its points and has no Problem row of its own', () => {
 	renderCard();
 
 	expect(screen.getByRole('heading', { name: 'Song-Seite · 3 points' })).toBeInTheDocument();
@@ -67,7 +67,7 @@ test('[ABRD-83] the card is titled by its name, carries the meta of its points a
 	expect(screen.queryByText('Problem')).not.toBeInTheDocument();
 });
 
-test('[ABRD-83] points in different areas and with their head show both in the meta', () => {
+test('ABRD-83: points in different areas and with their head show both in the meta', () => {
 	renderCard({
 		points: [
 			point(2, { area: 'Song-Seite' }),
@@ -82,7 +82,7 @@ test('[ABRD-83] points in different areas and with their head show both in the m
 	).toBeInTheDocument();
 });
 
-test('[ABRD-84] each point is a numbered row with its question, none open at first', () => {
+test('ABRD-84: each point is a numbered row with its question, none open at first', () => {
 	renderCard();
 
 	const toggles = screen.getAllByRole('button', { expanded: false, name: /^\d/ });
@@ -94,7 +94,7 @@ test('[ABRD-84] each point is a numbered row with its question, none open at fir
 	expect(screen.getByText('Points', { selector: 'dt' })).toBeInTheDocument();
 });
 
-test('[ABRD-84] each point offers one pick per option, named by point, letter and option, the recommended one in the accent', () => {
+test('ABRD-84: each point offers one pick per option, named by point, letter and option, the recommended one in the accent', () => {
 	renderCard();
 
 	const second = within(screen.getByRole('group', { name: 'Point 2' })).getAllByRole('button');
@@ -105,7 +105,7 @@ test('[ABRD-84] each point offers one pick per option, named by point, letter an
 	expect(second.map((pick) => pick.classList.contains('recommended'))).toEqual([true, false]);
 });
 
-test('[ABRD-84] a point with a final option carries the warn mark', () => {
+test('ABRD-84: a point with a final option carries the warn mark', () => {
 	renderCard({
 		points: [point(2), point(3, { options: [optionA, cardOption({ letter: 'B', undo: 'final' })] })]
 	});
@@ -115,7 +115,7 @@ test('[ABRD-84] a point with a final option carries the warn mark', () => {
 	expect(toggles[1]?.querySelector('.final')).not.toBeNull();
 });
 
-test('[ABRD-85] activating a point’s question reports its line', async () => {
+test('ABRD-85: activating a point’s question reports its line', async () => {
 	const { onToggle } = renderCard();
 
 	await fireEvent.click(screen.getByRole('button', { name: /Question 3\?/ }));
@@ -123,7 +123,7 @@ test('[ABRD-85] activating a point’s question reports its line', async () => {
 	expect(onToggle).toHaveBeenCalledWith(3);
 });
 
-test('[ABRD-85] the open point shows its Problem, Today, Options and Recommendation below its row', () => {
+test('ABRD-85: the open point shows its Problem, Today, Options and Recommendation below its row', () => {
 	renderCard({ open: 3 });
 
 	const labels = screen.getAllByRole('term').map((term) => term.textContent);
@@ -138,7 +138,7 @@ test('[ABRD-85] the open point shows its Problem, Today, Options and Recommendat
 	);
 });
 
-test('[ABRD-86] a pick reports its point as shown and its option', async () => {
+test('ABRD-86: a pick reports its point as shown and its option', async () => {
 	const { onPick } = renderCard();
 
 	await fireEvent.click(screen.getByRole('button', { name: 'Point 3: B – As today' }));
@@ -147,7 +147,7 @@ test('[ABRD-86] a pick reports its point as shown and its option', async () => {
 	expect(onPick).toHaveBeenCalledWith(points[2], optionB);
 });
 
-test('[ABRD-86] a chosen point shows its pick pressed and the others not', () => {
+test('ABRD-86: a chosen point shows its pick pressed and the others not', () => {
 	renderCard({ held: [{ shown: points[0] as OptionLine, option: optionB }] });
 
 	const pressed = screen
@@ -157,7 +157,7 @@ test('[ABRD-86] a chosen point shows its pick pressed and the others not', () =>
 	expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(5);
 });
 
-test('[ABRD-97] a waiting point disables its own picks and Other, the other points stay usable', () => {
+test('ABRD-97: a waiting point disables its own picks and Other, the other points stay usable', () => {
 	renderCard({ blocked: new Set([3]) });
 
 	const second = within(screen.getByRole('group', { name: 'Point 2' })).getAllByRole('button');
@@ -168,7 +168,7 @@ test('[ABRD-97] a waiting point disables its own picks and Other, the other poin
 	expect(screen.getByRole('button', { name: 'Point 1: Other…' })).toBeEnabled();
 });
 
-test('[ABRD-100] a saving point keeps its held pick pressed and locked, the card still opens a point and reads saving', async () => {
+test('ABRD-100: a saving point keeps its held pick pressed and locked, the card still opens a point and reads saving', async () => {
 	const { onToggle } = renderCard({
 		blocked: new Set([2]),
 		saving: true,
@@ -190,20 +190,20 @@ test('[ABRD-100] a saving point keeps its held pick pressed and locked, the card
 	expect(screen.getByText(META_LABEL.saving)).toBeInTheDocument();
 });
 
-test('[ABRD-99] a waiting Other answer marks no pick', () => {
+test('ABRD-99: a waiting Other answer marks no pick', () => {
 	renderCard({ blocked: new Set([3]), held: [] });
 
 	expect(screen.queryByRole('button', { pressed: true })).toBeNull();
 });
 
-test('[ABRD-154] every point offers its own Other without opening the point', () => {
+test('ABRD-154: every point offers its own Other without opening the point', () => {
 	renderCard();
 
 	expect(screen.getAllByRole('button', { name: /^Point \d: Other…$/ })).toHaveLength(3);
 	expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 });
 
-test('[ABRD-154] a point’s open Other shows its panel under that point only', () => {
+test('ABRD-154: a point’s open Other shows its panel under that point only', () => {
 	renderCard({
 		panelOf: (point) => (point.index === 3 ? { kind: 'other', shown: [point] } : null)
 	});
@@ -212,14 +212,14 @@ test('[ABRD-154] a point’s open Other shows its panel under that point only', 
 	expect(screen.getByRole('textbox', { name: 'Point 2: Your answer' })).toBeInTheDocument();
 });
 
-test('[ABRD-45] a card that needs Neu laden hides its picks and keeps its rows', () => {
+test('ABRD-45: a card that needs Neu laden hides its picks and keeps its rows', () => {
 	renderCard({ locked: true });
 
 	expect(screen.queryByRole('group', { name: /^Point/ })).not.toBeInTheDocument();
 	expect(screen.getAllByRole('button', { name: /^\d/ })).toHaveLength(3);
 });
 
-test('[ABRD-84] hostile texts render as text, never as markup', () => {
+test('ABRD-84: hostile texts render as text, never as markup', () => {
 	const hostile = '<img src=x onerror=alert(1)>';
 	const { container } = render(GroupCard, {
 		repo: 'songmaker',

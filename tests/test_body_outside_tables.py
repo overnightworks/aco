@@ -119,7 +119,7 @@ class TestBlockTableHeaderOutsideTheBlock:
     def test_the_fence_defects_print_before_and_instead_of_the_outside_header(
         self, capsys: pytest.CaptureFixture[str], raw_body: str, expected_stderr: str
     ) -> None:
-        """Spec: BODY-01..BODY-04, BODY-109."""
+        """Spec: BODY-01, BODY-02, BODY-03, BODY-04, BODY-109."""
         result = run_cli(["check", "-"], capsys, stdin=raw_body)
         assert (result.status, result.stdout, result.stderr) == (2, "", expected_stderr)
 

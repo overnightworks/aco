@@ -88,7 +88,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px failed read`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-101] a repository that fails on a later read keeps its cards under Not read, its sentence and its read time, and they stay decidable', async ({
+		test('ABRD-101: a repository that fails on a later read keeps its cards under Not read, its sentence and its read time, and they stay decidable', async ({
 			page
 		}, testInfo) => {
 			const served = await servedRepository();
@@ -119,7 +119,7 @@ for (const viewport of [
 			await expect.poll(posts.count).toBe(1);
 		});
 
-		test('[ABRD-102] a read that answers with no reading keeps every card under the page sentence and its read time, and a pick stores once', async ({
+		test('ABRD-102: a read that answers with no reading keeps every card under the page sentence and its read time, and a pick stores once', async ({
 			page
 		}, testInfo) => {
 			await refuseFirstCard(page, phone);
@@ -149,7 +149,7 @@ for (const viewport of [
 			await expect.poll(posts.count).toBe(1);
 		});
 
-		test('[ABRD-102] a first load that answers with no reading shows aco antwortet nicht. and the status line, no list', async ({
+		test('ABRD-102: a first load that answers with no reading shows aco antwortet nicht. and the status line, no list', async ({
 			page
 		}) => {
 			await page.route('**/api/board', (route) =>
@@ -163,7 +163,7 @@ for (const viewport of [
 			await expect(page.getByRole('heading', { level: 2 })).toHaveCount(0);
 		});
 
-		test('[ABRD-128] a first load where every repository fails shows its warning box with its own sentence, not the status line', async ({
+		test('ABRD-128: a first load where every repository fails shows its warning box with its own sentence, not the status line', async ({
 			page
 		}) => {
 			await arrange(board(false), { listingFailure: 'aco unavailable' });

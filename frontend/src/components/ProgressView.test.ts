@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { progressContainer, progressRead, repo } from '../test-support/board';
 import ProgressView from './ProgressView.svelte';
 
-test('[ABRD-135] a repo shows its figure, bar, counts and each top-level container', () => {
+test('ABRD-135: a repo shows its figure, bar, counts and each top-level container', () => {
 	render(ProgressView, {
 		repos: [repo({ name: 'songmaker', progress: progressRead() })]
 	});
@@ -20,7 +20,7 @@ test('[ABRD-135] a repo shows its figure, bar, counts and each top-level contain
 	expect(screen.getAllByRole('progressbar')[1]).toHaveAttribute('aria-valuetext', '7/48 · 14 %');
 });
 
-test('[ABRD-135] a repo with no container says so and shows no percent', () => {
+test('ABRD-135: a repo with no container says so and shows no percent', () => {
 	render(ProgressView, {
 		repos: [
 			repo({
@@ -44,7 +44,7 @@ test('[ABRD-135] a repo with no container says so and shows no percent', () => {
 	expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });
 
-test('[ABRD-137] a container shows its waiting count only when it is not zero', () => {
+test('ABRD-137: a container shows its waiting count only when it is not zero', () => {
 	const quiet = progressContainer({ number: 11, title: 'Quiet', waiting: 0 });
 	render(ProgressView, {
 		repos: [repo({ progress: progressRead({ containers: [progressContainer(), quiet] }) })]
@@ -55,14 +55,14 @@ test('[ABRD-137] a container shows its waiting count only when it is not zero', 
 	expect(others).toHaveLength(0);
 });
 
-test('[ABRD-135] a container at one hundred percent is marked done', () => {
+test('ABRD-135: a container at one hundred percent is marked done', () => {
 	const done = progressContainer({ closed: 5, planned: 5, open: 0, uncut: 0, percent: 100 });
 	render(ProgressView, { repos: [repo({ progress: progressRead({ containers: [done] }) })] });
 
 	expect(screen.getAllByRole('progressbar')[1]).toHaveClass('done');
 });
 
-test('[ABRD-134] a progress that could not be read shows its sentence and no figure', () => {
+test('ABRD-134: a progress that could not be read shows its sentence and no figure', () => {
 	render(ProgressView, { repos: [repo({ progress: { error: 'GitHub is down' } })] });
 
 	expect(screen.getByRole('alert')).toHaveTextContent('Progress unknown');
@@ -70,14 +70,14 @@ test('[ABRD-134] a progress that could not be read shows its sentence and no fig
 	expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });
 
-test('[ABRD-135] a repo that was not read shows its sentence', () => {
+test('ABRD-135: a repo that was not read shows its sentence', () => {
 	render(ProgressView, { repos: [repo({ error: 'git refused the read', progress: null })] });
 
 	expect(screen.getByRole('alert')).toHaveTextContent('Not read');
 	expect(screen.getByRole('alert')).toHaveTextContent('git refused the read');
 });
 
-test('[ABRD-146] a container shows its lanes left and range under its bar, none without a lane left', () => {
+test('ABRD-146: a container shows its lanes left and range under its bar, none without a lane left', () => {
 	const ranged = progressContainer({
 		number: 11,
 		title: 'Ranged',
@@ -107,7 +107,7 @@ test('[ABRD-146] a container shows its lanes left and range under its bar, none 
 	expect(within(article).queryAllByText(/lanes? left/)).toHaveLength(1);
 });
 
-test('[ABRD-146] a container whose range is unknown shows the sentence beside its lanes left', () => {
+test('ABRD-146: a container whose range is unknown shows the sentence beside its lanes left', () => {
 	render(ProgressView, {
 		repos: [repo({ progress: progressRead({ containers: [progressContainer()] }) })]
 	});
@@ -117,7 +117,7 @@ test('[ABRD-146] a container whose range is unknown shows the sentence beside it
 	).toBeInTheDocument();
 });
 
-test('[ABRD-151] a container lists its closed children with their actuals', () => {
+test('ABRD-151: a container lists its closed children with their actuals', () => {
 	const container = progressContainer({
 		closed_children: [
 			{ number: 12, title: 'Done thing', wall_seconds: 5400, fix_rounds: 2, recorded: true },
@@ -131,7 +131,7 @@ test('[ABRD-151] a container lists its closed children with their actuals', () =
 	expect(within(article).getByText('#13 Hand closed · no record')).toBeInTheDocument();
 });
 
-test('[ABRD-151] a container without closed children lists none', () => {
+test('ABRD-151: a container without closed children lists none', () => {
 	render(ProgressView, {
 		repos: [repo({ progress: progressRead({ containers: [progressContainer()] }) })]
 	});

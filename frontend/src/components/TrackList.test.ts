@@ -28,7 +28,7 @@ function renderList(
 	return { onSelect, container: rendered.container };
 }
 
-test('[ABRD-28] a repository is a heading with its name and open count', () => {
+test('ABRD-28: a repository is a heading with its name and open count', () => {
 	renderList([
 		repo({
 			items: [
@@ -41,7 +41,7 @@ test('[ABRD-28] a repository is a heading with its name and open count', () => {
 	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('repo 2');
 });
 
-test('[ABRD-48] an option row shows its topic, the Open shape and its question as title', () => {
+test('ABRD-48: an option row shows its topic, the Open shape and its question as title', () => {
 	renderList([
 		repo({
 			items: [item({ lines: [optionLine({ topic: 'Sprung', question: 'Keep the song open?' })] })]
@@ -53,7 +53,7 @@ test('[ABRD-48] an option row shows its topic, the Open shape and its question a
 	expect(within(row).getByRole('img', { name: 'Open' })).toBeInTheDocument();
 });
 
-test('[ABRD-106] an open row ends in the day it was asked', () => {
+test('ABRD-106: an open row ends in the day it was asked', () => {
 	renderList([
 		repo({
 			items: [item({ lines: [optionLine({ topic: 'Sprung', asked_on: '2026-10-05' })] })]
@@ -64,7 +64,7 @@ test('[ABRD-106] an open row ends in the day it was asked', () => {
 	).toBeVisible();
 });
 
-test('[ABRD-106] a card of several points ends in the newest day of its points, whatever their order', () => {
+test('ABRD-106: a card of several points ends in the newest day of its points, whatever their order', () => {
 	renderList([
 		repo({
 			items: [
@@ -83,7 +83,7 @@ test('[ABRD-106] a card of several points ends in the newest day of its points, 
 	).toBeVisible();
 });
 
-test('[ABRD-106] a decided row ends in its decision day', () => {
+test('ABRD-106: a decided row ends in its decision day', () => {
 	renderList(
 		[
 			repo({
@@ -101,7 +101,7 @@ test('[ABRD-106] a decided row ends in its decision day', () => {
 	).toBeVisible();
 });
 
-test('[ABRD-61] a returned option row shows its topic, the With head shape and a muted label', () => {
+test('ABRD-61: a returned option row shows its topic, the With head shape and a muted label', () => {
 	renderList([
 		repo({
 			items: [item({ lines: [optionLine({ topic: 'Sprung', returned_on: '2026-10-27' })] })]
@@ -113,7 +113,7 @@ test('[ABRD-61] a returned option row shows its topic, the With head shape and a
 	expect(within(row).getByText('Sprung')).toHaveClass('muted');
 });
 
-test('[ABRD-28] a short topic labels the row and the question titles it instead of the full sentence', () => {
+test('ABRD-28: a short topic labels the row and the question titles it instead of the full sentence', () => {
 	renderList([
 		repo({
 			items: [
@@ -137,7 +137,7 @@ test('[ABRD-28] a short topic labels the row and the question titles it instead 
 	expect(screen.queryByText('Guests may join the call.')).not.toBeInTheDocument();
 });
 
-test('[ABRD-49] ruled lines and ruled-only repositories leave the groups and stand in the quiet line', () => {
+test('ABRD-49: ruled lines and ruled-only repositories leave the groups and stand in the quiet line', () => {
 	renderList([
 		repo({ name: 'busy', items: [item({ lines: [optionLine()] })] }),
 		repo({
@@ -152,7 +152,7 @@ test('[ABRD-49] ruled lines and ruled-only repositories leave the groups and sta
 	expect(screen.queryByText('Nein · 2026-10-01')).not.toBeInTheDocument();
 });
 
-test('[ABRD-49] a failed repository shows its alert, and with no open line no All decided', () => {
+test('ABRD-49: a failed repository shows its alert, and with no open line no All decided', () => {
 	const sentence = 'aco rulings failed: ERROR: no forge adapter';
 	renderList([repo({ name: 'b', error: sentence, items: [] }), repo({ name: 'idle', items: [] })]);
 
@@ -162,7 +162,7 @@ test('[ABRD-49] a failed repository shows its alert, and with no open line no Al
 	expect(screen.queryByText('All decided')).not.toBeInTheDocument();
 });
 
-test('[ABRD-49] with no open line and no failure the list reads All decided', () => {
+test('ABRD-49: with no open line and no failure the list reads All decided', () => {
 	renderList([
 		repo({ items: [item({ lines: [line({ ruling: 'yes', ruled_on: '2026-10-01' })] })] })
 	]);
@@ -172,7 +172,7 @@ test('[ABRD-49] with no open line and no failure the list reads All decided', ()
 	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
 });
 
-test('[ABRD-15] hostile titles, topics, repository names and errors are shown as text, never as markup', () => {
+test('ABRD-15: hostile titles, topics, repository names and errors are shown as text, never as markup', () => {
 	const hostileTopic = '<script>alert(1)</script>';
 	const hostileQuestion = '"><img src=x onerror=alert(2)>';
 	const hostileName = '<svg onload=alert(3)>';
@@ -203,7 +203,7 @@ test('[ABRD-15] hostile titles, topics, repository names and errors are shown as
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
-test('[ABRD-28] a row is a button that selects its line by the repository-bound key', () => {
+test('ABRD-28: a row is a button that selects its line by the repository-bound key', () => {
 	const { onSelect } = renderList([
 		repo({ name: 'a', items: [item({ number: 42, lines: [optionLine({ index: 3 })] })] })
 	]);
@@ -213,7 +213,7 @@ test('[ABRD-28] a row is a button that selects its line by the repository-bound 
 	expect(onSelect).toHaveBeenCalledWith('a:42:card');
 });
 
-test('[ABRD-28] the selected row is marked current among several open ones', () => {
+test('ABRD-28: the selected row is marked current among several open ones', () => {
 	renderList(
 		[
 			repo({
@@ -231,7 +231,7 @@ test('[ABRD-28] the selected row is marked current among several open ones', () 
 	expect(second).toHaveAttribute('aria-current', 'true');
 });
 
-test('[ABRD-30] a decided row is named Decided with its label, carries the Decided shape and is not muted', () => {
+test('ABRD-30: a decided row is named Decided with its label, carries the Decided shape and is not muted', () => {
 	renderList(
 		[
 			repo({
@@ -258,7 +258,7 @@ test('[ABRD-30] a decided row is named Decided with its label, carries the Decid
 	expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('repo 2');
 });
 
-test('[ABRD-31] with nothing ruled the decided list reads Nothing decided yet and says what shows here', () => {
+test('ABRD-31: with nothing ruled the decided list reads Nothing decided yet and says what shows here', () => {
 	renderList([repo({ items: [item({ lines: [optionLine()] })] })], { view: 'decided' });
 
 	expect(screen.getByText('Nothing decided yet')).toBeInTheDocument();
@@ -268,7 +268,7 @@ test('[ABRD-31] with nothing ruled the decided list reads Nothing decided yet an
 	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
 });
 
-test('[ABRD-31] a failed repository shows its alert in the decided list and no Nothing decided yet', () => {
+test('ABRD-31: a failed repository shows its alert in the decided list and no Nothing decided yet', () => {
 	renderList(
 		[repo({ name: 'broken', error: 'down', items: [] }), repo({ name: 'idle', items: [] })],
 		{
@@ -282,7 +282,7 @@ test('[ABRD-31] a failed repository shows its alert in the decided list and no N
 	expect(screen.queryByText(/Nothing open/)).not.toBeInTheDocument();
 });
 
-test('[ABRD-100] a saving row is named by the Saving shape and its topic', () => {
+test('ABRD-100: a saving row is named by the Saving shape and its topic', () => {
 	renderList([repo({ items: [item({ number: 42, lines: [optionLine({ topic: 'Sprung' })] })] })], {
 		saving: [cardKey('repo', 42)]
 	});
@@ -291,7 +291,7 @@ test('[ABRD-100] a saving row is named by the Saving shape and its topic', () =>
 	expect(within(row).getByRole('img', { name: 'Saving' })).toBeInTheDocument();
 });
 
-test('[ABRD-100] a saving row with its head shows Saving, unmuted', () => {
+test('ABRD-100: a saving row with its head shows Saving, unmuted', () => {
 	renderList(
 		[
 			repo({
@@ -310,14 +310,14 @@ test('[ABRD-100] a saving row with its head shows Saving, unmuted', () => {
 	expect(within(row).getByText('Sprung')).not.toHaveClass('muted');
 });
 
-test('[ABRD-101] a failed repository without a kept card names no read time', () => {
+test('ABRD-101: a failed repository without a kept card names no read time', () => {
 	renderList([repo({ name: 'fresh', error: 'down', items: [] })]);
 
 	expect(screen.getByRole('alert')).not.toHaveTextContent(LAST_READ_LABEL);
 	expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
-test('[ABRD-101] a failed repository keeps its cards as selectable rows after the time they were read', () => {
+test('ABRD-101: a failed repository keeps its cards as selectable rows after the time they were read', () => {
 	const readAt = new Date(2026, 9, 31, 9, 41);
 	const { onSelect } = renderList(
 		[

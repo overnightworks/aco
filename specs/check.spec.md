@@ -64,10 +64,10 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 
 ## `--json`'s own envelope
 
-- [ ] [CHECK-01] `aco check <n> --json` against a pull request prints the envelope, `"kind": "pull_request", "number": <n>`, `reason`/`message` from the table below (see E-CHECK-01).
-- [ ] [CHECK-05] `aco check <n> --json` against an issue prints the envelope, `"kind": "issue", "number": <n>`, `reason`/`message` below, `"blocked_by"` only with `reason: "blocked"` (see E-CHECK-05).
-- [ ] [CHECK-19] `aco check - --json` prints the envelope, `reason` below and `"defects": [...]`, CHECK-18's ordered sentences, with no `kind`, `number` or `sha`; exit `0` on `valid`, else `2` (see E-CHECK-11).
-- [ ] [CHECK-14] `aco check <sha> --json` prints the envelope, `"kind": "trunk_commit", "sha": "<sha>"`, `reason`/`message` below, never a `refused` key (see E-CHECK-08).
+- CHECK-01: `aco check <n> --json` against a pull request prints the envelope, `"kind": "pull_request", "number": <n>`, `reason`/`message` from the table below (see E-CHECK-01).
+- CHECK-05: `aco check <n> --json` against an issue prints the envelope, `"kind": "issue", "number": <n>`, `reason`/`message` below, `"blocked_by"` only with `reason: "blocked"` (see E-CHECK-05).
+- CHECK-19: `aco check - --json` prints the envelope, `reason` below and `"defects": [...]`, CHECK-18's ordered sentences, with no `kind`, `number` or `sha`; exit `0` on `valid`, else `2` (see E-CHECK-11).
+- CHECK-14: `aco check <sha> --json` prints the envelope, `"kind": "trunk_commit", "sha": "<sha>"`, `reason`/`message` below, never a `refused` key (see E-CHECK-08).
 
 `reason`, by which outcome fired:
 
@@ -94,19 +94,19 @@ vocabulary is `valid`, `malformed`, `incomplete` and `unavailable`.
 
 ## A number in neither space
 
-- [ ] [CHECK-02] `<n>` matching no issue and no pull request prints `REFUSED: #<n> does not exist in <repository>` on stderr, exit `2`, naming no kind word (see E-CHECK-02).
-- [ ] [CHECK-03] The same read with `--json` prints the envelope, `"reason": "missing", "kind": "missing", "number": <n>, "message": "does not exist in <repository>"`, exit `2`.
+- CHECK-02: `<n>` matching no issue and no pull request prints `REFUSED: #<n> does not exist in <repository>` on stderr, exit `2`, naming no kind word (see E-CHECK-02).
+- CHECK-03: The same read with `--json` prints the envelope, `"reason": "missing", "kind": "missing", "number": <n>, "message": "does not exist in <repository>"`, exit `2`.
 
 ## Issue mode: a body's own contract
 
 `<body defect sentence>` and `<sections>` are `specs/body-block.spec.md`'s
 own text (BODY-01..BODY-50, BODY-12).
 
-- [ ] [CHECK-04] `<n>` naming a valid, complete, unblocked issue prints `ISSUE #<n> body ok` on stdout, exit `0` (see E-CHECK-03).
-- [ ] [CHECK-06] A malformed body prints `ISSUE #<n> <body defect sentence>` on stderr for its first defect, exit `2` (see E-CHECK-04).
-- [ ] [CHECK-07] A structurally valid but unfilled body prints `ISSUE #<n> body incomplete: <sections>` on stderr, exit `2`.
-- [ ] [CHECK-08] An issue with open `blocked_by` dependencies prints `ISSUE #<n> blocked by <label>, <label>` on stderr, exit `3`, local blockers first (see E-CHECK-05).
-- [ ] [CHECK-09] Under `storage = "state-ref"`, a local blocker's own label is `specs/landing-grammar.spec.md`'s `<label>` (`aco-xxxxxx`); a foreign one stays `owner/repo#n` regardless of either pin.
+- CHECK-04: `<n>` naming a valid, complete, unblocked issue prints `ISSUE #<n> body ok` on stdout, exit `0` (see E-CHECK-03).
+- CHECK-06: A malformed body prints `ISSUE #<n> <body defect sentence>` on stderr for its first defect, exit `2` (see E-CHECK-04).
+- CHECK-07: A structurally valid but unfilled body prints `ISSUE #<n> body incomplete: <sections>` on stderr, exit `2`.
+- CHECK-08: An issue with open `blocked_by` dependencies prints `ISSUE #<n> blocked by <label>, <label>` on stderr, exit `3`, local blockers first (see E-CHECK-05).
+- CHECK-09: Under `storage = "state-ref"`, a local blocker's own label is `specs/landing-grammar.spec.md`'s `<label>` (`aco-xxxxxx`); a foreign one stays `owner/repo#n` regardless of either pin.
 
 ## Trunk mode: a commit's own trailer
 
@@ -114,9 +114,9 @@ own text (BODY-01..BODY-50, BODY-12).
 `specs/landing-grammar.spec.md`'s own text (LAND-48; LAND-03, LAND-57,
 LAND-58, LAND-60, LAND-68).
 
-- [ ] [CHECK-12] `<sha>` naming a trunk commit whose own trailer classifies prints `<sha> declares <declaration>` on stdout, exit `0` (see E-CHECK-08).
-- [ ] [CHECK-13] A `<sha>` the trunk grammar refuses prints `REFUSED: <sha> <trunk defect sentence>` on stderr, exit `2`, and reads no forge at all (see E-CHECK-08).
-- [ ] [CHECK-15] A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, never a local branch (see E-CHECK-09).
+- CHECK-12: `<sha>` naming a trunk commit whose own trailer classifies prints `<sha> declares <declaration>` on stdout, exit `0` (see E-CHECK-08).
+- CHECK-13: A `<sha>` the trunk grammar refuses prints `REFUSED: <sha> <trunk defect sentence>` on stderr, exit `2`, and reads no forge at all (see E-CHECK-08).
+- CHECK-15: A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, never a local branch (see E-CHECK-09).
 
 ## No checkout, no read
 
@@ -124,29 +124,29 @@ LAND-58, LAND-60, LAND-68).
 from .aco/board.toml and needs a checkout (a shallow one
 is enough): <git detail>`.
 
-- [ ] [CHECK-10] `aco check <n>` outside a git checkout, or any other forge or store failure while reading, refuses `ERROR: <sentence>`, `--json` `reason: "unavailable"`, exit `2` (see E-CHECK-06).
-- [ ] [CHECK-11] Under `storage = "state-ref"`, `--repo` with `<n>` or `<sha>` refuses the same sentence as `specs/storage-pin.spec.md`'s PIN-04, `--json` `reason: "invalid_usage"`, exit `2` (see E-CHECK-07).
+- CHECK-10: `aco check <n>` outside a git checkout, or any other forge or store failure while reading, refuses `ERROR: <sentence>`, `--json` `reason: "unavailable"`, exit `2` (see E-CHECK-06).
+- CHECK-11: Under `storage = "state-ref"`, `--repo` with `<n>` or `<sha>` refuses the same sentence as `specs/storage-pin.spec.md`'s PIN-04, `--json` `reason: "invalid_usage"`, exit `2` (see E-CHECK-07).
 
 ## A body from stdin
 
 Every sentence below is `specs/body-block.spec.md`'s own text; this file
 owns only the CLI-level framing around it.
 
-- [ ] [CHECK-16] `aco body` is an unknown command: the parser itself refuses it with the ordinary usage error, exit `2`, before anything runs; no alias of it exists (see E-CHECK-12).
-- [ ] [CHECK-17] `aco check -` reading a valid, complete block from stdin prints and exits exactly as BODY-14 describes (see E-CHECK-10).
-- [ ] [CHECK-18] `aco check -` prints every defect sentence on stderr, one per line, never truncated like `aco check <n>` (CHECK-06, CHECK-07); exit `2` (see E-CHECK-10).
-- [ ] [CHECK-20] Stdin that is not valid UTF-8 refuses `stdin is not valid UTF-8: <reason>; pipe the body as UTF-8 text`, `--json` `reason: "unavailable"`, exit `2`, before any parse is attempted.
-- [ ] [CHECK-21] `aco check -` refuses PIN-32's sentence on an absent `.aco/board.toml`, PIN-01's on a present but untracked or ignored one, `--json` `reason: "unavailable"`, before stdin is ever read.
-- [ ] [CHECK-22] `aco check -` reads the storage pin for `[record]`'s validity: unknown under default `storage = "github"` (BODY-15), field-checked under `storage = "state-ref"` (BODY-16).
-- [ ] [CHECK-23] `aco check -` never reads the global `--repo`: it neither uses nor refuses it, under either storage.
-- [ ] [CHECK-24] A socket, terminal, `/dev/null` or closed stdin refuses `check - needs the body on stdin: aco check - < body.md`, `--json` `reason: "unavailable"`, exit `2`, unread, after CHECK-21's refusal.
+- CHECK-16: `aco body` is an unknown command: the parser itself refuses it with the ordinary usage error, exit `2`, before anything runs; no alias of it exists (see E-CHECK-12).
+- CHECK-17: `aco check -` reading a valid, complete block from stdin prints and exits exactly as BODY-14 describes (see E-CHECK-10).
+- CHECK-18: `aco check -` prints every defect sentence on stderr, one per line, never truncated like `aco check <n>` (CHECK-06, CHECK-07); exit `2` (see E-CHECK-10).
+- CHECK-20: Stdin that is not valid UTF-8 refuses `stdin is not valid UTF-8: <reason>; pipe the body as UTF-8 text`, `--json` `reason: "unavailable"`, exit `2`, before any parse is attempted.
+- CHECK-21: `aco check -` refuses PIN-32's sentence on an absent `.aco/board.toml`, PIN-01's on a present but untracked or ignored one, `--json` `reason: "unavailable"`, before stdin is ever read.
+- CHECK-22: `aco check -` reads the storage pin for `[record]`'s validity: unknown under default `storage = "github"` (BODY-15), field-checked under `storage = "state-ref"` (BODY-16).
+- CHECK-23: `aco check -` never reads the global `--repo`: it neither uses nor refuses it, under either storage.
+- CHECK-24: A socket, terminal, `/dev/null` or closed stdin refuses `check - needs the body on stdin: aco check - < body.md`, `--json` `reason: "unavailable"`, exit `2`, unread, after CHECK-21's refusal.
 
   ```console
   $ aco check - < /dev/null
   2> ERROR: check - needs the body on stdin: aco check - < body.md
   exit 2
   ```
-- [ ] [CHECK-25] `aco check -` outside a git checkout refuses CHECK-10's sentence, `--json` `reason: "unavailable"`, exit `2`, before stdin is read; the storage pin (CHECK-22) is the one repository fact it needs.
+- CHECK-25: `aco check -` outside a git checkout refuses CHECK-10's sentence, `--json` `reason: "unavailable"`, exit `2`, before stdin is read; the storage pin (CHECK-22) is the one repository fact it needs.
 
   ```console
   $ cd /tmp && printf 'x' | aco check -

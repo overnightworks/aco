@@ -22,23 +22,23 @@ wrote are listed, the boundary `specs/mcp.spec.md` draws for the inbox; under `s
 
 ## Listing
 
-- [ ] [FLP-01] An open, member-written item labelled `fleet-plan` is listed from any repository's checkout, that repository's own and every other's alike (see E-FLP-01).
-- [ ] [FLP-02] An item without the label, a closed item and an item a non-member wrote are never listed (see E-FLP-01).
-- [ ] [FLP-03] Text prints one line per plan, `<repository>#<n> <day>: <title> <url>`; `<day>` is the last-changed day, `<url>` left out when there is none (see E-FLP-01).
-- [ ] [FLP-05] Plans are ordered by repository `OWNER/REPO`, then by ascending `<n>` (see E-FLP-02).
-- [ ] [FLP-06] With no plan, text is exactly `No fleet-wide plans.`, exit `0`; `--json` has `"plans": []` (see E-FLP-03).
-- [ ] [FLP-10] Text shows `<title>` and an unavailable `<reason>` with each display control escaped (NEXT-37); `--json` carries both as stored.
+- FLP-01: An open, member-written item labelled `fleet-plan` is listed from any repository's checkout, that repository's own and every other's alike (see E-FLP-01).
+- FLP-02: An item without the label, a closed item and an item a non-member wrote are never listed (see E-FLP-01).
+- FLP-03: Text prints one line per plan, `<repository>#<n> <day>: <title> <url>`; `<day>` is the last-changed day, `<url>` left out when there is none (see E-FLP-01).
+- FLP-05: Plans are ordered by repository `OWNER/REPO`, then by ascending `<n>` (see E-FLP-02).
+- FLP-06: With no plan, text is exactly `No fleet-wide plans.`, exit `0`; `--json` has `"plans": []` (see E-FLP-03).
+- FLP-10: Text shows `<title>` and an unavailable `<reason>` with each display control escaped (NEXT-37); `--json` carries both as stored.
 
 ## `--json`
 
-- [ ] [FLP-04] A plan is `{"repository", "number", "title", "url", "updated_on"}`; `url` is the item's forge page, `null` under `storage = "state-ref"`; `updated_on` is `YYYY-MM-DD` (see E-FLP-01).
-- [ ] [FLP-11] Success is `{"ok": true, "reason": "listed", "plans", "unavailable"}`, exit `0`; an `unavailable` entry is `{"repository", "reason"}`, repositories first, then unreadable checkouts (see E-FLP-04).
+- FLP-04: A plan is `{"repository", "number", "title", "url", "updated_on"}`; `url` is the item's forge page, `null` under `storage = "state-ref"`; `updated_on` is `YYYY-MM-DD` (see E-FLP-01).
+- FLP-11: Success is `{"ok": true, "reason": "listed", "plans", "unavailable"}`, exit `0`; an `unavailable` entry is `{"repository", "reason"}`, repositories first, then unreadable checkouts (see E-FLP-04).
 
 ## Unavailable repositories and refusals
 
-- [ ] [FLP-07] An unreadable repository or checkout (named by its directory) prints `unavailable <repository>: <reason>` after the plans and is in `--json` `unavailable`; the others answer, exit `0` (see E-FLP-04).
-- [ ] [FLP-08] With no readable repository or no usable root: `ERROR: <sentence>` on stderr, exit `2`; `--json` has `reason` `unavailable` (see E-FLP-05).
-- [ ] [FLP-09] The global `--repo` refuses `aco fleet-plans finds its repositories itself; --repo does not apply to it`, exit `2`; `--json` has `reason` `invalid_usage` (see E-FLP-06).
+- FLP-07: An unreadable repository or checkout (named by its directory) prints `unavailable <repository>: <reason>` after the plans and is in `--json` `unavailable`; the others answer, exit `0` (see E-FLP-04).
+- FLP-08: With no readable repository or no usable root: `ERROR: <sentence>` on stderr, exit `2`; `--json` has `reason` `unavailable` (see E-FLP-05).
+- FLP-09: The global `--repo` refuses `aco fleet-plans finds its repositories itself; --repo does not apply to it`, exit `2`; `--json` has `reason` `invalid_usage` (see E-FLP-06).
 
 `reason`, by which refusal fired:
 

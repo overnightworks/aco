@@ -29,7 +29,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px step answers`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-173] [ABRD-175] [ABRD-176] Erfolgreich stores after its window and the card leaves', async ({
+		test('ABRD-173, ABRD-175, ABRD-176: Erfolgreich stores after its window and the card leaves', async ({
 			page
 		}, testInfo) => {
 			await arrange([{ ...item(7, 'Release the build'), step: stepTable() }]);
@@ -50,7 +50,7 @@ for (const viewport of [
 			expect(await storedNow(7)).toMatch(answeredOnBoard('Erfolgreich'));
 		});
 
-		test('[ABRD-174] Fehlgeschlagen cannot send without a note and stores with one', async ({
+		test('ABRD-174: Fehlgeschlagen cannot send without a note and stores with one', async ({
 			page
 		}, testInfo) => {
 			await arrange([{ ...item(7, 'Release the build'), step: stepTable() }]);
@@ -67,7 +67,7 @@ for (const viewport of [
 			expect(await storedNow(7)).toMatch(answeredOnBoard('Fehlgeschlagen: Stayed red\\.'));
 		});
 
-		test('[ABRD-173] a report step stores its report', async ({ page }, testInfo) => {
+		test('ABRD-173: a report step stores its report', async ({ page }, testInfo) => {
 			await arrange([
 				{ ...item(7, 'Release the build'), step: stepTable({ answer: 'the green run id' }) }
 			]);
@@ -83,7 +83,7 @@ for (const viewport of [
 			expect(await storedNow(7)).toMatch(answeredOnBoard('run 4711'));
 		});
 
-		test('[ABRD-175] Undo inside the window posts nothing', async ({ page }) => {
+		test('ABRD-175: Undo inside the window posts nothing', async ({ page }) => {
 			await arrange([{ ...item(7, 'Release the build'), step: stepTable() }]);
 			let posts = 0;
 			await page.route('**/api/step', (route) => {
@@ -102,7 +102,7 @@ for (const viewport of [
 			await expect(stepCard(page)).toBeVisible();
 		});
 
-		test('[ABRD-176] a refused answer shows its sentence with Neu laden', async ({
+		test('ABRD-176: a refused answer shows its sentence with Neu laden', async ({
 			page
 		}, testInfo) => {
 			await arrange([{ ...item(7, 'Release the build'), step: stepTable() }]);

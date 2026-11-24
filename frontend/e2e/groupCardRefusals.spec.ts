@@ -25,7 +25,7 @@ for (const viewport of [
 ]) {
 	const phone = viewport.width === 390;
 	test.describe(`${viewport.width}px card of points`, () => {
-		test('[ABRD-80] a point ruled from chat meanwhile is refused as already ruled and nothing else is stored', async ({
+		test('ABRD-80: a point ruled from chat meanwhile is refused as already ruled and nothing else is stored', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -44,7 +44,7 @@ for (const viewport of [
 			expect((await storedLine(7, 4)).ruling).toBeNull();
 		});
 
-		test('[ABRD-45] any other failure shows its banner with the point open again, and picking again posts again', async ({
+		test('ABRD-45: any other failure shows its banner with the point open again, and picking again posts again', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -77,7 +77,7 @@ for (const viewport of [
 			await expect.poll(() => storedLine(7, 2)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 
-		test('[ABRD-91] a point changed after the page read is refused, Neu laden shows it fresh, and the next post names it', async ({
+		test('ABRD-91: a point changed after the page read is refused, Neu laden shows it fresh, and the next post names it', async ({
 			page
 		}) => {
 			await arrange([sprung(...threePoints())]);

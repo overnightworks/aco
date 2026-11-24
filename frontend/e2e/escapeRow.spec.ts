@@ -77,7 +77,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Other…`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-63] Other… opens the panel with focus in the field, Send waits for text, and the card stays reachable', async ({
+		test('ABRD-63: Other… opens the panel with focus in the field, Send waits for text, and the card stays reachable', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -109,7 +109,7 @@ for (const viewport of [
 			);
 		});
 
-		test('[ABRD-67] Send shows the Other strip, Undo posts nothing and reopens the panel with the draft', async ({
+		test('ABRD-67: Send shows the Other strip, Undo posts nothing and reopens the panel with the draft', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -138,7 +138,7 @@ for (const viewport of [
 			await expect(page.getByRole('button', { name: 'Other…' })).toBeEnabled();
 		});
 
-		test('[ABRD-64] after the window the answer is ruled through aco and the card moves to Decided', async ({
+		test('ABRD-64: after the window the answer is ruled through aco and the card moves to Decided', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -156,7 +156,7 @@ for (const viewport of [
 			await expectDecidedAnswer(page, `Other: „${ANSWER}“`, BOARD_ANSWER_HOW);
 		});
 
-		test('[ABRD-66] the typed answer survives closing the panel and switching cards, per card', async ({
+		test('ABRD-66: the typed answer survives closing the panel and switching cards, per card', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -180,7 +180,7 @@ for (const viewport of [
 			await expect(answerField(page)).toHaveValue(ANSWER);
 		});
 
-		test('[ABRD-68] a card changed while the panel is open is refused on Send and the answer stays in the draft', async ({
+		test('ABRD-68: a card changed while the panel is open is refused on Send and the answer stays in the draft', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -199,7 +199,7 @@ for (const viewport of [
 			await expect(answerField(page)).toHaveValue(ANSWER);
 		});
 
-		test('[ABRD-69] a card with its head offers Other… too', async ({ page }) => {
+		test('ABRD-69: a card with its head offers Other… too', async ({ page }) => {
 			await arrangeCards(true);
 			await open(page, phone);
 

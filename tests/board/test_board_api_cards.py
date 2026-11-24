@@ -124,7 +124,7 @@ def test_a_card_only_writes_the_repo_its_fingerprint_was_read_from(
     expected_message: str | None,
     requests: tuple[tuple[ForgeRequest, ...], tuple[ForgeRequest, ...]],
 ) -> None:
-    """ABRD-16/21: a card decided against its own repo writes there; posted
+    """ABRD-16, ABRD-21: a card decided against its own repo writes there; posted
     against another configured repo instead -- even one holding an identical
     card -- it is refused like a changed line on that repo's one read, no
     write in either repo."""

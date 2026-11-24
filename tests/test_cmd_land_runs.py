@@ -303,8 +303,8 @@ def test_a_landing_with_stored_runs_and_a_record_file_refuses_before_any_merge(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: LANREC-98, LANREC-91, E-LANREC-20 -- the runs file stays, the claim is kept and the
-    branch is not deleted."""
+    """Spec: LANREC-98, LANREC-91 -- the runs file stays, the claim is kept and the
+    branch is not deleted. Example: E-LANREC-20."""
     standing = arranged(landing, path, monkeypatch, capsys)
     store_runs(landing, two_chained_runs([verdict("approve", landing.head)]))
     record = write_lane_record_file(

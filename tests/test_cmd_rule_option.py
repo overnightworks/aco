@@ -278,7 +278,8 @@ class TestRuleOption:
         message: str,
         reason: str,
     ) -> None:
-        """Spec: RULE-04, RULE-05, RULE-09, RULE-16..RULE-19, RULE-24 -- in that check order."""
+        """Spec: RULE-04, RULE-05, RULE-09, RULE-16, RULE-17, RULE-18,
+        RULE-19, RULE-24 -- in that check order."""
         client = serve_item(monkeypatch, item_body(option_line, yes_no_line=yes_no_line))
         assert_refusal_writes_nothing(client, capsys, arguments, message, reason)
 

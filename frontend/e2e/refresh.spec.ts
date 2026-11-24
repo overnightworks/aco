@@ -79,7 +79,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px refresh`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-103] Refresh reads once per click, shows a card added behind the page and keeps focus', async ({
+		test('ABRD-103: Refresh reads once per click, shows a card added behind the page and keeps focus', async ({
 			page
 		}, testInfo) => {
 			await arrange([item(61, 'First', card('Erste?'))]);
@@ -100,7 +100,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('refreshed.png') });
 		});
 
-		test('[ABRD-103] Refresh brings back a repository whose read failed', async ({ page }) => {
+		test('ABRD-103: Refresh brings back a repository whose read failed', async ({ page }) => {
 			await arrange([item(61, 'First', card('Erste?'))]);
 			const served = await servedRepository();
 			await routeRepositories(page, [served, 'Projekt B'], (read) =>
@@ -118,7 +118,7 @@ for (const viewport of [
 			await expect(row(page, 'Erste?')).toHaveCount(2);
 		});
 
-		test('[ABRD-103] Refresh is the retry after a read that failed whole', async ({ page }) => {
+		test('ABRD-103: Refresh is the retry after a read that failed whole', async ({ page }) => {
 			await arrange([item(61, 'First', card('Erste?'))]);
 			await visit(page);
 			await page.route('**/api/board', (route) =>
@@ -134,7 +134,7 @@ for (const viewport of [
 			await expect(notRead).toHaveCount(0);
 		});
 
-		test('[ABRD-105] a read leaves the card that waits as shown and its refusal lands on it', async ({
+		test('ABRD-105: a read leaves the card that waits as shown and its refusal lands on it', async ({
 			page
 		}, testInfo) => {
 			await arrange([item(61, 'First', card('Erste?')), item(62, 'Second', card('Zweite?'))]);
@@ -157,7 +157,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('waiting-card.png') });
 		});
 
-		test('[ABRD-105] a refused card’s Neu laden shows its new content while another card waits', async ({
+		test('ABRD-105: a refused card’s Neu laden shows its new content while another card waits', async ({
 			page
 		}) => {
 			await arrange([item(61, 'Refused', card('Refusiert?')), item(62, 'Waits', card('Wartet?'))]);
@@ -183,7 +183,7 @@ for (const viewport of [
 			await expect(pick(page, 'A')).toBeEnabled();
 		});
 
-		test('[ABRD-104] a slow read shows Reading… busy and clickable, turns the arrow, marks reading with a ring under reduced motion that keyboard focus keeps and asks for one more read', async ({
+		test('ABRD-104: a slow read shows Reading… busy and clickable, turns the arrow, marks reading with a ring under reduced motion that keyboard focus keeps and asks for one more read', async ({
 			page
 		}, testInfo) => {
 			await arrange([item(61, 'First', card('Erste?'))]);
@@ -242,7 +242,7 @@ async function edgeBands(button: Locator): Promise<{ ring: Buffer; cue: Buffer }
 }
 
 test.describe('timers and return to the tab', () => {
-	test('[ABRD-103] returning to the tab reads only once the last read is over the stale bound', async ({
+	test('ABRD-103: returning to the tab reads only once the last read is over the stale bound', async ({
 		page
 	}) => {
 		await arrange([item(61, 'First', card('Erste?'))]);
@@ -260,7 +260,7 @@ test.describe('timers and return to the tab', () => {
 		await expect.poll(reads.count).toBe(1);
 	});
 
-	test('[ABRD-103] the page reads every self-refresh interval while visible, and not while hidden', async ({
+	test('ABRD-103: the page reads every self-refresh interval while visible, and not while hidden', async ({
 		page
 	}) => {
 		await arrange([item(61, 'First', card('Erste?'))]);

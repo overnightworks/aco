@@ -19,7 +19,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px progress view`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-135] the Progress tab shows the repository line and each top-level container, never a nested one', async ({
+		test('ABRD-135: the Progress tab shows the repository line and each top-level container, never a nested one', async ({
 			page
 		}, testInfo) => {
 			await arrange(
@@ -62,7 +62,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('progress.png') });
 		});
 
-		test('[ABRD-135] a bar shows landed apart from other closes', async ({ page }) => {
+		test('ABRD-135: a bar shows landed apart from other closes', async ({ page }) => {
 			await arrange([container(10, 'Song jump', { closed: [101, 102, 103], open: [104] })], {
 				landed: [101, 102]
 			});
@@ -81,7 +81,7 @@ for (const viewport of [
 			expect(landed?.width).toBeGreaterThan(other?.width ?? Infinity);
 		});
 
-		test('[ABRD-135] a container with nothing planned shows the text and no progressbar', async ({
+		test('ABRD-135: a container with nothing planned shows the text and no progressbar', async ({
 			page
 		}) => {
 			await arrange([container(10, 'Empty', {})]);
@@ -97,7 +97,7 @@ for (const viewport of [
 			await expect(region.getByRole('progressbar')).toHaveCount(0);
 		});
 
-		test('[ABRD-135] a repository without containers shows 0/0 and says so', async ({ page }) => {
+		test('ABRD-135: a repository without containers shows 0/0 and says so', async ({ page }) => {
 			await arrange([item(20, 'Pick a key')]);
 			const { appUrl, token } = readBoardRuntime();
 			await page.goto(`${appUrl}#t=${token}`);
@@ -111,7 +111,7 @@ for (const viewport of [
 			await expect(page.getByText('No container is open.')).toBeVisible();
 		});
 
-		test('[ABRD-146] a container shows its lanes left and the agent-work range from the lane records', async ({
+		test('ABRD-146: a container shows its lanes left and the agent-work range from the lane records', async ({
 			page
 		}, testInfo) => {
 			await arrange(
@@ -143,7 +143,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath('progress-range.png') });
 		});
 
-		test('[ABRD-144] a container without enough lane records says so beside its lanes left', async ({
+		test('ABRD-144: a container without enough lane records says so beside its lanes left', async ({
 			page
 		}) => {
 			await arrange([container(10, 'Song jump', { closed: [101], open: [20, 21] })], {
@@ -159,7 +159,7 @@ for (const viewport of [
 			await expect(page.getByText('2 lanes left · not enough lane records yet')).toBeVisible();
 		});
 
-		test('[ABRD-144] a container with no lane records at all says so', async ({ page }) => {
+		test('ABRD-144: a container with no lane records at all says so', async ({ page }) => {
 			await arrange([container(10, 'Song jump', { closed: [101], open: [20] })]);
 			const { appUrl, token } = readBoardRuntime();
 			await page.goto(`${appUrl}#t=${token}`);
@@ -171,7 +171,7 @@ for (const viewport of [
 			await expect(page.getByText('1 lane left · no lane records')).toBeVisible();
 		});
 
-		test('[ABRD-151] a container lists its closed children with their lane time and fix rounds', async ({
+		test('ABRD-151: a container lists its closed children with their lane time and fix rounds', async ({
 			page
 		}, testInfo) => {
 			await arrange([container(10, 'Song jump', { closed: [101, 102, 103, 104], open: [20] })], {

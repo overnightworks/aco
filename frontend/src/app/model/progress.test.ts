@@ -6,11 +6,11 @@ test.each([
 	[{ closed: 7, landed: 0, planned: 48, open: 31, uncut: 10, percent: 14 }, '7/48 · 14 %'],
 	[{ closed: 5, landed: 5, planned: 5, open: 0, uncut: 0, percent: 100 }, '5/5 · 100 %'],
 	[{ closed: 0, landed: 0, planned: 0, open: 0, uncut: 0, percent: null }, '0/0']
-])('[ABRD-131] %j reads %s', (counts, figure) => {
+])('ABRD-131: %j reads %s', (counts, figure) => {
 	expect(progressFigure(counts)).toBe(figure);
 });
 
-test('[ABRD-135] a bar splits its closed share into landed and other closes', () => {
+test('ABRD-135: a bar splits its closed share into landed and other closes', () => {
 	const shares = barShares({
 		closed: 6,
 		landed: 2,
@@ -44,11 +44,11 @@ test.each([
 	[2, range(7500, 8100), '2 lanes left · about 2 h agent work · from 31 finished items'],
 	[3, { error: 'not enough lane records yet' }, '3 lanes left · not enough lane records yet'],
 	[1, { error: 'lane records unreadable' }, '1 lane left · lane records unreadable']
-])('[ABRD-146] %i lanes with %j read %s', (lanes, estimate, figure) => {
+])('ABRD-146: %i lanes with %j read %s', (lanes, estimate, figure) => {
 	expect(remainingFigure(lanes, estimate)).toBe(figure);
 });
 
-test('[ABRD-140] a container with no estimate has no remaining figure', () => {
+test('ABRD-140: a container with no estimate has no remaining figure', () => {
 	expect(remainingFigure(0, null)).toBeNull();
 });
 
@@ -70,6 +70,6 @@ test.each([
 	[closed({ wall_seconds: null }), '#12 Title · time unknown · 2 fix rounds'],
 	[closed({ fix_rounds: null }), '#12 Title · 1.5 h · fix rounds unknown'],
 	[closed({ wall_seconds: null, fix_rounds: null, recorded: false }), '#12 Title · no record']
-])('[ABRD-151] %j reads %s', (child, figure) => {
+])('ABRD-151: %j reads %s', (child, figure) => {
 	expect(closedChildFigure(child)).toBe(figure);
 });

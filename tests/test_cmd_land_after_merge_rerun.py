@@ -551,7 +551,7 @@ class TestLandAfterMergeRerun:
     def test_lands_from_a_separate_clone(
         self, separate_world: SeparateWorld, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Spec: LANDCMD-25, E-LANDCMD-18a. Local identity releases; the original lane stays."""
+        """LANDCMD-25. Example: E-LANDCMD-18a. Local identity releases; the original lane stays."""
         world = separate_world
         case = world.case
         capsys.readouterr()
@@ -644,7 +644,7 @@ class TestLandAfterMergeRerun:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """Spec: E-LANDCMD-18a, LANDCMD-38, REL-26, REL-47, REL-55, REL-59, E-REL-24."""
+        """Spec: LANDCMD-38, REL-26, REL-47, REL-55, REL-59. Example: E-LANDCMD-18a, E-REL-24."""
         world = separate_world
         merge, release = prepare_separate_rerun(world, capsys)
         before_tip = release.tip
@@ -769,7 +769,7 @@ class TestLandAfterMergeRerun:
         indirect=True,
     )
     def test_resumes(self, world: RerunWorld, capsys: pytest.CaptureFixture[str]) -> None:
-        """Spec: LANDCMD-18, E-LANDCMD-18, LANDCMD-32, REL-43, LAND-64.
+        """Spec: LANDCMD-18, LANDCMD-32, REL-43, LAND-64. Example: E-LANDCMD-18.
         Land's Never 2/3/4 resume release once, using the immutable merge trailer.
         """
         landing = world.world.landing

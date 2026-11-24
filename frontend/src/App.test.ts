@@ -25,7 +25,7 @@ test('the shell names the board in its heading, whatever the state', () => {
 	expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Entscheidungs-Board');
 });
 
-test('[ABRD-51] a ready board offers the Open, Decided, Progress and Steps tabs in that order with their counts, the current one marked', async () => {
+test('ABRD-51: a ready board offers the Open, Decided, Progress and Steps tabs in that order with their counts, the current one marked', async () => {
 	const repos = [
 		repo({
 			items: [
@@ -136,7 +136,7 @@ test.each([
 	{ name: 'beside another open card', others: [43] },
 	{ name: 'as the last open card', others: [] }
 ])(
-	'[ABRD-130] an answer with a note leaves the stage on its decided card with the Note row, $name, never a failure',
+	'ABRD-130: an answer with a note leaves the stage on its decided card with the Note row, $name, never a failure',
 	async ({ others }) => {
 		vi.useFakeTimers();
 		const open = optionLine({
@@ -205,7 +205,7 @@ function setVisibility(state: DocumentVisibilityState): void {
 	document.dispatchEvent(new Event('visibilitychange'));
 }
 
-test('[ABRD-152] closing the page inside the undo window posts the decision at once', async () => {
+test('ABRD-152: closing the page inside the undo window posts the decision at once', async () => {
 	const { rulePosts } = leaveScenario();
 	await decideInWindow();
 	expect(rulePosts()).toHaveLength(0);
@@ -215,7 +215,7 @@ test('[ABRD-152] closing the page inside the undo window posts the decision at o
 	expect(rulePosts()).toHaveLength(1);
 });
 
-test('[ABRD-152] hiding the page posts the decision at once, showing it does not', async () => {
+test('ABRD-152: hiding the page posts the decision at once, showing it does not', async () => {
 	const { rulePosts } = leaveScenario();
 	await decideInWindow();
 
@@ -226,7 +226,7 @@ test('[ABRD-152] hiding the page posts the decision at once, showing it does not
 	expect(rulePosts()).toHaveLength(1);
 });
 
-test('[ABRD-153] a refused post on a card left behind keeps a strip naming it until the card is shown', async () => {
+test('ABRD-153: a refused post on a card left behind keeps a strip naming it until the card is shown', async () => {
 	vi.useFakeTimers();
 	const first = optionLine({ index: 1, topic: 'Jump', question: 'Keep the song open?' });
 	const second = optionLine({ index: 1, topic: 'Hosts', question: 'Share the page?' });
@@ -259,7 +259,7 @@ test('[ABRD-153] a refused post on a card left behind keeps a strip naming it un
 	expect(screen.queryByText('Not saved: Jump')).not.toBeInTheDocument();
 });
 
-test('[ABRD-155] the stage stays on a card while one of its points is open and leaves when its last point is stored', async () => {
+test('ABRD-155: the stage stays on a card while one of its points is open and leaves when its last point is stored', async () => {
 	vi.useFakeTimers();
 	const first = optionLine({ index: 1, question: 'First?', fingerprint: 'fp-1' });
 	const second = optionLine({ index: 2, question: 'Second?', fingerprint: 'fp-2' });

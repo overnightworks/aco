@@ -113,7 +113,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px saving`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-99] a pick marks its letter from the click, at full strength beside a dimmed other', async ({
+		test('ABRD-99: a pick marks its letter from the click, at full strength beside a dimmed other', async ({
 			page
 		}) => {
 			await arrange([item(11, 'Window', card('Fenster?'))]);
@@ -128,7 +128,7 @@ for (const viewport of [
 			expect(await opacityOf(pick(page, 'A'))).toBeGreaterThan(await opacityOf(pick(page, 'B')));
 		});
 
-		test('[ABRD-100] a slow POST turns the row, the meta and the Decide row to Saving, and reduced motion stops the turn', async ({
+		test('ABRD-100: a slow POST turns the row, the meta and the Decide row to Saving, and reduced motion stops the turn', async ({
 			page
 		}) => {
 			await arrange([item(21, 'Slow', card('Langsam?'))]);
@@ -164,7 +164,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-100] a card of points keeps its picks held, locks Accept all, shows Saving, opens a point and ends in Decided', async ({
+		test('ABRD-100: a card of points keeps its picks held, locks Accept all, shows Saving, opens a point and ends in Decided', async ({
 			page
 		}) => {
 			await arrange([item(31, 'Points', ...points())]);
@@ -201,7 +201,7 @@ for (const viewport of [
 			await expectDecided(page, phone, 3);
 			await expect.poll(() => storedLine(31, 1)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
-		test('[ABRD-97] a Neu laden read held while another card saves keeps its Saving and its letter, and every other click counts', async ({
+		test('ABRD-97: a Neu laden read held while another card saves keeps its Saving and its letter, and every other click counts', async ({
 			page
 		}) => {
 			const others = [
@@ -258,7 +258,7 @@ for (const viewport of [
 			expect(posts.count()).toBe(3);
 		});
 
-		test('[ABRD-97] a pick made during a held read on a card the read changes ends in the changed banner, storing nothing', async ({
+		test('ABRD-97: a pick made during a held read on a card the read changes ends in the changed banner, storing nothing', async ({
 			page
 		}) => {
 			const watched = item(42, 'Watched', card('Beobachtet?'));
@@ -290,7 +290,7 @@ for (const viewport of [
 			expect((await storedLine(42, 1)).ruling).toBeNull();
 		});
 
-		test('[ABRD-45] the refused card’s own Neu laden read locks that card alone until it answers', async ({
+		test('ABRD-45: the refused card’s own Neu laden read locks that card alone until it answers', async ({
 			page
 		}) => {
 			const neighbour = item(42, 'Neighbour', card('Nachbar?'));

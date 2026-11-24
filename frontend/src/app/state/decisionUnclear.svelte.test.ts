@@ -28,7 +28,7 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-test('[ABRD-74] sending waits out the window as a With head strip named by the topic, then posts once', async () => {
+test('ABRD-74: sending waits out the window as a With head strip named by the topic, then posts once', async () => {
 	const { send, store } = unclearStore();
 
 	store.decideUnclear('repo', 42, points, '  Why two? ');
@@ -48,7 +48,7 @@ test('[ABRD-74] sending waits out the window as a With head strip named by the t
 	});
 });
 
-test('[ABRD-74] undo posts nothing and reopens the Unclear panel with the note', async () => {
+test('ABRD-74: undo posts nothing and reopens the Unclear panel with the note', async () => {
 	const { send, store } = unclearStore();
 	store.openPanel(key, { kind: 'unclear', shown: points });
 	store.setDraft(key, 'unclear', 'Why two?');
@@ -63,7 +63,7 @@ test('[ABRD-74] undo posts nothing and reopens the Unclear panel with the note',
 	expect(store.draft(key, 'unclear')).toBe('Why two?');
 });
 
-test('[ABRD-73] one panel per card: opening Unclear closes Other, and each keeps its own draft', () => {
+test('ABRD-73: one panel per card: opening Unclear closes Other, and each keeps its own draft', () => {
 	const { store } = unclearStore();
 	store.openPanel(key, { kind: 'other', shown: points });
 	store.setDraft(key, 'other', 'Only on desktop');
@@ -76,7 +76,7 @@ test('[ABRD-73] one panel per card: opening Unclear closes Other, and each keeps
 	expect(store.draft(key, 'unclear')).toBe('Why?');
 });
 
-test('[ABRD-75] the card is pending while its answer waits, so no pick can join it', () => {
+test('ABRD-75: the card is pending while its answer waits, so no pick can join it', () => {
 	const { store } = unclearStore();
 
 	store.decideUnclear('repo', 42, points, '');
@@ -84,7 +84,7 @@ test('[ABRD-75] the card is pending while its answer waits, so no pick can join 
 	expect(store.held(key)).not.toBeNull();
 });
 
-test('[ABRD-76] a returned answer shows its item in place, drops the Unclear draft only and is reported once, never as a ruling', async () => {
+test('ABRD-76: a returned answer shows its item in place, drops the Unclear draft only and is reported once, never as a ruling', async () => {
 	const { board, reads, store } = unclearStore();
 	store.setDraft(key, 'unclear', 'Why?');
 	store.setDraft(key, 'other', 'Only on desktop');
@@ -103,7 +103,7 @@ test('[ABRD-76] a returned answer shows its item in place, drops the Unclear dra
 	expect(store.justReturned).toBeNull();
 });
 
-test('[ABRD-75] a refused answer keeps the note in the draft and shows aco’s sentence', async () => {
+test('ABRD-75: a refused answer keeps the note in the draft and shows aco’s sentence', async () => {
 	const { store } = unclearStore({ status: 'failed', message: 'line 4 is with its head' });
 	store.setDraft(key, 'unclear', 'Why?');
 

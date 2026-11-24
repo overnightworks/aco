@@ -86,130 +86,132 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 
 ## `item new`
 
-- [ ] [ITEM-01] `aco item new --title TITLE` with no `--kind` and nothing piped mints the id, then writes the skeleton body once, `kind = "task"` in its `[record]`; PIN-06/PIN-07 own id and `--json` (see E-ITEM-01).
-- [ ] [ITEM-02] `--kind container` with nothing piped writes `Blocked by: nichts` ahead of the block, and `kind = "container"` in the stored `[record]` (see E-ITEM-01).
-- [ ] [ITEM-03] `--parent PARENT` sets `record.parent` to `PARENT`'s id, an open Task retyped first (ITEM-45); unlike `cut`'s child body, it never writes a `Parent: #<n>` line.
-- [ ] [ITEM-04] Repeated `--scope` values write a sorted, deduplicated top-level `scope = [...]` ahead of the `[record]` table, CLAIM-19..CLAIM-23's own canonical form (see E-ITEM-01).
-- [ ] [ITEM-05] A `--scope` value that is absolute, `..`, or `~`-prefixed refuses with CLAIM-19's own sentence; a duplicate refuses with CLAIM-21's `claim scope contains duplicate paths`, before any write.
-- [ ] [ITEM-19] `--origin`'s grammar is ASCII-only, case-insensitive `forge#n`/`host/owner/repo#n` tokens; an accepted value is stored in `record.origin` with its original case (PIN-20).
-- [ ] [ITEM-20] `--size S|M|L` writes the item's own top-level `size` (BODY-57..BODY-59); argparse refuses an invalid value first. `id`/`--json` stay ITEM-01's shape; `size` is never printed.
+- ITEM-01: `aco item new --title TITLE` with no `--kind` and nothing piped mints the id, then writes the skeleton body once, `kind = "task"` in its `[record]`; PIN-06/PIN-07 own id and `--json` (see E-ITEM-01).
+- ITEM-02: `--kind container` with nothing piped writes `Blocked by: nichts` ahead of the block, and `kind = "container"` in the stored `[record]` (see E-ITEM-01).
+- ITEM-03: `--parent PARENT` sets `record.parent` to `PARENT`'s id, an open Task retyped first (ITEM-45); unlike `cut`'s child body, it never writes a `Parent: #<n>` line.
+- ITEM-04: Repeated `--scope` values write a sorted, deduplicated top-level `scope = [...]` ahead of the `[record]` table, CLAIM-19..CLAIM-23's own canonical form (see E-ITEM-01).
+- ITEM-05: A `--scope` value that is absolute, `..`, or `~`-prefixed refuses with CLAIM-19's own sentence; a duplicate refuses with CLAIM-21's `claim scope contains duplicate paths`, before any write.
+- ITEM-19: `--origin`'s grammar is ASCII-only, case-insensitive `forge#n`/`host/owner/repo#n` tokens; an accepted value is stored in `record.origin` with its original case (PIN-20).
+- ITEM-20: `--size S|M|L` writes the item's own top-level `size` (BODY-57..BODY-59); argparse refuses an invalid value first. `id`/`--json` stay ITEM-01's shape; `size` is never printed.
 
   ```
   $ aco item new --title "Ship it" --size M
   writes size = "M" at the block's top level, ahead of [record]
   ```
-- [ ] [ITEM-23] `--whole REASON` writes the item's own top-level `whole` (BODY-60..BODY-62), the same bound `claim`'s own `--whole` enforces; `claim`/`start` read it back when their own call names none (CLM-21).
+- ITEM-23: `--whole REASON` writes the item's own top-level `whole` (BODY-60..BODY-62), the same bound `claim`'s own `--whole` enforces; `claim`/`start` read it back when their own call names none (CLM-21).
 
 ## `item new` in another repository
 
-- [ ] [ITEM-67] `aco --repo OWNER/NAME item new` naming another repository creates the item in its checkout, found by MCP-19's scan, under its own storage, rules and canonical remote (PIN-57).
+- ITEM-67: `aco --repo OWNER/NAME item new` naming another repository creates the item in its checkout, found by MCP-19's scan, under its own storage, rules and canonical remote (PIN-57).
 - ITEM-57 (retired).
-- [ ] [ITEM-69] A `--repo` naming this checkout's own repository (its canonical remote's) creates the item here without any scan, so a checkout outside the configured root works; under `state-ref` PIN-04 refuses it.
+- ITEM-69: A `--repo` naming this checkout's own repository (its canonical remote's) creates the item here without any scan, so a checkout outside the configured root works; under `state-ref` PIN-04 refuses it.
 
 ## The body `item new` stores
 
-- [ ] [ITEM-58] Either storage keeps prose piped without a block byte for byte, CRLF and trailing blanks too, above a block the flags build in its line ending; a key no flag names stays `""` (see E-ITEM-16).
-- [ ] [ITEM-60] Under either storage `item new` reads a body from a file or pipe on stdin, never dropping it; a socket, terminal, `/dev/null` or closed stdin is never read.
-- [ ] [ITEM-61] Under `storage = "state-ref"`, each empty section prints one stderr line naming `item edit <item-id> --base <body_hash>` and `item show <item-id> --json` for the hash (see E-ITEM-01).
-- [ ] [ITEM-62] A piped block is stored verbatim when the flags add nothing to it under `storage = "github"`, otherwise in its canonical rendering, a comment typed inside it not kept.
+- ITEM-58: Either storage keeps prose piped without a block byte for byte, CRLF and trailing blanks too, above a block the flags build in its line ending; a key no flag names stays `""` (see E-ITEM-16).
+- ITEM-60: Under either storage `item new` reads a body from a file or pipe on stdin, never dropping it; a socket, terminal, `/dev/null` or closed stdin is never read.
+- ITEM-61: Under `storage = "state-ref"`, each empty section prints one stderr line naming `item edit <item-id> --base <body_hash>` and `item show <item-id> --json` for the hash (see E-ITEM-01).
+- ITEM-62: A piped block is stored verbatim when the flags add nothing to it under `storage = "github"`, otherwise in its canonical rendering, a comment typed inside it not kept.
 
 ## `item new` under `storage = "github"`
 
-- [ ] [ITEM-26] Under `storage = "github"`, `aco item new --title T < BODY` opens one GitHub issue titled `T` whose body is the piped one, its block built or completed from the flags (ITEM-58, ITEM-59).
-- [ ] [ITEM-27] The body to store passes `aco check <n>`'s own body check first; a failing body refuses exactly like ITEM-25, and nothing is created (see E-ITEM-08).
-- [ ] [ITEM-28] `--kind task|feature|container` sets the organization's own issue type `Task`, `Feature`, or `Container`, by name.
-- [ ] [ITEM-45] Under either storage, `--parent N` on an open Task retypes it Container after the twin search, before the create; stderr: `retyped #N to Container for its first child` (see E-ITEM-12).
-- [ ] [ITEM-30] Success prints `#<n>`, exit `0`; `--json` prints the envelope, `reason: "created"`, then `item` (`#<n>`) and `number`, the state-ref shape (see E-ITEM-07).
-- [ ] [ITEM-32] A failed `--parent` relation write refuses CUT-17's `created` sentence ending `; record that sub-issue relation on the forge by hand`, `--json` shaped as CUT-28.
+- ITEM-26: Under `storage = "github"`, `aco item new --title T < BODY` opens one GitHub issue titled `T` whose body is the piped one, its block built or completed from the flags (ITEM-58, ITEM-59).
+- ITEM-27: The body to store passes `aco check <n>`'s own body check first; a failing body refuses exactly like ITEM-25, and nothing is created (see E-ITEM-08).
+- ITEM-28: `--kind task|feature|container` sets the organization's own issue type `Task`, `Feature`, or `Container`, by name.
+- ITEM-45: Under either storage, `--parent N` on an open Task retypes it Container after the twin search, before the create; stderr: `retyped #N to Container for its first child` (see E-ITEM-12).
+- ITEM-30: Success prints `#<n>`, exit `0`; `--json` prints the envelope, `reason: "created"`, then `item` (`#<n>`) and `number`, the state-ref shape (see E-ITEM-07).
+- ITEM-32: A failed `--parent` relation write refuses CUT-17's `created` sentence ending `; record that sub-issue relation on the forge by hand`, `--json` shaped as CUT-28.
 
 ## The twin search
 
-- [ ] [ITEM-33] Under either storage, `item new` runs `cut`'s twin search (CUT-29..CUT-31) before it creates, `--parent` excepted as `cut` excepts its container (see E-ITEM-07).
-- [ ] [ITEM-35] A re-run of the same GitHub `item new`, after a success, ITEM-32, or ITEM-34, meets its own issue as `possible twin #<n>`; `--not-a-twin` creates anyway, even an exact duplicate.
+- ITEM-33: Under either storage, `item new` runs `cut`'s twin search (CUT-29..CUT-31) before it creates, `--parent` excepted as `cut` excepts its container (see E-ITEM-07).
+- ITEM-35: A re-run of the same GitHub `item new`, after a success, ITEM-32, or ITEM-34, meets its own issue as `possible twin #<n>`; `--not-a-twin` creates anyway, even an exact duplicate.
 
 ## `item show`
 
-- [ ] [ITEM-07] `aco item show ITEM` prints one header, `<id> · #<n> · <state> · parent <parent-or-none> · origin <origin-or-none>`, then the stored body as ITEM-56 shows it, exit `0` (see E-ITEM-02).
-- [ ] [ITEM-56] Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `body` keeps it as stored.
-- [ ] [ITEM-08] A closed item prints ITEM-07's same header, `state closed`; closing rewrites the body's `[record]` with `state = "closed"`, `closed_at`, and `updated_at`, the rest byte-identical.
-- [ ] [ITEM-09] `aco item show ITEM --json` prints the envelope, `reason: "shown"`, then `item`, `number`, `state`, `parent`, `origin`, `body`, `body_hash` (`parent`/`origin` `null` when unset) (see E-ITEM-02).
-- [ ] [ITEM-11] `aco item show ITEM` under `storage = "github"` reads the forge issue's own body through ITEM-07/ITEM-09's same header and `--json` shape.
-- [ ] [ITEM-70] `item show --json`'s `body_hash` is `sha256:` and 64 lowercase hex digits over the UTF-8 body it shows, under both storages; the text header is unchanged (see E-ITEM-02).
+- ITEM-07: `aco item show ITEM` prints one header, `<id> · #<n> · <state> · parent <parent-or-none> · origin <origin-or-none>`, then the stored body as ITEM-56 shows it, exit `0` (see E-ITEM-02).
+- ITEM-56: Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `body` keeps it as stored.
+- ITEM-08: A closed item prints ITEM-07's same header, `state closed`; closing rewrites the body's `[record]` with `state = "closed"`, `closed_at`, and `updated_at`, the rest byte-identical.
+- ITEM-09: `aco item show ITEM --json` prints the envelope, `reason: "shown"`, then `item`, `number`, `state`, `parent`, `origin`, `body`, `body_hash` (`parent`/`origin` `null` when unset) (see E-ITEM-02).
+- ITEM-11: `aco item show ITEM` under `storage = "github"` reads the forge issue's own body through ITEM-07/ITEM-09's same header and `--json` shape.
+- ITEM-70: `item show --json`'s `body_hash` is `sha256:` and 64 lowercase hex digits over the UTF-8 body it shows, under both storages; the text header is unchanged (see E-ITEM-02).
 
 ## `item edit`
 
-- [ ] [ITEM-12] Under `storage = "state-ref"`, `aco item edit ITEM --base HASH < BODY` takes `title`, `labels`, `blocked_by` from a delivered `[record]` when the piped body carries one valid (see E-ITEM-03).
-- [ ] [ITEM-13] `item edit`'s every other field — `parent`, `state`, `origin`, `kind`, `created_at`, `closed_at` — stays stored, except a malformed item (ITEM-39) or `--kind` (ITEM-47); `updated_at` moves to now.
-- [ ] [ITEM-14] A delivered body carrying no `[record]` table at all leaves `title`, `labels`, `blocked_by` unchanged too, exactly `item edit`'s own behaviour, except a malformed item (ITEM-39).
-- [ ] [ITEM-43] A delivered `blocked_by` refuses before any write when it names one blocker twice, `item <item-id> lists blocker <blocker-id> more than once`, or a new one naming no item, PIN-17's (see E-ITEM-11).
-- [ ] [ITEM-44] So does a new blocker naming a malformed item, PIN-14/PIN-15's then ITEM-38's, or the item itself, `item <item-id> is listed as its own blocker`; a stored list delivered unchanged is never re-judged.
-- [ ] [ITEM-15] `item edit ITEM --base HASH --json` prints the envelope, `reason: "edited"`, then `item`, `number`, `body_hash` of the body written, and under state-ref the written blob's `oid` (see E-ITEM-03).
-- [ ] [ITEM-72] The compare runs under the item's lock (RULE-40) on a fresh read; a changed body, or under state-ref a store write meanwhile (CAS-20), refuses `stale`, exit `2`, nothing written (see E-ITEM-19).
-- [ ] [ITEM-74] The body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock and refuses `body_invalid` (ITEM-25) whatever the base; ITEM-79 excepts one defect.
-- [ ] [ITEM-76] Under `storage = "github"` a write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the body is written.
-- [ ] [ITEM-79] Under `storage = "github"` a piped body with no aco block, and no other defect, is replaced like any body (ITEM-71, ITEM-72) when the item read under the lock carries the board's idea label.
-- [ ] [ITEM-80] Without that label the same body refuses `body_invalid` as ITEM-25 says, exit `2`, nothing written; a body that carries an aco block is checked as ITEM-74 says, labelled or not.
-- [ ] [ITEM-21] `item edit --size S|M|L` patches only the top-level `size`, reads no stdin, works under both storages; state-ref also bumps `record.updated_at`.
+- ITEM-12: Under `storage = "state-ref"`, `aco item edit ITEM --base HASH < BODY` takes `title`, `labels`, `blocked_by` from a delivered `[record]` when the piped body carries one valid (see E-ITEM-03).
+- ITEM-13: `item edit`'s every other field — `parent`, `state`, `origin`, `kind`, `created_at`, `closed_at` — stays stored, except a malformed item (ITEM-39) or `--kind` (ITEM-47); `updated_at` moves to now.
+- ITEM-14: A delivered body carrying no `[record]` table at all leaves `title`, `labels`, `blocked_by` unchanged too, exactly `item edit`'s own behaviour, except a malformed item (ITEM-39).
+- ITEM-43: A delivered `blocked_by` refuses before any write when it names one blocker twice, `item <item-id> lists blocker <blocker-id> more than once`, or a new one naming no item, PIN-17's (see E-ITEM-11).
+- ITEM-44: So does a new blocker naming a malformed item, PIN-14/PIN-15's then ITEM-38's, or the item itself, `item <item-id> is listed as its own blocker`; a stored list delivered unchanged is never re-judged.
+- ITEM-15: `item edit ITEM --base HASH --json` prints the envelope, `reason: "edited"`, then `item`, `number`, `body_hash` of the body written, and under state-ref the written blob's `oid` (see E-ITEM-03).
+- ITEM-72: The compare runs under the item's lock (RULE-40) on a fresh read; a changed body, or under state-ref a store write meanwhile (CAS-20), refuses `stale`, exit `2`, nothing written (see E-ITEM-19).
+- ITEM-74: The body passes the shape check (ITEM-27; state-ref ITEM-39, ITEM-43, ITEM-44, ITEM-52) before the lock and refuses `body_invalid` (ITEM-25) whatever the base; ITEM-79 excepts one defect.
+- ITEM-76: Under `storage = "github"` a write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the body is written.
+- ITEM-79: Under `storage = "github"` a piped body with no aco block, and no other defect, is replaced like any body (ITEM-71, ITEM-72) when the item read under the lock carries the board's idea label.
+- ITEM-80: Without that label the same body refuses `body_invalid` as ITEM-25 says, exit `2`, nothing written; a body that carries an aco block is checked as ITEM-74 says, labelled or not.
+- ITEM-21: `item edit --size S|M|L` patches only the top-level `size`, reads no stdin, works under both storages; state-ref also bumps `record.updated_at`.
 
   ```
   $ aco item edit <item-id> --size L
   patches size = "L" only; every other field, including the body outside it, is untouched
   ```
-- [ ] [ITEM-65] `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
-- [ ] [ITEM-66] A `--size` or `--whole` write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the field is written (see E-ITEM-18).
-- [ ] [ITEM-50] `--size`, `--whole`, `--kind`, `--base` exclude one another: a second refuses at argparse, `argument <second>: not allowed with argument <first>`, exit `2`, as does a `--base` that is no ITEM-70 hash.
-- [ ] [ITEM-51] A socket, terminal, `/dev/null` or closed stdin on `--kind`, `--size` or `--whole` passes unread, as an agent harness hands a socket when nothing was piped.
+- ITEM-65: `--size` and `--whole` run in the item's turn (RULE-40): a held lock prints RULE-42's line; one they cannot take refuses as RULE-41, `reason: "precondition_failed"` (see E-ITEM-17).
+- ITEM-66: A `--size` or `--whole` write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept` instead of ITEM-17's; the field is written (see E-ITEM-18).
+- ITEM-50: `--size`, `--whole`, `--kind`, `--base` exclude one another: a second refuses at argparse, `argument <second>: not allowed with argument <first>`, exit `2`, as does a `--base` that is no ITEM-70 hash.
+- ITEM-51: A socket, terminal, `/dev/null` or closed stdin on `--kind`, `--size` or `--whole` passes unread, as an agent harness hands a socket when nothing was piped.
 
 ## `item close`
 
-- [ ] [ITEM-16] `aco item close ITEM --json` prints `reason: "closed"`, then `item`, `number`, `closed_at`, `parent_closable` (the parent hint); overlaps ITEM-09's `item`/`number` (see E-ITEM-04).
-- [ ] [ITEM-55] After the write, only hints: a `freed:` read another item refuses (PIN-16/17/34) prints LAND-38's or LAND-65's `hint:` line instead (`--json`: on stderr), exit `0` (see E-ITEM-15).
+- ITEM-16: `aco item close ITEM --json` prints `reason: "closed"`, then `item`, `number`, `closed_at`, `parent_closable` (the parent hint); overlaps ITEM-09's `item`/`number` (see E-ITEM-04).
+- ITEM-55: After the write, only hints: a `freed:` read another item refuses (PIN-16/17/34) prints LAND-38's or LAND-65's `hint:` line instead (`--json`: on stderr), exit `0` (see E-ITEM-15).
 
 ## One malformed item
 
-- [ ] [ITEM-37] Under `storage = "state-ref"`, an item whose file PIN-14/PIN-15 refuse never stops `item new`, nor `item show` of any other item.
-- [ ] [ITEM-42] That item's `record.title`, while it still reads as a non-empty string, joins ITEM-33's twin search as an open item's title.
-- [ ] [ITEM-53] Beside a malformed item, `item close` refuses only if it is its item, its parent, or a child, and `item edit --kind` only if it is its item or a child; any other malformed item stops neither (PIN-29).
-- [ ] [ITEM-54] For ITEM-53 and the board's child counts alike, a malformed item whose `[record]`, or its `parent`, does not read is an open child of every Container; one read without a parent is no child.
-- [ ] [ITEM-38] Reading that item itself (`item show`, `item close`, `item edit --size`/`--whole`/`--kind`) refuses PIN-14/PIN-15's sentence, then the repair clause of E-ITEM-10 (naming `--base`).
-- [ ] [ITEM-77] `item show --json` of that item adds `body_hash` before `message`, over its stored bytes (a file that is not UTF-8 too), the base `item edit` compares under the lock (see E-ITEM-10).
-- [ ] [ITEM-39] `aco item edit <id> --base HASH < BODY` on that item takes BODY's complete `[record]` as the item's own, `updated_at` moved to now; BODY without a `[record]` refuses as ITEM-38 (see E-ITEM-10).
-- [ ] [ITEM-40] That `[record]`'s `parent` or `blocked_by` naming a missing item refuses PIN-16/PIN-17's sentence, a malformed one or the item itself ITEM-38's, before any write.
+- ITEM-37: Under `storage = "state-ref"`, an item whose file PIN-14/PIN-15 refuse never stops `item new`, nor `item show` of any other item.
+- ITEM-42: That item's `record.title`, while it still reads as a non-empty string, joins ITEM-33's twin search as an open item's title.
+- ITEM-53: Beside a malformed item, `item close` refuses only if it is its item, its parent, or a child, and `item edit --kind` only if it is its item or a child; any other malformed item stops neither (PIN-29).
+- ITEM-54: For ITEM-53 and the board's child counts alike, a malformed item whose `[record]`, or its `parent`, does not read is an open child of every Container; one read without a parent is no child.
+- ITEM-38: Reading that item itself (`item show`, `item close`, `item edit --size`/`--whole`/`--kind`) refuses PIN-14/PIN-15's sentence, then the repair clause of E-ITEM-10 (naming `--base`).
+- ITEM-77: `item show --json` of that item adds `body_hash` before `message`, over its stored bytes (a file that is not UTF-8 too), the base `item edit` compares under the lock (see E-ITEM-10).
+- ITEM-39: `aco item edit <id> --base HASH < BODY` on that item takes BODY's complete `[record]` as the item's own, `updated_at` moved to now; BODY without a `[record]` refuses as ITEM-38 (see E-ITEM-10).
+- ITEM-40: That `[record]`'s `parent` or `blocked_by` naming a missing item refuses PIN-16/PIN-17's sentence, a malformed one or the item itself ITEM-38's, before any write.
 
 ## `--json` and the shared envelope
 
-- [ ] [ITEM-17] Every other runtime refusal from `item new`/`show`/`edit`/`close`, reached with `--json`, prints `specs/output.spec.md`'s envelope, `reason: "precondition_failed"`, exit `2`.
-- [ ] [ITEM-18] An argparse-level refusal — a malformed `--origin`, a blank `--title`, or an item argument PIN-08 refuses — prints the `ERROR:` line, exit `2`, and under `--json` OUT-06's envelope.
-- [ ] [ITEM-25] A malformed piped body (`item edit`'s PIN-24, `item new`'s ITEM-27) reports `reason: "body_invalid"` instead, `defects` the same list `check -`'s own `--json` carries, exit `2`.
+- ITEM-17: Every other runtime refusal from `item new`/`show`/`edit`/`close`, reached with `--json`, prints `specs/output.spec.md`'s envelope, `reason: "precondition_failed"`, exit `2`.
+- ITEM-18: An argparse-level refusal — a malformed `--origin`, a blank `--title`, or an item argument PIN-08 refuses — prints the `ERROR:` line, exit `2`, and under `--json` OUT-06's envelope.
+- ITEM-25: A malformed piped body (`item edit`'s PIN-24, `item new`'s ITEM-27) reports `reason: "body_invalid"` instead, `defects` the same list `check -`'s own `--json` carries, exit `2`.
 
 ## Printed wording
 
-- Each row of this table is one criterion under its own ID: when its trigger holds, the command prints or refuses with the sentence in the third column, exactly as written (`<...>` and `#N` stand for the value the command names) and as the fourth column says. Every other spec and test cites a row by that ID.
+- ITEM-81: Each row of the table below is one criterion under its own ID: when its trigger holds, the command prints or refuses with the third column's sentence exactly as written and as the fourth column says.
 
 | ID | When | Prints or refuses | Then |
 |---|---|---|---|
-| [ITEM-06] | `--origin FORGE#N` fails its grammar | `'<value>' is not an origin; use forge#n or host/owner/repo#n, e.g. gitlab#42` | exit `2`, before `item new`'s own body ever runs |
-| [ITEM-36] | Under either storage, an empty or whitespace-only `--title` | `--title must be a non-empty string` | exit `2`, before anything is read, created, or minted (see E-ITEM-09) |
-| [ITEM-68] | A `--repo` no discovered repository carries | `no repository <OWNER/NAME> found` | exit `2`, under `--json` as ITEM-25's `precondition_failed`, and writes nothing |
-| [ITEM-78] | A `--repo` whose checkout the scan could not read | `repository <OWNER/NAME> is unreadable: <directory>: <reason>` | as MCP-18 lists it, exit `2`, ITEM-25's `precondition_failed`, no write |
-| [ITEM-59] | A piped body keeps its prose and fence lines byte for byte; a flag names another value | `--<flag> <value> contradicts the piped block's <key> = <value>` | exit `2` (see E-ITEM-16) |
-| [ITEM-29] | `--parent N` records the issue as `#N`'s sub-issue; `#N` not open, or neither Container nor Task | `#N is not an open container`, `#N is not a container` | exit `2` (see E-ITEM-08) |
-| [ITEM-46] | A retype GitHub drops | `GitHub did not set #N's type Container; set that type on the forge by hand` | exit `2`, before anything is created (see E-ITEM-12) |
-| [ITEM-31] | `--origin` under `storage = "github"` | `--origin needs storage = "state-ref"` | exit `2`, before stdin is read |
-| [ITEM-34] | An issue GitHub creates untyped | `created #<n> but GitHub did not set its type <Type>; set that type[ and record it under #<N>] on the forge by hand` | `--json` as CUT-28 |
-| [ITEM-10] | `aco item show ITEM` against an unknown id | `#<n> does not exist in <owner/repo>` | exit `2` |
-| [ITEM-52] | A state-ref write whose stored body PIN-14/PIN-15 would refuse | `<defect>; stored, that body would not read back, so nothing was written` | exit `2`, before any write (see E-ITEM-14) |
-| [ITEM-63] | With `--base`, a socket, terminal, `/dev/null` or closed stdin | `item edit <item-id> needs the new body on stdin: aco item edit <item> --base <hash> < body.md` | exit `2`, before any write |
-| [ITEM-71] | A whole-body `item edit` whose `--base` is the stored body's hash | `EDITED <item-id>` | replaces the body, exit `0`; github stores it as piped, under both storages (see E-ITEM-19) |
-| [ITEM-73] | No `--base` | `item edit <item-id> needs --base <hash>; aco item show <item> --json prints it` | exit `2`, before stdin is read or any write (see E-ITEM-19) |
-| [ITEM-75] | Under `storage = "github"` a body equal to the stored one | `UNCHANGED <item-id>` | `--json`: `reason: "unchanged"`, ITEM-15's keys; exit `0`, writing nothing; state-ref always writes (ITEM-13) |
-| [ITEM-22] | `item edit --size` | `EDITED #<n> size=<S\|M\|L>` | `--json`: the envelope, `reason: "edited"`, then `item`, `size`; an invalid value is refused by argparse before any write |
-| [ITEM-24] | `item edit --whole REASON` patches only the top-level `whole`, reads no stdin, works under both storages | `EDITED #<n> whole=<reason>` | `--json`: `reason: "edited"`, `item`, `whole` |
-| [ITEM-47] | `item edit --kind task\|container` sets only an open item's type, both storages; else `#<n> is not an open item` | `EDITED #<n> kind=<kind>` | `--json`: `item`, `number`, `kind` (see E-ITEM-13) |
-| [ITEM-48] | `--kind task` on an item with an open child | `#<n> has an open child; a container with open children stays a container` | exit `2`, before any write (see E-ITEM-13) |
-| [ITEM-49] | A file or pipe on the stdin of `--kind`, `--size` or `--whole` | `item edit --<flag> reads no stdin; drop the redirect` | exit `2`, before any write |
-| [ITEM-64] | `--size`, `--whole` or `--kind` naming the value already set | `UNCHANGED #<n> <field>=<value>` | `--json`: `reason: "unchanged"`, ITEM-22/24/47's keys; exit `0`, and writes nothing |
-| [ITEM-41] | That `[record]` naming `state = "closed"` | `a repair records state = "open"; close <id> afterwards with aco item close <id>` | before any write |
+| ITEM-06 | `--origin FORGE#N` fails its grammar | `'<value>' is not an origin; use forge#n or host/owner/repo#n, e.g. gitlab#42` | exit `2`, before `item new`'s own body ever runs |
+| ITEM-36 | Under either storage, an empty or whitespace-only `--title` | `--title must be a non-empty string` | exit `2`, before anything is read, created, or minted (see E-ITEM-09) |
+| ITEM-68 | A `--repo` no discovered repository carries | `no repository <OWNER/NAME> found` | exit `2`, under `--json` as ITEM-25's `precondition_failed`, and writes nothing |
+| ITEM-78 | A `--repo` whose checkout the scan could not read | `repository <OWNER/NAME> is unreadable: <directory>: <reason>` | as MCP-18 lists it, exit `2`, ITEM-25's `precondition_failed`, no write |
+| ITEM-59 | A piped body keeps its prose and fence lines byte for byte; a flag names another value | `--<flag> <value> contradicts the piped block's <key> = <value>` | exit `2` (see E-ITEM-16) |
+| ITEM-29 | `--parent N` records the issue as `#N`'s sub-issue; `#N` not open, or neither Container nor Task | `#N is not an open container`, `#N is not a container` | exit `2` (see E-ITEM-08) |
+| ITEM-46 | A retype GitHub drops | `GitHub did not set #N's type Container; set that type on the forge by hand` | exit `2`, before anything is created (see E-ITEM-12) |
+| ITEM-31 | `--origin` under `storage = "github"` | `--origin needs storage = "state-ref"` | exit `2`, before stdin is read |
+| ITEM-34 | An issue GitHub creates untyped | `created #<n> but GitHub did not set its type <Type>; set that type[ and record it under #<N>] on the forge by hand` | `--json` as CUT-28 |
+| ITEM-10 | `aco item show ITEM` against an unknown id | `#<n> does not exist in <owner/repo>` | exit `2` |
+| ITEM-52 | A state-ref write whose stored body PIN-14/PIN-15 would refuse | `<defect>; stored, that body would not read back, so nothing was written` | exit `2`, before any write (see E-ITEM-14) |
+| ITEM-63 | With `--base`, a socket, terminal, `/dev/null` or closed stdin | `item edit <item-id> needs the new body on stdin: aco item edit <item> --base <hash> < body.md` | exit `2`, before any write |
+| ITEM-71 | A whole-body `item edit` whose `--base` is the stored body's hash | `EDITED <item-id>` | replaces the body, exit `0`; github stores it as piped, under both storages (see E-ITEM-19) |
+| ITEM-73 | No `--base` | `item edit <item-id> needs --base <hash>; aco item show <item> --json prints it` | exit `2`, before stdin is read or any write (see E-ITEM-19) |
+| ITEM-75 | Under `storage = "github"` a body equal to the stored one | `UNCHANGED <item-id>` | `--json`: `reason: "unchanged"`, ITEM-15's keys; exit `0`, writing nothing; state-ref always writes (ITEM-13) |
+| ITEM-22 | `item edit --size` | `EDITED #<n> size=<S\|M\|L>` | `--json`: the envelope, `reason: "edited"`, then `item`, `size`; an invalid value is refused by argparse before any write |
+| ITEM-24 | `item edit --whole REASON` patches only the top-level `whole`, reads no stdin, works under both storages | `EDITED #<n> whole=<reason>` | `--json`: `reason: "edited"`, `item`, `whole` |
+| ITEM-47 | `item edit --kind task\|container` sets only an open item's type, both storages; else `#<n> is not an open item` | `EDITED #<n> kind=<kind>` | `--json`: `item`, `number`, `kind` (see E-ITEM-13) |
+| ITEM-48 | `--kind task` on an item with an open child | `#<n> has an open child; a container with open children stays a container` | exit `2`, before any write (see E-ITEM-13) |
+| ITEM-49 | A file or pipe on the stdin of `--kind`, `--size` or `--whole` | `item edit --<flag> reads no stdin; drop the redirect` | exit `2`, before any write |
+| ITEM-64 | `--size`, `--whole` or `--kind` naming the value already set | `UNCHANGED #<n> <field>=<value>` | `--json`: `reason: "unchanged"`, ITEM-22/24/47's keys; exit `0`, and writes nothing |
+| ITEM-41 | That `[record]` naming `state = "closed"` | `a repair records state = "open"; close <id> afterwards with aco item close <id>` | before any write |
+
+In the third column, `<...>` and `#N` stand for the value the command names; every other spec and test cites a row by its ID.
 
 ITEM-63, ITEM-49 and ITEM-64 in a shell:
 

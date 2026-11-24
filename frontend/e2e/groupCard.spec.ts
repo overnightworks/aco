@@ -47,7 +47,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px card of points`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-82] [ABRD-106] an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
+		test('ABRD-82, ABRD-106: an item’s open option lines are one Open row named by area and count, beside another open row, and the tab counts rows', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -64,7 +64,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'list');
 		});
 
-		test('[ABRD-83] [ABRD-106] [ABRD-154] the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all and Unclear, with an Other… at every point', async ({
+		test('ABRD-83, ABRD-106, ABRD-154: the card is titled by its name, carries the meta of its points, has no Problem row and offers Accept all and Unclear, with an Other… at every point', async ({
 			page
 		}, testInfo) => {
 			const { repository } = readBoardRuntime();
@@ -100,7 +100,7 @@ for (const viewport of [
 		});
 
 		if (phone)
-			test('[ABRD-83] every point’s picks stand at least 44 px high on a phone', async ({
+			test('ABRD-83: every point’s picks stand at least 44 px high on a phone', async ({
 				page
 			}) => {
 				await arrangeCards();
@@ -114,7 +114,7 @@ for (const viewport of [
 				for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
 			});
 
-		test('[ABRD-85] one point is open at a time, with its rows and a Today that enlarges, and a phone keeps the Decide row in view', async ({
+		test('ABRD-85: one point is open at a time, with its rows and a Today that enlarges, and a phone keeps the Decide row in view', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -162,7 +162,7 @@ for (const viewport of [
 			}
 		});
 
-		test('[ABRD-84] the points, their picks, Other… and Accept all are reachable by keyboard with the right state', async ({
+		test('ABRD-84: the points, their picks, Other… and Accept all are reachable by keyboard with the right state', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -191,7 +191,7 @@ for (const viewport of [
 			await expect(undo(page).last()).toBeFocused();
 		});
 
-		test('[ABRD-86] a pick answers its point alone: it waits, the other points stay open, and the card stays with the points left, renumbered', async ({
+		test('ABRD-86: a pick answers its point alone: it waits, the other points stay open, and the card stays with the points left, renumbered', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -229,7 +229,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'two-left');
 		});
 
-		test('[ABRD-87] picks on two points are two strips and two posts, Undo frees one point alone, and Decided lists each stored point', async ({
+		test('ABRD-87: picks on two points are two strips and two posts, Undo frees one point alone, and Decided lists each stored point', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -263,7 +263,7 @@ for (const viewport of [
 			await expectDecidedAnswer(page, 'B — Weg B', BOARD_PICK_HOW);
 		});
 
-		test('[ABRD-155] the stage stays on the card until its last point is stored, then leaves it, the third point alone showing the one-point layout', async ({
+		test('ABRD-155: the stage stays on the card until its last point is stored, then leaves it, the third point alone showing the one-point layout', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -291,7 +291,7 @@ for (const viewport of [
 			).toBeVisible();
 		});
 
-		test('[ABRD-87] leaving the page inside the windows stores every waiting point', async ({
+		test('ABRD-87: leaving the page inside the windows stores every waiting point', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -306,7 +306,7 @@ for (const viewport of [
 			expect((await storedLine(7, 3)).ruling).toBeNull();
 		});
 
-		test('[ABRD-88] a final pick asks first with its point, Cancel leaves the point open, and confirming starts its window', async ({
+		test('ABRD-88: a final pick asks first with its point, Cancel leaves the point open, and confirming starts its window', async ({
 			page
 		}) => {
 			await arrangeCards([point(2), point(3, { option: FINAL_OPTIONS }), point(4)]);
@@ -336,7 +336,7 @@ for (const viewport of [
 			await expect.poll(() => storedLine(7, 3)).toMatchObject({ ruling: 'B', via: 'board' });
 		});
 
-		test('[ABRD-89] Accept all picks the recommendation for the points still open only, after one pick waits', async ({
+		test('ABRD-89: Accept all picks the recommendation for the points still open only, after one pick waits', async ({
 			page
 		}) => {
 			await arrangeCards([point(2), point(3, { recommended: 'B' }), point(4)]);
@@ -356,7 +356,7 @@ for (const viewport of [
 			await expectRuled(['B', 'B', 'A']);
 		});
 
-		test('[ABRD-90] Accept all with a final recommendation asks first, Cancel or Esc post nothing, and confirming stores the recommendations of the open points', async ({
+		test('ABRD-90: Accept all with a final recommendation asks first, Cancel or Esc post nothing, and confirming stores the recommendations of the open points', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards([
@@ -389,7 +389,7 @@ for (const viewport of [
 			await expectRuled(['A', 'B', 'A']);
 		});
 
-		test('[ABRD-154] Other… at a point answers that point alone with its own text, after its own strip', async ({
+		test('ABRD-154: Other… at a point answers that point alone with its own text, after its own strip', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -414,7 +414,7 @@ for (const viewport of [
 			).toBeVisible();
 		});
 
-		test('[ABRD-154] the Other panels of two points hold their own text', async ({ page }) => {
+		test('ABRD-154: the Other panels of two points hold their own text', async ({ page }) => {
 			await arrangeCards();
 			await open(page, phone);
 
@@ -427,7 +427,7 @@ for (const viewport of [
 			await expect(page.getByRole('textbox', { name: 'Point 3: Your answer' })).toHaveValue('Drei');
 		});
 
-		test('[ABRD-92] Unclear sends the whole card back with its note, and the card is then with its head without Unclear', async ({
+		test('ABRD-92: Unclear sends the whole card back with its note, and the card is then with its head without Unclear', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -461,7 +461,7 @@ for (const viewport of [
 			await shoot(page, testInfo, 'with-head');
 		});
 
-		test('[ABRD-61] [ABRD-106] points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
+		test('ABRD-61, ABRD-106: points in different areas join their areas, and a card with one point with its head lists muted after the open cards and offers no Unclear', async ({
 			page
 		}, testInfo) => {
 			const { repository } = readBoardRuntime();
@@ -496,7 +496,7 @@ for (const viewport of [
 			await fits(page, viewport.width);
 		});
 
-		test('[ABRD-154] Other… at a point with its head stores that point alone and drops its sent-back marks', async ({
+		test('ABRD-154: Other… at a point with its head stores that point alone and drops its sent-back marks', async ({
 			page
 		}) => {
 			await arrange([
@@ -513,7 +513,7 @@ for (const viewport of [
 			await expect.poll(async () => (await storedLine(7, 2)).ruling).toBeNull();
 		});
 
-		test('[ABRD-36] [ABRD-106] a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
+		test('ABRD-36, ABRD-106: a one-point card looks as before, has no Accept all and posts the card form with one entry', async ({
 			page
 		}) => {
 			await arrange([item(8, 'Offen', point(1, { topic: 'Einzel', question: 'Eine Frage?' }))]);
@@ -549,7 +549,7 @@ for (const viewport of [
 		});
 
 		for (const kind of ['other', 'unclear'] as const) {
-			test(`[ABRD-75] ${kind} on a one-point card posts one entry`, async ({ page }) => {
+			test(`ABRD-75: ${kind} on a one-point card posts one entry`, async ({ page }) => {
 				await arrange([item(8, 'Offen', point(1, { topic: 'Einzel' }))]);
 				const posts = logPosts(page);
 				await open(page, phone, 'Frage 1?');
@@ -572,7 +572,7 @@ for (const viewport of [
 		}
 
 		for (const how of ['the pick', 'Accept all'] as const) {
-			test(`[ABRD-91] ${how} on a card that gained a point after the page read stores the points posted and leaves the new point open`, async ({
+			test(`ABRD-91: ${how} on a card that gained a point after the page read stores the points posted and leaves the new point open`, async ({
 				page
 			}) => {
 				await arrangeCards();
