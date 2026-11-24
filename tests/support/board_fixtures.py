@@ -73,7 +73,9 @@ class FakeBoardProbe:
         current = self.tokens.setdefault(target, "first")
         changed = current != token
         self.billed += changed
-        return forge.ProbeAnswer(changed=changed, token=current, closed=changed and target in self.closed)
+        return forge.ProbeAnswer(
+            changed=changed, token=current, closed=changed and target in self.closed
+        )
 
     def change(self, target: forge.ProbeTarget) -> None:
         """What the forge answers for `target` from now on differs from what it answered."""

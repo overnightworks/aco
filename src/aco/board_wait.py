@@ -9,7 +9,7 @@ board read means is `board_read.observed_board` and `workboard.next_action`'s al
 import os
 import sys
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -56,7 +56,7 @@ class BoardReading:
     foreign_blockers: tuple[forge.ProbeTarget, ...]
     earliest_until: item_wait.UntilWait | None
     audits_due: tuple[str, ...] = ()
-    listings: board_read.OpenListings = board_read.OpenListings(())
+    listings: board_read.OpenListings = field(default_factory=lambda: board_read.OpenListings(()))
 
 
 @dataclass(frozen=True)

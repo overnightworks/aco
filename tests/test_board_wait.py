@@ -209,16 +209,17 @@ def listing(
         pytest.param(
             listing(FIRST), listing(replace(FIRST, body="Another body.")), True, id="a-body"
         ),
-        pytest.param(
-            listing(FIRST), listing(replace(FIRST, labels=("bug",))), True, id="a-label"
-        ),
+        pytest.param(listing(FIRST), listing(replace(FIRST, labels=("bug",))), True, id="a-label"),
         pytest.param(listing(FIRST), listing(FIRST, SECOND), True, id="an-issue-joins"),
         pytest.param(listing(FIRST, SECOND), listing(FIRST), True, id="an-issue-leaves"),
         pytest.param(
             listing(FIRST), listing(FIRST, pull_requests=(PULL_REQUEST,)), True, id="a-pull-request"
         ),
         pytest.param(
-            listing(FIRST, pull_requests=(PULL_REQUEST,)), listing(FIRST), True, id="no-pull-request"
+            listing(FIRST, pull_requests=(PULL_REQUEST,)),
+            listing(FIRST),
+            True,
+            id="no-pull-request",
         ),
     ],
 )

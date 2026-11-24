@@ -3,7 +3,6 @@ open listings decide whether a hit reads the board, and a blocker in another rep
 from its own answer, through the real entry with only the forge, its probe, the pause and the
 clock injected."""
 
-from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 import pytest
@@ -69,7 +68,9 @@ def test_a_hit_that_changes_no_listed_row_reads_no_board_and_a_changed_one_does(
 ) -> None:
     """Spec: WAIT-27 -- a comment moves the probe and the update time only; a row that gains
     an item reads the board."""
-    client = serve_forge(monkeypatch, FakeForge(board_issues=(waiting_card(),), issue_references=card_references()))
+    client = serve_forge(
+        monkeypatch, FakeForge(board_issues=(waiting_card(),), issue_references=card_references())
+    )
     ticks = install(monkeypatch, lambda: 0)
     builds_before_the_change: list[int] = []
 
@@ -97,7 +98,9 @@ def test_a_hit_that_changes_the_body_of_a_listed_item_wakes_it_within_the_minute
 ) -> None:
     """Spec: WAIT-27 -- a changed body is a changed row: the read that follows names the
     action `aco next` would."""
-    client = serve_forge(monkeypatch, FakeForge(board_issues=(waiting_card(),), issue_references=card_references()))
+    client = serve_forge(
+        monkeypatch, FakeForge(board_issues=(waiting_card(),), issue_references=card_references())
+    )
     ticks = install(monkeypatch, lambda: 0)
 
     def rewrite_the_body() -> None:
@@ -158,7 +161,10 @@ def test_a_listing_check_that_fails_is_made_again_and_the_read_after_it_sees_the
 ) -> None:
     """Spec: WAIT-27, WAIT-20, WAIT-22 -- the hit stays owed when the probes after it answer
     unchanged, the warning is said once, and the rows read at last are the latest."""
-    client = serve_forge(monkeypatch, ListingForge(board_issues=(waiting_card(),), issue_references=card_references()))
+    client = serve_forge(
+        monkeypatch,
+        ListingForge(board_issues=(waiting_card(),), issue_references=card_references()),
+    )
     ticks = install(monkeypatch, lambda: 0)
 
     def hit_while_the_listing_fails() -> None:
@@ -217,4 +223,3 @@ def test_a_hit_on_an_open_blocker_reads_no_board_and_one_that_shows_it_closed_do
     assert (result.status, result.stdout, result.stderr) == (0, ACTIONABLE, "")
     assert (builds_before_the_closing, client.board_builds) == ([1], 2)
     assert len(ticks.pauses) == 2 * PAUSES_PER_PROBE
-

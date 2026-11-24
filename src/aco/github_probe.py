@@ -30,7 +30,7 @@ def _command(target: forge.ProbeTarget, token: str | None) -> list[str]:
 
 
 def _is_closed(body: str) -> bool:
-    """Whether the answered issue's `state` is `closed`; anything but `open` or `closed` is malformed."""
+    """Whether the issue answered is closed; any `state` but `open` or `closed` is malformed."""
     try:
         state = json.loads(body).get("state")
     except (ValueError, AttributeError) as error:
