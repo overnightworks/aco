@@ -1,0 +1,8 @@
+claim_id = "f7cdf2f9def94a5abe0237d2ef01bc41"
+agent = "Claude 017d4cae-a004-41d3-bf31-083bc83d5fec"
+role = "builder"
+base = "8e58ae0a669afc80f69c61bddda0da23228bf625"
+branch = "claude/issue-1077-a-step-holds-one-paste-which-the-step-to"
+scope = ["frontend/e2e/itemFixture.ts", "frontend/e2e/stepAnswer.spec.ts", "frontend/e2e/stepCard.spec.ts", "frontend/src/app/model/steps.ts", "frontend/src/components/StepsView.svelte", "frontend/src/components/StepsView.test.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "specs/body-block.spec.md", "specs/mcp.spec.md", "specs/serve.spec.md", "src/aco/board/board.py", "src/aco/board/static", "src/aco/card_rules.py", "src/aco/cmd_mcp.py", "src/aco/decide.py", "src/aco/inbox.py", "src/aco/item_step.py", "src/aco/item_wait.py", "src/aco/mcp_server.py", "tests/board/test_aco_source_state_ref.py", "tests/board/test_board_api_steps.py", "tests/board/test_board_core.py", "tests/support/board_fixtures.py", "tests/test_body_step.py", "tests/test_card_rules.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_step.py", "tests/test_inbox.py", "tests/test_item_step.py", "tests/test_item_step_rules.py", "tests/test_item_wait.py", "tests/test_mcp_server.py", "tests/test_mcp_server_step.py"]
+opened_commit = "4d0ea8fd7a5700a57e2a88151573a5517efb6b04"
+whole_reason = "One coherent change: reader, renderer, writer and board of the new paste key land together, because splitting them leaves a stored paste that the next body write corrupts or a board on which every new step is born alte Form."
