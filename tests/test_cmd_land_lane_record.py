@@ -51,16 +51,16 @@ def test_a_landing_of_a_claim_with_no_stored_run_and_no_record_file_refuses_befo
 
 
 @pytest.mark.parametrize(
-    "world", ["lane", "issue_less_lane"], ids=["issue-claim", "issue-less-claim"]
+    "landing_world", ["lane", "issue_less_lane"], ids=["issue-claim", "issue-less-claim"]
 )
 def test_a_landing_with_a_record_file_merges(
-    world: str,
+    landing_world: str,
     request: pytest.FixtureRequest,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Spec: LANREC-100, LANREC-102. Example: E-LANREC-22."""
-    landing: LaneLandingWorld = request.getfixturevalue(world)
+    landing: LaneLandingWorld = request.getfixturevalue(landing_world)
 
     result = run_cli(["land", *land_arguments_with_record(tmp_path, landing.head, NUMBER)], capsys)
 
