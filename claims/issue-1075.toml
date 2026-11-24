@@ -1,8 +1,0 @@
-claim_id = "e83bba8effee43bdb4169a34f5ef91fa"
-agent = "Claude 017d4cae-a004-41d3-bf31-083bc83d5fec"
-role = "builder"
-base = "fc95bcbf3b7ee7473c5ea346481565339b2514c9"
-branch = "claude/issue-1075-a-bare-wait-survives-a-forge-answer-that"
-scope = ["specs/wait.spec.md", "src/aco/github_failure.py", "src/aco/github_probe.py", "tests/test_cmd_wait_truncated_answer.py", "tests/test_github_failure.py", "tests/test_github_probe.py"]
-opened_commit = "fccad32f948d67a61bb33ef54977c9f39e2e439b"
-whole_reason = "One failure rule: the classifier, the probe and the wait's tests prove one sentence and cannot land apart."
