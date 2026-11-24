@@ -119,3 +119,27 @@ def test_hits_that_change_no_listed_row_cost_the_probe_and_two_listings(
     assert cost <= HITS * REQUESTS_PER_HIT + FULL_READS * full_read
     assert full_read > 2 * REQUESTS_PER_HIT + 1
     assert (builds_after_each_hit[:2], client.board_builds) == ([2, 3], FULL_READS)
+
+
+def test_a_hit_that_changes_a_listed_row_reads_the_board_over_the_listings_it_fetched(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: WAIT-27 -- the hit costs the probe and the two listings, and the read it asks for
+    reuses those listings, so it fetches the full read less the two listings."""
+    client = serve_forge(monkeypatch, board_with_children_and_dependencies())
+    probe = serve_board_probe(monkeypatch, FakeBoardProbe())
+    ticks = install(monkeypatch, lambda: client.requests)
+    costs_before_the_hit: list[int] = []
+
+    def open_an_item_with_a_new_body() -> None:
+        costs_before_the_hit.append(client.requests + probe.billed)
+        card, *rest = client.board_issues
+        client.board_issues = (replace(card, body=card.body + "\nNote.\n"), *rest, free_item())
+        probe.change(forge.ProbeTarget(REPOSITORY))
+
+    ticks.afterwards[HIT_OFFSET] = open_an_item_with_a_new_body
+    result = run_cli(["wait"], capsys)
+    full_read = ticks.reads_seen[0]
+    cost_of_the_hit = client.requests + probe.billed - costs_before_the_hit[0]
+    assert (result.status, result.stdout) == (0, f"ACTIONABLE #{OTHER_ITEM}\n")
+    assert cost_of_the_hit == REQUESTS_PER_HIT + full_read - 2
