@@ -350,7 +350,11 @@ class BoardForge:
             return forge.ItemReference(forge.ItemState.MISSING)
         item_state = forge.ItemState.CLOSED if number in state.closed else forge.ItemState.OPEN
         return forge.ItemReference(
-            item_state, item.title, item.body, author_is_member=item.author_is_member
+            item_state,
+            item.title,
+            item.body,
+            author_is_member=item.author_is_member,
+            parent=item.parent,
         )
 
     def update_item_body(self, number: int, body: str, *, replacing: str) -> None:
