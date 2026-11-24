@@ -14,7 +14,7 @@ from github_fixtures import (
     serve_forge,
 )
 from landing_refusals import refusal_observations
-from lane_record_fixtures import approving_record_file
+from lane_record_fixtures import land_arguments_with_record
 from queue_forge import LANDS, QueueForge
 
 from aco import cmd_land_queue, forge, protocol
@@ -54,9 +54,7 @@ def test_the_same_landing_with_a_record_file_merges(
     lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: LANREC-100. Example: E-LANREC-22."""
-    record = approving_record_file(tmp_path, lane.head)
-
-    result = run_cli(["land", str(NUMBER), "--head", lane.head, "--record", str(record)], capsys)
+    result = run_cli(["land", *land_arguments_with_record(tmp_path, lane.head, NUMBER)], capsys)
 
     assert (result.status, result.stderr, lane.forge.landings[NUMBER].merged) == (0, "", True)
 
@@ -66,8 +64,7 @@ def test_a_rerun_of_a_merged_pull_request_needs_no_record_file(
 ) -> None:
     """Spec: LANREC-101, LANDCMD-78 -- the rerun judges the claim nowhere."""
     arrange_follow_up_failures(lane.forge, None, "branch deletion failed")
-    record = approving_record_file(tmp_path, lane.head)
-    merged = run_cli(["land", str(NUMBER), "--head", lane.head, "--record", str(record)], capsys)
+    merged = run_cli(["land", *land_arguments_with_record(tmp_path, lane.head, NUMBER)], capsys)
     lane.forge.delete_error = None
 
     rerun = run_cli(["land", str(NUMBER), "--head", lane.head], capsys)
@@ -126,10 +123,8 @@ def test_an_issue_less_lane_lands_with_a_record_file(
     issue_less_lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: LANREC-102."""
-    record = approving_record_file(tmp_path, issue_less_lane.head)
-
     result = run_cli(
-        ["land", str(NUMBER), "--head", issue_less_lane.head, "--record", str(record)], capsys
+        ["land", *land_arguments_with_record(tmp_path, issue_less_lane.head, NUMBER)], capsys
     )
 
     assert (result.status, result.stderr) == (0, "")
