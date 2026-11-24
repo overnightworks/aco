@@ -463,6 +463,11 @@ class FakeForge:
         self._run()
         return self.parents.get(number)
 
+    def parent_number(self, number: int) -> int | None:
+        self._run()
+        parent = self.parents.get(number)
+        return parent.reference.number if parent else None
+
     def list_children(self, number: int) -> workboard.ChildList:
         self._run()
         return self.children.get(number, ())
