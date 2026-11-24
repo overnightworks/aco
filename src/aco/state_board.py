@@ -487,12 +487,11 @@ class StateRefBoard:
         """`number`'s recorded parent off its own record alone, never decoding that parent, so
         `item show` still names a malformed one; PIN-16 refuses one `items/` lacks."""
         decoded = self._decoded(number)
-        parent_id = None if decoded is None else decoded.record.parent
-        if parent_id is None:
+        if decoded is None or decoded.record.parent is None:
             return None
-        if not self._carries(parent_id):
-            raise MalformedStateTreeError(_missing_parent_sentence(parent_id))
-        return items.item_number(parent_id)
+        if not self._carries(decoded.record.parent):
+            raise MalformedStateTreeError(_missing_parent_sentence(decoded.record.parent))
+        return decoded.record.parent_number
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None:
         """`number`'s parent as the board reads it; an unreadable parent is answered by its
