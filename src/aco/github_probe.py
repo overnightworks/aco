@@ -32,8 +32,12 @@ def _command(target: forge.ProbeTarget, token: str | None) -> list[str]:
 def _is_closed(body: str) -> bool:
     """Whether the issue answered is closed; any `state` but `open` or `closed` is malformed."""
     try:
-        state = json.loads(body).get("state")
-    except (ValueError, AttributeError) as error:
+        answer = json.loads(body)
+    except ValueError as error:
+        raise forge.ForgeTransientError(f"{_PURPOSE} returned an answer cut short") from error
+    try:
+        state = answer.get("state")
+    except AttributeError as error:
         raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned no issue") from error
     if state not in {_OPEN, _CLOSED}:
         raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned the issue state {state!r}")
@@ -69,7 +73,9 @@ class GitHubBoardProbe:
     def _failure(self, decoded: str, exit_status: int, repository: str) -> forge.ForgeError:
         """The failure of a refused probe; a rate limit carries the reset its owner states,
         read through this probe's own runner."""
-        failure = github_failure.nonzero_exit_failure(decoded, exit_status, _PURPOSE)
+        failure = github_failure.nonzero_exit_failure(
+            github_paging.without_head(decoded), exit_status, _PURPOSE
+        )
         if isinstance(failure, github_failure.RateLimitedError):
             return github_failure.with_reset(
                 failure, lambda arguments: self._answer(arguments, repository)
