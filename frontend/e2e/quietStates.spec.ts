@@ -58,7 +58,7 @@ for (const viewport of [
 		test.describe(`${viewport.width}px quiet states, device set to ${scheme}`, () => {
 			test.use({ viewport, colorScheme: scheme });
 
-			test('[ABRD-127] nothing waiting shows one centred state with its sign and both sentences, no stage beside it', async ({
+			test('ABRD-127: nothing waiting shows one centred state with its sign and both sentences, no stage beside it', async ({
 				page
 			}, testInfo) => {
 				await visit(page, RULED_ONLY);
@@ -78,7 +78,7 @@ for (const viewport of [
 				);
 			});
 
-			test('[ABRD-127] loading shows a turning ring in the middle, and a still one under reduced motion', async ({
+			test('ABRD-127: loading shows a turning ring in the middle, and a still one under reduced motion', async ({
 				page
 			}) => {
 				let finish: (() => void) | undefined;
@@ -107,7 +107,7 @@ for (const viewport of [
 				finish?.();
 			});
 
-			test('[ABRD-127] no access shows a centred card with the warning sign and its sentence', async ({
+			test('ABRD-127: no access shows a centred card with the warning sign and its sentence', async ({
 				page
 			}, testInfo) => {
 				await page.goto(readBoardRuntime().appUrl);
@@ -123,7 +123,7 @@ for (const viewport of [
 				expect(Math.abs((await centreX(card)) - viewport.width / 2)).toBeLessThan(2);
 			});
 
-			test('[ABRD-127] an unanswered board shows the same card with the warning sign and its sentence', async ({
+			test('ABRD-127: an unanswered board shows the same card with the warning sign and its sentence', async ({
 				page
 			}) => {
 				const { appUrl, token } = readBoardRuntime();
@@ -139,7 +139,7 @@ for (const viewport of [
 				expect(Math.abs((await centreX(card)) - viewport.width / 2)).toBeLessThan(2);
 			});
 
-			test('[ABRD-128] a refused read shows the server sentence in the card, not the status line', async ({
+			test('ABRD-128: a refused read shows the server sentence in the card, not the status line', async ({
 				page
 			}) => {
 				await page.route('**/api/board', (route) =>
@@ -154,7 +154,7 @@ for (const viewport of [
 				expect(Math.abs((await centreX(card)) - viewport.width / 2)).toBeLessThan(2);
 			});
 
-			test('[ABRD-128] a read where every repository failed shows each repository its own warning box', async ({
+			test('ABRD-128: a read where every repository failed shows each repository its own warning box', async ({
 				page
 			}) => {
 				await page.route('**/api/board', (route) =>
@@ -177,7 +177,7 @@ for (const viewport of [
 				await expect(page.getByText('answered')).toBeHidden();
 			});
 
-			test('[ABRD-128] a refused read whose body carries no sentence shows the status line', async ({
+			test('ABRD-128: a refused read whose body carries no sentence shows the status line', async ({
 				page
 			}) => {
 				await page.route('**/api/board', (route) =>
@@ -188,7 +188,7 @@ for (const viewport of [
 				await expect(page.getByRole('alert')).toContainText('GET /api/board answered 502');
 			});
 
-			test('[ABRD-101] a repository not read is one warning box with the mark, its sentence and its last read, above the cards it kept', async ({
+			test('ABRD-101: a repository not read is one warning box with the mark, its sentence and its last read, above the cards it kept', async ({
 				page
 			}, testInfo) => {
 				let reads = 0;

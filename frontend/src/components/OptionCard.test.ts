@@ -129,7 +129,7 @@ test('hostile texts render as text and the picture stays out of the DOM tree', (
 	expect(container.querySelector('[onerror], [onload]')).toBeNull();
 });
 
-test('[ABRD-100] a saving card reads saving between its kind and its undo token', () => {
+test('ABRD-100: a saving card reads saving between its kind and its undo token', () => {
 	const { container } = render(OptionCard, {
 		repo: 'songmaker',
 		item: 1843,

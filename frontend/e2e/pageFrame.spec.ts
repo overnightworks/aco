@@ -108,7 +108,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px page frame`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-51] the header holds the brand, the Open, Decided, Progress and Steps tabs and Refresh', async ({
+		test('ABRD-51: the header holds the brand, the Open, Decided, Progress and Steps tabs and Refresh', async ({
 			page
 		}, testInfo) => {
 			await openBoard(page);
@@ -152,7 +152,7 @@ for (const viewport of [
 			await screenshots(page, testInfo.outputPath.bind(testInfo), 'header-decided');
 		});
 
-		test('[ABRD-51] the header stays inside the page with wider glyphs and clips no tab label', async ({
+		test('ABRD-51: the header stays inside the page with wider glyphs and clips no tab label', async ({
 			page
 		}) => {
 			await openBoard(page);
@@ -173,7 +173,7 @@ for (const viewport of [
 			expect(geometry).toEqual({ overflow: 0, clipped: 0 });
 		});
 
-		test('[ABRD-123] a reload returns the board to its Open view, the Decided view is not kept', async ({
+		test('ABRD-123: a reload returns the board to its Open view, the Decided view is not kept', async ({
 			page
 		}) => {
 			await openBoard(page);
@@ -190,7 +190,7 @@ for (const viewport of [
 			await expect(page.getByRole('region', { name: 'Decided', exact: true })).toHaveCount(0);
 		});
 
-		test('[ABRD-52] the Decide row rests on the pane foot with a shadow, then in place without one', async ({
+		test('ABRD-52: the Decide row rests on the pane foot with a shadow, then in place without one', async ({
 			page
 		}, testInfo) => {
 			await openBoard(page);
@@ -218,7 +218,7 @@ for (const viewport of [
 			await screenshots(page, testInfo.outputPath.bind(testInfo), 'decide-row-at-rest');
 		});
 
-		test('[ABRD-55] on phones an opened card stands edge to edge under ‹ Open or ‹ Decided, which returns to its list', async ({
+		test('ABRD-55: on phones an opened card stands edge to edge under ‹ Open or ‹ Decided, which returns to its list', async ({
 			page
 		}, testInfo) => {
 			await openBoard(page);
@@ -291,7 +291,7 @@ for (const viewport of [
 		});
 
 		if (!isPhone) {
-			test('[ABRD-28] the list holds its text unclipped in group, row and quiet line, text --fg on --bg', async ({
+			test('ABRD-28: the list holds its text unclipped in group, row and quiet line, text --fg on --bg', async ({
 				page
 			}) => {
 				await openBoard(page);

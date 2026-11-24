@@ -17,7 +17,7 @@ function readRepo(name: string, moment: Date | null, error: string | null = null
 }
 
 describe('lastReadAt', () => {
-	test('[ABRD-104] is the latest read time, a failed repository keeping its older one', () => {
+	test('ABRD-104: is the latest read time, a failed repository keeping its older one', () => {
 		const later = new Date(2026, 9, 31, 9, 55);
 		const repos = [
 			readRepo('a', readAt),
@@ -28,7 +28,7 @@ describe('lastReadAt', () => {
 		expect(lastReadAt(repos)).toEqual(later);
 	});
 
-	test('[ABRD-104] is null while no repository has been read', () => {
+	test('ABRD-104: is null while no repository has been read', () => {
 		expect(lastReadAt([readRepo('a', null)])).toBeNull();
 	});
 });
@@ -40,11 +40,11 @@ describe('isStale', () => {
 	test.each([
 		{ seconds: STALE_AFTER_SECONDS - 1, stale: false },
 		{ seconds: STALE_AFTER_SECONDS + 1, stale: true }
-	])('[ABRD-103] a read $seconds s ago is stale: $stale', ({ seconds, stale }) => {
+	])('ABRD-103: a read $seconds s ago is stale: $stale', ({ seconds, stale }) => {
 		expect(isStale(repos, after(seconds))).toBe(stale);
 	});
 
-	test('[ABRD-103] with no read yet the board is stale', () => {
+	test('ABRD-103: with no read yet the board is stale', () => {
 		expect(isStale([readRepo('a', null)], readAt)).toBe(true);
 	});
 });
@@ -53,11 +53,11 @@ describe('refreshName', () => {
 	test.each([
 		{ reading: false, label: REFRESH_LABEL },
 		{ reading: true, label: READING_LABEL }
-	])('[ABRD-104] reads "$label · read HH:MM" when reading is $reading', ({ reading, label }) => {
+	])('ABRD-104: reads "$label · read HH:MM" when reading is $reading', ({ reading, label }) => {
 		expect(refreshName(reading, readAt)).toBe(`${label} · read ${clockTime(readAt)}`);
 	});
 
-	test('[ABRD-104] is the bare label before any read', () => {
+	test('ABRD-104: is the bare label before any read', () => {
 		expect(refreshName(false, null)).toBe(REFRESH_LABEL);
 	});
 });

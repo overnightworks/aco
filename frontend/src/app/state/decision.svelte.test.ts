@@ -70,7 +70,7 @@ test('once the window elapses, exactly one request is sent and the stored item s
 	expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('[ABRD-130] a stored answer with a note shows its item, keeps the note and raises no banner', async () => {
+test('ABRD-130: a stored answer with a note shows its item, keeps the note and raises no banner', async () => {
 	const send = sender(storedAnswer(storedSong, 'ruled', 'Written over a change.'));
 	const { store: board, wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 	const store = new DecisionStore('token', wiring, send);
@@ -175,7 +175,7 @@ function otherStore(result: DecisionResult = storedAnswer(storedSong)) {
 	return { send, store: new DecisionStore('token', wiring, send) };
 }
 
-test('[ABRD-67] an Other answer waits out the window, names Other and the point’s topic, then posts once', async () => {
+test('ABRD-67: an Other answer waits out the window, names Other and the point’s topic, then posts once', async () => {
 	const { send, store } = otherStore();
 
 	store.decideOther('repo', 42, songCard, '  Only on desktop ');
@@ -194,7 +194,7 @@ test('[ABRD-67] an Other answer waits out the window, names Other and the point�
 	});
 });
 
-test('[ABRD-68] Send posts the card the panel opened with, though the board shows a revised one', async () => {
+test('ABRD-68: Send posts the card the panel opened with, though the board shows a revised one', async () => {
 	const { send, store } = otherStore();
 	store.openPanel(songPanel, { kind: 'other', shown: songPoints });
 
@@ -210,7 +210,7 @@ test('[ABRD-68] Send posts the card the panel opened with, though the board show
 	);
 });
 
-test('[ABRD-67] sending closes the panel and undoing posts nothing and reopens it with the draft', async () => {
+test('ABRD-67: sending closes the panel and undoing posts nothing and reopens it with the draft', async () => {
 	const { send, store } = otherStore();
 	store.openPanel(songPanel, { kind: 'other', shown: songPoints });
 	store.setDraft(songPanel, 'other', 'Only on desktop');
@@ -225,7 +225,7 @@ test('[ABRD-67] sending closes the panel and undoing posts nothing and reopens i
 	expect(store.draft(songPanel, 'other')).toBe('Only on desktop');
 });
 
-test('[ABRD-66] the draft is kept per card and survives a failed post, and a stored decision drops it', async () => {
+test('ABRD-66: the draft is kept per card and survives a failed post, and a stored decision drops it', async () => {
 	const failing = otherStore({ status: 'failed', message: 'aco unavailable' });
 	failing.store.setDraft(songPanel, 'other', 'Only on desktop');
 	failing.store.decideOther('repo', 42, songCard, 'Only on desktop');
@@ -240,7 +240,7 @@ test('[ABRD-66] the draft is kept per card and survives a failed post, and a sto
 	expect(ruling.store.draft(songPanel, 'other')).toBe('');
 });
 
-test('[ABRD-65] a pending Other answer marks its point waiting so no pick can join it', () => {
+test('ABRD-65: a pending Other answer marks its point waiting so no pick can join it', () => {
 	const { store } = otherStore();
 
 	store.decideOther('repo', 42, songCard, 'x');
@@ -248,7 +248,7 @@ test('[ABRD-65] a pending Other answer marks its point waiting so no pick can jo
 	expect([...store.waitingIndexes(songKey)]).toEqual([4]);
 });
 
-test('[ABRD-97] a card saves from the end of its window until its answer is applied, and Undo then does nothing', async () => {
+test('ABRD-97: a card saves from the end of its window until its answer is applied, and Undo then does nothing', async () => {
 	let answer: (result: DecisionResult) => void = () => {};
 	const held = new Promise<DecisionResult>((resolve) => {
 		answer = resolve;
@@ -276,7 +276,7 @@ test('[ABRD-97] a card saves from the end of its window until its answer is appl
 test.each([
 	['a refused', { status: 'already_ruled', message: 'line 3 is already ruled' } as DecisionResult],
 	['a failed', { status: 'failed', message: 'aco unavailable' } as DecisionResult]
-])('[ABRD-97] %s answer releases the saving card', async (_name, refusal) => {
+])('ABRD-97: %s answer releases the saving card', async (_name, refusal) => {
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, sender(refusal));
 
@@ -306,7 +306,7 @@ test.each([
 		1
 	],
 	['Accept all', (store: DecisionStore) => store.acceptAll('repo', 42, twoPoints), 2]
-])('[ABRD-99] %s holds its picks in the window and while saving', async (_name, decide, count) => {
+])('ABRD-99: %s holds its picks in the window and while saving', async (_name, decide, count) => {
 	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 	const { send } = heldSend();
 	const store = new DecisionStore('token', wiring, send);
@@ -323,7 +323,7 @@ test.each([
 test.each([
 	['Other', (store: DecisionStore) => store.decideOther('repo', 42, songCard, 'my own answer')],
 	['Unclear', (store: DecisionStore) => store.decideUnclear('repo', 42, twoPoints, 'a note')]
-])('[ABRD-99] an %s answer holds no picks', async (_name, decide) => {
+])('ABRD-99: an %s answer holds no picks', async (_name, decide) => {
 	const { wiring } = readyBoard([repo({ items: [item({ number: 42 })] })]);
 	const { send } = heldSend();
 	const store = new DecisionStore('token', wiring, send);
@@ -340,7 +340,7 @@ test.each([
 	['answers', false],
 	['fails', true]
 ])(
-	'[ABRD-45] a card is pending from Neu laden until the read %s, and free after it',
+	'ABRD-45: a card is pending from Neu laden until the read %s, and free after it',
 	async (_name, fails) => {
 		let finish: () => void = () => {};
 		const read = new Promise<void>((resolve, reject) => {
@@ -368,7 +368,7 @@ const otherCard = optionLine({
 });
 const otherKey = cardKey('repo', 43);
 
-test('[ABRD-152] flush posts every decision in its window at once, each card as its own write, and no timer posts again', async () => {
+test('ABRD-152: flush posts every decision in its window at once, each card as its own write, and no timer posts again', async () => {
 	const send = sender(storedAnswer(storedSong));
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
@@ -393,7 +393,7 @@ test('[ABRD-152] flush posts every decision in its window at once, each card as 
 	expect(send).toHaveBeenCalledTimes(2);
 });
 
-test('[ABRD-152] a second flush posts nothing more', () => {
+test('ABRD-152: a second flush posts nothing more', () => {
 	const send = sender(storedAnswer(storedSong));
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
@@ -405,7 +405,7 @@ test('[ABRD-152] a second flush posts nothing more', () => {
 	expect(send).toHaveBeenCalledTimes(1);
 });
 
-test('[ABRD-152] flush posts nothing for an undone decision, and every other point of a card as its own write', () => {
+test('ABRD-152: flush posts nothing for an undone decision, and every other point of a card as its own write', () => {
 	const send = sender(storedAnswer(storedSong));
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
@@ -423,7 +423,7 @@ test('[ABRD-152] flush posts nothing for an undone decision, and every other poi
 	expect(store.pendingEntries).toEqual([]);
 });
 
-test('[ABRD-153] a refused post on a card not shown is an unseen failure naming it until the card is shown', async () => {
+test('ABRD-153: a refused post on a card not shown is an unseen failure naming it until the card is shown', async () => {
 	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
@@ -446,7 +446,7 @@ test('[ABRD-153] a refused post on a card not shown is an unseen failure naming 
 	expect(store.banner(songKey)).not.toBeNull();
 });
 
-test('[ABRD-153] a failed post on a card not shown is an unseen failure too', async () => {
+test('ABRD-153: a failed post on a card not shown is an unseen failure too', async () => {
 	const send = vi.fn(async () => {
 		throw new Error('network down');
 	});
@@ -470,7 +470,7 @@ test.each([
 		'its banner is dropped for a re-read',
 		(store: DecisionStore) => store.reloadAfterBanner(songKey)
 	]
-])('[ABRD-153] an unseen failure goes when %s', async (_name, clearBanner) => {
+])('ABRD-153: an unseen failure goes when %s', async (_name, clearBanner) => {
 	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);
@@ -484,7 +484,7 @@ test.each([
 	expect(store.unseenFailures).toEqual([]);
 });
 
-test('[ABRD-153] a refused post on the card shown raises no failure strip', async () => {
+test('ABRD-153: a refused post on the card shown raises no failure strip', async () => {
 	const send = sender({ status: 'already_ruled', message: 'line 3 is already ruled' });
 	const { wiring } = readyBoard();
 	const store = new DecisionStore('token', wiring, send);

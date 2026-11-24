@@ -27,7 +27,7 @@ function renderOption() {
 	});
 }
 
-test('[ABRD-37] an option line shows its meta, title and exactly Decided, How and Contract', () => {
+test('ABRD-37: an option line shows its meta, title and exactly Decided, How and Contract', () => {
 	const { container } = renderOption();
 
 	expect(container.querySelector('.decided-card')).not.toBeNull();
@@ -43,7 +43,7 @@ test('[ABRD-37] an option line shows its meta, title and exactly Decided, How an
 	]);
 });
 
-test('[ABRD-37] Decided holds the done shape and the answer, How the way and the date', () => {
+test('ABRD-37: Decided holds the done shape and the answer, How the way and the date', () => {
 	renderOption();
 
 	const decided = screen.getByText('Decided', { selector: 'dt' }).closest('div') as HTMLElement;
@@ -53,7 +53,7 @@ test('[ABRD-37] Decided holds the done shape and the answer, How the way and the
 	expect(how).toHaveTextContent('Board · 26.10.2026');
 });
 
-test('[ABRD-37] the contract is closed behind Show with its sentences and source', async () => {
+test('ABRD-37: the contract is closed behind Show with its sentences and source', async () => {
 	const { container } = renderOption();
 
 	const fold = container.querySelector('details.contract') as HTMLDetailsElement;
@@ -67,7 +67,7 @@ test('[ABRD-37] the contract is closed behind Show with its sentences and source
 	expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
-test('[ABRD-37] [ABRD-54] a yes/no line names its item, answers and reads not recorded', () => {
+test('ABRD-37, ABRD-54: a yes/no line names its item, answers and reads not recorded', () => {
 	render(DecidedCard, {
 		repo: 'songmaker',
 		item: item({ number: 42, title: 'Share page' }),
@@ -82,7 +82,7 @@ test('[ABRD-37] [ABRD-54] a yes/no line names its item, answers and reads not re
 	expect(screen.getByText('songmaker · Item 42 · Line 2')).toBeInTheDocument();
 });
 
-test('[ABRD-37] hostile text renders as text', () => {
+test('ABRD-37: hostile text renders as text', () => {
 	const hostile = '<img src=x onerror=alert(1)>';
 	const { container } = render(DecidedCard, {
 		repo: 'songmaker',
@@ -94,7 +94,7 @@ test('[ABRD-37] hostile text renders as text', () => {
 	expect(container.querySelector('img[onerror]')).toBeNull();
 });
 
-test('[ABRD-130] a note shows as its own Note row, and no note shows no row', () => {
+test('ABRD-130: a note shows as its own Note row, and no note shows no row', () => {
 	const plain = renderOption();
 	expect(screen.queryByText('Note', { selector: 'dt' })).not.toBeInTheDocument();
 	plain.unmount();
@@ -116,7 +116,7 @@ test('[ABRD-130] a note shows as its own Note row, and no note shows no row', ()
 	]);
 });
 
-test('[ABRD-37] a hostile item title on a ruled yes/no line shows as text in the meta line', () => {
+test('ABRD-37: a hostile item title on a ruled yes/no line shows as text in the meta line', () => {
 	const hostile = '<img src=x onerror=alert(1)>';
 	const { container } = render(DecidedCard, {
 		repo: 'songmaker',

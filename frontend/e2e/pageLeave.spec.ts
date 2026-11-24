@@ -59,7 +59,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px page leave`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-152] leaving the page inside the undo window stores the decision', async ({
+		test('ABRD-152: leaving the page inside the undo window stores the decision', async ({
 			page
 		}) => {
 			await arrange([item(61, 'Leave', card('Verlassen?', 'Weg'))]);
@@ -73,7 +73,7 @@ for (const viewport of [
 			await expect.poll(() => storedLine(61, 1)).toMatchObject({ ruling: 'B', via: 'board' });
 		});
 
-		test('[ABRD-152] closing the page inside the undo window stores the decision', async ({
+		test('ABRD-152: closing the page inside the undo window stores the decision', async ({
 			page
 		}) => {
 			await arrange([item(62, 'Close', card('Schliessen?', 'Zu'))]);
@@ -87,7 +87,7 @@ for (const viewport of [
 			await expect.poll(() => storedLine(62, 1)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 
-		test('[ABRD-152] hiding the page inside the undo window stores the decision and keeps the page', async ({
+		test('ABRD-152: hiding the page inside the undo window stores the decision and keeps the page', async ({
 			page
 		}) => {
 			await arrange([item(63, 'Hide', card('Verstecken?', 'Weg'))]);
@@ -107,7 +107,7 @@ for (const viewport of [
 			await expect.poll(() => storedLine(63, 1)).toMatchObject({ ruling: 'A', via: 'board' });
 		});
 
-		test('[ABRD-152] a card nothing was chosen on is never stored by leaving', async ({ page }) => {
+		test('ABRD-152: a card nothing was chosen on is never stored by leaving', async ({ page }) => {
 			await arrange([item(64, 'Idle', card('Unberuehrt?', 'Nichts'))]);
 			await visit(page);
 			await show(page, phone, 'Unberuehrt?');
@@ -117,7 +117,7 @@ for (const viewport of [
 			expect(await storedLine(64, 1)).toMatchObject({ ruling: null });
 		});
 
-		test('[ABRD-153] a failed post on a card left behind keeps a strip naming it until the card is shown', async ({
+		test('ABRD-153: a failed post on a card left behind keeps a strip naming it until the card is shown', async ({
 			page
 		}) => {
 			await arrange([
@@ -142,7 +142,7 @@ for (const viewport of [
 
 		// The back button exists only on the phone.
 		if (phone)
-			test('[ABRD-153] a failed post on a card hidden by the back button keeps a strip naming it until the card is shown', async ({
+			test('ABRD-153: a failed post on a card hidden by the back button keeps a strip naming it until the card is shown', async ({
 				page
 			}) => {
 				await arrange([item(67, 'Only', card('Einzige?', 'Einziges'))]);

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 import UndoStrip from './UndoStrip.svelte';
 
-test('[ABRD-58] shows the pick made with the Decided shape, Saves shortly, and offers to undo it', () => {
+test('ABRD-58: shows the pick made with the Decided shape, Saves shortly, and offers to undo it', () => {
 	const onUndo = vi.fn();
 	render(UndoStrip, { message: 'B — Browser-Sprung bleibt · Sprung', kind: 'done', onUndo });
 
@@ -14,7 +14,7 @@ test('[ABRD-58] shows the pick made with the Decided shape, Saves shortly, and o
 	expect(onUndo).toHaveBeenCalledTimes(1);
 });
 
-test('[ABRD-74] a card on its way to its head shows the With head shape, grey, and offers Undo', () => {
+test('ABRD-74: a card on its way to its head shows the With head shape, grey, and offers Undo', () => {
 	const { container } = render(UndoStrip, { message: 'Jump', kind: 'back', onUndo: vi.fn() });
 
 	expect(screen.getByRole('img', { name: 'With head' })).toBeInTheDocument();

@@ -143,7 +143,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px Decide row`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-44] a pick waits out the undo window, then the card moves to Decided', async ({
+		test('ABRD-44: a pick waits out the undo window, then the card moves to Decided', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -185,7 +185,7 @@ for (const viewport of [
 			);
 		});
 
-		test('[ABRD-33] Undo inside the window posts nothing and leaves the picks usable', async ({
+		test('ABRD-33: Undo inside the window posts nothing and leaves the picks usable', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -214,7 +214,7 @@ for (const viewport of [
 		});
 
 		if (phone)
-			test('[ABRD-44] every pick stands at least 44 px high on a phone', async ({ page }) => {
+			test('ABRD-44: every pick stands at least 44 px high on a phone', async ({ page }) => {
 				await arrangeCards();
 				await open(page, phone);
 
@@ -226,7 +226,7 @@ for (const viewport of [
 				for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
 			});
 
-		test('[ABRD-36] the recommendation’s letter stays a circle beside a long reason', async ({
+		test('ABRD-36: the recommendation’s letter stays a circle beside a long reason', async ({
 			page
 		}) => {
 			await arrangeCards({ reason: 'Weil der Song so offen bleibt. '.repeat(12) });
@@ -237,7 +237,7 @@ for (const viewport of [
 			expect(box?.width).toBe(box?.height);
 		});
 
-		test('[ABRD-58] the strip shows its whole text beside Undo', async ({ page }) => {
+		test('ABRD-58: the strip shows its whole text beside Undo', async ({ page }) => {
 			await arrangeCards({ topic: 'Sehr langes Thema '.repeat(8).trim() });
 			await open(page, phone);
 
@@ -256,7 +256,7 @@ for (const viewport of [
 			expect(clipped).toBe(false);
 		});
 
-		test('[ABRD-58] a pick shows the strip with the Decided shape and Undo above the card, in view while the card scrolls and over a phone list', async ({
+		test('ABRD-58: a pick shows the strip with the Decided shape and Undo above the card, in view while the card scrolls and over a phone list', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -313,7 +313,7 @@ for (const viewport of [
 			expect(posts.count()).toBe(0);
 		});
 
-		test('[ABRD-58] two picks on two option cards show two strips in pick order and Undo on the first cancels only the first', async ({
+		test('ABRD-58: two picks on two option cards show two strips in pick order and Undo on the first cancels only the first', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -354,7 +354,7 @@ for (const viewport of [
 
 		if (phone) {
 			for (const width of [390, 320]) {
-				test(`[ABRD-58] Undo keeps its full width beside a long topic at ${width}px`, async ({
+				test(`ABRD-58: Undo keeps its full width beside a long topic at ${width}px`, async ({
 					page
 				}) => {
 					await arrangeCards({ topic: 'Ein sehr langes Thema '.repeat(8).trim() });
@@ -376,7 +376,7 @@ for (const viewport of [
 			}
 		}
 
-		test('[ABRD-45] a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
+		test('ABRD-45: a card changed before the post shows the changed sentence and decides only after Neu laden', async ({
 			page
 		}, testInfo) => {
 			await arrangeCards();
@@ -397,7 +397,7 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused();
 		});
 
-		test('[ABRD-45] a card ruled elsewhere answers already ruled instead of a second write', async ({
+		test('ABRD-45: a card ruled elsewhere answers already ruled instead of a second write', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -414,7 +414,7 @@ for (const viewport of [
 			await expect(page.getByRole('button', { name: 'Neu laden' })).toBeVisible();
 		});
 
-		test('[ABRD-44] the Decide row stays in view above a card taller than the pane', async ({
+		test('ABRD-44: the Decide row stays in view above a card taller than the pane', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -430,7 +430,7 @@ for (const viewport of [
 			await expect(picks(page)).toBeInViewport({ ratio: 1 });
 		});
 
-		test('[ABRD-59] Tab reaches the picks in letter order, Enter on a pick focuses its Undo and Enter again undoes it', async ({
+		test('ABRD-59: Tab reaches the picks in letter order, Enter on a pick focuses its Undo and Enter again undoes it', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -458,7 +458,7 @@ for (const viewport of [
 			expect(posts.count()).toBe(0);
 		});
 
-		test('[ABRD-59] a window that ends in a refused post leaves focus on the stage, not on the page', async ({
+		test('ABRD-59: a window that ends in a refused post leaves focus on the stage, not on the page', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -478,7 +478,7 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused();
 		});
 
-		test('[ABRD-59] an older window that ends in a refused post, while a newer pick stays pending, leaves focus on the stage', async ({
+		test('ABRD-59: an older window that ends in a refused post, while a newer pick stays pending, leaves focus on the stage', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -510,7 +510,7 @@ for (const viewport of [
 			await expect(page.locator('.stage')).toBeFocused({ timeout: 1000 });
 		});
 
-		test('[ABRD-59] a window that ends with focus on Undo leaves focus on the stage, not on the page', async ({
+		test('ABRD-59: a window that ends with focus on Undo leaves focus on the stage, not on the page', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -530,7 +530,7 @@ for (const viewport of [
 			await ruled;
 		});
 
-		test('[ABRD-44] a ruled card inside an open picture dialog leaves the stage focused', async ({
+		test('ABRD-44: a ruled card inside an open picture dialog leaves the stage focused', async ({
 			page
 		}) => {
 			await arrangeCards();
@@ -547,7 +547,7 @@ for (const viewport of [
 			if (!phone) await expect(page.locator('.stage')).toBeFocused();
 		});
 
-		test('[ABRD-46] a final pick asks first and Decide B starts the undo window', async ({
+		test('ABRD-46: a final pick asks first and Decide B starts the undo window', async ({
 			page
 		}, testInfo) => {
 			await arrangeFinal();
@@ -587,7 +587,7 @@ for (const viewport of [
 			['Cancel', (page: Page) => confirm(page).getByRole('button', { name: 'Cancel' }).click()],
 			['Esc', (page: Page) => page.keyboard.press('Escape')]
 		] as const) {
-			test(`[ABRD-47] ${key} closes the confirm, posts nothing and returns focus to the pick`, async ({
+			test(`ABRD-47: ${key} closes the confirm, posts nothing and returns focus to the pick`, async ({
 				page
 			}) => {
 				await arrangeFinal();
@@ -611,7 +611,7 @@ for (const viewport of [
 			});
 		}
 
-		test('[ABRD-46] Enter on the pick opens the confirm on Cancel and a second Enter cancels', async ({
+		test('ABRD-46: Enter on the pick opens the confirm on Cancel and a second Enter cancels', async ({
 			page
 		}) => {
 			await arrangeFinal();
@@ -630,7 +630,7 @@ for (const viewport of [
 			expect(posts.count()).toBe(0);
 		});
 
-		test('[ABRD-44] a reversible pick on a card with a final option opens no confirm', async ({
+		test('ABRD-44: a reversible pick on a card with a final option opens no confirm', async ({
 			page
 		}) => {
 			await arrangeFinal();
@@ -649,7 +649,7 @@ for (const viewport of [
 test.describe('1280px confirm over a changing board', () => {
 	test.use({ viewport: { width: 1280, height: 900 } });
 
-	test('[ABRD-47] a card changed under the open confirm is refused as changed, not decided', async ({
+	test('ABRD-47: a card changed under the open confirm is refused as changed, not decided', async ({
 		page
 	}) => {
 		await arrangeFinal();
@@ -683,7 +683,7 @@ test.describe('1280px confirm over a changing board', () => {
 		await expect(decidedList(page).getByTitle(SONG_QUESTION, { exact: true })).toHaveCount(0);
 	});
 
-	test('[ABRD-47] a slow POST leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
+	test('ABRD-47: a slow POST leaves the open confirm usable: Cancel keeps focus and Escape returns it to the pick', async ({
 		page
 	}) => {
 		await arrangeFinal();

@@ -21,7 +21,7 @@ function stubClipboard(writeText: (text: string) => Promise<void>) {
 	vi.stubGlobal('navigator', { clipboard: { writeText } });
 }
 
-test('[ABRD-159] a step shows its title, purpose, actions in a block, expected result and the yes or no answer', () => {
+test('ABRD-159: a step shows its title, purpose, actions in a block, expected result and the yes or no answer', () => {
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
 
 	const card = screen.getByRole('article', { name: /Release/ });
@@ -31,7 +31,7 @@ test('[ABRD-159] a step shows its title, purpose, actions in a block, expected r
 	expect(within(card).getByText('Antwort: Ja / Nein')).toBeInTheDocument();
 });
 
-test('[ABRD-159] a step that names an answer shows that report', () => {
+test('ABRD-159: a step that names an answer shows that report', () => {
 	render(StepsView, {
 		repos: [repo({ steps: [stepRead({ answer: 'the green run id' })] })],
 		decisions: store()
@@ -41,7 +41,7 @@ test('[ABRD-159] a step that names an answer shows that report', () => {
 	expect(screen.queryByText('Antwort: Ja / Nein')).toBeNull();
 });
 
-test('[ABRD-160] Copy puts exactly the block text on the clipboard and says so', async () => {
+test('ABRD-160: Copy puts exactly the block text on the clipboard and says so', async () => {
 	const writeText = vi.fn(() => Promise.resolve());
 	stubClipboard(writeText);
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
@@ -52,7 +52,7 @@ test('[ABRD-160] Copy puts exactly the block text on the clipboard and says so',
 	expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
 });
 
-test('[ABRD-160] a refused copy says so and offers the copy again', async () => {
+test('ABRD-160: a refused copy says so and offers the copy again', async () => {
 	stubClipboard(() => Promise.reject(new Error('denied')));
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
 
@@ -61,7 +61,7 @@ test('[ABRD-160] a refused copy says so and offers the copy again', async () => 
 	expect(await screen.findByRole('button', { name: 'Copy failed, try again' })).toBeInTheDocument();
 });
 
-test('[ABRD-161] a step without the fields shows its one line only and no button', () => {
+test('ABRD-161: a step without the fields shows its one line only and no button', () => {
 	render(StepsView, {
 		repos: [
 			repo({
@@ -84,13 +84,13 @@ test('[ABRD-161] a step without the fields shows its one line only and no button
 	expect(screen.queryByText(/Antwort/)).toBeNull();
 });
 
-test('[ABRD-162] no step anywhere says nothing waits', () => {
+test('ABRD-162: no step anywhere says nothing waits', () => {
 	render(StepsView, { repos: [repo({ steps: [] })], decisions: store() });
 
 	expect(screen.getByText('No step is waiting for you.')).toBeInTheDocument();
 });
 
-test('[ABRD-162] a repo that could not be read says so instead of an empty list', () => {
+test('ABRD-162: a repo that could not be read says so instead of an empty list', () => {
 	render(StepsView, {
 		repos: [repo({ name: 'songmaker', error: 'GitHub is down', steps: [] })],
 		decisions: store()
@@ -101,7 +101,7 @@ test('[ABRD-162] a repo that could not be read says so instead of an empty list'
 	expect(screen.queryByText('No step is waiting for you.')).toBeNull();
 });
 
-test('[ABRD-173] a yes or no step offers Erfolgreich and Fehlgeschlagen, and Erfolgreich posts yes after its window', async () => {
+test('ABRD-173: a yes or no step offers Erfolgreich and Fehlgeschlagen, and Erfolgreich posts yes after its window', async () => {
 	vi.useFakeTimers();
 	const send = vi.fn(async () => ({ status: 'answered' as const, message: null }));
 	render(StepsView, {
@@ -122,7 +122,7 @@ test('[ABRD-173] a yes or no step offers Erfolgreich and Fehlgeschlagen, and Erf
 	});
 });
 
-test('[ABRD-174] Fehlgeschlagen cannot send without a note', async () => {
+test('ABRD-174: Fehlgeschlagen cannot send without a note', async () => {
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
 
 	await fireEvent.click(screen.getByRole('button', { name: 'Fehlgeschlagen' }));
@@ -133,7 +133,7 @@ test('[ABRD-174] Fehlgeschlagen cannot send without a note', async () => {
 	expect(send).toBeEnabled();
 });
 
-test('[ABRD-173] a step that asks for a report offers a report field with Senden and no Erfolgreich', async () => {
+test('ABRD-173: a step that asks for a report offers a report field with Senden and no Erfolgreich', async () => {
 	render(StepsView, {
 		repos: [repo({ steps: [stepRead({ answer: 'the green run id' })] })],
 		decisions: store()
@@ -147,7 +147,7 @@ test('[ABRD-173] a step that asks for a report offers a report field with Senden
 	expect(send).toBeEnabled();
 });
 
-test('[ABRD-175] Undo inside the window removes the strip and brings the buttons back', async () => {
+test('ABRD-175: Undo inside the window removes the strip and brings the buttons back', async () => {
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
 
 	await fireEvent.click(screen.getByRole('button', { name: 'Erfolgreich' }));
@@ -156,7 +156,7 @@ test('[ABRD-175] Undo inside the window removes the strip and brings the buttons
 	expect(screen.getByRole('button', { name: 'Erfolgreich' })).toBeInTheDocument();
 });
 
-test('[ABRD-177] a step whose card changed offers Copy again instead of Copied', async () => {
+test('ABRD-177: a step whose card changed offers Copy again instead of Copied', async () => {
 	stubClipboard(() => Promise.resolve());
 	const decisions = store();
 	const { rerender } = render(StepsView, {
@@ -174,7 +174,7 @@ test('[ABRD-177] a step whose card changed offers Copy again instead of Copied',
 	expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
 });
 
-test('[ABRD-176] a refused answer keeps every answer button disabled until Neu laden', async () => {
+test('ABRD-176: a refused answer keeps every answer button disabled until Neu laden', async () => {
 	vi.useFakeTimers();
 	const send = vi.fn(async () => ({ status: 'failed' as const, message: 'This step changed' }));
 	render(StepsView, {

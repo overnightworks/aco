@@ -152,7 +152,7 @@ for (const viewport of [
 			});
 		}
 
-		test('[ABRD-58] the undo strip drains over the window, stands still under reduced motion and undo is a button', async ({
+		test('ABRD-58: the undo strip drains over the window, stands still under reduced motion and undo is a button', async ({
 			page
 		}) => {
 			await arrangeCards();

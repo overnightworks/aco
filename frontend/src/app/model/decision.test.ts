@@ -29,12 +29,12 @@ describe('card requests', () => {
 		{ line: 6, fingerprint: 'fp-library' }
 	];
 
-	test('[ABRD-77] a card key is one per item and never a line key', () => {
+	test('ABRD-77: a card key is one per item and never a line key', () => {
 		expect(cardKey('repo', 42)).toBe('repo:42:card');
 		expect(cardKey('repo', 42)).not.toBe(lineKey('repo', 42, first));
 	});
 
-	test('[ABRD-77] the picks name each point as it was shown with its letter, nothing else', () => {
+	test('ABRD-77: the picks name each point as it was shown with its letter, nothing else', () => {
 		const request = cardPicksRequest('repo', 42, [
 			{ shown: first, option: cardOption({ letter: 'B' }) },
 			{ shown: second, option: cardOption({ letter: 'A' }) }
@@ -50,7 +50,7 @@ describe('card requests', () => {
 		});
 	});
 
-	test('[ABRD-92] an Other answer names every point and carries the trimmed text once', () => {
+	test('ABRD-92: an Other answer names every point and carries the trimmed text once', () => {
 		const request = cardOtherRequest('repo', 42, [first, second], '  Only on desktop \n');
 
 		expect(request).toEqual({ repo: 'repo', item: 42, lines: shown, other: 'Only on desktop' });
@@ -59,7 +59,7 @@ describe('card requests', () => {
 	test.each([
 		['  Why two options? \n', 'Why two options?'],
 		['   ', null]
-	])('[ABRD-75] the note %j goes as %j on every point, with no letter', (raw, note) => {
+	])('ABRD-75: the note %j goes as %j on every point, with no letter', (raw, note) => {
 		const request = cardUnclearRequest('repo', 42, [first, second], raw);
 
 		expect(request).toEqual({ repo: 'repo', item: 42, lines: shown, unclear: true, note });
@@ -83,7 +83,7 @@ describe('readDecisionResult', () => {
 		expect(readDecisionResult(storedAnswer(written))).toEqual({ kind: 'ruled', item: written });
 	});
 
-	test('[ABRD-130] a ruled result with a note carries it and is never read as a failure', () => {
+	test('ABRD-130: a ruled result with a note carries it and is never read as a failure', () => {
 		const written = item({ number: 42 });
 
 		expect(readDecisionResult(storedAnswer(written, 'ruled', 'Written over a change.'))).toEqual({
@@ -93,7 +93,7 @@ describe('readDecisionResult', () => {
 		});
 	});
 
-	test('[ABRD-76] a returned result carries its item and is read as stored, not as a refusal', () => {
+	test('ABRD-76: a returned result carries its item and is read as stored, not as a refusal', () => {
 		const written = item({ number: 42 });
 
 		expect(readDecisionResult(storedAnswer(written, 'returned'))).toEqual({
@@ -149,7 +149,7 @@ describe('readStepResult', () => {
 });
 
 describe('entryKey', () => {
-	test('[ABRD-87] a post is keyed by its card and the sorted lines it names', () => {
+	test('ABRD-87: a post is keyed by its card and the sorted lines it names', () => {
 		expect(entryKey('repo:7:card', [5, 2])).toBe('repo:7:card:2,5');
 		expect(entryKey('repo:7:card', [3])).not.toBe(entryKey('repo:7:card', [2]));
 	});

@@ -64,7 +64,7 @@ afterEach(() => {
 });
 
 describe('picking on a card of points', () => {
-	test('[ABRD-86] a pick answers its point alone: one strip, then one post naming only that line', async () => {
+	test('ABRD-86: a pick answers its point alone: one strip, then one post naming only that line', async () => {
 		const { send, store } = setup(storedAnswer(oneStored));
 
 		store.choose('repo', 7, points, pickOf(points[0]));
@@ -83,7 +83,7 @@ describe('picking on a card of points', () => {
 		});
 	});
 
-	test('[ABRD-86] two picks are two windows and two writes, each naming its own line', async () => {
+	test('ABRD-86: two picks are two windows and two writes, each naming its own line', async () => {
 		const { send, store } = setup(storedAnswer(oneStored));
 
 		store.choose('repo', 7, points, pickOf(points[0], optionB));
@@ -101,7 +101,7 @@ describe('picking on a card of points', () => {
 		);
 	});
 
-	test('[ABRD-97] a waiting point is told from the others, and clears once its post is answered', async () => {
+	test('ABRD-97: a waiting point is told from the others, and clears once its post is answered', async () => {
 		const { store } = setup(storedAnswer(oneStored));
 
 		store.choose('repo', 7, points, pickOf(points[1]));
@@ -112,7 +112,7 @@ describe('picking on a card of points', () => {
 		expect(store.waitingIndexes(key).size).toBe(0);
 	});
 
-	test('[ABRD-99] the card holds the picks of every waiting point, none while nothing waits', async () => {
+	test('ABRD-99: the card holds the picks of every waiting point, none while nothing waits', async () => {
 		const { store } = setup(storedAnswer(oneStored));
 		expect(store.held(key)).toBeNull();
 
@@ -124,7 +124,7 @@ describe('picking on a card of points', () => {
 		expect(store.held(key)).toBeNull();
 	});
 
-	test('[ABRD-100] the card saves from the end of the window until its post is answered', async () => {
+	test('ABRD-100: the card saves from the end of the window until its post is answered', async () => {
 		let answer: (result: DecisionResult) => void = () => undefined;
 		const send = vi.fn(
 			() =>
@@ -146,7 +146,7 @@ describe('picking on a card of points', () => {
 		expect(store.isSaving(key)).toBe(false);
 	});
 
-	test('[ABRD-87] Undo of a pick posts nothing for it and frees its point, the others stay waiting', async () => {
+	test('ABRD-87: Undo of a pick posts nothing for it and frees its point, the others stay waiting', async () => {
 		const { send, store } = setup(storedAnswer(oneStored));
 		store.choose('repo', 7, points, pickOf(points[0]));
 		store.choose('repo', 7, points, pickOf(points[1]));
@@ -161,7 +161,7 @@ describe('picking on a card of points', () => {
 		);
 	});
 
-	test('[ABRD-44] a stored point shows its item in place and names the card as just ruled', async () => {
+	test('ABRD-44: a stored point shows its item in place and names the card as just ruled', async () => {
 		const { board, reads, store } = setup(storedAnswer(oneStored));
 		store.choose('repo', 7, points, pickOf(points[0]));
 
@@ -174,7 +174,7 @@ describe('picking on a card of points', () => {
 		expect(store.justRuled).toBeNull();
 	});
 
-	test('[ABRD-98] a waiting point of one card leaves the other card’s points free', () => {
+	test('ABRD-98: a waiting point of one card leaves the other card’s points free', () => {
 		const { store } = setup();
 		store.choose('repo', 8, points, pickOf(points[0]));
 
@@ -184,7 +184,7 @@ describe('picking on a card of points', () => {
 		expect([...store.waitingIndexes(key)]).toEqual([3]);
 	});
 
-	test('[ABRD-85] a point opens when toggled, another toggle closes any other, the same one closes it', () => {
+	test('ABRD-85: a point opens when toggled, another toggle closes any other, the same one closes it', () => {
 		const { store } = setup();
 
 		expect(store.openPoint(key)).toBeNull();
@@ -195,7 +195,7 @@ describe('picking on a card of points', () => {
 		expect(store.openPoint(key)).toBeNull();
 	});
 
-	test('[ABRD-44] a one-point card starts its window with the pick itself, named by letter, option and topic', async () => {
+	test('ABRD-44: a one-point card starts its window with the pick itself, named by letter, option and topic', async () => {
 		const { send, store } = setup();
 		const only = point(4, { topic: 'Jump' });
 
@@ -220,7 +220,7 @@ describe('Accept all', () => {
 		point(5, { recommended: 'A' })
 	];
 
-	test('[ABRD-89] picks each recommended letter in one window and one write', async () => {
+	test('ABRD-89: picks each recommended letter in one window and one write', async () => {
 		const { send, store } = setup();
 
 		store.acceptAll('repo', 7, recommending);
@@ -237,7 +237,7 @@ describe('Accept all', () => {
 		});
 	});
 
-	test('[ABRD-89] after a pick is stored it posts the points still open, once', async () => {
+	test('ABRD-89: after a pick is stored it posts the points still open, once', async () => {
 		const { send, store } = setup(storedAnswer(oneStored));
 		store.choose('repo', 7, recommending, pickOf(recommending[0], optionB));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -253,7 +253,7 @@ describe('Accept all', () => {
 		});
 	});
 
-	test('[ABRD-89] it skips the points that wait and numbers the strip among all the points', async () => {
+	test('ABRD-89: it skips the points that wait and numbers the strip among all the points', async () => {
 		const { send, store } = setup(storedAnswer(oneStored));
 		store.choose('repo', 7, recommending, pickOf(recommending[0], optionB));
 
@@ -270,7 +270,7 @@ describe('Accept all', () => {
 		);
 	});
 
-	test('[ABRD-89] Undo after Accept all posts nothing', async () => {
+	test('ABRD-89: Undo after Accept all posts nothing', async () => {
 		const { send, store } = setup();
 		store.acceptAll('repo', 7, recommending);
 
@@ -281,7 +281,7 @@ describe('Accept all', () => {
 		expect(store.waitingIndexes(key).size).toBe(0);
 	});
 
-	test('[ABRD-89] a point whose recommendation names no option stays open, the others post', async () => {
+	test('ABRD-89: a point whose recommendation names no option stays open, the others post', async () => {
 		const { send, store } = setup();
 		const broken = [point(2), point(3, { recommended: 'D' })];
 
@@ -294,7 +294,7 @@ describe('Accept all', () => {
 		);
 	});
 
-	test('[ABRD-89] with no valid recommendation, or every point waiting, nothing new waits', () => {
+	test('ABRD-89: with no valid recommendation, or every point waiting, nothing new waits', () => {
 		const { store } = setup();
 		store.acceptAll('repo', 7, [point(2, { recommended: 'D' })]);
 		expect(store.pendingEntries).toEqual([]);
@@ -307,7 +307,7 @@ describe('Accept all', () => {
 });
 
 describe('a refused post', () => {
-	test('[ABRD-45] "Neu laden" after a changed refusal drops the banner and re-reads', async () => {
+	test('ABRD-45: "Neu laden" after a changed refusal drops the banner and re-reads', async () => {
 		const { reads, store } = setup({ status: 'failed', message: LINE_CHANGED_MESSAGE });
 		store.choose('repo', 7, points, pickOf(points[0]));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -319,7 +319,7 @@ describe('a refused post', () => {
 		expect(reads()).toBe(1);
 	});
 
-	test('[ABRD-45] a failed point shows open again with the banner, and picking again posts again', async () => {
+	test('ABRD-45: a failed point shows open again with the banner, and picking again posts again', async () => {
 		const { send, store } = setup({ status: 'failed', message: 'aco unavailable' });
 		store.choose('repo', 7, points, pickOf(points[0]));
 		await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
@@ -338,7 +338,7 @@ describe('a refused post', () => {
 });
 
 describe('Other and Unclear on a card of points', () => {
-	test('[ABRD-154] Other answers its point alone, with its own strip and the text it was given', async () => {
+	test('ABRD-154: Other answers its point alone, with its own strip and the text it was given', async () => {
 		const { send, store } = setup(storedAnswer(oneStored));
 		const second = point(3, { topic: 'Library' });
 
@@ -356,7 +356,7 @@ describe('Other and Unclear on a card of points', () => {
 		});
 	});
 
-	test('[ABRD-92] Unclear covers the points not waiting and waits as a With head strip', async () => {
+	test('ABRD-92: Unclear covers the points not waiting and waits as a With head strip', async () => {
 		const { send, store } = setup(storedAnswer(storedCard, 'returned'));
 		store.choose('repo', 7, points, pickOf(points[0]));
 
@@ -380,7 +380,7 @@ describe('Other and Unclear on a card of points', () => {
 		expect(store.justReturned).toBe(key);
 	});
 
-	test('[ABRD-92] Unclear starts nothing while every point waits', () => {
+	test('ABRD-92: Unclear starts nothing while every point waits', () => {
 		const { store } = setup();
 		store.acceptAll('repo', 7, points);
 
@@ -389,7 +389,7 @@ describe('Other and Unclear on a card of points', () => {
 		expect(store.pendingEntries).toHaveLength(1);
 	});
 
-	test('[ABRD-154] Undo of an Other answer reopens its point’s panel and keeps its draft', async () => {
+	test('ABRD-154: Undo of an Other answer reopens its point’s panel and keeps its draft', async () => {
 		const { send, store } = setup();
 		const second = points[1] as OptionLine;
 		const panelKey = pointKey('repo', 7, 3);
@@ -404,7 +404,7 @@ describe('Other and Unclear on a card of points', () => {
 		expect(store.draft(panelKey, 'other')).toBe('x');
 	});
 
-	test('[ABRD-66] the Other draft is kept per point, and a stored point drops only its own', async () => {
+	test('ABRD-66: the Other draft is kept per point, and a stored point drops only its own', async () => {
 		const { store } = setup(storedAnswer(oneStored));
 		const first = pointKey('repo', 7, 2);
 		const second = pointKey('repo', 7, 3);

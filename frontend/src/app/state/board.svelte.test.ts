@@ -75,7 +75,7 @@ test('setNoAccess resets a previously loaded board', async () => {
 	expect(store.error).toBeNull();
 });
 
-test('[ABRD-47] a ready board stays ready and readable while it is re-read', async () => {
+test('ABRD-47: a ready board stays ready and readable while it is re-read', async () => {
 	const store = new BoardStore();
 	const first = [repo()];
 	await store.load('secret', fakeFetch(200, { repos: first }));
@@ -99,7 +99,7 @@ test('[ABRD-47] a ready board stays ready and readable while it is re-read', asy
 
 const flawed = (name: string, sentence: string) => repo({ name, error: sentence, items: [] });
 
-test('[ABRD-101] a repository that fails inside an answer keeps its items and read time and takes the sentence', async () => {
+test('ABRD-101: a repository that fails inside an answer keeps its items and read time and takes the sentence', async () => {
 	const store = new BoardStore();
 	const keptItems = [item({ number: 7 })];
 	vi.setSystemTime(new Date(2026, 9, 31, 9, 41));
@@ -128,7 +128,7 @@ test('[ABRD-101] a repository that fails inside an answer keeps its items and re
 	expect(store.repos[0]?.readAt?.getTime()).toBe(new Date(2026, 9, 31, 10, 5).getTime());
 });
 
-test('[ABRD-101] a repository that fails on its first read has the sentence, no items and no read time', async () => {
+test('ABRD-101: a repository that fails on its first read has the sentence, no items and no read time', async () => {
 	const store = new BoardStore();
 
 	await store.load('t', fakeFetch(200, { repos: [repo({ name: 'a' }), flawed('b', 'gh down')] }));
@@ -143,7 +143,7 @@ test('[ABRD-101] a repository that fails on its first read has the sentence, no 
 	expect(store.repos[1]?.readAt).toBeNull();
 });
 
-test('[ABRD-101] a repository that reads again replaces its kept items, sentence and time', async () => {
+test('ABRD-101: a repository that reads again replaces its kept items, sentence and time', async () => {
 	const store = new BoardStore();
 	await store.load('t', fakeFetch(200, { repos: [repo({ name: 'b' })] }));
 	await store.load('t', fakeFetch(200, { repos: [flawed('b', 'gh down')] }));
@@ -166,7 +166,7 @@ test.each([
 	['an answer of 502', fakeFetch(502, { error: 'aco rulings failed' })],
 	['no network', throwingFetch()]
 ])(
-	'[ABRD-102] a read that fails whole on a ready board (%s) keeps every repository with the page sentence',
+	'ABRD-102: a read that fails whole on a ready board (%s) keeps every repository with the page sentence',
 	async (_name, failing) => {
 		const store = new BoardStore();
 		vi.setSystemTime(new Date(2026, 9, 31, 9, 41));
@@ -185,7 +185,7 @@ test.each([
 	}
 );
 
-test('[ABRD-33] a stored answer for a kept card shows in place and a later failed read keeps it', async () => {
+test('ABRD-33: a stored answer for a kept card shows in place and a later failed read keeps it', async () => {
 	const store = new BoardStore();
 	await store.load(
 		't',
@@ -205,7 +205,7 @@ const changed = item({ number: 42, title: 'Changed' });
 const refused = item({ number: 43, title: 'Refused' });
 const renewed = item({ number: 43, title: 'Renewed' });
 
-test('[ABRD-103] reads asked for during a read run once after it, and every caller settles with that one', async () => {
+test('ABRD-103: reads asked for during a read run once after it, and every caller settles with that one', async () => {
 	const store = new BoardStore();
 	const reads = heldReads();
 	const first = store.load('t', reads.fetchImpl);
@@ -224,7 +224,7 @@ test('[ABRD-103] reads asked for during a read run once after it, and every call
 	expect(store.reading).toBe(false);
 });
 
-test('[ABRD-103] a read asked for after a refusal starts only once the running read answered and shows the content after it', async () => {
+test('ABRD-103: a read asked for after a refusal starts only once the running read answered and shows the content after it', async () => {
 	const store = new BoardStore();
 	const reads = heldReads();
 	const running = store.load('t', reads.fetchImpl);
@@ -239,7 +239,7 @@ test('[ABRD-103] a read asked for after a refusal starts only once the running r
 	expect(store.repos[0]?.items).toEqual([renewed]);
 });
 
-test('[ABRD-103] a read waiting when the token goes settles without reading', async () => {
+test('ABRD-103: a read waiting when the token goes settles without reading', async () => {
 	const store = new BoardStore();
 	const reads = heldReads();
 	const running = store.load('t', reads.fetchImpl);
@@ -254,7 +254,7 @@ test('[ABRD-103] a read waiting when the token goes settles without reading', as
 	expect(store.status).toBe('no-access');
 });
 
-test('[ABRD-105] a read leaves the item of a card that waits as shown, and appends it when the read omits it', async () => {
+test('ABRD-105: a read leaves the item of a card that waits as shown, and appends it when the read omits it', async () => {
 	const store = new BoardStore((_repo, candidate) => candidate.number === shown.number);
 	await store.load('t', fakeFetch(200, { repos: [repo({ items: [shown, refused] })] }));
 	const reads = heldReads();
@@ -271,7 +271,7 @@ test('[ABRD-105] a read leaves the item of a card that waits as shown, and appen
 	expect(store.repos[0]?.items).toEqual([renewed, shown]);
 });
 
-test('[ABRD-105] a read that answers once the card no longer waits applies its item', async () => {
+test('ABRD-105: a read that answers once the card no longer waits applies its item', async () => {
 	let waiting = true;
 	const store = new BoardStore(() => waiting);
 	await store.load('t', fakeFetch(200, { repos: [repo({ items: [shown] })] }));

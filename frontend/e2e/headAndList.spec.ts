@@ -65,7 +65,7 @@ for (const scheme of ['light', 'dark'] as const) {
 	test.describe(`the list and the count badge, device set to ${scheme}`, () => {
 		test.use({ colorScheme: scheme, viewport: { width: 1280, height: 900 } });
 
-		test('[ABRD-125] the count of open decisions is an accent badge that goes quiet at zero', async ({
+		test('ABRD-125: the count of open decisions is an accent badge that goes quiet at zero', async ({
 			page
 		}) => {
 			await openBoard(page, WAITING);
@@ -83,7 +83,7 @@ for (const scheme of ['light', 'dark'] as const) {
 			await expect(badge).not.toHaveCSS('background-color', accent);
 		});
 
-		test('[ABRD-126] the selected row carries an accent bar on a light accent ground without hover, and rows share one height', async ({
+		test('ABRD-126: the selected row carries an accent bar on a light accent ground without hover, and rows share one height', async ({
 			page
 		}) => {
 			await openBoard(page, WAITING);
@@ -110,7 +110,7 @@ for (const scheme of ['light', 'dark'] as const) {
 			expect(await height(selected)).toBe(await height(other));
 		});
 
-		test('[ABRD-126] a repository heading keeps the case it is typed in', async ({ page }) => {
+		test('ABRD-126: a repository heading keeps the case it is typed in', async ({ page }) => {
 			await openBoard(page, WAITING);
 			const name = page.locator('.tracks .group').first().locator('span').first();
 
@@ -128,7 +128,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px head`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-125] the head shows the pill tabs with the count badge and starts the tabs at the left on phones', async ({
+		test('ABRD-125: the head shows the pill tabs with the count badge and starts the tabs at the left on phones', async ({
 			page
 		}) => {
 			await openBoard(page, WAITING);
@@ -151,7 +151,7 @@ for (const viewport of [
 		});
 
 		for (const state of ['without access', 'while loading']) {
-			test(`[ABRD-125] the wordmark is visible ${state}`, async ({ page }) => {
+			test(`ABRD-125: the wordmark is visible ${state}`, async ({ page }) => {
 				const { appUrl, token } = readBoardRuntime();
 				if (state === 'while loading') {
 					await page.route('**/api/board', () => new Promise(() => undefined));

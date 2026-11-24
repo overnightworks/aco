@@ -36,7 +36,7 @@ function renderRow(
 	return handlers;
 }
 
-test('[ABRD-63] Other… opens the panel with the card as shown now', async () => {
+test('ABRD-63: Other… opens the panel with the card as shown now', async () => {
 	const { onOpen } = renderRow();
 
 	await fireEvent.click(screen.getByRole('button', { name: 'Other…' }));
@@ -44,7 +44,7 @@ test('[ABRD-63] Other… opens the panel with the card as shown now', async () =
 	expect(onOpen).toHaveBeenCalledWith('other', shown);
 });
 
-test('[ABRD-63] an open panel has a focusable answer field named Your answer, and Other… closes it', async () => {
+test('ABRD-63: an open panel has a focusable answer field named Your answer, and Other… closes it', async () => {
 	const { onClose } = renderRow({ panel: otherPanel });
 
 	const field = screen.getByRole('textbox', { name: 'Your answer' });
@@ -55,13 +55,13 @@ test('[ABRD-63] an open panel has a focusable answer field named Your answer, an
 	expect(onClose).toHaveBeenCalled();
 });
 
-test.each(['', '   \n'])('[ABRD-63] Send stays disabled while the answer %j is blank', (draft) => {
+test.each(['', '   \n'])('ABRD-63: Send stays disabled while the answer %j is blank', (draft) => {
 	renderRow({ panel: otherPanel, draft });
 
 	expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test('[ABRD-66] typing reports the text for the draft', async () => {
+test('ABRD-66: typing reports the text for the draft', async () => {
 	const { onDraft } = renderRow({ panel: otherPanel });
 
 	await fireEvent.input(screen.getByRole('textbox', { name: 'Your answer' }), {
@@ -71,7 +71,7 @@ test('[ABRD-66] typing reports the text for the draft', async () => {
 	expect(onDraft).toHaveBeenCalledWith('Only on desktop');
 });
 
-test('[ABRD-68] Send posts the card the panel opened with, not the one shown now', async () => {
+test('ABRD-68: Send posts the card the panel opened with, not the one shown now', async () => {
 	const { onSend } = renderRow({
 		points: [optionLine({ fingerprint: 'fp-revised' })],
 		panel: otherPanel,
@@ -83,14 +83,14 @@ test('[ABRD-68] Send posts the card the panel opened with, not the one shown now
 	expect(onSend).toHaveBeenCalledWith(otherPanel, 'Only on desktop');
 });
 
-test('[ABRD-65] a pending decision disables Other… and Send', () => {
+test('ABRD-65: a pending decision disables Other… and Send', () => {
 	renderRow({ panel: otherPanel, draft: 'x', pending: true });
 
 	expect((screen.getByRole('button', { name: 'Other…' }) as HTMLButtonElement).disabled).toBe(true);
 	expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test('[ABRD-72] an open card offers Other… then Unclear, and Unclear opens its panel with the card as shown', async () => {
+test('ABRD-72: an open card offers Other… then Unclear, and Unclear opens its panel with the card as shown', async () => {
 	const { onOpen } = renderRow();
 
 	const names = screen.getAllByRole('button').map((button) => button.textContent?.trim());
@@ -100,7 +100,7 @@ test('[ABRD-72] an open card offers Other… then Unclear, and Unclear opens its
 	expect(onOpen).toHaveBeenCalledWith('unclear', shown);
 });
 
-test('[ABRD-73] the Unclear panel has an optional note field and a Send that is enabled while blank', async () => {
+test('ABRD-73: the Unclear panel has an optional note field and a Send that is enabled while blank', async () => {
 	const { onSend, onClose } = renderRow({ panel: unclearPanel });
 
 	const field = screen.getByRole('textbox', { name: 'What is unclear? (optional)' });
@@ -118,7 +118,7 @@ test('[ABRD-73] the Unclear panel has an optional note field and a Send that is 
 	expect(onClose).toHaveBeenCalled();
 });
 
-test('[ABRD-75] a pending decision disables Unclear and its Send', () => {
+test('ABRD-75: a pending decision disables Unclear and its Send', () => {
 	renderRow({ panel: unclearPanel, pending: true });
 
 	expect((screen.getByRole('button', { name: 'Unclear' }) as HTMLButtonElement).disabled).toBe(
@@ -127,7 +127,7 @@ test('[ABRD-75] a pending decision disables Unclear and its Send', () => {
 	expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test('[ABRD-72] a row offers only the kinds it is given, and shows no panel of another kind', () => {
+test('ABRD-72: a row offers only the kinds it is given, and shows no panel of another kind', () => {
 	renderRow({ kinds: ['other'], panel: unclearPanel });
 
 	expect(screen.queryByRole('button', { name: 'Unclear' })).toBeNull();
@@ -135,7 +135,7 @@ test('[ABRD-72] a row offers only the kinds it is given, and shows no panel of a
 	expect(screen.getByRole('button', { name: 'Other…' })).toBeTruthy();
 });
 
-test('[ABRD-154] a row at a point names the point in its button and its field', () => {
+test('ABRD-154: a row at a point names the point in its button and its field', () => {
 	renderRow({ kinds: ['other'], number: 2, panel: otherPanel });
 
 	expect(screen.getByRole('button', { name: 'Point 2: Other…' })).toBeTruthy();

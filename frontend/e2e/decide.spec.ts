@@ -229,7 +229,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px selection flow`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-97] a slow POST disables only its card and every other card stays usable without a read', async ({
+		test('ABRD-97: a slow POST disables only its card and every other card stays usable without a read', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -281,7 +281,7 @@ for (const viewport of [
 			expect(board.count()).toBe(0);
 		});
 
-		test('[ABRD-98] a Neu laden read held across another card’s stored answer leaves that card in Decided', async ({
+		test('ABRD-98: a Neu laden read held across another card’s stored answer leaves that card in Decided', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -339,7 +339,7 @@ for (const viewport of [
 			await expect(decidedList(page).getByRole('button')).toHaveCount(1);
 		});
 
-		test('[ABRD-130] an answer with a note on the last open card stands decided with its note', async ({
+		test('ABRD-130: an answer with a note on the last open card stands decided with its note', async ({
 			page
 		}) => {
 			const { appUrl, token } = readBoardRuntime();

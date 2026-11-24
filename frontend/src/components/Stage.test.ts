@@ -34,7 +34,7 @@ test('with nothing selected, the stage says no question is selected', () => {
 	expect(screen.getByText('Keine Frage ausgewählt.')).toBeInTheDocument();
 });
 
-test('[ABRD-44] a selected one-point card shows its card and offers the Decide picks, no outcome', () => {
+test('ABRD-44: a selected one-point card shows its card and offers the Decide picks, no outcome', () => {
 	const card = optionLine({ index: 2, question: 'Keep the song open?' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
@@ -61,7 +61,7 @@ test('[ABRD-44] a selected one-point card shows its card and offers the Decide p
 	expect(screen.getByRole('button', { name: 'Enlarge picture' })).toBeInTheDocument();
 });
 
-test('[ABRD-44] a ruled option line offers no Decide group', () => {
+test('ABRD-44: a ruled option line offers no Decide group', () => {
 	const card = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 
@@ -74,7 +74,7 @@ test('[ABRD-44] a ruled option line offers no Decide group', () => {
 	expect(screen.queryByRole('group', { name: 'Decide' })).not.toBeInTheDocument();
 });
 
-test('[ABRD-130] the decided card of a noted answer shows the note, never a failure', async () => {
+test('ABRD-130: the decided card of a noted answer shows the note, never a failure', async () => {
 	const open = optionLine({ index: 2, fingerprint: 'fp-option' });
 	const ruled = optionLine({ index: 2, ruling: 'A', ruled_on: '2026-10-01', via: 'board' });
 	const written = item({ number: 42, lines: [ruled] });
@@ -100,7 +100,7 @@ test('[ABRD-130] the decided card of a noted answer shows the note, never a fail
 	expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('[ABRD-44] picking an option disables the picks, then posts the card with exactly that letter', async () => {
+test('ABRD-44: picking an option disables the picks, then posts the card with exactly that letter', async () => {
 	const card = optionLine({ index: 2, fingerprint: 'fp-option' });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
@@ -122,7 +122,7 @@ test('[ABRD-44] picking an option disables the picks, then posts the card with e
 	});
 });
 
-test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it', async () => {
+test('ABRD-45: a changed option card hides the picks until Neu laden reloads it', async () => {
 	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const reload = vi.fn(async () => {});
@@ -138,7 +138,7 @@ test('[ABRD-45] a changed option card hides the picks until Neu laden reloads it
 	expect(reload).toHaveBeenCalledTimes(1);
 });
 
-test('[ABRD-37] an already-ruled line of either form shows the decided card, never live choices', () => {
+test('ABRD-37: an already-ruled line of either form shows the decided card, never live choices', () => {
 	const yesNo = line({
 		index: 1,
 		question: 'Guests allowed?',
@@ -272,7 +272,7 @@ function renderGroup(decisions: DecisionStore, points = groupPoints()) {
 	});
 }
 
-test('[ABRD-83] a card of points is titled by its name and offers Accept all, Unclear and an Other… at every point, no pick row of its own', () => {
+test('ABRD-83: a card of points is titled by its name and offers Accept all, Unclear and an Other… at every point, no pick row of its own', () => {
 	renderGroup(storeAnswering(storedAnswer(item())));
 
 	expect(screen.getByRole('heading', { name: 'Song-Seite · 3 points' })).toBeInTheDocument();
@@ -285,7 +285,7 @@ test('[ABRD-83] a card of points is titled by its name and offers Accept all, Un
 	expect(screen.getByRole('button', { name: 'Unclear' })).toBeInTheDocument();
 });
 
-test('[ABRD-85] activating a point opens it, and another point closes the first', async () => {
+test('ABRD-85: activating a point opens it, and another point closes the first', async () => {
 	renderGroup(storeAnswering(storedAnswer(item())));
 	const first = screen.getByRole('button', { name: /Question 2\?/ });
 	const second = screen.getByRole('button', { name: /Question 3\?/ });
@@ -299,7 +299,7 @@ test('[ABRD-85] activating a point opens it, and another point closes the first'
 	expect(second).toHaveAttribute('aria-expanded', 'true');
 });
 
-test('[ABRD-86] a pick answers its point alone: it waits, the other points stay open, and one post names only its line', async () => {
+test('ABRD-86: a pick answers its point alone: it waits, the other points stay open, and one post names only its line', async () => {
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
 	const decisions = new DecisionStore('token', inertBoard(), send as never);
 	renderGroup(decisions);
@@ -326,7 +326,7 @@ test('[ABRD-86] a pick answers its point alone: it waits, the other points stay 
 	});
 });
 
-test('[ABRD-87] picks on two points are two windows and two posts', async () => {
+test('ABRD-87: picks on two points are two windows and two posts', async () => {
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
 	const decisions = new DecisionStore('token', inertBoard(), send as never);
 	renderGroup(decisions);
@@ -344,7 +344,7 @@ test('[ABRD-87] picks on two points are two windows and two posts', async () => 
 	expect(send).toHaveBeenCalledTimes(2);
 });
 
-test('[ABRD-89] Accept all picks each recommended letter and posts the card after the window', async () => {
+test('ABRD-89: Accept all picks each recommended letter and posts the card after the window', async () => {
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
 	const decisions = new DecisionStore('token', inertBoard(), send as never);
 	renderGroup(decisions);
@@ -368,7 +368,7 @@ test('[ABRD-89] Accept all picks each recommended letter and posts the card afte
 	});
 });
 
-test('[ABRD-45] a changed card hides its picks and Accept all until Neu laden', async () => {
+test('ABRD-45: a changed card hides its picks and Accept all until Neu laden', async () => {
 	const decisions = storeAnswering({ status: 'failed', message: LINE_CHANGED_MESSAGE });
 	renderGroup(decisions);
 
@@ -381,7 +381,7 @@ test('[ABRD-45] a changed card hides its picks and Accept all until Neu laden', 
 	expect(screen.getByRole('button', { name: 'Neu laden' })).toBeInTheDocument();
 });
 
-test('[ABRD-154] Other… at a point answers that point alone with its own text', async () => {
+test('ABRD-154: Other… at a point answers that point alone with its own text', async () => {
 	const send = vi.fn(async () => storedAnswer(item()) as DecisionResult);
 	renderGroup(new DecisionStore('token', inertBoard(), send as never));
 
@@ -401,7 +401,7 @@ test('[ABRD-154] Other… at a point answers that point alone with its own text'
 	});
 });
 
-test('[ABRD-66] the open Other panel of a point and its draft survive the card turning into a one-point card', async () => {
+test('ABRD-66: the open Other panel of a point and its draft survive the card turning into a one-point card', async () => {
 	const decisions = storeAnswering(storedAnswer(item()));
 	const points = groupPoints();
 	const { rerender } = renderGroup(decisions, points);
@@ -420,7 +420,7 @@ test('[ABRD-66] the open Other panel of a point and its draft survive the card t
 	expect(screen.getByRole('textbox', { name: 'Your answer' })).toHaveValue('Only on desktop');
 });
 
-test('[ABRD-92] Unclear covers the points not waiting', async () => {
+test('ABRD-92: Unclear covers the points not waiting', async () => {
 	const send = vi.fn(async () => storedAnswer(item(), 'returned') as DecisionResult);
 	const decisions = new DecisionStore('token', inertBoard(), send as never);
 	renderGroup(decisions);
@@ -444,7 +444,7 @@ test('[ABRD-92] Unclear covers the points not waiting', async () => {
 	});
 });
 
-test('[ABRD-61] a card of points with one point with its head offers no Unclear and keeps Accept all', () => {
+test('ABRD-61: a card of points with one point with its head offers no Unclear and keeps Accept all', () => {
 	const points = groupPoints();
 	points[1] = optionLine({ ...points[1], returned_on: '2026-10-27' });
 	renderGroup(storeAnswering(storedAnswer(item())), points);
@@ -454,7 +454,7 @@ test('[ABRD-61] a card of points with one point with its head offers no Unclear 
 	expect(screen.getByRole('button', { name: 'Accept all recommendations' })).toBeInTheDocument();
 });
 
-test("[ABRD-99] [ABRD-100] a held pick lights its letter from the click and Saving shows from the window's end", async () => {
+test("ABRD-99, ABRD-100: a held pick lights its letter from the click and Saving shows from the window's end", async () => {
 	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	let answer: (result: DecisionResult) => void = () => {};
@@ -483,7 +483,7 @@ test("[ABRD-99] [ABRD-100] a held pick lights its letter from the click and Savi
 	answer(storedAnswer(item()));
 });
 
-test('[ABRD-97] a failed answer brings back Other… and Unclear in place of Saving', async () => {
+test('ABRD-97: a failed answer brings back Other… and Unclear in place of Saving', async () => {
 	const card = optionLine({ index: 2 });
 	const repos = [repo({ items: [item({ number: 42, lines: [card] })] })];
 	const decisions = storeAnswering({ status: 'failed', message: 'aco unavailable' });

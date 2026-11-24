@@ -106,7 +106,7 @@ test('a non-OK answer to a decision raises BoardApiError naming the status', asy
 	await expect(postDecision('wrong-token', decision, fetchImpl)).rejects.toThrow(BoardApiError);
 });
 
-test('[ABRD-152] a decision is posted keepalive, so it survives the page closing', async () => {
+test('ABRD-152: a decision is posted keepalive, so it survives the page closing', async () => {
 	const decision: DecisionRequest = {
 		repo: 'repo',
 		item: 42,
@@ -119,7 +119,7 @@ test('[ABRD-152] a decision is posted keepalive, so it survives the page closing
 	expect(vi.mocked(fetchImpl).mock.calls.at(0)?.[1]?.keepalive).toBe(true);
 });
 
-test('[ABRD-175] a step answer is posted to /api/step, keepalive, with the token only in the header', async () => {
+test('ABRD-175: a step answer is posted to /api/step, keepalive, with the token only in the header', async () => {
 	const answer = { repo: 'repo', item: 7, fingerprint: 'fp', result: 'yes' } as const;
 	const fetchImpl = fakeFetch(200, { status: 'answered', message: null });
 

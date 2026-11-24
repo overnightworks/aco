@@ -128,7 +128,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px option card`, () => {
 		test.use({ viewport });
 
-		test('[ABRD-106] an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
+		test('ABRD-106: an open option line shows the whole card, every option closed, and offers the Decide picks', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repository } = readBoardRuntime();
@@ -194,7 +194,7 @@ for (const viewport of [
 				.toBeLessThanOrEqual(viewport.width);
 		});
 
-		test('[ABRD-106] a card with a final option says final in its meta line', async ({
+		test('ABRD-106: a card with a final option says final in its meta line', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token } = readBoardRuntime();
@@ -382,7 +382,7 @@ for (const viewport of [
 			);
 		});
 
-		test('[ABRD-37] a ruled option line leaves the open list and Decided lists it under its project', async ({
+		test('ABRD-37: a ruled option line leaves the open list and Decided lists it under its project', async ({
 			page
 		}, testInfo) => {
 			const { appUrl, token, repository } = readBoardRuntime();

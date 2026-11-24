@@ -17,7 +17,7 @@ for (const viewport of [
 	test.describe(`${viewport.width}px steps view`, () => {
 		test.use({ viewport, permissions: ['clipboard-read', 'clipboard-write'] });
 
-		test('[ABRD-159] [ABRD-160] the step card shows purpose, block, expected and answer; Copy copies the block', async ({
+		test('ABRD-159, ABRD-160: the step card shows purpose, block, expected and answer; Copy copies the block', async ({
 			page
 		}, testInfo) => {
 			await arrange([
@@ -52,7 +52,7 @@ for (const viewport of [
 			await page.screenshot({ path: testInfo.outputPath(`steps-${viewport.width}.png`) });
 		});
 
-		test('[ABRD-162] with no step the view says nothing waits', async ({ page }) => {
+		test('ABRD-162: with no step the view says nothing waits', async ({ page }) => {
 			await arrange([item(8, 'Quiet')]);
 			const { appUrl, token } = readBoardRuntime();
 			await page.goto(`${appUrl}#t=${token}`);
