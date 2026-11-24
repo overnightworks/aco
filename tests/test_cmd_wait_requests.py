@@ -3,7 +3,7 @@ WAIT-27): a fake forge counts every request, a fake probe every answer that is b
 real command ticks over a board with a container and an item with a dependency."""
 
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import pytest
 from board_fixtures import (
@@ -16,7 +16,15 @@ from board_fixtures import (
 )
 from cli_fixtures import run_cli
 from github_fixtures import FakeForge, serve_forge
-from wait_fixtures import ITEM, OTHER_ITEM, free_item, install, open_reference, waiting_card
+from wait_fixtures import (
+    ITEM,
+    OTHER_ITEM,
+    Ticks,
+    free_item,
+    install,
+    open_reference,
+    waiting_card,
+)
 
 from aco import board_wait, body, cmd_wait, forge, workboard
 
@@ -24,6 +32,7 @@ HITS = 22
 FULL_READS = 4
 LISTED_ROW_CHANGES = (4, 10, 21)
 REQUESTS_PER_HIT = 3
+LISTINGS = 2
 PAUSES_PER_PROBE = int(board_wait.PROBE_SECONDS / cmd_wait.SIGNAL_POLL_SECONDS)
 HIT_OFFSET = 5
 READ_OFFSET = 1
@@ -62,15 +71,27 @@ def board_with_children_and_dependencies() -> FakeForge:
     )
 
 
+@dataclass(frozen=True)
+class WaitWorld:
+    client: FakeForge
+    probe: FakeBoardProbe
+    ticks: Ticks
+
+
+@pytest.fixture
+def wait_world(monkeypatch: pytest.MonkeyPatch) -> WaitWorld:
+    client = serve_forge(monkeypatch, board_with_children_and_dependencies())
+    probe = serve_board_probe(monkeypatch, FakeBoardProbe())
+    return WaitWorld(client, probe, install(monkeypatch, lambda: client.requests))
+
+
 def test_hits_that_change_no_listed_row_cost_the_probe_and_two_listings(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    wait_world: WaitWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: WAIT-27 -- of 22 hits three change a listed row (a body, a label, an item that
     opens with a pull request) and each of those ends in a read that sees the change; the
     other 19 cost the probe and the two listings only."""
-    client = serve_forge(monkeypatch, board_with_children_and_dependencies())
-    probe = serve_board_probe(monkeypatch, FakeBoardProbe())
-    ticks = install(monkeypatch, lambda: client.requests)
+    client, probe, ticks = wait_world.client, wait_world.probe, wait_world.ticks
     target = forge.ProbeTarget(REPOSITORY)
     builds_after_each_hit: list[int] = []
 
@@ -122,13 +143,11 @@ def test_hits_that_change_no_listed_row_cost_the_probe_and_two_listings(
 
 
 def test_a_hit_that_changes_a_listed_row_reads_the_board_over_the_listings_it_fetched(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    wait_world: WaitWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: WAIT-27 -- the hit costs the probe and the two listings, and the read it asks for
     reuses those listings, so it fetches the full read less the two listings."""
-    client = serve_forge(monkeypatch, board_with_children_and_dependencies())
-    probe = serve_board_probe(monkeypatch, FakeBoardProbe())
-    ticks = install(monkeypatch, lambda: client.requests)
+    client, probe, ticks = wait_world.client, wait_world.probe, wait_world.ticks
     costs_before_the_hit: list[int] = []
 
     def open_an_item_with_a_new_body() -> None:
@@ -142,4 +161,4 @@ def test_a_hit_that_changes_a_listed_row_reads_the_board_over_the_listings_it_fe
     full_read = ticks.reads_seen[0]
     cost_of_the_hit = client.requests + probe.billed - costs_before_the_hit[0]
     assert (result.status, result.stdout) == (0, f"ACTIONABLE #{OTHER_ITEM}\n")
-    assert cost_of_the_hit == REQUESTS_PER_HIT + full_read - 2
+    assert cost_of_the_hit == REQUESTS_PER_HIT + full_read - LISTINGS
