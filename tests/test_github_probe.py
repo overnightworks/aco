@@ -133,7 +133,6 @@ def test_a_repository_target_never_reads_its_body() -> None:
         pytest.param('{"state": "merged"}', id="another-state"),
         pytest.param("{}", id="no-state"),
         pytest.param("[]", id="not-an-issue"),
-        pytest.param("not json", id="not-json"),
     ],
 )
 def test_an_issue_answer_without_a_state_of_open_or_closed_fails(body: str) -> None:
@@ -141,3 +140,23 @@ def test_an_issue_answer_without_a_state_of_open_or_closed_fails(body: str) -> N
     probe = github_probe.GitHubBoardProbe(_Gh(0, f"HTTP/2.0 200 OK\nEtag: {ETAG}\n\n{body}"))
     with pytest.raises(forge.ForgeMalformedResponseError):
         probe.changed_since(ISSUE_TARGET, None)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [pytest.param("not json", id="not-json"), pytest.param('{"state": "clo', id="cut-short")],
+)
+def test_an_issue_answer_that_does_not_parse_is_a_transient_failure(body: str) -> None:
+    """Spec: WAIT-29 -- a 200 whose body is cut short may be cured by a retry."""
+    probe = github_probe.GitHubBoardProbe(_Gh(0, f"HTTP/2.0 200 OK\nEtag: {ETAG}\n\n{body}"))
+    with pytest.raises(forge.ForgeTransientError):
+        probe.changed_since(ISSUE_TARGET, None)
+
+
+def test_a_failed_probe_is_transient_and_its_message_holds_no_header_line() -> None:
+    """Spec: WAIT-29, WAIT-30 -- a 502 that gh follows with its own cut-short message."""
+    text = "HTTP/2.0 502 Bad Gateway\r\nX-Xss-Protection: 0\r\n\r\nunexpected end of JSON input"
+    probe = github_probe.GitHubBoardProbe(_Gh(1, text))
+    with pytest.raises(forge.ForgeTransientError) as raised:
+        probe.changed_since(REPOSITORY_TARGET, ETAG)
+    assert str(raised.value) == "unexpected end of JSON input"

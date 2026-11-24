@@ -113,6 +113,27 @@ def test_text_that_is_not_gh_closing_a_rate_limit_keeps_its_type(
 
 
 @pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param("unexpected end of JSON input", forge.ForgeTransientError, id="bare"),
+        pytest.param(
+            "HTTP/2.0 502 Bad Gateway\r\nX-Xss-Protection: 0\r\n\r\nunexpected end of JSON input",
+            forge.ForgeTransientError,
+            id="after-a-response-head",
+        ),
+        pytest.param("unexpected end of file", forge.ForgeError, id="other-words"),
+    ],
+)
+def test_an_answer_cut_short_is_transient_and_similar_text_keeps_its_type(
+    text: str, expected: type[forge.ForgeError]
+) -> None:
+    """Spec: WAIT-29 -- gh's `unexpected end of JSON input` is a failed call a retry may cure."""
+    error = classified(text)
+
+    assert type(error) is expected
+
+
+@pytest.mark.parametrize(
     ("answer", "expected"),
     [
         pytest.param("1795118883", datetime(2026, 11, 19, 20, 8, 3, tzinfo=UTC), id="epoch"),

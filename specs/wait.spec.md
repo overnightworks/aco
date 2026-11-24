@@ -27,7 +27,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | item does not exist, is a pull request, is closed, or its body is malformed | WAIT-04, WAIT-22 | WAIT-11 |
 | `--repo` given, `storage = "state-ref"` | WAIT-06 | WAIT-11 |
 | a forge failure at the start other than a rate limit, a forge failure that is not transient while it waits, or a signal that cannot be read | WAIT-10 | WAIT-10 |
-| a transient forge failure other than a rate limit while it waits | WAIT-10 | — |
+| a transient forge failure other than a rate limit while it waits | WAIT-10, WAIT-29, WAIT-30 | — |
 | a rate limit, at the start or while it waits, with or without an item | WAIT-22 | — |
 | a ruling, return or withdrawal written by aco | WAIT-12 | — |
 | the signal cannot be touched | WAIT-13 | — |
@@ -38,7 +38,7 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | no item, the repository's probe moved and its open listings did not change | WAIT-27 | — |
 | no item, a recurring audit is due | WAIT-23, WAIT-25 | WAIT-25 |
 | no item, an audit is not due or unavailable, or none is configured | WAIT-23, WAIT-24 | WAIT-25 |
-| no item, a transient failure other than a rate limit while it waits | WAIT-20, WAIT-27 | — |
+| no item, a transient failure other than a rate limit while it waits | WAIT-20, WAIT-27, WAIT-29, WAIT-30 | — |
 | no item, a failure that is not transient | WAIT-20 | WAIT-20 |
 | `--line` without an item, or an item without `--line` | WAIT-21 | WAIT-21 |
 
@@ -86,6 +86,8 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 - WAIT-27: A probe hit on the repository's own issues makes it list the open issues and open pull requests, and it reads the board only if they differ from the last read's rows, update times aside.
   - a check that fails stays owed until one answers (WAIT-20, WAIT-22); it never replaces the hourly read (WAIT-19)
 - WAIT-28: A hit on a blocker in another repository makes it read the board only when the probe's own answer shows that blocker closed, whether or not it was probed before.
+- WAIT-29: An answer cut short or not JSON (`unexpected end of JSON input`, a 200 body that does not parse) is a transient failure: WAIT-10's or WAIT-20's warning once per run, and the wait goes on.
+- WAIT-30: A warning or refusal of the wait holds no header line of the forge's answer.
 - WAIT-19: It reads the board every hour, and on the first tick on or after 00:00 UTC of the earliest `until` date still ahead; the date is compared on each tick and found again after each read.
 - WAIT-20: A forge answer "not modified" means unchanged, whatever the exit status of the call; "modified" means changed and its tag is sent back as it came (see E-WAIT-08):
   - a transient forge failure, or a failed read of the state ref's tip, prints one `WARNING: the board could not be read, still waiting: <sentence>` to stderr per run of failures; the wait goes on

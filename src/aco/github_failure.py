@@ -12,9 +12,11 @@ from . import forge
 # code but never its class, so any 5xx is matched by digit rather than by an
 # enumerated list of codes that would need to grow with the API.
 HTTP_SERVER_ERROR_PATTERN = re.compile(r"HTTP 5\d\d")
-# gh words a DNS failure `error connecting to <host>` and any other connect failure `dial tcp`.
+# gh words a DNS failure `error connecting to <host>` and any other connect failure `dial tcp`;
+# an answer with no or a cut-short body ends in `unexpected end of JSON input`.
 _TRANSIENT_PATTERN = re.compile(
-    HTTP_SERVER_ERROR_PATTERN.pattern + r"|connection reset|timeout|error connecting to|dial tcp"
+    HTTP_SERVER_ERROR_PATTERN.pattern
+    + r"|connection reset|timeout|error connecting to|dial tcp|unexpected end of JSON input"
 )
 # gh's own closing message of a rate limit. Anchored at the end of the output, with no quote
 # and no line break after the phrase, so that the phrase inside a body, a diff or a JSON answer
