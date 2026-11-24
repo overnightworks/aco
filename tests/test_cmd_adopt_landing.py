@@ -58,7 +58,7 @@ def _adopt_and_re_push(world: AdoptionWorld, capsys: pytest.CaptureFixture[str])
 
 
 def _land_the_new_head(world: AdoptionWorld, capsys: pytest.CaptureFixture[str], *flags: str):
-    return run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", world.head, *flags], capsys)
+    return run_cli(["land", *world.land_arguments(), *flags], capsys)
 
 
 def _worktree_line(run: CliRun) -> str:
@@ -506,7 +506,7 @@ def test_an_adopted_lane_lands_or_is_refused_by_the_head_it_is_given(
     trunk_before = remote_tip(world, "main")
     state_before = state_ref_tip(world.remote)
 
-    landed = run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", reviewed_head], capsys)
+    landed = run_cli(["land", *world.land_arguments(reviewed_head)], capsys)
 
     refusal = refusal_line(
         f"head is {current_head}, not the reviewed {reviewed_head}; "

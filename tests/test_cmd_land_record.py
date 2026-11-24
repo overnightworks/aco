@@ -19,7 +19,7 @@ from store_fixtures import lane_trailers
 def lane(
     github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch
 ) -> LaneLandingWorld:
-    return landed_world(github_clone, bare_remote, monkeypatch).landing
+    return landed_world(github_clone, bare_remote, monkeypatch, stored_run=False).landing
 
 
 def verdict_on(sha: str) -> list[dict[str, str]]:

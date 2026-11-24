@@ -166,3 +166,9 @@ LANE_RECORD_TRAILERS = (
     "lane_misses_ci: 1",
     "lane_misses_test: 0",
 )
+
+
+def approving_record_file(directory: Path, head: str) -> Path:
+    """A valid lane record file in `directory` whose last verdict approves `head`."""
+    approval = [{"stage": "review", "verdict": "approve", "sha": head}]
+    return write_lane_record_file(directory, lane_record_object(verdicts=approval))

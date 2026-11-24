@@ -26,13 +26,13 @@ from lane_record_runs_world import (
     THIRD_RUN,
     a_run_stored_late,
     chained_runs,
-    commit_runs_file,
     race_before_the_push,
     record_stating,
     routing_trailers_of,
     stale_runs_sentence,
     two_chained_runs,
 )
+from lane_run_entries import commit_runs_file
 from queue_forge import LANDS, QueueForge, QueueRead
 from store_fixtures import claim_intent
 
@@ -87,6 +87,13 @@ def landing(
     github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch
 ) -> LaneLandingWorld:
     return landed_world(github_clone, bare_remote, monkeypatch).landing
+
+
+@pytest.fixture
+def landing_without_runs(
+    github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch
+) -> LaneLandingWorld:
+    return landed_world(github_clone, bare_remote, monkeypatch, stored_run=False).landing
 
 
 @pytest.fixture
@@ -374,9 +381,10 @@ def test_a_refused_rerun_after_a_merge_is_released_by_hand_and_the_land_again_de
 
 
 def test_a_landing_whose_stored_runs_stand_on_another_branch_takes_the_record_file_as_today(
-    landing: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    landing_without_runs: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: LANREC-98 -- only the runs of the claims on the pull request's head branch count."""
+    landing = landing_without_runs
     base = protocol.ObjectId(real_git(landing.clone, "rev-parse", "main").stdout.strip())
     observed = store.fetch_state(worktree=landing.clone, remote=str(landing.remote))
     store.commit_transition(

@@ -348,6 +348,7 @@ class RerunCase:
     head_config: str | None = ""
     quality_error: str | None = None
     arguments: tuple[str, ...] = ()
+    stored_run: bool = True
     status: int = 0
     stdout: str = (
         "RELEASED issue #72: landing\nfreed: none\nnext: none\nworktree: removed\nmerged: {merge}\n"
@@ -491,6 +492,7 @@ def world(
         branch=case.branch,
         body=case.body,
         extra_arrange=arrange,
+        stored_run=case.stored_run,
     )
     merge = prepare_merge(shared, case, capsys)
     arrange_rerun(shared, case)
@@ -763,7 +765,8 @@ class TestLandAfterMergeRerun:
                 id="merge-trailer-survives-body-edit",
             ),
             pytest.param(
-                RerunCase(arguments=("--head", "0000000")), id="squash-rerun-on-recorded-head"
+                RerunCase(arguments=("--head", "0000000"), stored_run=False),
+                id="squash-rerun-on-recorded-head",
             ),
         ],
         indirect=True,

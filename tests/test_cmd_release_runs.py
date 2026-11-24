@@ -23,13 +23,13 @@ from lane_record_runs_world import (
     add_arguments,
     begin_arguments,
     commit_on,
-    commit_runs_file,
     race_before_the_push,
     routing_trailers_of,
     stale_runs_sentence,
     standing_claims_of,
     two_chained_runs,
 )
+from lane_run_entries import commit_runs_file
 from merged_release import arrange_merged_pull_request, seed_open_item
 from store_fixtures import state_ref_tip
 

@@ -133,7 +133,10 @@ def test_a_stage_no_run_ran_is_none_for_fix_test_and_gate_and_unknown_for_review
     ("entries", "land", "risk"),
     [
         pytest.param(
-            (added("one", "build", marker="x", risk="material"), added("two", "review", marker="y")),
+            (
+                added("one", "build", marker="x", risk="material"),
+                added("two", "review", marker="y"),
+            ),
             "land-y/low",
             "normal",
             id="the-newest-entrys-record",
