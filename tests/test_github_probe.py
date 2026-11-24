@@ -64,7 +64,7 @@ def test_the_request_is_conditional_on_the_token_it_is_given(
     conditional: list[str],
 ) -> None:
     """Spec: WAIT-18 -- one conditional request for the newest updated issue, one per blocker."""
-    gh = _Gh(0, f"HTTP/2.0 200 OK\nEtag: {ETAG}\n\n[]")
+    gh = _Gh(0, f'HTTP/2.0 200 OK\nEtag: {ETAG}\n\n{{"state": "open"}}')
     github_probe.GitHubBoardProbe(gh).changed_since(target, token)
     assert gh.commands == [["gh", "api", "-i", *conditional, path]]
 
@@ -105,3 +105,39 @@ def test_an_answer_that_is_not_a_usable_200_or_304_fails(
     probe = github_probe.GitHubBoardProbe(_Gh(exit_status, text))
     with pytest.raises(failure):
         probe.changed_since(REPOSITORY_TARGET, token)
+
+
+@pytest.mark.parametrize(
+    ("state", "closed"),
+    [pytest.param("open", False, id="open"), pytest.param("closed", True, id="closed")],
+)
+def test_the_answer_for_an_issue_target_carries_whether_the_issue_is_closed(
+    state: str, closed: bool
+) -> None:
+    """Spec: WAIT-28 -- a blocker is judged from the `state` of the issue the probe answered."""
+    text = f'HTTP/2.0 200 OK\nEtag: {ETAG}\n\n{{"state": "{state}"}}'
+    answer = github_probe.GitHubBoardProbe(_Gh(0, text)).changed_since(ISSUE_TARGET, None)
+    assert (answer.changed, answer.closed) == (True, closed)
+
+
+def test_a_repository_target_never_reads_its_body() -> None:
+    """Spec: WAIT-28 -- the newest updated issue is no blocker; its body is not judged."""
+    text = f'HTTP/2.0 200 OK\nEtag: {ETAG}\n\n[{{"state": "closed"}}]'
+    answer = github_probe.GitHubBoardProbe(_Gh(0, text)).changed_since(REPOSITORY_TARGET, None)
+    assert answer.closed is False
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param('{"state": "merged"}', id="another-state"),
+        pytest.param("{}", id="no-state"),
+        pytest.param("[]", id="not-an-issue"),
+        pytest.param("not json", id="not-json"),
+    ],
+)
+def test_an_issue_answer_without_a_state_of_open_or_closed_fails(body: str) -> None:
+    """Spec: WAIT-28 -- a malformed answer for a blocker fails loud."""
+    probe = github_probe.GitHubBoardProbe(_Gh(0, f"HTTP/2.0 200 OK\nEtag: {ETAG}\n\n{body}"))
+    with pytest.raises(forge.ForgeMalformedResponseError):
+        probe.changed_since(ISSUE_TARGET, None)

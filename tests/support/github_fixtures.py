@@ -145,6 +145,7 @@ class FakeForge:
     board_issues: tuple[workboard.Issue, ...] = ()
     board_open_pull_requests: tuple[workboard.PullRequest, ...] = ()
     board_merged_pull_requests: tuple[workboard.PullRequest, ...] = ()
+    board_builds: int = 0
     board_dependencies: dict[int, tuple[IssueDependency, ...]] = field(default_factory=dict)
     board_reopened: dict[int, datetime] = field(default_factory=dict)
     repository: forge.RepositoryId = field(default_factory=lambda: github.repository_id(REPOSITORY))
@@ -490,6 +491,7 @@ class FakeForge:
         self, since: datetime
     ) -> tuple[workboard.PullRequest, ...]:
         self._run()
+        self.board_builds += 1
         return self.board_merged_pull_requests
 
     def list_recently_closed_issues(self, since: datetime) -> tuple[forge.ClosedIssue, ...]:

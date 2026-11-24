@@ -572,7 +572,7 @@ def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
     as_json = parsed.json
     try:
         issues = context.forge.list_open_board_issues()
-        observed = board_read.observed_board(context, issues=issues)
+        observed = board_read.observed_board(context, listings=board_read.OpenListings(issues))
         storage = context.config.storage
         projected = observed.board
         action = workboard.next_action(projected)

@@ -315,10 +315,12 @@ class ProbeTarget:
 @dataclass(frozen=True)
 class ProbeAnswer:
     """`changed` is whether the target differs from the one `token` stood for;
-    `token` stands for the target as it is now, to hand back as it is."""
+    `token` stands for the target as it is now, to hand back as it is. `closed` is
+    whether the answered issue is closed; a repository target never is."""
 
     changed: bool
     token: str
+    closed: bool = False
 
 
 class BoardProbe(Protocol):

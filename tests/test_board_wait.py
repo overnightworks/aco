@@ -1,11 +1,13 @@
 """The decisions of the wait on a board (`specs/wait.spec.md`, WAIT-14, WAIT-15, WAIT-18,
 WAIT-19): when it ends and when it looks, with the times and the date as plain values."""
 
+from dataclasses import replace
 from datetime import date
 
 import pytest
+from board_fixtures import board_issue
 
-from aco import board_wait, forge, item_wait
+from aco import board_read, board_wait, forge, item_wait, workboard
 
 TODAY = date(2026, 11, 15)
 TOMORROW = date(2026, 11, 16)
@@ -181,3 +183,49 @@ def test_the_forge_is_asked_about_the_repository_then_each_foreign_blocker() -> 
         forge.ProbeTarget("owner/repo"),
         forge.ProbeTarget("other/repo", 3),
     )
+
+
+FIRST = board_issue(1, "First", "Body of the first.")
+SECOND = board_issue(2, "Second", "Body of the second.")
+PULL_REQUEST = workboard.PullRequest(9, "Change", "Closes #1", "branch")
+
+
+def listing(
+    *issues: workboard.Issue, pull_requests: tuple[workboard.PullRequest, ...] = ()
+) -> board_read.OpenListings:
+    return board_read.OpenListings(issues, pull_requests)
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "differ"),
+    [
+        pytest.param(listing(FIRST), listing(FIRST), False, id="the-same-rows"),
+        pytest.param(
+            listing(FIRST),
+            listing(replace(FIRST, updated_at="2026-08-21T00:00:00Z")),
+            False,
+            id="only-an-update-time-moved",
+        ),
+        pytest.param(
+            listing(FIRST), listing(replace(FIRST, body="Another body.")), True, id="a-body"
+        ),
+        pytest.param(listing(FIRST), listing(replace(FIRST, labels=("bug",))), True, id="a-label"),
+        pytest.param(listing(FIRST), listing(FIRST, SECOND), True, id="an-issue-joins"),
+        pytest.param(listing(FIRST, SECOND), listing(FIRST), True, id="an-issue-leaves"),
+        pytest.param(
+            listing(FIRST), listing(FIRST, pull_requests=(PULL_REQUEST,)), True, id="a-pull-request"
+        ),
+        pytest.param(
+            listing(FIRST, pull_requests=(PULL_REQUEST,)),
+            listing(FIRST),
+            True,
+            id="no-pull-request",
+        ),
+    ],
+)
+def test_listings_differ_in_anything_but_the_update_time(
+    before: board_read.OpenListings, after: board_read.OpenListings, differ: bool
+) -> None:
+    """Spec: WAIT-27 -- a comment moves only an update time and asks for no read;
+    a body, a label, a pull request or an open issue leaving the listing asks for one."""
+    assert board_wait.listings_differ(before, after) is differ

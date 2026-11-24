@@ -765,7 +765,7 @@ def _claim_target_checks(
     projected = board_read.build_board(
         context,
         tuple(observed.claims.values()),
-        issues=tuple(open_by_number.values()),
+        listings=board_read.OpenListings(tuple(open_by_number.values())),
         history=board_read.ClaimHistory(ages=board_read.claim_ages(target.worktree, observed)),
     )
     checks = _slice_rule_checks(
