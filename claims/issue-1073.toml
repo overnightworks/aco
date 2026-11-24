@@ -1,0 +1,8 @@
+claim_id = "8e50a8e334ae4a8990faa761fd8e6cde"
+agent = "Claude 017d4cae-a004-41d3-bf31-083bc83d5fec"
+role = "builder"
+base = "9dcf8a82f4399a99b7fddc501d4c311be2baf252"
+branch = "claude/issue-1073-a-bare-wait-reads-the-board-only-when-th"
+scope = ["docs/ARCHITECTURE.md", "quality/baseline.toml", "specs/wait.spec.md", "src/aco/board_read.py", "src/aco/board_wait.py", "src/aco/cmd_claim.py", "src/aco/cmd_next.py", "src/aco/cmd_release.py", "src/aco/forge.py", "src/aco/github_probe.py", "tests/support/board_fixtures.py", "tests/support/github_fixtures.py", "tests/test_board_wait.py", "tests/test_cmd_wait_board.py", "tests/test_cmd_wait_listings.py", "tests/test_cmd_wait_rate_limit.py", "tests/test_cmd_wait_requests.py", "tests/test_github_probe.py"]
+opened_commit = "926dcc9a95fc215ee09530dc6c47b63e4829bf08"
+whole_reason = "The probe answer, the listing rows the read reuses, the watch that decides, the three callers of the changed board-read signature, the spec and its fakes change together; a half-built comparison would read the listings twice or lose a wake."
