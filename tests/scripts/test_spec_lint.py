@@ -5,7 +5,7 @@ rule -- against a minimal fixture spec built from `GREEN_SPEC` by flipping exact
 one detail that rule polices; the fixture stays green everywhere else, so a red case
 proves that rule alone fired, and every rule also carries a green case (`GREEN_SPEC`
 itself) proving it stays silent on clean text. A last, unparametrized test drives the
-same `analyze` over the repository's own `specs/` tree: every one of its 23 files must
+same `analyze` over the repository's own `specs/` tree: every one of its files must
 already be clean under this gate.
 """
 
@@ -30,7 +30,7 @@ A minimal fixture spec for spec_lint's own tests.
 |---|---|
 | default | SAMPLE-01 |
 
-- [ ] [SAMPLE-01] `sample` prints `ok`, exit `0` (see E-SAMPLE-01).
+- SAMPLE-01: `sample` prints `ok`, exit `0` (see E-SAMPLE-01).
 
 ## Never
 
@@ -58,7 +58,7 @@ def _line_number(text: str, needle: str) -> int:
     raise AssertionError(f"{needle!r} not found in fixture text")
 
 
-_CRITERION_LINE_TEXT = "[SAMPLE-01] `sample` prints `ok`, exit `0` (see E-SAMPLE-01)."
+_CRITERION_LINE_TEXT = "SAMPLE-01: `sample` prints `ok`, exit `0` (see E-SAMPLE-01)."
 CRITERION_LINE = _line_number(GREEN_SPEC, _CRITERION_LINE_TEXT)
 EXAMPLE_HEADING_LINE = _line_number(GREEN_SPEC, "### E-SAMPLE-01")
 
@@ -67,18 +67,17 @@ RED_CRITERION_LENGTH = GREEN_SPEC.replace(
     "`sample` prints `ok`, exit `0` (see E-SAMPLE-01).", _LONG_CRITERION
 )
 RED_ID_SEQUENCE = GREEN_SPEC.replace(
-    "- [ ] [SAMPLE-01] `sample` prints `ok`, exit `0` (see E-SAMPLE-01).",
-    "- [ ] [SAMPLE-01] `sample` prints `ok`, exit `0` (see E-SAMPLE-01).\n"
-    "- [ ] [SAMPLE-03] `sample --other` prints `ok`, exit `0`.",
+    "- SAMPLE-01: `sample` prints `ok`, exit `0` (see E-SAMPLE-01).",
+    "- SAMPLE-01: `sample` prints `ok`, exit `0` (see E-SAMPLE-01).\n"
+    "- SAMPLE-03: `sample --other` prints `ok`, exit `0`.",
 )
-_CRITERION_LINE_MARKUP = "- [ ] " + _CRITERION_LINE_TEXT
+_CRITERION_LINE_MARKUP = "- " + _CRITERION_LINE_TEXT
 RED_TWO_ID_PREFIXES = GREEN_SPEC.replace(
     _CRITERION_LINE_MARKUP,
-    _CRITERION_LINE_MARKUP + "\n- [ ] [OTHER-01] `sample --other` prints `ok`, exit `0`.",
+    _CRITERION_LINE_MARKUP + "\n- OTHER-01: `sample --other` prints `ok`, exit `0`.",
 )
-RED_DUPLICATED_ID = GREEN_SPEC.replace(
-    _CRITERION_LINE_MARKUP,
-    _CRITERION_LINE_MARKUP + "\n- [ ] [SAMPLE-01] `sample --again` prints `ok`, exit `0`.",
+GREEN_RETIRED_NOTE_FILLS_THE_GAP = RED_ID_SEQUENCE.replace(
+    "- SAMPLE-03:", "- SAMPLE-02 (retired).\n- SAMPLE-03:"
 )
 _BEHAVIOR_TABLE_BLOCK = "| state \\ trigger | `sample` |\n|---|---|\n| default | SAMPLE-01 |\n"
 GREEN_WITHOUT_BEHAVIOR_TABLE = GREEN_SPEC.replace(
@@ -87,7 +86,7 @@ GREEN_WITHOUT_BEHAVIOR_TABLE = GREEN_SPEC.replace(
 GREEN_TABLE_ENDS_THE_FILE = (
     GREEN_WITHOUT_BEHAVIOR_TABLE + f"\n## Behavior table\n\n{_BEHAVIOR_TABLE_BLOCK}"
 )
-_TABLE_ROW_TEXT = "[SAMPLE-02] | `sample --other` | `ok` | exit `0` (see E-SAMPLE-01) |"
+_TABLE_ROW_TEXT = "SAMPLE-02 | `sample --other` | `ok` | exit `0` (see E-SAMPLE-01) |"
 
 
 def _with_table_row(row_text: str) -> str:
@@ -181,15 +180,7 @@ RULE_FAMILY_CASES: tuple[tuple[str, str, tuple[_ExpectedFinding, ...]], ...] = (
         RED_TWO_ID_PREFIXES,
         (_ExpectedFinding("id_sequence", 1, "OTHER, SAMPLE"),),
     ),
-    (
-        "id_sequence:duplicated_id",
-        RED_DUPLICATED_ID,
-        (
-            _ExpectedFinding(
-                "id_sequence", CRITERION_LINE + 1, f"duplicates SAMPLE-01 at line {CRITERION_LINE}"
-            ),
-        ),
-    ),
+    ("id_sequence:retired_note_fills_the_gap", GREEN_RETIRED_NOTE_FILLS_THE_GAP, ()),
     ("id_sequence:green", GREEN_SPEC, ()),
     (
         "unresolved_reference:red",

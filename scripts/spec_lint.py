@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """Mechanical style lint for ``specs/*.spec.md``.
 
-The house shape uses a ``- [ ] [ID] ...`` criterion on exactly one physical line (no
-continuation-line joining is needed here), or a ``| [ID] | ...`` row of a table-driven
+The house shape uses a ``- ID: ...`` criterion on exactly one physical line (no
+continuation-line joining is needed here), or a ``| ID | ...`` row of a table-driven
 criterion, read as the criterion of that ID; a behaviour table cites criterion IDs by their bare
 token, and a named example is a ``### E-<PREFIX>-nn`` heading followed by a ``Setup:`` line
 before its first fenced block.
 
 Checks (one finding per hit, each named ``file:line``):
 
-* ``criterion_length``: the criterion text -- everything after ``[ID]`` on its own line,
+* ``criterion_length``: the criterion text -- everything after the ID on its own line,
   whitespace-trimmed -- exceeds ``MAX_CRITERION_LENGTH`` characters.
 * ``id_sequence``: a file's own criterion IDs share one prefix; the numeric suffixes used by
-  live criteria, together with any suffix a ``- <ID> (retired ...)``/``(removed ...)`` note
-  names, cover every integer from the lowest to the highest used with no gap and no duplicate.
+  live criteria, together with any suffix a ``- <ID> (retired).`` note names, cover every
+  integer from the lowest to the highest used with no gap; an ID defined twice is the
+  gate's ``spec-citation`` finding, not this lint's.
 * ``unresolved_reference``: every ``see ...`` reference list anywhere in a line -- not only
   right after ``(`` -- or a behaviour-table data cell (its row-label column is prose, not a
   citation, and is never scanned), names an ``E-<PREFIX>-nn`` that no ``###`` heading defines,
-  or a plain ``ID-nn`` that no ``- [ ] [ID-nn]`` bullet or ``| [ID-nn] |`` row anywhere in
+  or a plain ``ID-nn`` that no ``- ID-nn:`` rule or ``| ID-nn |`` row anywhere in
   ``specs/`` defines --
   criteria and examples cite across files routinely, so both namespaces are read tree-wide, not
   per file. A ``see`` list may comma-join several ids (``see A-01, A-02``), shorthand a further
@@ -62,13 +63,10 @@ MAX_CRITERION_LENGTH = 200
 
 # A criterion is always one physical line in aco's house format: no continuation-line
 # joining, unlike the blueprint's ``_iter_blocks``.
-CRITERION_PATTERN = re.compile(r"^(?:- \[ \] |\| )\[([A-Z]+-\d+)\](.*)$")
+CRITERION_PATTERN = re.compile(r"^(?:- ([A-Z]+-\d+):|\| ([A-Z]+-\d+)(?= \|))(.*)$")
 EXAMPLE_HEADING_PATTERN = re.compile(r"^### (E-[A-Za-z0-9]+-\d+)\b")
-# A retirement note is a checkbox-less bullet naming the retired id(s), e.g.
-# ``- LAND-36 (retired).``.
-RETIRED_NOTE_PATTERN = re.compile(
-    r"^-\s*([A-Z]+-\d+(?:\s*,\s*[A-Z]+-\d+)*)\s*\((?:retired|removed)\b", re.IGNORECASE
-)
+# A retirement is one bullet per retired id, e.g. ``- LAND-36 (retired).``.
+RETIRED_NOTE_PATTERN = re.compile(r"^- ([A-Z]+-\d+) \(retired\)\.$")
 # A reference id is a compound example id (``E-<PREFIX>-nn``) or a plain criterion id
 # (``<PREFIX>-nn``); both shapes can follow ``see`` or a shorthand separator below.
 _REFERENCE_ID = r"(?:E-[A-Za-z0-9]+-\d+|[A-Za-z]+-\d+)"
@@ -158,7 +156,8 @@ def _extract_criteria(name: str, lines: list[str]) -> list[Criterion]:
     for lineno, line in enumerate(lines, 1):
         match = CRITERION_PATTERN.match(line)
         if match is not None:
-            criteria.append(Criterion(name, lineno, match.group(1), match.group(2).strip()))
+            spec_id = match.group(1) or match.group(2)
+            criteria.append(Criterion(name, lineno, spec_id, match.group(3).strip()))
     return criteria
 
 
@@ -167,7 +166,7 @@ def _extract_retired_ids(lines: list[str]) -> frozenset[str]:
     for line in lines:
         match = RETIRED_NOTE_PATTERN.match(line.strip())
         if match is not None:
-            retired.update(ID_TOKEN_PATTERN.findall(match.group(1)))
+            retired.add(match.group(1))
     return frozenset(retired)
 
 
@@ -198,8 +197,7 @@ def check_criterion_length(spec_file: SpecFile) -> list[Finding]:
             Rule.CRITERION_LENGTH,
             spec_file.name,
             c.line,
-            f"[{c.spec_id}] is {len(c.text)} chars from the id to line end, "
-            f"> {MAX_CRITERION_LENGTH}",
+            f"{c.spec_id} is {len(c.text)} chars from the id to line end, > {MAX_CRITERION_LENGTH}",
         )
         for c in spec_file.criteria
         if len(c.text) > MAX_CRITERION_LENGTH
@@ -222,22 +220,8 @@ def check_id_sequence(spec_file: SpecFile) -> list[Finding]:
         prefix, _, number = retired_id.rpartition("-")
         retired_by_prefix[prefix].add(int(number))
     for prefix, criteria in by_prefix.items():
-        seen: dict[int, Criterion] = {}
         width = len(criteria[0].spec_id.rpartition("-")[2])
-        for criterion in criteria:
-            number = int(criterion.spec_id.rpartition("-")[2])
-            earlier = seen.get(number)
-            if earlier is not None:
-                findings.append(
-                    Finding(
-                        Rule.ID_SEQUENCE,
-                        spec_file.name,
-                        criterion.line,
-                        f"{criterion.spec_id} duplicates {earlier.spec_id} at line {earlier.line}",
-                    )
-                )
-                continue
-            seen[number] = criterion
+        seen = {int(criterion.spec_id.rpartition("-")[2]) for criterion in criteria}
         used = sorted(seen)
         retired = retired_by_prefix[prefix]
         for gap in range(used[0], used[-1] + 1):
@@ -305,7 +289,7 @@ def _check_see_references(
                     known_ids = example_ids if is_example else criterion_ids
                     if token in known_ids:
                         continue
-                    owner = f"`### {token}` heading" if is_example else f"`[{token}]` criterion"
+                    owner = f"`### {token}` heading" if is_example else f"`{token}` criterion"
                     findings.append(
                         Finding(
                             Rule.UNRESOLVED_REFERENCE,
@@ -356,7 +340,7 @@ def _check_behavior_table(spec_file: SpecFile, criterion_ids: frozenset[str]) ->
                             Rule.UNRESOLVED_REFERENCE,
                             spec_file.name,
                             lineno,
-                            f"behaviour-table cell names {token}, which no `[{token}]` "
+                            f"behaviour-table cell names {token}, which no `{token}` "
                             "criterion anywhere in specs/ defines",
                         )
                     )
@@ -417,7 +401,7 @@ def check_implementation_names(spec_file: SpecFile) -> list[Finding]:
                     Rule.IMPLEMENTATION_NAME,
                     spec_file.name,
                     criterion.line,
-                    f"[{criterion.spec_id}] names `{match.group(0)}` outside a backtick literal",
+                    f"{criterion.spec_id} names `{match.group(0)}` outside a backtick literal",
                 )
             )
     return findings
