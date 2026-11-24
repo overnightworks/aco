@@ -1,4 +1,4 @@
-"""`aco mcp`'s answer_step tool (`specs/mcp.spec.md`) through `cli.main(["mcp"])` over
+"""`aco mcp`'s answer_step tool (`specs/mcp.spec.md`) through `cli.main(["mcp", "--direct"])` over
 the board's test forge: an answer given in chat takes the writer of the board's
 `POST /api/step`, and a step that changed, an item without one or an answer the step does
 not ask for is refused with nothing written."""

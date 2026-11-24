@@ -117,6 +117,8 @@ operator's chat answer to a step through the board's writer, and its tool
 `wait.operator` to the step, leaves its `next` as it is, and sets the label
 `needs-operator` as its GitHub view, or opens such an item
 (`specs/mcp.spec.md`).
+A reinstall of aco reaches a running session at its next call; only a change to the relay
+or to a tool's schema needs `/mcp` → Reconnect.
 For one session, `claude --strict-mcp-config
 --mcp-config '{"mcpServers":{"aco":{"command":"aco","args":["mcp"]}}}'` or
 `codex exec -c 'mcp_servers.aco.command="aco"' -c 'mcp_servers.aco.args=["mcp"]'`

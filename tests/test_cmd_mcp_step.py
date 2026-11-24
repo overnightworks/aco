@@ -1,4 +1,4 @@
-"""`aco mcp`'s step tool (`specs/mcp.spec.md`) through `cli.main(["mcp"])` over the
+"""`aco mcp`'s step tool (`specs/mcp.spec.md`) through `cli.main(["mcp", "--direct"])` over the
 board's test forge: marking an item, opening one, finding the one a failed call
 left, and what each refusal and each failure after a write leaves behind."""
 

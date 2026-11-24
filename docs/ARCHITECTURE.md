@@ -38,7 +38,8 @@ flowchart LR
     Port --> StateBoard["state-ref item store<br/>state_board.py"]
     Mcp -->|"ask: earlier rulings"| Search["ruling search port<br/>forge.py, github_search.py"]
     Board["board (aco serve)<br/>board/, frontend/"]
-    Mcp["aco mcp<br/>cmd_mcp.py, mcp_server.py"]
+    Mcp["aco mcp --direct, one process per message<br/>cmd_mcp.py, mcp_server.py, installed_code.py"]
+    Relay["aco mcp (relay)<br/>cmd_mcp.py, mcp_relay.py"] -->|"each message to a fresh process"| Mcp
     Mcp --> Repos
     Mcp --> Inbox
     Plans["aco fleet-plans<br/>cmd_fleet_plans.py"]
@@ -122,7 +123,10 @@ coordination state of its own, only its access token file and the call record; t
 root it scans comes from aco's config file (`specs/serve.spec.md`). `aco mcp` is the same
 kind of process: an agent host starts it over stdio for one session and it ends
 when the host closes stdin; it keeps no state but the call record and scans the same root
-(`specs/mcp.spec.md`). Nothing else is deployed.
+(`specs/mcp.spec.md`). The process the host starts holds no tool code: each message runs
+in a fresh `aco mcp --direct` from the installed package, so a reinstall reaches running
+sessions without a reconnect, which an interactive host would never repeat after the
+server exited. Nothing else is deployed.
 
 ## Crosscutting Concepts
 

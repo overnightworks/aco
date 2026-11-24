@@ -20,6 +20,12 @@ item = "#1027"
 date = 2026-11-21
 reason = "the token file moves out of aco.board to aco.board_token so core's board link producer may read it, so the row that held token_store beside board and aco_source loses it"
 
+[[gate.loosened]]
+what = 'import contract "Only the gh and git owners run commands" ignores aco.mcp_relay -> aco.process'
+item = "#1042"
+date = 2026-11-22
+reason = "mcp_relay starts aco's own fresh `aco mcp --direct` process, never gh or git"
+
 [[root.allow]]
 entry = "frontend/"
 reason = "the web client, built apart from the Python package"

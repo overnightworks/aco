@@ -697,3 +697,37 @@ def test_malformed_input_is_answered_with_its_error_and_a_null_id(text: str, cod
     answer = _answer(text)
 
     assert (answer["id"], cast("dict[str, Any]", answer["error"])["code"]) == (None, code)
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        (
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "read_inbox"}},
+            {"result": {"content": [{"type": "text", "text": "gone"}], "isError": True}},
+        ),
+        (
+            {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+            {"error": {"code": -32603, "message": "gone"}},
+        ),
+        ({"jsonrpc": "2.0", "method": "notifications/initialized"}, None),
+        ([1], {"error": {"code": -32600, "message": "a request is one JSON object"}}),
+    ],
+    ids=["a tool call", "another request", "a notification", "no request"],
+)
+def test_a_message_no_tool_code_could_answer_is_answered_with_the_reason(
+    message: object, expected: dict[str, Any] | None
+) -> None:
+    line = mcp_server.unanswered_reply(json.dumps(message), "gone")
+
+    if expected is None:
+        assert line is None
+    else:
+        assert line is not None
+        assert expected.items() <= json.loads(line).items()
+
+
+def test_a_message_that_is_no_json_is_answered_unparsable_though_no_tool_code_could_answer() -> (
+    None
+):
+    assert mcp_server.unanswered_reply("{", "gone") == mcp_server.unparsable_reply()

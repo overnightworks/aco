@@ -1,7 +1,8 @@
 # `aco mcp`
 
 `aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions and the steps waiting on the operator across every
-repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take; its tool `answer_step` records the operator's chat answer to such a step. It takes no flags and no `--repo`, starts from any working directory and writes only through `ask`, `record_answer`, `step` and `answer_step`: the CLI stays complete without it.
+repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take; its tool `answer_step` records the operator's chat answer to such a step. It takes no `--repo` and no flag but the hidden `--direct` (MCP-84), starts from any working directory and writes only through `ask`, `record_answer`, `step` and `answer_step`: the CLI stays complete without it.
+The process the host starts holds no tool code: it hands each message to a fresh `aco mcp --direct` process of the installed package and writes that process's answer (MCP-81), so a reinstall reaches a running session at its next call.
 It speaks the protocol of the `initialize` era, revisions `2025-11-25` and `2025-06-18`. The items and lines it returns are the ones `specs/rulings.spec.md` owns (RUL-10),
 so an agent holds the line index and the `card_hash` that `aco rule` takes. Which repositories exist and how the root is found is `specs/serve.spec.md`'s (ABRD-14, ABRD-108..ABRD-111).
 
@@ -12,6 +13,12 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | the global `aco --repo OWNER/REPO` before `mcp` | MCP-01 | — | — |
 | stdin ends | MCP-02 | — | — |
 | the host closed the pipe | MCP-03 | — | — |
+| a message after a reinstall | — | MCP-81 | — |
+| a fresh process that cannot start, exits non-zero, runs past its bound or answers nothing to a request | — | MCP-82 | E-MCP-21 |
+| a fresh process whose loaded code is not one complete install | — | MCP-83, MCP-88 | E-MCP-21 |
+| `aco mcp --direct` | MCP-84 | — | — |
+| the host closed the session while a call ran | MCP-87 | — | — |
+| a change to the relay, or to a tool's schema | — | MCP-85, MCP-86 | — |
 | a line that is no JSON, no object or no request | — | MCP-04 | — |
 | a notification | — | MCP-05 | — |
 | `initialize` | — | MCP-06 | — |
@@ -85,7 +92,15 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - [ ] [MCP-78] `ask`, `record_answer` and `step` are listed with `idempotentHint` true, `answer_step` with `idempotentHint` false.
 - [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
 - [ ] [MCP-10] `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
-- [ ] [MCP-20] Standard output carries only these answers, one per line; logs go to standard error; every child process reads the null device or only data aco pipes to it, never the host's stream.
+- [ ] [MCP-20] Standard output carries only the fresh process's answers, one per line; its standard error reaches the host's; every child process reads the null device or aco's piped data, never the host's stream.
+- [ ] [MCP-81] The process the host starts hands each message to a fresh `aco mcp --direct`, run with its own interpreter and no working directory on its import path; a reinstall reaches the next message.
+- [ ] [MCP-82] A fresh process that cannot start, exits non-zero, runs past 600 seconds, answers past the output bound or answers nothing gets the answer of E-MCP-21; a notification gets nothing.
+- [ ] [MCP-83] A fresh process answers nothing and ends with exit `1`, naming the file on standard error, when a site-packages aco module it loaded is missing from the RECORD or differs from its hash there.
+- [ ] [MCP-88] A fresh process also ends that way when a loaded aco module was replaced or lacks its pre-load stamp, or the RECORD changed or is missing while it loaded; a source run is never refused.
+- [ ] [MCP-84] `aco mcp --direct` answers its standard input in its own process, as MCP-02 to MCP-80 describe, hidden from help; a change to it or MCP-81's command line takes a reconnect.
+- [ ] [MCP-85] The process the host starts loads its own code once, so a change to the relay (`aco mcp` without `--direct`, MCP-82's answers) reaches a session only at its next reconnect.
+- [ ] [MCP-86] A change to the tool list or a tool's schema reaches a session at its host's next `tools/list`, which hosts send at connect: the next reconnect.
+- [ ] [MCP-87] A fresh process whose host process ended mid-call finishes its one call, then ends with exit `0` and no traceback on the closed pipe (MCP-03).
 
 ## Reading the inbox
 
@@ -187,6 +202,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
 - It never prints anything but protocol messages on standard output (MCP-20).
 - It never answers a notification (MCP-05).
+- The process the host starts never answers a tool itself: every answer but a failure's (MCP-82) is a fresh process's (MCP-81).
 - `read_inbox` never lists a line that is with its head or already decided (MCP-12); `ask` answers a line that stands whatever its state (MCP-22).
 - `ask` never applies an earlier ruling and never fails for its search (MCP-61, MCP-62); `earlier` is no proof that no ruling exists (MCP-63, MCP-64).
 
@@ -401,3 +417,14 @@ Setup: `owner/a` holds the open item `#9` of E-MCP-12, waiting on its step, whic
 ```
 
 The block's `wait` and `step` are gone, `now` reads `The operator answered "Rotate the deploy key in the host's settings." in chat on <the day>: Fehlgeschlagen: The page shows an error.`, the item is open without the label `needs-operator`, and E-MCP-11's `read_inbox` no longer lists it. The same call again answers a tool error that the item no longer waits on that step.
+
+### E-MCP-21 -- a call while aco is being reinstalled
+
+Setup: a session's `aco mcp` is running; the installer is replacing the files of aco
+
+```text
+> {"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"read_inbox","arguments":{}}}
+< {"jsonrpc":"2.0","id":21,"result":{"content":[{"type":"text","text":"aco could not answer this call: the installed aco changed while this call loaded it: RECORD; if aco is being reinstalled, repeat the call once the install has finished"}],"isError":true}}
+```
+
+The fresh process ended with exit `1` and wrote its sentence on standard error; the process the host started is still running and answers the same call, repeated after the install, from the installed code. A `ping` in that moment answers error `-32603` with the same sentence, and a notification answers nothing.

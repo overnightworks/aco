@@ -18,6 +18,7 @@ from . import (
     inbox,
     item_step,
     item_wait,
+    mcp_relay,
     mcp_server,
     protocol,
     report,
@@ -28,6 +29,10 @@ from . import (
 )
 from .session import RunContext
 
+_HELP = (
+    "serve the operator's inbox, a card writer, an answer writer, a step writer and "
+    "a step answer writer to an agent host over MCP on stdio"
+)
 _GLOBAL_REPO_MESSAGE = "aco mcp finds its repositories itself; --repo does not apply to it"
 
 
@@ -241,38 +246,31 @@ def _mark_in_turn(
 def serve(requests: Iterable[bytes], replies: TextIO) -> None:
     """Answer each line of `requests` on `replies` until the lines end; a line
     that is no UTF-8 is answered as unparsable."""
-    for request in requests:
-        if not request.strip():
-            continue
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step)
+
+    def answer(request: bytes) -> str | None:
         try:
-            answer = mcp_server.reply(
-                request.decode("utf-8"),
-                mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step),
-            )
+            return mcp_server.reply(request.decode("utf-8"), tools)
         except UnicodeDecodeError:
-            answer = mcp_server.unparsable_reply()
-        if answer is not None:
-            replies.write(answer + "\n")
-            replies.flush()
+            return mcp_server.unparsable_reply()
+
+    mcp_server.answer_lines(requests, replies, answer)
 
 
 def add_parser(commands: usage.Subcommands, name: str) -> None:
-    """`mcp`'s parser: it takes no flags."""
-    commands.add_parser(
-        name,
-        help=(
-            "serve the operator's inbox, a card writer, an answer writer, a step writer and "
-            "a step answer writer to an agent host over MCP on stdio"
-        ),
+    """`mcp`'s parser: its one flag, `--direct`, is the hand-off of `mcp_relay`."""
+    commands.add_parser(name, help=_HELP).add_argument(
+        "--direct", action="store_true", help=argparse.SUPPRESS
     )
 
 
 def run(parsed: argparse.Namespace, _context: RunContext) -> int:
-    """Serve the MCP protocol on stdin and stdout until stdin ends."""
+    """Serve the MCP protocol on stdin and stdout until stdin ends: in this process
+    with `--direct`, else by handing each line to a fresh `aco mcp --direct`."""
     if parsed.repo is not None:
         return report.render_error(protocol.ClaimError(_GLOBAL_REPO_MESSAGE))
     try:
-        serve(sys.stdin.buffer, sys.stdout)
+        (serve if parsed.direct else mcp_relay.relay)(sys.stdin.buffer, sys.stdout)
     except BrokenPipeError:
         # The host closed the pipe; the interpreter's own flush at exit must not
         # fail on it either.
