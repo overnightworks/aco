@@ -133,14 +133,18 @@ def test_a_stage_no_run_ran_is_none_for_fix_test_and_gate_and_unknown_for_review
     ("entries", "land", "risk"),
     [
         pytest.param(
-            (added("one", "build", marker="x", risk="first"), added("two", "review", marker="y")),
+            (added("one", "build", marker="x", risk="material"), added("two", "review", marker="y")),
             "land-y/low",
-            "routine",
+            "normal",
             id="the-newest-entrys-record",
         ),
         pytest.param(
-            (added("one", "build"), begun("two")), UNKNOWN, UNKNOWN, id="the-newest-has-no-record"
+            (added("one", "build", risk="material"), begun("two")),
+            UNKNOWN,
+            "material",
+            id="the-newest-has-no-record-so-the-earlier-ones-risk-stands",
         ),
+        pytest.param((begun("one"),), UNKNOWN, UNKNOWN, id="no-entry-has-a-record"),
         pytest.param(
             (added("one", "build", risk=None),), "land-m/low", UNKNOWN, id="the-record-has-no-risk"
         ),

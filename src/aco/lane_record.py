@@ -79,6 +79,13 @@ class Verdict(StrEnum):
     REVISE = "revise"
 
 
+class RiskClass(StrEnum):
+    """The lane's risk class, the two values the contract names."""
+
+    MATERIAL = "material"
+    NORMAL = "normal"
+
+
 def _stage_key(stage: RoutingStage) -> LaneTrailerKey:
     return LaneTrailerKey(f"lane_{stage}")
 
@@ -135,7 +142,7 @@ class LaneRecordFile:
     blocking: Mapping[FindingStage, int]
     misses: Mapping[FindingStage, int] | None
     verdicts: tuple[JudgedVerdict, ...]
-    risk: str | None
+    risk: RiskClass | None
     experiment: str | None
 
     def figures(self) -> LaneFigures:
@@ -166,7 +173,7 @@ class LaneFigures:
     `lane_runs.lane_figures`: `None` is unknown, never zero; `stages` holds every routing stage."""
 
     stages: Mapping[RoutingStage, str | None]
-    risk: str | None
+    risk: RiskClass | None
     experiment: str | None
     counts: Mapping[FindingStage, StageCounts]
     verdicts: tuple[JudgedVerdict, ...]
@@ -611,7 +618,7 @@ def _record_file(raw: object) -> LaneRecordFile:
         blocking=blocking,
         misses=misses,
         verdicts=_verdicts(fields["verdicts"]),
-        risk=_optional_tag(fields, "risk"),
+        risk=_optional_risk(fields),
         experiment=_optional_tag(fields, "experiment"),
     )
 
@@ -711,6 +718,15 @@ def _optional_tag(fields: Mapping[str, object], name: str) -> str | None:
     return tag
 
 
+def _optional_risk(fields: Mapping[str, object]) -> RiskClass | None:
+    if "risk" not in fields:
+        return None
+    risk = fields["risk"]
+    if not isinstance(risk, str) or risk not in RiskClass:
+        raise RecordFileError(f"risk must be {' or '.join(RiskClass)}")
+    return RiskClass(risk)
+
+
 def require_abandoned_release(record: LaneRecordFile | None, abandoned: str | None) -> None:
     """Refuse a `release` given a lane record file for a landing: `aco land` takes it there."""
     if record is not None and abandoned is None:
@@ -719,10 +735,20 @@ def require_abandoned_release(record: LaneRecordFile | None, abandoned: str | No
 
 def require_landable_record(record: LaneRecordFile | None, reviewed: str) -> None:
     """Refuse a landing whose lane record file judged another commit than `reviewed` (a full
-    sha or a prefix of one), or whose last verdict is not an approval: nothing is merged or
-    written for it. A landing without a record file has nothing to compare."""
+    sha or a prefix of one), whose last verdict is not an approval, or that states no risk
+    class: nothing is merged or written for it. A landing without a record file has nothing to
+    compare."""
     if record is not None:
         require_landable_verdicts(record.verdicts, reviewed)
+        require_landable_risk(record.risk)
+
+
+def require_landable_risk(risk: RiskClass | None) -> None:
+    """Refuse a landing whose lane record, the file or the stored runs, states no risk class."""
+    if risk is None:
+        raise protocol.ClaimUnavailableError(
+            f"the lane record states no risk class; record risk as {' or '.join(RiskClass)}"
+        )
 
 
 def require_landable_verdicts(verdicts: tuple[JudgedVerdict, ...], reviewed: str) -> None:

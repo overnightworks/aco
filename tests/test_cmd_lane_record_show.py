@@ -175,7 +175,7 @@ def test_one_run_that_ran_build_and_review_shows_its_record_and_the_lane_compute
             "blocking": four(3, 0, 1, 0),
             "misses": four(0, 0, 1, 0),
             "verdicts": stated["verdicts"],
-            "risk": "routine",
+            "risk": "normal",
             "experiment": "builder-sonnet",
         },
     }

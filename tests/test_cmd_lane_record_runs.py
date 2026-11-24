@@ -181,7 +181,7 @@ def test_a_repeated_add_changes_nothing_and_says_so(
     [
         pytest.param(OTHER_TIP, STAGES_RAN, {}, id="end-tip"),
         pytest.param(END_TIP, (RoutingStage.BUILD,), {}, id="stages"),
-        pytest.param(END_TIP, STAGES_RAN, {"risk": "other"}, id="record"),
+        pytest.param(END_TIP, STAGES_RAN, {"risk": "material"}, id="record"),
     ],
 )
 def test_another_entry_under_an_added_run_id_refuses_and_writes_nothing(

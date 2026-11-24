@@ -297,7 +297,7 @@ def lane_figures(runs: RunsFile) -> lane_record.LaneFigures:
     tags = {record.experiment for record in known}
     return lane_record.LaneFigures(
         stages=stages,
-        risk=None if newest is None or newest.added is None else newest.added.record.risk,
+        risk=known[-1].risk if known else None,
         experiment=tags.pop() if len(tags) == 1 and None not in sequence else None,
         counts=_counts(sequence),
         verdicts=tuple(judged for record in known for judged in record.verdicts),

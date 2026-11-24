@@ -188,7 +188,7 @@ def store_a_second_run_that_does_not_follow(
                 "lane_build: sonnet-5.5/high",
                 "lane_review: opus-5.5/medium",
                 "lane_land: haiku-5.5/low",
-                "lane_risk: routine",
+                "lane_risk: normal",
             ),
             id="a-second-run-that-does-not-follow",
         ),

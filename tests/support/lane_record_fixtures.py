@@ -129,7 +129,7 @@ def lane_record_object(**changes: object) -> dict[str, object]:
             {"stage": "review", "verdict": "revise", "sha": "b" * 40},
             {"stage": "review", "verdict": "approve", "sha": JUDGED_SHA},
         ],
-        "risk": "routine",
+        "risk": "normal",
         "experiment": "builder-sonnet",
     }
     return {**record, **changes}
@@ -152,7 +152,7 @@ LANE_RECORD_TRAILERS = (
     "lane_fix_rounds: 3",
     "lane_blocking: 4",
     "lane_experiment: builder-sonnet",
-    "lane_risk: routine",
+    "lane_risk: normal",
     "lane_fix_rounds_review: 1",
     "lane_fix_rounds_gate: 0",
     "lane_fix_rounds_ci: 2",
