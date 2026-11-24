@@ -280,8 +280,9 @@ def _land_preflight(
     own claimant/coordinator-override check): a
     claim held by another agent or role refuses here, before the merge,
     rather than only once the delegated `release --merged` step runs after
-    it. `run`'s own entry already validated `--coordinator-override`'s
-    role -- before this preflight, and before
+    it, and a claim that stores no run, without `--record`, refuses as LANREC-100
+    right after (`release_record.require_lane_record`). `run`'s own entry already validated
+    `--coordinator-override`'s role -- before this preflight, and before
     the fresh/rerun split that skips it entirely on a rerun -- so this
     function itself never repeats that check.
     """
@@ -311,6 +312,19 @@ def _land_preflight(
         raise protocol.ClaimUnavailableError(
             report.bounded_refusal(f"pull request #{number} {defect.message}")
         )
+    _land_authorized_claim(context, parsed, observed, detail, structural)
+    return detail, structural, readiness
+
+
+def _land_authorized_claim(
+    context: policy.LandingCheckContext,
+    parsed: argparse.Namespace,
+    observed: protocol.ClaimState,
+    detail: forge.Landing,
+    structural: workboard.Classification,
+) -> None:
+    """The claim the landing releases: selected for the classified item or lane, authorized for
+    this session (LANDCMD-10), then judged to have a lane record (LANDCMD-78)."""
     identity: protocol.ClaimIdentity = (
         protocol.IssueIdentity(structural.item.number)
         if isinstance(structural, workboard.WorkItemClassification)
@@ -324,7 +338,9 @@ def _land_preflight(
         context.storage,
     )
     cmd_release.authorize_releaser(parsed, selected, workboard.item_labeller(context.storage))
-    return detail, structural, readiness
+    release_record.require_lane_record(
+        context.run.toplevel, observed, selected, parsed.record, parsed.head
+    )
 
 
 def _land_merge_body(
@@ -610,8 +626,10 @@ def run(parsed: argparse.Namespace, context: RunContext) -> int:
     a resumed run -- skips preflight and the merge itself: `merge_landing` never runs twice.
     What judges the lane is checked here, before that fresh/rerun split, since a rerun skips
     `_land_preflight` and a check placed only there left it free to delete the branch and close
-    the item: `--coordinator-override`'s role and `--record`'s verdict at entry, then the stored
-    runs of the claims on the pull request's head branch, once that branch is read."""
+    the item: `--coordinator-override`'s role and `--record`'s verdict and risk class at entry,
+    then the stored runs of the claims on the pull request's head branch, once that branch is
+    read; the lane record every other landing needs is judged in `_land_preflight`, which a rerun
+    skips."""
     if parsed.head is None:
         raise protocol.ClaimUnavailableError(_LAND_HEAD_REQUIRED_REFUSAL)
     if context.config.storage is not body.Storage.GITHUB:

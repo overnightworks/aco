@@ -42,8 +42,8 @@ After that: `aco next` names the one next action (pull, cut, check or close
 an item), `aco start <n>` creates its worktree and branch and claims its
 scope, `aco brief <n>` prints what a builder starts from, and
 `aco land <pull request> --head <sha>`, from a clean default-branch checkout,
-merges a green pull request pinned to the head the
-reviewers saw and releases the claim (`specs/start.spec.md`,
+merges a green pull request pinned to the head the reviewers saw, once the lane's
+record names its risk class and an approving review of that head, and releases the claim (`specs/start.spec.md`,
 `specs/brief.spec.md`, `specs/land.spec.md`).
 A head with nothing to do runs `aco wait` in the background; it ends when `aco next`
 names something to do, a recurring audit is due or a card is ruled (`specs/wait.spec.md`).

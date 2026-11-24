@@ -1,10 +1,13 @@
-"""Parts a landing world is assembled from: the forge's file listing and the merge observer."""
+"""Parts a landing world is assembled from: the forge's file listing, the merge observer and the
+land command with a lane record."""
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from board_fixtures import REPOSITORY
 from cli_fixtures import pull_request_listing
+from lane_record_fixtures import land_arguments_with_record
 from store_fixtures import lineage_observation
 
 from aco import forge
@@ -17,6 +20,12 @@ if TYPE_CHECKING:
 def landing_listing(head: str, *paths: str) -> forge.PullRequestChanges:
     """What the forge lists for a landing that changes `paths` at `head`."""
     return pull_request_listing(head, *(forge.ChangedFile(path, None) for path in paths))
+
+
+def land_command_with_record(directory: Path, head: str) -> list[str]:
+    """`aco land` of pull request 12 at `head`, with a lane record file in `directory` approving
+    it, for a lane whose claim stores no run."""
+    return ["--repo", REPOSITORY, "land", *land_arguments_with_record(directory, head, 12)]
 
 
 def observe_merge_entry(

@@ -92,7 +92,7 @@ from github_fixtures import (
     landing_readiness,
 )
 from github_pages import listing_answer
-from landing_world_parts import landing_listing
+from landing_world_parts import land_command_with_record, landing_listing
 from option_cards import card, decide, open_option_entry, returned_option_entry
 from reader_only_forge import ReaderOnlyForge
 from store_fixtures import (
@@ -9364,12 +9364,12 @@ def _release_merged_of_an_open_item(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
 def _land(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     _land_scenario(monkeypatch, tmp_path)
-    return ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]
+    return land_command_with_record(tmp_path, MERGE_COMMIT_SHA)
 
 
 def _land_rerun(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[str]:
     _land_with_its_release_failing_once(monkeypatch, tmp_path)
-    return ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA]
+    return land_command_with_record(tmp_path, MERGE_COMMIT_SHA)
 
 
 def test_start_fetches_its_trunk_once_and_reads_the_recorded_head_after_the_fetch(
@@ -9784,7 +9784,7 @@ def _land_with_its_release_failing_once(
         raise ClaimError("forge unreachable (simulated)")
 
     monkeypatch.setattr(client, "close_landed_item", failing_close)
-    status = issue_claim.main(["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA])
+    status = issue_claim.main(land_command_with_record(tmp_path, MERGE_COMMIT_SHA))
     monkeypatch.setattr(client, "close_landed_item", real_close)
     return repo, client, status
 
@@ -11752,7 +11752,7 @@ def _land_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> _CountedRu
     release's fresh context, after its own write (CAS-54)."""
     repo, _client = _land_scenario(monkeypatch, tmp_path)
     return _CountedRun(
-        ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA],
+        land_command_with_record(tmp_path, MERGE_COMMIT_SHA),
         toplevel_reads={None: 2},
         config_reads={repo: 2},
         observations={repo: 1},

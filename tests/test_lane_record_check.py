@@ -217,10 +217,19 @@ MALFORMED_RECORDS = [
         "verdicts[0].sha must be a full 40-digit commit sha",
         id="a-short-sha",
     ),
-    pytest.param(
-        json.dumps(lane_record_object(risk="very risky")),
-        "risk must be 1 to 40 lowercase letters, digits and `-`",
-        id="a-risk-with-whitespace",
+    *(
+        pytest.param(
+            json.dumps(lane_record_object(risk=risk)),
+            "risk must be material or normal",
+            id=f"a-risk-of-{name}",
+        )
+        for name, risk in (
+            ("another-tag", "routine"),
+            ("another-case", "Material"),
+            ("whitespace", "very risky"),
+            ("no-letters", ""),
+            ("no-string", 1),
+        )
     ),
     pytest.param(
         json.dumps(lane_record_object(experiment="x" * 41)),

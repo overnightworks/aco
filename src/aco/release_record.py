@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from . import body, forge, lane_record, lane_runs, protocol, state_runs, store
+from . import body, forge, lane_record, lane_runs, protocol, report, state_runs, store
 from .session import RunContext
 
 
@@ -114,17 +114,50 @@ def require_landable_runs(
 ) -> None:
     """Refuse a landing of `branch` before it merges anything when a live claim on it stores
     runs that cannot be read (LANREC-62), runs beside `--record` (LANREC-91), or runs whose last
-    verdict is none, not on `reviewed` or no approval; a claim without runs judges nothing here
-    (`specs/lane-record.spec.md`, "Landing with stored runs")."""
+    verdict is none, not on `reviewed` or no approval, or whose record states no risk class
+    (LANREC-99); a claim without runs judges nothing here (`specs/lane-record.spec.md`,
+    "Landing with stored runs")."""
     for claim in protocol.claims_on_branch(observed.claims, branch):
-        blob = observed.runs.get(claim.claim_id)
-        if blob is None:
-            continue
-        label = protocol.claim_label(claim, protocol.forge_item_label)
-        runs = lane_runs.read_stored_runs(toplevel, blob, label)
-        if runs.holds_runs():
+        runs = _runs_stored_for(toplevel, observed, claim)
+        if runs is not None:
             _refuse_record_file_beside_runs(claim, record_file)
-            lane_record.require_landable_verdicts(lane_runs.lane_figures(runs).verdicts, reviewed)
+            figures = lane_runs.lane_figures(runs)
+            lane_record.require_landable_verdicts(figures.verdicts, reviewed)
+            lane_record.require_landable_risk(figures.risk)
+
+
+def require_lane_record(
+    toplevel: Path,
+    observed: protocol.ClaimState,
+    claim: protocol.ActiveClaim,
+    record_file: lane_record.LaneRecordFile | None,
+    reviewed: str,
+) -> None:
+    """Refuse a landing of `claim` that has no lane record: no `--record` and no stored run, a
+    runs file with no entry included (LANREC-100)."""
+    if record_file is None and _runs_stored_for(toplevel, observed, claim) is None:
+        raise protocol.ClaimUnavailableError(
+            report.bounded_refusal(
+                f"{_forge_label(claim)} has no lane record (no stored runs, no --record), "
+                f"so no review is known to have judged {reviewed}"
+            )
+        )
+
+
+def _forge_label(claim: protocol.ActiveClaim) -> str:
+    return protocol.claim_label(claim, protocol.forge_item_label)
+
+
+def _runs_stored_for(
+    toplevel: Path, observed: protocol.ClaimState, claim: protocol.ActiveClaim
+) -> lane_runs.RunsFile | None:
+    """The runs `claim` stores, `None` where its runs file is missing or holds no entry; one that
+    cannot be read is unavailable (LANREC-62)."""
+    blob = observed.runs.get(claim.claim_id)
+    if blob is None:
+        return None
+    runs = lane_runs.read_stored_runs(toplevel, blob, _forge_label(claim))
+    return runs if runs.holds_runs() else None
 
 
 def _merge_commit(outcome: protocol.ReleaseOutcome, verified_merge: str | None) -> str | None:

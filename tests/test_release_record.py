@@ -2,6 +2,7 @@
 "Stored runs"): the stored runs when the claim has any, else the record file, else the routing
 line, against a real repository that holds the runs blobs."""
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -16,9 +17,10 @@ from lane_record_fixtures import (
 )
 from lane_run_entries import added, begun
 
-from aco import lane_record, lane_runs, protocol, store, workboard
+from aco import lane_record, lane_runs, protocol, release_record, store, workboard
 
 OUTCOME = "lane_outcome: abandoned"
+REVIEWED = "a" * 40
 BOTH_REFUSED = "{label} has stored runs, so aco computes its record from them; drop --record"
 
 
@@ -79,7 +81,7 @@ def test_a_run_begun_after_an_added_one_leaves_the_build_stage_of_the_added_one(
 
     trailers, expected_runs = release(repository, stored)
 
-    assert trailers == (OUTCOME, "lane_build: build-x/low")
+    assert trailers == (OUTCOME, "lane_build: build-x/low", "lane_risk: normal")
     assert expected_runs == stored
 
 
@@ -126,3 +128,21 @@ def test_a_runs_file_that_cannot_be_read_leaves_every_routing_figure_unknown_and
 
     assert trailers == (OUTCOME,)
     assert expected_runs == stored
+
+
+NO_LANE_RECORD = (
+    "{label} has no lane record (no stored runs, no --record), "
+    f"so no review is known to have judged {REVIEWED}"
+)
+
+
+def test_a_runs_file_without_an_entry_is_no_lane_record(repository: Path) -> None:
+    """Spec: LANREC-100."""
+    claim = standing_active_claim()
+    stored = runs_blob(repository, ())
+    observed = dataclasses.replace(protocol.EMPTY_STATE, runs={claim.claim_id: stored})
+
+    with pytest.raises(protocol.ClaimUnavailableError) as refusal:
+        release_record.require_lane_record(repository, observed, claim, None, REVIEWED)
+
+    assert str(refusal.value) == NO_LANE_RECORD.format(label="#72")

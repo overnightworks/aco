@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from cli_fixtures import CliRun, run_cli
 from github_fixtures import LandedWorld, landed_world, landing_readiness, serve_forge
+from lane_record_fixtures import approving_record_file
 from queue_forge import LANDS, QueueForge, QueueRead
 
 from aco import cmd_land_queue, forge, github, protocol, store
@@ -105,7 +106,13 @@ def world(
     case: QueueCase = request.param
     pauses: list[float] = []
     monkeypatch.setattr(cmd_land_queue, "pause_between_queue_reads", pauses.append)
-    landed = landed_world(github_clone, bare_remote, monkeypatch, body=case.body)
+    landed = landed_world(
+        github_clone,
+        bare_remote,
+        monkeypatch,
+        body=case.body,
+        stored_run=case.pin is Pin.QUEUED_HEAD,
+    )
     queue = QueueForge.over(landed.landing.forge)
     queue.closes_on_merge = True
     queue.queue_branches = {"main"} if case.queue_rule else set()
@@ -410,12 +417,13 @@ class TestLandThroughTheMergeQueue:
         indirect=True,
     )
     def test_land_queues_waits_and_releases_or_refuses(
-        self, world: QueueWorld, capsys: pytest.CaptureFixture[str]
+        self, world: QueueWorld, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         capsys.readouterr()
+        record = approving_record_file(tmp_path, OTHER_HEAD.ljust(40, "0"))
         pin = {
             Pin.QUEUED_HEAD: ["--head", world.landed.landing.head],
-            Pin.OTHER_HEAD: ["--head", OTHER_HEAD],
+            Pin.OTHER_HEAD: ["--head", OTHER_HEAD, "--record", str(record)],
         }[world.case.pin]
         result = run_cli(["land", str(NUMBER), *pin], capsys)
 

@@ -26,13 +26,13 @@ from lane_record_runs_world import (
     THIRD_RUN,
     a_run_stored_late,
     chained_runs,
-    commit_runs_file,
     race_before_the_push,
     record_stating,
     routing_trailers_of,
     stale_runs_sentence,
     two_chained_runs,
 )
+from lane_run_entries import commit_runs_file
 from queue_forge import LANDS, QueueForge, QueueRead
 from store_fixtures import claim_intent
 
@@ -47,6 +47,7 @@ SENTENCE_OF_BOTH = "#72 has stored runs, so aco computes its record from them; d
 # The body the landing message already holds once the pull request was queued.
 COMPOSED_BODY = "Closes #72\n\nWork-Item: #72\n"
 NO_VERDICT = "the lane record states no review or gate verdict, so it judged no head to land"
+NO_RISK = "the lane record states no risk class; record risk as material or normal"
 QueueStanding = tuple[list[tuple[int, str]], dict[int, forge.MergeQueueState]]
 
 
@@ -87,6 +88,13 @@ def landing(
     github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch
 ) -> LaneLandingWorld:
     return landed_world(github_clone, bare_remote, monkeypatch).landing
+
+
+@pytest.fixture
+def landing_without_runs(
+    github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch
+) -> LaneLandingWorld:
+    return landed_world(github_clone, bare_remote, monkeypatch, stored_run=False).landing
 
 
 @pytest.fixture
@@ -374,9 +382,10 @@ def test_a_refused_rerun_after_a_merge_is_released_by_hand_and_the_land_again_de
 
 
 def test_a_landing_whose_stored_runs_stand_on_another_branch_takes_the_record_file_as_today(
-    landing: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    landing_without_runs: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Spec: LANREC-98 -- only the runs of the claims on the pull request's head branch count."""
+    landing = landing_without_runs
     base = protocol.ObjectId(real_git(landing.clone, "rev-parse", "main").stdout.strip())
     observed = store.fetch_state(worktree=landing.clone, remote=str(landing.remote))
     store.commit_transition(
@@ -428,3 +437,62 @@ def test_a_run_added_between_the_releases_read_and_its_push_ends_the_landing_and
     assert (rerun.status, rerun.stderr) == (0, "")
     assert {"lane_fix_rounds: 9", "lane_blocking: 12"} <= set(routing_trailers_of(lane.remote))
     assert runs_files_in_state(lane) == 0
+
+
+@pytest.mark.parametrize("path", ALL_PATHS)
+@pytest.mark.parametrize(
+    "risks",
+    [
+        pytest.param((None,), id="the-only-record-states-no-risk-class"),
+        pytest.param(("material", None), id="the-newest-record-states-no-risk-class"),
+    ],
+)
+def test_a_landing_whose_newest_stored_record_names_no_risk_class_refuses_before_any_merge(
+    landing: LaneLandingWorld,
+    path: LandPath,
+    risks: tuple[str | None, ...],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: LANREC-99, LANREC-98 -- nothing is merged, enqueued, deleted or written, and a pull
+    request already queued stays queued."""
+    standing = arranged(landing, path, monkeypatch, capsys)
+    approval = [verdict("approve", landing.head)]
+    store_runs(
+        landing, chained_runs(*[record_stating(verdicts=approval, risk=risk) for risk in risks])
+    )
+    queue_before = standing.queue_standing()
+
+    result = run_cli(["land", "12", "--head", landing.head], capsys)
+
+    observed, expected = refused_observations(standing, result, NO_RISK, queue_before)
+    assert observed == expected
+
+
+def test_a_landing_whose_newest_run_has_no_record_lands_on_the_risk_of_the_newest_added_record(
+    landing: LaneLandingWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-99, LANREC-80."""
+    approval = [verdict("approve", landing.head)]
+    store_runs(landing, chained_runs(record_stating(verdicts=approval, risk="material"), None))
+
+    result = run_cli(["land", "12", "--head", landing.head], capsys)
+
+    trailers = routing_trailers_of(landing.remote)
+    assert (result.status, result.stderr, "lane_risk: material" in trailers) == (0, "", True)
+
+
+def test_a_landing_whose_stored_record_names_a_risk_class_outside_the_grammar_is_unreadable(
+    landing: LaneLandingWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-103, LANREC-62."""
+    runs = chained_runs(record_stating(verdicts=[verdict("approve", landing.head)]))
+    store_runs(landing, lane_runs.serialize_runs(runs).replace(b'"normal"', b'"routine"'))
+
+    result = run_cli(["land", "12", "--head", landing.head], capsys)
+
+    sentence = (
+        "the stored runs of #72 cannot be used: runs[0].record risk must be material or normal"
+    )
+    observed, expected = refusal_observations(landing, result, sentence)
+    assert observed == expected

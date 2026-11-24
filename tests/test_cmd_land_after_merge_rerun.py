@@ -491,6 +491,7 @@ def world(
         branch=case.branch,
         body=case.body,
         extra_arrange=arrange,
+        stored_run=not case.arguments,
     )
     merge = prepare_merge(shared, case, capsys)
     arrange_rerun(shared, case)
@@ -770,8 +771,7 @@ class TestLandAfterMergeRerun:
     )
     def test_resumes(self, world: RerunWorld, capsys: pytest.CaptureFixture[str]) -> None:
         """Spec: LANDCMD-18, LANDCMD-32, REL-43, LAND-64. Example: E-LANDCMD-18.
-        Land's Never 2/3/4 resume release once, using the immutable merge trailer.
-        """
+        Land's Never 2/3/4 resume release once, using the immutable merge trailer."""
         landing = world.world.landing
         client = landing.forge
         case = world.case

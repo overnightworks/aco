@@ -49,8 +49,8 @@ order `merge`, `squash`, `rebase`.
 | `<path>` present but untracked or ignored | PIN-01 (cited) |
 | `storage = "state-ref"` | LANDCMD-01 |
 | `--coordinator-override` without `--role coordinator` | LANDCMD-19 |
-| `--record <file>` malformed, or its last verdict not the `--head` or not an approval | LANDCMD-77 (LANREC-31, LANREC-38..LANREC-40, LANREC-44, cited) |
-| the claims on the head branch store runs: unreadable, beside `--record`, or no approval of `--head` | LANDCMD-77 (LANREC-97, LANREC-98, cited) |
+| `--record <file>` malformed, or its last verdict not the `--head` or not an approval, or no risk class | LANDCMD-77 (LANREC-31, LANREC-38..LANREC-40, LANREC-44, LANREC-99, cited) |
+| the claims on the head branch store runs: unreadable, beside `--record`, or no approval of `--head`, or no risk class | LANDCMD-77 (LANREC-97, LANREC-98, LANREC-99, cited) |
 | the head no longer starts with `<reviewed>` | LANDCMD-31 |
 | pull request not open | LANDCMD-02 |
 | pull request is a draft | LANDCMD-74 |
@@ -66,6 +66,7 @@ order `merge`, `squash`, `rebase`.
 | named work item not open | LANDCMD-08 |
 | classification's own claim/parent/closing defect | LANDCMD-09 (LAND-14..28, LAND-70..77, LAND-79, LAND-87..90, cited) |
 | claim held by another agent or role | LANDCMD-10 |
+| the authorized claim stores no run and no `--record` is given | LANDCMD-78 (LANREC-100, LANREC-101, cited) |
 | checkout unclean or off the default branch | LANDCMD-11 |
 | checkout without a git identity | LANDCMD-25 |
 | the repository's own settings allow neither a merge commit nor a squash merge | LANDCMD-28 |
@@ -106,7 +107,7 @@ second is the claim check of LANDCMD-10.
 - LANDCMD-44: An integer `<n>` below 1 refuses `argument pull_request: <n> is not a positive number`, exit `2`, at the argument parse, before any read.
 - LANDCMD-01: Under `storage = "state-ref"`, `aco land <n>` refuses `aco land is a github command; storage = state-ref has no pull requests to land`, exit `2`, before any read.
 - LANDCMD-19: `--coordinator-override` without `--role coordinator` refuses (CLAIM-39's sentence), exit `2`, at `aco land`'s own entry -- before any read, so also before a rerun skips the rest of preflight.
-- LANDCMD-77: `--record <file>` is checked before any merge or write, a rerun too: LANREC-31 at the argument parse, LANREC-38, 39, 44 after LANDCMD-19, LANREC-98 after LANDCMD-50; it writes its record (LANREC-42).
+- LANDCMD-77: `--record` is checked before any merge or write, a rerun too: LANREC-31 at parse, LANREC-38, 39, 44, 99 after LANDCMD-19, LANREC-98 and the runs' 99 after LANDCMD-50; it writes its record (LANREC-42).
 - LANDCMD-31: `--head <reviewed>` refuses `pull request #<n> head is <actual>, not the reviewed <reviewed>; review the new head before landing`, exit `2`, unless the head starts with `<reviewed>` (E-LANDCMD-31).
 - LANDCMD-32: Without `--head`, `aco land` refuses `aco land needs --head <sha>, the head the reviewers saw: it merges only that state`, exit `2`, before any read, on a rerun too (LANDCMD-18, 76).
 - LANDCMD-02: A pull request that is not open refuses `pull request #<n> is not open; it cannot be landed`, exit `2`.
@@ -130,6 +131,7 @@ second is the claim check of LANDCMD-10.
 - LANDCMD-08: A classified work item that is not open refuses `work item #<n> is not open; it cannot be landed`, exit `2`; an issue-less pull request skips this check.
 - LANDCMD-09: The classification's claim, parent and closing rules apply (LAND-14..28, LAND-70..77, LAND-79, LAND-87..90): defects refuse `pull request #<n> <that same defect sentence>`, exit `2`.
 - LANDCMD-10: A claim held by another agent or role, no coordinator override, refuses (REL-12's sentence, naming REL-41's `aco handover` route, an item's or a lane's), exit `2`, before the merge.
+- LANDCMD-78: After LANDCMD-10 and before LANDCMD-11, a claim storing no run, without `--record`, refuses as LANREC-100, exit `2`; a rerun finding the pull request merged or queued skips it (LANDCMD-18, 69).
 - LANDCMD-11: This checkout must sit on the forge's default branch with nothing uncommitted, or `aco land` refuses `land must run from a clean checkout of the default branch '<branch>'`, exit `2`.
 - LANDCMD-25: A checkout without a git identity refuses `land must run from a checkout with a git identity; set user.name and user.email there so its release can commit to the claim state`, exit `2`.
 - LANDCMD-20: The forge names `<branch>` even where the canonical remote records no `HEAD`; LANDCMD-11 never reads one.
@@ -179,7 +181,7 @@ second is the claim check of LANDCMD-10.
 - LANDCMD-21: The fast-forward fetches the canonical remote `<remote>` once per run and moves `<branch>` to `<remote>/<branch>`; the delegated release walks that same ref.
 - LANDCMD-16: Deleting the merged branch is idempotent: a forge already reporting it absent is success, not a refusal.
 - LANDCMD-17: In this package's own repository, a successful landing's last line is `reinstall: uv tool install --force --from . overnightworks-aco`; any other repository prints nothing after LANDCMD-54's line.
-- LANDCMD-18: A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25, 33 and LANREC-97, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
+- LANDCMD-18: A rerun skips every preflight check except LANDCMD-50, 51, 11, 19, 25, 33, LANREC-97 and LANREC-99, verifies the trailer as `release --merged` does (LAND-62), and resumes without a second merge.
 - LANDCMD-38: A rerun whose delegated release meets REL-47 exits `0` with REL-49's lines, never LANDCMD-15, and no LANDCMD-57, LANDCMD-17 or LANDCMD-54 line follows (see E-LANDCMD-18a).
 - LANDCMD-57: After every RELEASED ending, first landing or resumed rerun, `merged: <sha>` (the full 40-hex merge commit) follows the release's lines, before LANDCMD-54's and LANDCMD-17's.
 - LANDCMD-54: After a RELEASED ending, a red trunk at the merge's first parent prints `trunk: red at <sha7>: <check> (<conclusion>)` for its first failed check, not skipped or neutral; else nothing (E-LANDCMD-54).
@@ -199,15 +201,17 @@ pull request's head (REL-61); a rerun with no live claim has no `base` (REL-47).
 - `aco land` never runs `release`'s own close, store transition, `freed`/`next` report, or worktree cleanup a second time; it delegates to the one existing `release --merged` path (`specs/release.spec.md`).
 - A step after the merge never re-merges: recovery always resumes from the pull request's own already-merged state, read fresh on every rerun.
 - Once merged, the delegated release never reads the pull request's own mutable body for routing: a fixer editing it away afterward changes nothing this pull request already landed (LAND-64).
-- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-50..53, LANDCMD-77, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
+- `aco land` never writes when any preflight check (LANDCMD-01..11, LANDCMD-22..25, LANDCMD-50..53, LANDCMD-77, LANDCMD-78, LANDCMD-28, LANDCMD-31, LANDCMD-33, LANDCMD-40, LANDCMD-41, LANDCMD-43, LANDCMD-46) refuses.
 - `aco land` never takes its storage, canonical remote, forge, or claim store from a head's `<path>`: this checkout's own tracked copy governs, and the head's copy is only checked (LANDCMD-22..24).
+- `aco land` never tells the head from its landing agent: both run under the claim's identity (LANDCMD-10), a Claude subagent inherits its session's `CLAUDE_CODE_SESSION_ID`, and Claude Code documents no fact a subagent's commands see that its session's do not. The contract's 'never land yourself' is held outside aco, in marketplace's tooling; LANDCMD-10, LANDCMD-78 and the landing checks of LANREC-99 and LANREC-100 are tripwires for cooperative agents (aco#1064 line 1).
 
 ## Examples
 
 `Setup: bare-remote` is `specs/landing-grammar.spec.md`'s own fixture: a
 fresh work repository whose `origin` is a local bare repository with `main`
 at one commit, a git identity, `origin/HEAD`, and `ACO_AGENT` set to `Ada`,
-plus a fixed, deterministic fake `gh`.
+plus a fixed, deterministic fake `gh`, and the claim storing one run that approves the pull
+request's head with risk `normal`, unless an example says otherwise.
 
 ### E-LANDCMD-13 — a body ending in a trailer block keeps one trailer paragraph
 

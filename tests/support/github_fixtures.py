@@ -22,10 +22,10 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from landing_world_parts import landing_listing, observe_merge_entry
+from lane_run_entries import seed_landing_claim
 from store_fixtures import (
     claim_intent,
     lineage_observation,
-    publish_claims_from_a_second_clone,
     state_ref_tip,
 )
 
@@ -557,6 +557,7 @@ def lane_landing_world(
     head_config: str = "",
     arrange: Callable[[FakeForge, str], None] | None = None,
     scope: tuple[str, ...] | None = None,
+    stored_run: bool = True,
 ) -> LaneLandingWorld:
     """Publish a claimed lane and snapshot it after the caller's final arrangement."""
     head = push_lane_branch(clone, branch)
@@ -570,11 +571,7 @@ def lane_landing_world(
         scope=scope or changed,
         base=protocol.ObjectId(real_git(clone, "rev-parse", default_branch).stdout.strip()),
     )
-    seeded = publish_claims_from_a_second_clone(clone, remote, (intent,))
-    observed = tuple(
-        (c.identity, c.branch, c.agent, c.role, str(c.claim_id)) for c in seeded.claims.values()
-    )
-    assert observed == ((identity, branch, holder, role, "landing"),)
+    seeded = seed_landing_claim(clone, remote, intent, head, stored_run=stored_run)
     detail = replace(
         landing_pull_request(body=body, head_ref_name=branch, base_ref_name=default_branch),
         head_sha=real_git(clone, "rev-parse", default_branch).stdout.strip()
@@ -634,6 +631,7 @@ def landed_world(
     extra_arrange: Callable[[FakeForge, str], None] | None = None,
     default_branch: str = LANDING_DEFAULT_BRANCH,
     head_config: str = "",
+    stored_run: bool = True,
 ) -> LandedWorld:
     """Add the claimed lane beside the landing checkout and verify the common setup."""
     monkeypatch.setenv("LC_ALL", "C")
@@ -671,6 +669,7 @@ def landed_world(
         default_branch=default_branch,
         head_config=head_config,
         arrange=arrange,
+        stored_run=stored_run,
     )
     return LandedWorld(landing, lane)
 

@@ -27,10 +27,10 @@ from github_fixtures import (
     serve_forge,
 )
 from landing_refusals import RefusalLength, refusal_observations
+from lane_run_entries import publish_claims_with_runs
 from store_fixtures import (
     claim_intent,
     lineage_observation,
-    publish_claims_from_a_second_clone,
     state_ref_tip,
 )
 
@@ -109,7 +109,7 @@ def world(
     if case.trunk_config:
         track_board_config(github_clone, case.trunk_config)
         real_git(github_clone, "push", "-q", "origin", "main")
-    seeded = publish_claims_from_a_second_clone(github_clone, bare_remote, case.intents)
+    seeded = publish_claims_with_runs(github_clone, bare_remote, case.intents, MERGE_COMMIT_SHA)
     claims = tuple(seeded.claims.values())
     observed = tuple((c.identity, c.branch, c.agent, c.role) for c in claims)
     expected = tuple((c.identity, c.branch, c.agent, c.role) for c in case.intents)

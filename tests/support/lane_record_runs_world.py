@@ -13,6 +13,7 @@ from board_fixtures import REPOSITORY, complete_contract
 from claim_worktrees import ISSUE, StandIn, held_by_ada, make_stand_in
 from cli_fixtures import CliRun, real_git, run_cli
 from lane_record_fixtures import lane_record_object, write_lane_record_file
+from lane_run_entries import commit_runs_file
 from store_fixtures import lane_trailers
 
 from aco import body, lane_record, lane_runs, protocol, state_runs, store
@@ -47,7 +48,7 @@ SUMMED_TRAILERS = (
     "lane_fix_rounds: 6",
     "lane_blocking: 8",
     "lane_experiment: builder-sonnet",
-    "lane_risk: routine",
+    "lane_risk: normal",
     "lane_fix_rounds_review: 2",
     "lane_fix_rounds_gate: 0",
     "lane_fix_rounds_ci: 4",
@@ -71,7 +72,7 @@ SINGLE_RUN_TRAILERS = (
     "lane_fix_rounds: 3",
     "lane_blocking: 4",
     "lane_experiment: builder-sonnet",
-    "lane_risk: routine",
+    "lane_risk: normal",
     "lane_fix_rounds_review: 1",
     "lane_fix_rounds_gate: 0",
     "lane_fix_rounds_ci: 2",
@@ -194,35 +195,12 @@ def routing_trailers_of(remote: Path) -> tuple[str, ...]:
     return tuple(line for line in lane_trailers(remote) if not line.startswith(MEASURED))
 
 
-def commit_runs_file(
-    directory: Path,
-    remote: Path | str,
-    claim_id: protocol.ClaimId,
-    content: bytes,
-    *,
-    agent: str = "Ada",
-) -> None:
-    """The runs file of `claim_id` in `remote`'s state ref replaced by `content`, as `agent`
-    holding the claim, over the file the state holds now."""
-    observed = store.fetch_state(worktree=directory, remote=str(remote))
-    store.commit_transition(
-        observed=store.Observation(directory, str(remote), observed),
-        subject=store.TransitionSubject("lane-record lane"),
-        intent=protocol.RunsWriteIntent(
-            claim_id=claim_id,
-            agent=agent,
-            expected=observed.runs.get(claim_id),
-            new_oid=store.hash_blob(directory, content),
-            operation_id=f"op-runs-{len(content)}",
-            holder_refusal="{}".format,
-            stale_refusal="never reached",
-        ),
-    )
-
-
 def record_stating(**changes: object) -> lane_record.LaneRecordFile:
-    """The lane record file of `lane_record_object` with `changes`, parsed."""
-    return lane_record.parse_record_file(json.dumps(lane_record_object(**changes)).encode())
+    """The lane record file of `lane_record_object` with `changes`, parsed; a change to `None`
+    leaves the field out."""
+    content = lane_record_object(**changes)
+    stated = {name: value for name, value in content.items() if value is not None}
+    return lane_record.parse_record_file(json.dumps(stated).encode())
 
 
 def chained_runs(*records: lane_record.LaneRecordFile | None) -> lane_runs.RunsFile:

@@ -1373,7 +1373,7 @@ def _land_the_abandoned_pull_request(
 ) -> CliRun:
     world.forge.merge_remote = world.remote
     the_forge_reads_the_branch_ready(world)
-    return run_cli(["land", str(ADOPTED_PULL_REQUEST), "--head", world.head], capsys)
+    return run_cli(["land", *world.land_arguments()], capsys)
 
 
 def _adopt_the_abandoned_pull_request(

@@ -222,7 +222,7 @@ then LAND-79, LAND-92 and LAND-21, and only then LAND-19.
 ## Never
 
 - `dependency_paths` never certifies a change safe: it bounds where a `deps` pull request may write; review still judges workflow and tool-configuration changes.
-- LAND-71 and LAND-87 are tripwires for cooperative agents, not boundaries: push rights to the canonical remote stop outsiders, and nothing stops an agent acting under the operator's own identity, which can rescope its claim before `aco land` or merge without `aco land`; the merge commit records who merged. Neither the forge's branch protection nor its review is claimed to stop anyone.
+- LAND-71 and LAND-87 are tripwires for cooperative agents, not boundaries (aco#1064 line 1): push rights to the canonical remote stop outsiders, and nothing stops an agent acting under the operator's own identity, which can rescope its claim before `aco land` or merge without `aco land`; the merge commit records who merged. Neither the forge's branch protection nor its review is claimed to stop anyone.
 - A force-push back to the exact head preflight read, during the bracketed listing or before the pinned merge, is not detected (an accepted ABA residual).
 
 - A body line or a branch name never makes a pull request dependabot-authored, and a present `Work-Item:`/`No-Item:` line, valid or not, always wins over LAND-91.
