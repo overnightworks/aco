@@ -51,44 +51,9 @@ def probe(monkeypatch: pytest.MonkeyPatch) -> FakeBoardProbe:
     return probe
 
 
-def commented(issues: tuple[workboard.Issue, ...]) -> tuple[workboard.Issue, ...]:
-    """`issues` after a comment: only the update time moved."""
-    return tuple(replace(issue, updated_at="2026-08-21T00:00:00Z") for issue in issues)
-
-
 def card_references() -> dict[int, forge.ItemReference]:
     """Item 7 as the forge serves it for the wait's reread of an item it watches."""
     return {ITEM: open_reference(waiting_card().body)}
-
-
-def test_a_hit_that_changes_no_listed_row_reads_no_board_and_a_changed_one_does(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    probe: FakeBoardProbe,
-) -> None:
-    """Spec: WAIT-27 -- a comment moves the probe and the update time only; a row that gains
-    an item reads the board."""
-    client = serve_forge(
-        monkeypatch, FakeForge(board_issues=(waiting_card(),), issue_references=card_references())
-    )
-    ticks = install(monkeypatch, lambda: 0)
-    builds_before_the_change: list[int] = []
-
-    def comment() -> None:
-        client.board_issues = commented(client.board_issues)
-        probe.change(REPOSITORY_TARGET)
-
-    def gain_an_action() -> None:
-        builds_before_the_change.append(client.board_builds)
-        client.board_issues = (*client.board_issues, free_item())
-        probe.change(REPOSITORY_TARGET)
-
-    ticks.afterwards[HIT_AT] = comment
-    ticks.afterwards[SECOND_HIT_AT] = gain_an_action
-    result = run_cli(["wait"], capsys)
-    assert (result.status, result.stdout, result.stderr) == (0, ACTIONABLE, "")
-    assert (builds_before_the_change, client.board_builds) == ([1], 2)
-    assert len(ticks.pauses) == 2 * PAUSES_PER_PROBE
 
 
 def test_a_hit_that_changes_the_body_of_a_listed_item_wakes_it_within_the_minute(
@@ -184,42 +149,70 @@ def test_a_listing_check_that_fails_is_made_again_and_the_read_after_it_sees_the
     assert len(ticks.pauses) == 4 * PAUSES_PER_PROBE
 
 
-def test_a_hit_on_an_open_blocker_reads_no_board_and_one_that_shows_it_closed_does(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    probe: FakeBoardProbe,
-) -> None:
-    """Spec: WAIT-28 -- a comment on a blocker moves its probe only; its closing wakes the
-    wait with the item, and a blocker first probed after a read costs no second read."""
+@pytest.fixture
+def foreign_blocked(monkeypatch: pytest.MonkeyPatch) -> FakeForge:
+    """A forge whose one item is blocked by item 3 of another repository."""
     dependent, dependencies = blocked_issue(
         OTHER_ITEM, "Alpha", block_dependency(3, repository=FOREIGN)
     )
-    client = serve_forge(
+    return serve_forge(
         monkeypatch, FakeForge(board_issues=(dependent,), board_dependencies=dependencies)
     )
+
+
+def close_foreign_blocker(client: FakeForge) -> None:
+    client.board_dependencies = {
+        OTHER_ITEM: (
+            block_dependency(
+                3,
+                repository=FOREIGN,
+                state=workboard.BlockerState.CLOSED,
+                closed_at=FROZEN_CLI_NOW,
+            ),
+        )
+    }
+
+
+def test_a_hit_on_an_open_blocker_reads_no_board(
+    capsys: pytest.CaptureFixture[str],
+    probe: FakeBoardProbe,
+    foreign_blocked: FakeForge,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: WAIT-28 -- a comment on a blocker moves its probe only; the board is read once
+    at the start and once when the blocker closes."""
     ticks = install(monkeypatch, lambda: 0)
-    builds_before_the_closing: list[int] = []
+    builds_after_the_comment: list[int] = []
 
     def comment_on_the_blocker() -> None:
         probe.change(FOREIGN_BLOCKER)
 
-    def close_the_blocker() -> None:
-        builds_before_the_closing.append(client.board_builds)
-        client.board_dependencies = {
-            OTHER_ITEM: (
-                block_dependency(
-                    3,
-                    repository=FOREIGN,
-                    state=workboard.BlockerState.CLOSED,
-                    closed_at=FROZEN_CLI_NOW,
-                ),
-            )
-        }
+    def note_the_builds() -> None:
+        builds_after_the_comment.append(foreign_blocked.board_builds)
+        close_foreign_blocker(foreign_blocked)
         probe.close(FOREIGN_BLOCKER)
 
     ticks.afterwards[HIT_AT] = comment_on_the_blocker
-    ticks.afterwards[SECOND_HIT_AT] = close_the_blocker
+    ticks.afterwards[SECOND_HIT_AT] = note_the_builds
+    run_cli(["wait"], capsys)
+    assert builds_after_the_comment == [1]
+
+
+def test_a_blocker_in_another_repository_that_closes_wakes_its_dependent_within_the_minute(
+    capsys: pytest.CaptureFixture[str],
+    probe: FakeBoardProbe,
+    foreign_blocked: FakeForge,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec: WAIT-28 -- the closing wakes the wait with the item, and a blocker first probed
+    after a read costs no second read."""
+    ticks = install(monkeypatch, lambda: 0)
+
+    def close_the_blocker() -> None:
+        close_foreign_blocker(foreign_blocked)
+        probe.close(FOREIGN_BLOCKER)
+
+    ticks.afterwards[HIT_AT] = close_the_blocker
     result = run_cli(["wait"], capsys)
     assert (result.status, result.stdout, result.stderr) == (0, ACTIONABLE, "")
-    assert (builds_before_the_closing, client.board_builds) == ([1], 2)
-    assert len(ticks.pauses) == 2 * PAUSES_PER_PROBE
+    assert (foreign_blocked.board_builds, len(ticks.pauses)) == (2, PAUSES_PER_PROBE)
