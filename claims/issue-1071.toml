@@ -1,0 +1,8 @@
+claim_id = "54b12b4d3dbe4f8cba680b25b8a52bdc"
+agent = "Claude 017d4cae-a004-41d3-bf31-083bc83d5fec"
+role = "builder"
+base = "15444770149ef77ad8f41d692988ab4b915dcd87"
+branch = "claude/issue-1071-parent-from-row"
+scope = ["quality/baseline.toml", "specs/item.spec.md", "specs/serve.spec.md", "src/aco/cmd_item.py", "src/aco/forge.py", "src/aco/github.py", "src/aco/github_issue_payload.py", "src/aco/inbox.py", "src/aco/progress.py", "src/aco/state_board.py", "src/aco/workboard.py", "tests/board/test_board_api_progress.py", "tests/support/board_fixtures.py", "tests/support/board_forge.py", "tests/support/github_fixtures.py", "tests/support/github_pages.py", "tests/test_cli.py", "tests/test_github.py", "tests/test_github_issue_payload.py", "tests/test_inbox.py", "tests/test_progress.py", "tests/test_state_board.py", "tests/test_state_board_item_reference.py"]
+opened_commit = "34a86810d00c90221136a174d97bc39788ba199f"
+whole_reason = "The parent field crosses the issue row, the single answer, both storages' adapters, progress, inbox, item show, two specs and their fakes and pinning tests; it does not split without a half-built reader."
