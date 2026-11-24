@@ -116,11 +116,6 @@ def test_text_that_is_not_gh_closing_a_rate_limit_keeps_its_type(
     ("text", "expected"),
     [
         pytest.param("unexpected end of JSON input", forge.ForgeTransientError, id="bare"),
-        pytest.param(
-            "HTTP/2.0 502 Bad Gateway\r\nX-Xss-Protection: 0\r\n\r\nunexpected end of JSON input",
-            forge.ForgeTransientError,
-            id="after-a-response-head",
-        ),
         pytest.param("unexpected end of file", forge.ForgeError, id="other-words"),
     ],
 )

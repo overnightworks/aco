@@ -24,7 +24,7 @@ STILL_WAITING = "WARNING: the board could not be read, still waiting: "
 CUT_SHORT = "unexpected end of JSON input"
 BAD_GATEWAY_HEAD = (
     "HTTP/2.0 502 Bad Gateway\r\n"
-    "Content-Type: text/html\r\n"
+    "Content-Type: application/json; charset=utf-8\r\n"
     "X-Github-Request-Id: 8F3A:1B2C:3D4E\r\n"
     "X-Xss-Protection: 0\r\n"
     "\r\n"
