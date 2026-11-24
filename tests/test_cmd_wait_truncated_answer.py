@@ -1,8 +1,12 @@
 """`aco wait` without an item over a forge that answers cut short (`specs/wait.spec.md`,
 WAIT-29, WAIT-30), through the real entry and the real GitHub probe over a fake `gh` runner,
-with only the forge, the pause and the clock injected."""
+with only the forge, the pause and the clock injected and a `gh` on `PATH`."""
 
-from dataclasses import dataclass
+import json
+import os
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import pytest
 from board_fixtures import block_dependency, blocked_issue
@@ -10,7 +14,7 @@ from cli_fixtures import FROZEN_CLI_NOW, run_cli
 from github_fixtures import FakeForge, serve_forge
 from wait_fixtures import ITEM, OTHER_ITEM, free_item, install, open_reference, waiting_card
 
-from aco import board_wait, cmd_wait, github, workboard
+from aco import board_wait, cmd_wait, workboard
 
 FOREIGN = "other/repo"
 FOREIGN_BLOCKER = 3
@@ -33,37 +37,63 @@ pytestmark = pytest.mark.usefixtures("frozen_wait_world")
 
 @dataclass
 class Resource:
-    """What the forge answers for one probed path: its tag and body, or the text of a failed
-    call."""
+    """What the forge answers for one probed path: its tag and body, or the head and the text
+    of a failed call."""
 
     etag: str
     body: str = "[]"
-    failure: str | None = None
+    failure: tuple[str, str] | None = None
+
+
+# Reads the answer for the repository's newest issue or the foreign blocker from the file the
+# test last wrote, as `gh api -i` prints it: the head on stdout, a failure's text on stderr.
+FAKE_GH = """#!{python}
+import json, os, sys
+
+arguments = sys.argv[1:]
+name = "blocker" if arguments[-1].endswith("issues/{blocker}") else "repository"
+with open(os.path.join(os.environ["FAKE_GH_ANSWERS"], name)) as answer_file:
+    answer = json.load(answer_file)
+if answer["failure"] is not None:
+    head, text = answer["failure"]
+    sys.stdout.write(head)
+    sys.stdout.flush()
+    print(text, file=sys.stderr)
+    sys.exit(1)
+if "If-None-Match: " + answer["etag"] in arguments:
+    sys.stdout.write({not_modified!r})
+    sys.exit(1)
+sys.stdout.write("HTTP/2.0 200 OK\\r\\nEtag: " + answer["etag"] + "\\r\\n\\r\\n" + answer["body"])
+"""
 
 
 @dataclass
 class FakeGh:
-    """A `ResponseRunner` over two resources: the repository's newest issue and the foreign
+    """A `gh` on `PATH` over two resources, the repository's newest issue and the foreign
     blocker; it answers a 304 to a request that sends the current tag."""
 
-    repository: Resource
-    blocker: Resource
+    answers: Path
 
-    def __call__(self, command: list[str], *, purpose: str, repository: str) -> tuple[str, int]:
-        resource = (
-            self.blocker if command[-1].endswith(f"issues/{FOREIGN_BLOCKER}") else self.repository
-        )
-        if resource.failure is not None:
-            return resource.failure, 1
-        if f"If-None-Match: {resource.etag}" in command:
-            return NOT_MODIFIED, 1
-        return f"HTTP/2.0 200 OK\r\nEtag: {resource.etag}\r\n\r\n{resource.body}", 0
+    def answer(self, name: str, resource: Resource) -> None:
+        (self.answers / name).write_text(json.dumps(asdict(resource)))
 
 
 @pytest.fixture
-def gh(monkeypatch: pytest.MonkeyPatch) -> FakeGh:
-    runner = FakeGh(Resource("A"), Resource("B", '{"state": "open"}'))
-    monkeypatch.setattr(github, "response_command", runner)
+def gh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeGh:
+    shims = tmp_path / "gh-bin"
+    shims.mkdir()
+    fake_gh = shims / "gh"
+    fake_gh.write_text(
+        FAKE_GH.format(python=sys.executable, blocker=FOREIGN_BLOCKER, not_modified=NOT_MODIFIED)
+    )
+    fake_gh.chmod(0o755)
+    answers = tmp_path / "gh-answers"
+    answers.mkdir()
+    monkeypatch.setenv("PATH", f"{shims}:{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_GH_ANSWERS", str(answers))
+    runner = FakeGh(answers)
+    runner.answer("repository", Resource("A"))
+    runner.answer("blocker", Resource("B", '{"state": "open"}'))
     return runner
 
 
@@ -92,10 +122,10 @@ def test_a_probe_answered_cut_short_is_one_warning_and_the_wait_goes_on(
     ticks = install(monkeypatch, lambda: 0)
 
     def fail() -> None:
-        gh.repository.failure = f"{BAD_GATEWAY_HEAD}{CUT_SHORT}"
+        gh.answer("repository", Resource("A", failure=(BAD_GATEWAY_HEAD, CUT_SHORT)))
 
     def answer_with_a_new_card() -> None:
-        gh.repository = Resource("A+")
+        gh.answer("repository", Resource("A+"))
         client.board_issues = (waiting_card(), free_item())
 
     ticks.afterwards[FIRST_PAUSE_AFTER_THE_READ] = fail
@@ -125,10 +155,10 @@ def test_a_blocker_answered_with_a_cut_body_is_one_warning_and_the_wait_goes_on(
     ticks = install(monkeypatch, lambda: 0)
 
     def cut_the_answer() -> None:
-        gh.blocker = Resource("B+", '{"sta')
+        gh.answer("blocker", Resource("B+", '{"sta'))
 
     def close_the_blocker() -> None:
-        gh.blocker = Resource("B++", '{"state": "closed"}')
+        gh.answer("blocker", Resource("B++", '{"state": "closed"}'))
         client.board_dependencies = {
             OTHER_ITEM: (
                 block_dependency(
