@@ -93,12 +93,12 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 - LANREC-35: `fix_rounds` and `blocking` each hold a whole number from `0` to `999` for each finding stage `review`, `gate`, `ci` and `test`; a finding a stand-in raised counts under `gate`.
 - LANREC-47: A fix round counts under the stage whose report raised the blocking findings it fixes; one fixing only folded follow-ups, under the stage that raised them, the first of `review`, `gate`, `ci`, `test`.
 - LANREC-36: `verdicts` lists each review and gate verdict, oldest first, as `stage` (`review` or `gate`), `verdict` (`approve` or `revise`) and the full commit `sha` it judged; the list may be empty.
-- LANREC-37: `experiment`, optional, is a tag as LANREC-20 reads one; `risk`, optional, is the lane's risk class, `material` or `normal`, and any other value refuses the defect `risk must be material or normal`; no value in the file holds whitespace, so a count, a sha or a tag is one word.
+- LANREC-37: `experiment`, optional, is a tag as LANREC-20 reads one; `risk`, optional, is `material` or `normal` (else `risk must be material or normal`); no value holds whitespace.
 - LANREC-48: `misses`, optional, holds a whole number from `0` to `999` for each finding stage: how many of its blocking findings the head contract's Misses rule counts, its exclusions applied by the writer.
 - LANREC-49: A stage's misses above its blocking refuses `misses.<stage> exceeds blocking.<stage>`, through LANREC-31 (E-LANREC-11).
 - LANREC-38: `aco land <n> --head <reviewed> --record <file>` refuses `the lane record's last verdict judged <full>, not the reviewed <reviewed>`, exit `2`, unless `<full>` starts with `<reviewed>`.
 - LANREC-39: A record that states no verdict refuses `the lane record states no review or gate verdict, so it judged no head to land`, exit `2`.
-- LANREC-40: LANREC-31 refuses at the argument parse; LANREC-38, 39, 44 and a file's LANREC-99 once the root and board.toml are read, LANREC-97, 98 and the runs' LANREC-99 after LANDCMD-50, LANREC-100 after LANDCMD-10; all before any merge or write, a rerun too except LANREC-100 (LANREC-101; E-LANREC-04).
+- LANREC-40: LANREC-31 refuses at the parse; LANREC-38, 39, 44, 99 after board.toml, LANREC-97, 98, 99 after LANDCMD-50; all before any merge or write, a rerun too (E-LANREC-04); LANREC-100 is LANREC-101's.
 - LANREC-41: Without stored runs, `aco release --abandoned <reason> --record <file>` writes the file's record; `--merged` refuses `--record applies to --abandoned only`, exit `2`; neither, REL-01 (E-LANREC-05).
 - LANREC-42: With `--record` and without stored runs, LANREC-11 and LANREC-12 hold the file's figures, `lane_fix_rounds` and `lane_blocking` summed over the finding stages; no routing line is read.
 - LANREC-43: A file also writes `lane_risk`, then `lane_fix_rounds_<stage>` and `lane_blocking_<stage>` for `review`, `gate`, `ci` and `test`, each a whole number; an omitted `risk` has no line.
@@ -176,11 +176,11 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 
 ## What a landing needs
 
-- LANREC-99: `aco land` refuses a lane whose record, the file or the stored runs (LANREC-80), states no risk class: `the lane record states no risk class; record risk as material or normal`, exit `2` (E-LANREC-21).
-- LANREC-100: `aco land` refuses a claim that stores no run when no `--record` is given: `<label> has no lane record (no stored runs, no --record), so no review is known to have judged <reviewed>`, exit `2`, nothing merged, enqueued or written (E-LANREC-22).
-- LANREC-101: LANREC-100 judges the claim LANDCMD-10 authorized, only where `aco land` still merges or enqueues; a rerun that finds the pull request merged or queued (LANDCMD-18, LANDCMD-69) judges it nowhere. A routing line is never a lane record.
+- LANREC-99: `aco land` refuses a lane whose record, file or stored runs (LANREC-80), states no risk class: `the lane record states no risk class; record risk as material or normal`, exit `2` (E-LANREC-21).
+- LANREC-100: `aco land` refuses a claim storing no run, without `--record`: `<label> has no lane record (no stored runs, no --record), so no review is known to have judged <reviewed>`, exit `2` (E-LANREC-22).
+- LANREC-101: LANREC-100 judges the claim LANDCMD-10 authorized, only where `aco land` merges or enqueues, so a rerun of a landed pull request (LANDCMD-18, LANDCMD-69) skips it; a routing line is no record.
 - LANREC-102: LANREC-99 and LANREC-100 hold for every claim kind; an issue-less or adopted lane, which stores no runs (LANREC-52 takes an item), lands with `--record`.
-- LANREC-103: Stored runs are read through the file grammar (LANREC-37), so a stored record whose `risk` is neither `material` nor `normal` is unreadable: `aco land` refuses it as LANREC-62, a release writes unknown figures (LANREC-93), and `aco lane-record show` refuses it; nothing rewrites a stored record.
+- LANREC-103: A stored record whose `risk` is not `material` or `normal` is unreadable (LANREC-37): `aco land` refuses it as LANREC-62, `lane-record show` refuses it, a release writes unknown figures (LANREC-93).
 
 ## Failure
 

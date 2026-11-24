@@ -27,8 +27,9 @@ not any function reads it back by name), and tests already pin them by
 name (`tests/test_board.py`'s `priority_bucket` attribute assertions,
 `tests/test_cli.py`'s `"age_days"` envelope pin).
 
-`Verdict.APPROVE` and `Verdict.REVISE` are reached only by construction from a lane record
-file's value (`Verdict(value)`) and by iteration when its refusal lists the accepted ones.
+`Verdict.APPROVE` and `Verdict.REVISE`, and `RiskClass.MATERIAL` and `RiskClass.NORMAL`, are
+reached only by construction from a lane record file's value (`Verdict(value)`) and by iteration
+when its refusal lists the accepted ones.
 
 `MergeMethod.REBASE` is reached the same way as
 `NoItemKind.DOCS`: `GitHubForge.allowed_merge_methods` iterates `MergeMethod`
@@ -69,7 +70,7 @@ from aco.expectation_grammar import DecisionKind, RulingVia
 from aco.forge import UnqueuedPullRequest
 from aco.github import GitHubForge
 from aco.github_calls import CallRecord
-from aco.lane_record import Verdict
+from aco.lane_record import RiskClass, Verdict
 from aco.workboard import (
     BoardItem,
     BodyReadState,
@@ -145,6 +146,8 @@ _referenced_only_for_vulture = (
     Size.LARGE,
     Verdict.APPROVE,
     Verdict.REVISE,
+    RiskClass.MATERIAL,
+    RiskClass.NORMAL,
     _board_item_for_vulture.priority_bucket,
     _board_item_for_vulture.age_days,
     _board_item_for_vulture.freed_days,
