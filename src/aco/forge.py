@@ -249,6 +249,7 @@ class ItemReference:
     by the same rule as the board listing; the default is a stranger's.
     `labels` are the item's label names under `github`; state-ref keeps them in
     its block's `[record]`, so it leaves them empty.
+    `parent` is the number of the item's parent, as the same read carries it.
     """
 
     state: ItemState
@@ -258,6 +259,7 @@ class ItemReference:
     origin: str | None = None
     author_is_member: bool = False
     labels: tuple[str, ...] = ()
+    parent: int | None = None
 
 
 @dataclass(frozen=True)
@@ -515,12 +517,6 @@ class ForgeReader(BoardSource, Protocol):
     def pull_request_changes(self, number: int) -> PullRequestChanges: ...
 
     def parent_issue(self, number: int) -> workboard.ParentIssue | None: ...
-
-    def parent_number(self, number: int) -> int | None:
-        """The number of `number`'s parent without decoding that parent
-        -- all `item show`'s header names, so a parent no other read
-        can decode never stops it."""
-        ...
 
     def default_branch(self) -> str: ...
 

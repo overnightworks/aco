@@ -10,7 +10,6 @@ from aco import body, forge, lane_measure, progress, workboard
 from aco.body import ItemKind, Size
 from aco.lane_record import LaneOutcome, LaneRecord, RecordedLane
 
-type ParentOf = Callable[[int], workboard.ParentIssue | None]
 type Arranged = tuple[workboard.Issue, workboard.ChildList]
 
 NO_LANE_RECORDS = lane_measure.lane_prices(())
@@ -26,6 +25,7 @@ def _container(
     open_count: int = 0,
     uncut: int = 0,
     member: bool = True,
+    parent_in: str | None = None,
     foreign_open: tuple[workboard.IssueReference, ...] = (),
 ) -> Arranged:
     container, children = container_with_children(
@@ -36,25 +36,12 @@ def _container(
         body=complete_contract("Build.", slice=slice_entries(*(f"S{n}" for n in range(uncut)))),
         foreign_open=foreign_open,
     )
-    return replace(container, author_is_member=member), children
-
-
-def _no_parent(_number: int) -> workboard.ParentIssue | None:
-    return None
-
-
-def _parent_in(repository: str) -> ParentOf:
-    parent = workboard.ParentIssue(workboard.IssueReference(repository, 1), "")
-    return lambda _number: parent
-
-
-def _failing_read(number: int) -> workboard.ParentIssue | None:
-    raise forge.ForgeTransientError(f"no parent of #{number}")
+    parent = None if parent_in is None else workboard.IssueReference(parent_in, 1)
+    return replace(container, author_is_member=member, parent=parent), children
 
 
 def _read(
     arranged: list[Arranged],
-    parent_of: ParentOf = _no_parent,
     *,
     operator_steps: frozenset[int] = frozenset(),
     landed: frozenset[int] = frozenset(),
@@ -68,7 +55,6 @@ def _read(
         [*(issue for issue, _children in arranged), *open_items],
         storage=body.Storage.GITHUB,
         marks=progress.Marks(operator_steps, landed, prices, actuals),
-        parent_of=parent_of,
         children_of=children_of or listed.__getitem__,
     )
 
@@ -120,29 +106,28 @@ def test_the_repository_line_sums_its_top_level_containers() -> None:
 
 
 @pytest.mark.parametrize(
-    "parent_of",
+    "parent_in",
     [
-        pytest.param(_parent_in("owner/repo"), id="parent-in-this-repository"),
-        pytest.param(_parent_in("owner/other"), id="parent-in-another-repository"),
+        pytest.param("owner/repo", id="parent-in-this-repository"),
+        pytest.param("owner/other", id="parent-in-another-repository"),
     ],
 )
-def test_a_container_with_a_parent_is_nested_and_not_on_the_top_level(parent_of: ParentOf) -> None:
-    arranged = [_container(10, closed=1, open_count=1)]
+def test_a_container_with_a_parent_is_nested_and_not_on_the_top_level(parent_in: str) -> None:
+    arranged = [_container(10, closed=1, open_count=1, parent_in=parent_in)]
 
-    shown = _shown(_read(arranged, parent_of))
+    shown = _shown(_read(arranged))
 
     assert (shown.containers, shown.planned) == ((), 0)
 
 
 def test_only_a_parentless_container_stays_top_level_beside_a_nested_one() -> None:
-    parent = workboard.ParentIssue(workboard.IssueReference("owner/repo", 1), "")
 
-    def parent_of(number: int) -> workboard.ParentIssue | None:
-        return parent if number == 20 else None
+    arranged = [
+        _container(10, closed=1, open_count=1),
+        _container(20, closed=9, parent_in="owner/repo"),
+    ]
 
-    arranged = [_container(10, closed=1, open_count=1), _container(20, closed=9)]
-
-    shown = _shown(_read(arranged, parent_of))
+    shown = _shown(_read(arranged))
 
     assert [container.number for container in shown.containers] == [10]
 
@@ -248,17 +233,9 @@ def test_a_nested_container_reads_no_children() -> None:
         reads.append(number)
         return ()
 
-    _read([_container(10, closed=1)], _parent_in("owner/repo"), children_of=children_of)
+    _read([_container(10, closed=1, parent_in="owner/repo")], children_of=children_of)
 
     assert reads == []
-
-
-def test_a_failed_parent_read_is_a_visible_state_not_a_number() -> None:
-    arranged = [_container(10, closed=1, open_count=1)]
-
-    read = _read(arranged, _failing_read)
-
-    assert read == progress.ProgressUnavailable("no parent of #10")
 
 
 def test_a_failed_child_read_is_a_visible_state_not_a_number() -> None:

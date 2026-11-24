@@ -64,7 +64,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | no config file, a malformed one, no root, a relative root or one that is no directory | ABRD-108 | — | — |
 | no repository found, at start or on a later read | ABRD-109 | — | — |
 | a directory under the root that cannot be read | ABRD-110 | — | — |
-| a repo with open containers, none, or a failed read of a container's parent, its sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139, ABRD-147, ABRD-148, ABRD-149, ABRD-150, ABRD-151 | — | — |
+| a repo with open containers, none, or a failed read of a container's sub-issues or the trunk | ABRD-131, ABRD-132, ABRD-133, ABRD-134, ABRD-194, ABRD-135, ABRD-136, ABRD-137, ABRD-138, ABRD-139, ABRD-147, ABRD-148, ABRD-149, ABRD-150, ABRD-151 | — | — |
 | any request answered | ABRD-180, ABRD-181, ABRD-182 | ABRD-180, ABRD-181, ABRD-182 | ABRD-180, ABRD-181, ABRD-182 |
 | a request that raises, or whose browser leaves mid-answer | ABRD-183, ABRD-184 | ABRD-183, ABRD-184 | ABRD-183, ABRD-184 |
 | the board starting, or stopping on Ctrl-C or SIGTERM | ABRD-179, ABRD-185 | — | — |
@@ -230,7 +230,8 @@ Each listed line is `aco rulings --json`'s line (RUL-10); an option line adds
 - ABRD-131: A repo's `progress` lists top-level containers with `closed`, `landed`, `planned`, `open`, `uncut`, `waiting`, `percent`, `lanes_left`, `estimate`, `closed_children` (ABRD-136 to ABRD-147; E-ABRD-20).
 - ABRD-132: `percent` (rounded down) is 100 only when nothing is open or uncut and `null` while nothing is planned; a repo's line sums its top-level containers, a container with a parent anywhere has none.
 - ABRD-133: `progress.waiting` counts the repo's items that wait on the operator, `aco inbox`'s steps (E-ABRD-20).
-- ABRD-134: A failed read of a container's parent, sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).
+- ABRD-134: A failed read of a container's sub-issues or the trunk leaves that repo's `progress` as `{"error": "<sentence>"}` with no counts; its items stay listed (E-ABRD-21).
+- ABRD-194: A container's parent is the one its listing row names: a read asks the forge for the open-item listing and one sub-issue list per top-level container, and for no parent (E-ABRD-20).
 - ABRD-135: The tab `Progress` shows per container a bar of `Landed` and `Closed otherwise` children and `closed/planned · percent %` (`7/48 · 14 %`); an unknown progress shows its sentence.
 - ABRD-136: A closed child is `landed` when a trunk commit (the last `5000` first-parent) names it in a `Work-Item:` trailer; a child in another repository never is; `landed` is at most `closed`.
 - ABRD-137: A container's `waiting` counts its open children in this repository that wait on the operator, `aco inbox`'s steps; `progress.waiting` stays the repo's total.
@@ -592,16 +593,16 @@ Setup: test-forge, open container `#10` titled `Song jump` whose sub-issue list 
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
-forge requests: the open-item listing, the parent of #10, the parent of #11, the sub-issues of #10
+forge requests: the open-item listing, the sub-issues of #10
 answer 200: {"root": "<root>", "repos": [{"name": "<repo>", "error": null, "items": [], "progress": {
   "error": null, "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
   "containers": [{"number": 10, "title": "Song jump", "closed": 3, "landed": 2, "planned": 6, "open": 1, "uncut": 2, "percent": 50, "waiting": 1,
     "lanes_left": 2, "estimate": {"error": "no lane records"}}]}, "steps": [...]}]}
 ```
 
-### E-ABRD-21 -- a container's parent cannot be read
+### E-ABRD-21 -- a container's sub-issues cannot be read
 
-Setup: test-forge, open container `#10` with 3 children closed of 4, whose parent read (or sub-issue read) fails with `GitHub is down`
+Setup: test-forge, open container `#10` with 3 children closed of 4, whose sub-issue read fails with `GitHub is down`
 
 ```text
 request: GET /api/board, header X-Board-Token: <board token>
