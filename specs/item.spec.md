@@ -59,7 +59,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 | a piped block a flag agrees with or contradicts, either storage | ITEM-59, ITEM-62 | — | — | — |
 | state-ref pin, a stored body leaving a section empty | ITEM-61 | — | — | — |
 | `--parent` an open Task, or `--kind` given, either storage | ITEM-45, ITEM-46 | — | ITEM-47..ITEM-51 | — |
-| an item, open or closed | — | ITEM-07, ITEM-08, ITEM-56 | — | — |
+| an item, open or closed | — | ITEM-07, ITEM-82, ITEM-08, ITEM-56 | — | — |
 | an unknown id | PIN-18 | ITEM-10 | PIN-23 | PIN-28 |
 | `storage = "github"` | ITEM-26..ITEM-31 | ITEM-11 | ITEM-71, ITEM-75, ITEM-76 | PIN-11 |
 | an item's body, read for a whole-body `item edit` | — | ITEM-70 | ITEM-71 | — |
@@ -133,6 +133,7 @@ is its `storage = "github"` form; under `storage = "state-ref"` it prints
 - ITEM-56: Text shows the body with each display control but the line feed escaped (NEXT-37): `a\x1b[2J` prints as typed; line breaks, TAB and `Größe` as is; `--json`'s `body` keeps it as stored.
 - ITEM-08: A closed item prints ITEM-07's same header, `state closed`; closing rewrites the body's `[record]` with `state = "closed"`, `closed_at`, and `updated_at`, the rest byte-identical.
 - ITEM-09: `aco item show ITEM --json` prints the envelope, `reason: "shown"`, then `item`, `number`, `state`, `parent`, `origin`, `body`, `body_hash` (`parent`/`origin` `null` when unset) (see E-ITEM-02).
+- ITEM-82: `aco item show ITEM` reads the parent from the answer that carries the body, so a `github` show costs one request; under `state-ref` it reads the record, and a parent `items/` lacks refuses PIN-16.
 - ITEM-11: `aco item show ITEM` under `storage = "github"` reads the forge issue's own body through ITEM-07/ITEM-09's same header and `--json` shape.
 - ITEM-70: `item show --json`'s `body_hash` is `sha256:` and 64 lowercase hex digits over the UTF-8 body it shows, under both storages; the text header is unchanged (see E-ITEM-02).
 

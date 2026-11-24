@@ -9,11 +9,12 @@ from github_pages import (
     api_head,
     api_pull_request,
     board_issue_page_client,
+    gh_api_prints,
     raw_board_issue,
     rest_board_issue_page_client,
 )
 
-from aco import github
+from aco import github, workboard
 from aco.forge import ForgeMalformedResponseError
 
 
@@ -157,3 +158,73 @@ def test_the_board_listing_refuses_a_malformed_open_dependents_count(count: obje
 
     with pytest.raises(ForgeMalformedResponseError, match="malformed board issue"):
         client.list_open_board_issues()
+
+
+_PARENT_URL = f"https://api.github.com/repos/{REPOSITORY}/issues/991"
+MALFORMED_PARENT_URLS = [
+    pytest.param(991, id="not-text"),
+    pytest.param(f"https://api.github.com/repos/{REPOSITORY}/pulls/991", id="not-an-issue"),
+    pytest.param(f"https://api.github.com/repos/{REPOSITORY}/issues/0", id="no-number"),
+    pytest.param("https://api.github.com/issues/991", id="no-repository"),
+]
+
+
+@pytest.mark.parametrize(
+    ("fields", "parent"),
+    [
+        pytest.param(
+            {"parent_issue_url": _PARENT_URL},
+            workboard.IssueReference(REPOSITORY, 991),
+            id="a-row-with-a-parent",
+        ),
+        pytest.param({}, None, id="a-row-without-one"),
+    ],
+)
+def test_the_board_listing_names_the_parent_its_row_carries(
+    fields: dict[str, object], parent: workboard.IssueReference | None
+) -> None:
+    """ABRD-194."""
+    client = rest_board_issue_page_client(_rest_issue(**fields))
+
+    issues = client.list_open_board_issues()
+
+    assert [issue.parent for issue in issues] == [parent]
+
+
+@pytest.mark.parametrize("url", MALFORMED_PARENT_URLS)
+def test_the_board_listing_refuses_a_malformed_parent_url(url: object) -> None:
+    """ABRD-194."""
+    client = rest_board_issue_page_client(_rest_issue(parent_issue_url=url))
+
+    with pytest.raises(ForgeMalformedResponseError, match="malformed parent issue url"):
+        client.list_open_board_issues()
+
+
+@pytest.mark.parametrize("url", MALFORMED_PARENT_URLS)
+def test_the_single_item_read_refuses_a_malformed_parent_url(url: object) -> None:
+    """ITEM-82."""
+    client = _item_reference_client(parent=url)
+
+    with pytest.raises(ForgeMalformedResponseError, match="malformed parent issue url"):
+        client.item_reference(10)
+
+
+@pytest.mark.parametrize(
+    ("fields", "parent"),
+    [
+        pytest.param({"parent_issue_url": _PARENT_URL}, 991, id="a-row-with-a-parent"),
+        pytest.param({}, None, id="a-row-without-one"),
+    ],
+)
+def test_the_single_item_read_takes_the_parent_from_the_same_answer(
+    fields: dict[str, object], parent: int | None
+) -> None:
+    """ITEM-82."""
+    row = {"state": "open", "title": "Work", "body": "", "labels": [], **fields}
+    client = github.GitHubForge(
+        github.repository_id(REPOSITORY), run=lambda arguments: gh_api_prints(arguments, row)
+    )
+
+    reference = client.item_reference(10)
+
+    assert (reference.parent, client.requests) == (parent, 1)

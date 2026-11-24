@@ -5,7 +5,7 @@ import hashlib
 from board_fixtures import block_body
 from store_fixtures import item_record
 
-from aco import forge, items, protocol
+from aco import forge, items, protocol, workboard
 from aco.body import render_block
 from aco.state_board import StateRefBoard
 
@@ -70,3 +70,44 @@ def test_a_child_of_an_unreadable_item_reads_its_parent_with_the_kind_unknown() 
 
     assert parent is not None
     assert (parent.reference.number, parent.kind) == (items.item_number(_ITEM_ID), None)
+
+
+def test_a_childs_item_reference_carries_its_parent_number() -> None:
+    """ITEM-82."""
+    child_id = "aco-000003"
+    board = _board(
+        {f"{_ITEM_ID}.md": _item_file("Slice"), f"{child_id}.md": _item_file("Child", _ITEM_ID)}
+    )
+
+    references = board.item_references([items.item_number(_ITEM_ID), items.item_number(child_id)])
+
+    assert [reference.parent for reference in references.values()] == [
+        None,
+        items.item_number(_ITEM_ID),
+    ]
+
+
+def test_an_item_reference_of_a_child_whose_parent_is_missing_still_reads() -> None:
+    """ITEM-82."""
+    board = _board({f"{_ITEM_ID}.md": _item_file("Slice", "aco-ffffff")})
+
+    reference = board.item_reference(items.item_number(_ITEM_ID))
+
+    assert reference.parent == items.item_number("aco-ffffff")
+
+
+def test_a_listed_child_names_its_parent_without_reading_it() -> None:
+    """ABRD-194."""
+    child_id = "aco-000003"
+    board = _board(
+        {f"{_ITEM_ID}.md": _item_file("Slice"), f"{child_id}.md": _item_file("Child", _ITEM_ID)}
+    )
+
+    listed = {issue.number: issue.parent for issue in board.list_open_board_issues()}
+
+    assert listed == {
+        items.item_number(_ITEM_ID): None,
+        items.item_number(child_id): workboard.IssueReference(
+            board.repository.path, items.item_number(_ITEM_ID)
+        ),
+    }

@@ -386,7 +386,13 @@ def _item_parent_id(parent: int | None) -> str | None:
     return None if parent is None else items.format_item_id(parent)
 
 
-def _item_header(number: int, reference: forge.ItemReference, parent: int | None) -> str:
+def _refuse_a_parent_items_lacks(context: RunContext, number: int) -> None:
+    """PIN-16 for `item show` under `state-ref`, whose `item_reference` names a parent unread."""
+    if context.config.storage is body.Storage.STATE_REF:
+        state_ref_board(context).parent_number(number)
+
+
+def _item_header(number: int, reference: forge.ItemReference) -> str:
     """`item show`'s one header line: id, number, state, parent, and origin
     -- the same shape regardless of which forge answered the reads, since an
     id (`items.format_item_id`) is a pure encoding of `number`, never a
@@ -395,7 +401,8 @@ def _item_header(number: int, reference: forge.ItemReference, parent: int | None
     unset parent prints `parent none`."""
     return (
         f"{items.format_item_id(number)} · #{number} · "
-        f"{_item_state_text(reference.state)} · parent {_item_parent_id(parent) or 'none'} · "
+        f"{_item_state_text(reference.state)} · "
+        f"parent {_item_parent_id(reference.parent) or 'none'} · "
         f"origin {reference.origin or 'none'}"
     )
 
@@ -419,7 +426,7 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
             raise protocol.ClaimUnavailableError(
                 board_read.missing_item_refusal(number, client, storage)
             )
-        parent = client.parent_number(number)
+        _refuse_a_parent_items_lacks(context, number)
     except items.MalformedItemError as error:
         return report.refuse(
             ItemReason.PRECONDITION_FAILED, error, as_json=as_json, body_hash=error.body_hash
@@ -434,13 +441,13 @@ def _cmd_item_show(parsed: argparse.Namespace, context: RunContext) -> int:
             item=items.format_item_id(number),
             number=number,
             state=_item_state_text(reference.state),
-            parent=_item_parent_id(parent),
+            parent=_item_parent_id(reference.parent),
             origin=reference.origin,
             body=body,
             body_hash=decide.body_hash(body),
         )
         return 0
-    print(_item_header(number, reference, parent))
+    print(_item_header(number, reference))
     print(protocol.terminal_block(body), end="")
     return 0
 

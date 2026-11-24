@@ -154,7 +154,7 @@ def read_issues(
 def read_context(context: session.RunContext, *, with_progress: bool = False) -> Reading:
     """The rows, the steps and the plans of the checkout `context` is bound to,
     from one listing of its open items; with `with_progress`, also the progress
-    view, which reads each container's parent and sub-issues, the trunk's trailers and the
+    view, which reads each top-level container's sub-issues, the trunk's trailers and the
     state ref's lane records."""
     listed = tuple(context.forge.list_open_board_issues())
     storage = context.config.storage
@@ -196,7 +196,6 @@ def _progress(
             None if lanes is None else lane_measure.lane_prices(lanes),
             None if lanes is None else lane_measure.item_actuals(lanes),
         ),
-        parent_of=context.forge.parent_issue,
         children_of=context.forge.list_children,
     )
 

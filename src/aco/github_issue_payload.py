@@ -2,6 +2,7 @@
 single-item read, which share the one rule for who counts as a member."""
 
 import json
+import re
 from collections.abc import Iterable
 from typing import TypeIs
 
@@ -21,6 +22,23 @@ ISSUE_TYPE_KINDS: dict[str, ItemKind] = {
 _MEMBER_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")  # tuple: unhashable input is no member
 DEPENDENCY_BOT_LOGIN = "app/dependabot"
 _MALFORMED_ITEM_REFERENCE = "GitHub returned a malformed issue reference"
+
+
+_PARENT_ISSUE_URL = re.compile(
+    rf".*/repos/(?P<repository>{protocol.REPOSITORY_PATTERN.pattern})"
+    r"/issues/(?P<number>[1-9][0-9]*)"
+)
+
+
+def parent_reference(value: object) -> workboard.IssueReference | None:
+    """The issue a row's `parent_issue_url` names; GitHub leaves the field out of a parentless
+    row, and the `--jq` filters send that as `null`."""
+    if value is None:
+        return None
+    match = _PARENT_ISSUE_URL.fullmatch(value) if isinstance(value, str) else None
+    if match is None:
+        raise forge.ForgeMalformedResponseError("GitHub returned a malformed parent issue url")
+    return workboard.IssueReference(match["repository"], int(match["number"]))
 
 
 def is_member(association: object) -> bool:
@@ -72,6 +90,7 @@ BOARD_ISSUE_JQ = (
     'isPullRequest:has("pull_request"),'
     "kind:(.type.name // null),"
     "authorAssociation:(.author_association // null),"
+    "parent:(.parent_issue_url // null),"
     "childrenClosed:(.sub_issues_summary.completed // null),"
     "childrenTotal:(.sub_issues_summary.total // null),"
     "blockedByCount:(.issue_dependencies_summary.total_blocked_by // 0),"
@@ -130,6 +149,7 @@ def board_issue(value: object) -> workboard.Issue:
         blocked_by_count,
         open_dependents,
         author_is_member=is_member(value.get("authorAssociation")),
+        parent=parent_reference(value.get("parent")),
     )
 
 
@@ -151,6 +171,7 @@ def item_reference(value: object) -> forge.ItemReference:
         or not isinstance(is_landing, bool)
     ):
         raise forge.ForgeMalformedResponseError(_MALFORMED_ITEM_REFERENCE)
+    parent = parent_reference(value.get("parent"))
     return forge.ItemReference(
         forge.ItemState.OPEN if state == "open" else forge.ItemState.CLOSED,
         title,
@@ -158,6 +179,7 @@ def item_reference(value: object) -> forge.ItemReference:
         is_landing,
         author_is_member=is_member(value.get("author_association")),
         labels=tuple(labels),
+        parent=None if parent is None else parent.number,
     )
 
 
