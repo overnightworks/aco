@@ -107,17 +107,11 @@ def test_a_claim_held_by_another_agent_refuses_for_its_holder_not_for_the_missin
     )
 
 
-@pytest.mark.parametrize("with_record", [False, True], ids=["no-record", "a-record-file"])
-def test_an_issue_less_lane_lands_with_a_record_file_and_is_named_by_its_claim_id_without(
-    github_clone: Path,
-    bare_remote: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    with_record: bool,
-) -> None:
-    """Spec: LANREC-102, LANREC-100."""
-    landing = landed_world(
+@pytest.fixture
+def issue_less_lane(
+    github_clone: Path, bare_remote: Path, monkeypatch: pytest.MonkeyPatch
+) -> LaneLandingWorld:
+    return landed_world(
         github_clone,
         bare_remote,
         monkeypatch,
@@ -126,14 +120,28 @@ def test_an_issue_less_lane_lands_with_a_record_file_and_is_named_by_its_claim_i
         body=FOREIGN_BODY,
         stored_run=False,
     ).landing
-    record = ["--record", str(approving_record_file(tmp_path, landing.head))] if with_record else []
 
-    result = run_cli(["land", str(NUMBER), "--head", landing.head, *record], capsys)
 
-    if with_record:
-        assert (result.status, result.stderr) == (0, "")
-    else:
-        assert result.stderr == f"ERROR: {no_lane_record('landing', landing.head)}\n"
+def test_an_issue_less_lane_lands_with_a_record_file(
+    issue_less_lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-102."""
+    record = approving_record_file(tmp_path, issue_less_lane.head)
+
+    result = run_cli(
+        ["land", str(NUMBER), "--head", issue_less_lane.head, "--record", str(record)], capsys
+    )
+
+    assert (result.status, result.stderr) == (0, "")
+
+
+def test_an_issue_less_lane_without_a_record_file_refuses_and_names_its_claim_id(
+    issue_less_lane: LaneLandingWorld, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-102, LANREC-100."""
+    result = run_cli(["land", str(NUMBER), "--head", issue_less_lane.head], capsys)
+
+    assert result.stderr == f"ERROR: {no_lane_record('landing', issue_less_lane.head)}\n"
 
 
 def test_an_adopted_lane_without_a_record_file_refuses_before_any_write(
