@@ -81,118 +81,118 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 
 ## Serving
 
-- [ ] [MCP-01] The global `aco --repo OWNER/REPO` before `mcp` is refused `ERROR: aco mcp finds its repositories itself; --repo does not apply to it`, exit `2` (see E-MCP-01).
-- [ ] [MCP-02] End of input ends the process, exit `0`; every message before it was answered.
-- [ ] [MCP-03] A host that closed the pipe ends the process, exit `0`, with no traceback on stderr.
-- [ ] [MCP-04] One message is one line holding one JSON object. Unparsable JSON is answered error `-32700`; an array (no batching), another JSON value or a non-request object, error `-32600`; each with a null `id`.
-- [ ] [MCP-05] A message without an `id` is a notification and is never answered; an empty line is skipped.
-- [ ] [MCP-06] `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all five tools.
-- [ ] [MCP-07] `ping` is answered with the empty result.
-- [ ] [MCP-08] `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` and `answer_step` (`destructiveHint` true); the last four: `readOnlyHint` false.
-- [ ] [MCP-78] `ask`, `record_answer` and `step` are listed with `idempotentHint` true, `answer_step` with `idempotentHint` false.
-- [ ] [MCP-09] `server/discover` and every other method are answered error `-32601`.
-- [ ] [MCP-10] `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
-- [ ] [MCP-20] Standard output carries only the fresh process's answers, one per line; its standard error reaches the host's; every child process reads the null device or aco's piped data, never the host's stream.
-- [ ] [MCP-81] The process the host starts hands each message to a fresh `aco mcp --direct`, run with its own interpreter and no working directory on its import path; a reinstall reaches the next message.
-- [ ] [MCP-82] A fresh process that cannot start, exits non-zero, runs past 600 seconds, answers past the output bound or answers nothing gets the answer of E-MCP-21; a notification gets nothing.
-- [ ] [MCP-83] A fresh process answers nothing and ends with exit `1`, naming the file on standard error, when a site-packages aco module it loaded is missing from the RECORD or differs from its hash there.
-- [ ] [MCP-88] A fresh process also ends that way when a loaded aco module was replaced or lacks its pre-load stamp, or the RECORD changed or is missing while it loaded; a source run is never refused.
-- [ ] [MCP-84] `aco mcp --direct` answers its standard input in its own process, as MCP-02 to MCP-80 describe, hidden from help; a change to it or MCP-81's command line takes a reconnect.
-- [ ] [MCP-85] The process the host starts loads its own code once, so a change to the relay (`aco mcp` without `--direct`, MCP-82's answers) reaches a session only at its next reconnect.
-- [ ] [MCP-86] A change to the tool list or a tool's schema reaches a session at its host's next `tools/list`, which hosts send at connect: the next reconnect.
-- [ ] [MCP-87] A fresh process whose host process ended mid-call finishes its one call, then ends with exit `0` and no traceback on the closed pipe (MCP-03).
+- MCP-01: The global `aco --repo OWNER/REPO` before `mcp` is refused `ERROR: aco mcp finds its repositories itself; --repo does not apply to it`, exit `2` (see E-MCP-01).
+- MCP-02: End of input ends the process, exit `0`; every message before it was answered.
+- MCP-03: A host that closed the pipe ends the process, exit `0`, with no traceback on stderr.
+- MCP-04: One message is one line holding one JSON object. Unparsable JSON is answered error `-32700`; an array (no batching), another JSON value or a non-request object, error `-32600`; each with a null `id`.
+- MCP-05: A message without an `id` is a notification and is never answered; an empty line is skipped.
+- MCP-06: `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all five tools.
+- MCP-07: `ping` is answered with the empty result.
+- MCP-08: `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` and `answer_step` (`destructiveHint` true); the last four: `readOnlyHint` false.
+- MCP-78: `ask`, `record_answer` and `step` are listed with `idempotentHint` true, `answer_step` with `idempotentHint` false.
+- MCP-09: `server/discover` and every other method are answered error `-32601`.
+- MCP-10: `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
+- MCP-20: Standard output carries only the fresh process's answers, one per line; its standard error reaches the host's; every child process reads the null device or aco's piped data, never the host's stream.
+- MCP-81: The process the host starts hands each message to a fresh `aco mcp --direct`, run with its own interpreter and no working directory on its import path; a reinstall reaches the next message.
+- MCP-82: A fresh process that cannot start, exits non-zero, runs past 600 seconds, answers past the output bound or answers nothing gets the answer of E-MCP-21; a notification gets nothing.
+- MCP-83: A fresh process answers nothing and ends with exit `1`, naming the file on standard error, when a site-packages aco module it loaded is missing from the RECORD or differs from its hash there.
+- MCP-88: A fresh process also ends that way when a loaded aco module was replaced or lacks its pre-load stamp, or the RECORD changed or is missing while it loaded; a source run is never refused.
+- MCP-84: `aco mcp --direct` answers its standard input in its own process, as MCP-02 to MCP-80 describe, hidden from help; a change to it or MCP-81's command line takes a reconnect.
+- MCP-85: The process the host starts loads its own code once, so a change to the relay (`aco mcp` without `--direct`, MCP-82's answers) reaches a session only at its next reconnect.
+- MCP-86: A change to the tool list or a tool's schema reaches a session at its host's next `tools/list`, which hosts send at connect: the next reconnect.
+- MCP-87: A fresh process whose host process ended mid-call finishes its one call, then ends with exit `0` and no traceback on the closed pipe (MCP-03).
 
 ## Reading the inbox
 
-- [ ] [MCP-11] `read_inbox` answers `structuredContent` and the same JSON as text: `root`, per repository its `items` and `steps`, or `unavailable` and a reason, and `unreadable` (see E-MCP-02).
-- [ ] [MCP-12] A line waits on the operator when it is an option line neither ruled, nor returned to its head, nor withdrawn; no other line is listed.
-- [ ] [MCP-13] An item left with no waiting line is not listed; a repository left with none is listed with no `items`.
-- [ ] [MCP-14] Only items a member of the repository wrote are read (ABRD-06).
-- [ ] [MCP-15] A missing or malformed config file, one without `root`, a relative `root` or a `root` that is no directory is a tool result with `isError` true naming the file, never an empty inbox (see E-MCP-03).
-- [ ] [MCP-16] Finding no repository is a tool result with `isError` true that names the root, never an empty inbox.
-- [ ] [MCP-17] A repository whose read fails is listed with `unavailable` and its reason; the others are still read (see E-MCP-02).
-- [ ] [MCP-18] A directory under the root that cannot be read is listed in `unreadable` by its path with its reason, never skipped.
-- [ ] [MCP-19] Every call scans the root afresh and reads the repositories concurrently, in discovery's order; a refusal or unexpected failure is a tool error, the server keeps running and the next call succeeds.
+- MCP-11: `read_inbox` answers `structuredContent` and the same JSON as text: `root`, per repository its `items` and `steps`, or `unavailable` and a reason, and `unreadable` (see E-MCP-02).
+- MCP-12: A line waits on the operator when it is an option line neither ruled, nor returned to its head, nor withdrawn; no other line is listed.
+- MCP-13: An item left with no waiting line is not listed; a repository left with none is listed with no `items`.
+- MCP-14: Only items a member of the repository wrote are read (ABRD-06).
+- MCP-15: A missing or malformed config file, one without `root`, a relative `root` or a `root` that is no directory is a tool result with `isError` true naming the file, never an empty inbox (see E-MCP-03).
+- MCP-16: Finding no repository is a tool result with `isError` true that names the root, never an empty inbox.
+- MCP-17: A repository whose read fails is listed with `unavailable` and its reason; the others are still read (see E-MCP-02).
+- MCP-18: A directory under the root that cannot be read is listed in `unreadable` by its path with its reason, never skipped.
+- MCP-19: Every call scans the root afresh and reads the repositories concurrently, in discovery's order; a refusal or unexpected failure is a tool error, the server keeps running and the next call succeeds.
 
 ## Asking a card
 
 The card is the option line `specs/body-block.spec.md` owns (BODY-84..BODY-99): `text`, the line keys and `options`, with no state key.
 
-- [ ] [MCP-21] `ask` appends one option line, dated today in UTC, to the open item, and answers `repository`, `item`, `written` true, the line as RUL-10 prints it (see E-MCP-04).
-- [ ] [MCP-22] The same card asked again writes nothing: `ask` answers `written` false and the line already there, the first when several match, with its ruling or return (see E-MCP-05).
-- [ ] [MCP-23] A withdrawn line never matches a card: asking after its withdrawal appends a new line.
-- [ ] [MCP-24] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-06).
-- [ ] [MCP-25] A card value the grammar refuses, a card breaking BODY-96..BODY-99 or an item whose body is incomplete is a tool error naming every defect; nothing is written (see E-MCP-07).
-- [ ] [MCP-26] A card whose picture holds a code-fence line is stored: the body keeps its one `aco` block and the picture reads back unchanged.
-- [ ] [MCP-27] An unknown argument, a state key (`asked_on`, `ruling`, `card_hash`, ...), a `repository` that is no string or an `item` that is no integer is a tool error naming each; nothing is written.
-- [ ] [MCP-28] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; asking the same card again then answers the line if it stands, else writes it.
+- MCP-21: `ask` appends one option line, dated today in UTC, to the open item, and answers `repository`, `item`, `written` true, the line as RUL-10 prints it (see E-MCP-04).
+- MCP-22: The same card asked again writes nothing: `ask` answers `written` false and the line already there, the first when several match, with its ruling or return (see E-MCP-05).
+- MCP-23: A withdrawn line never matches a card: asking after its withdrawal appends a new line.
+- MCP-24: A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-06).
+- MCP-25: A card value the grammar refuses, a card breaking BODY-96..BODY-99 or an item whose body is incomplete is a tool error naming every defect; nothing is written (see E-MCP-07).
+- MCP-26: A card whose picture holds a code-fence line is stored: the body keeps its one `aco` block and the picture reads back unchanged.
+- MCP-27: An unknown argument, a state key (`asked_on`, `ruling`, `card_hash`, ...), a `repository` that is no string or an `item` that is no integer is a tool error naming each; nothing is written.
+- MCP-28: A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; asking the same card again then answers the line if it stands, else writes it.
 
 ## Earlier rulings
 
 A head that asks a card is shown what the operator already ruled in the card's area.
 
-- [ ] [MCP-57] `ask` also answers `earlier`: the ruled option lines of the card's area in every repository found, closed items too, each `{repository, item, title, question, answer, ruled_on, via}` (see E-MCP-18).
-- [ ] [MCP-58] `answer` is the ruled option's name, or the operator's own words for `other`; `via` is `board`, `chat` or `default`; lines come newest `ruled_on` first, ties by repository, item descending, line.
-- [ ] [MCP-59] `earlier` holds at most five lines and `earlier_more` counts the lines beyond them; for an area without a ruling `earlier` is an empty list and `earlier_more` is 0 (see E-MCP-04).
-- [ ] [MCP-60] A ruled option line counts when its area equals the card's ignoring case and a member of a found repository wrote its item; open, returned and withdrawn lines and the asked line are left out.
-- [ ] [MCP-61] The same card asked again, nothing written, answers `earlier` as the first call did; the lines are shown, never applied, and the card is written whatever they hold.
-- [ ] [MCP-62] A search that cannot answer gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
-- [ ] [MCP-63] `earlier` is what the forge's search index finds when the card is asked, so a ruling of the last minutes can be missing; the search runs after the item's lock is released.
-- [ ] [MCP-64] The area is matched as written (`Sicherung` and `Backup` differ); a body that no longer parses, a `state-ref` repository, a second forge host, a repository with a former remote name are not searched.
-- [ ] [MCP-65] The search cannot answer on a forge error, an incomplete or too large result, an area without a letter or digit word, no tracked owner, or a query over the forge's length limit (see MCP-62).
+- MCP-57: `ask` also answers `earlier`: the ruled option lines of the card's area in every repository found, closed items too, each `{repository, item, title, question, answer, ruled_on, via}` (see E-MCP-18).
+- MCP-58: `answer` is the ruled option's name, or the operator's own words for `other`; `via` is `board`, `chat` or `default`; lines come newest `ruled_on` first, ties by repository, item descending, line.
+- MCP-59: `earlier` holds at most five lines and `earlier_more` counts the lines beyond them; for an area without a ruling `earlier` is an empty list and `earlier_more` is 0 (see E-MCP-04).
+- MCP-60: A ruled option line counts when its area equals the card's ignoring case and a member of a found repository wrote its item; open, returned and withdrawn lines and the asked line are left out.
+- MCP-61: The same card asked again, nothing written, answers `earlier` as the first call did; the lines are shown, never applied, and the card is written whatever they hold.
+- MCP-62: A search that cannot answer gives `earlier_unavailable`, a sentence, not `earlier`; the card is written (see E-MCP-19).
+- MCP-63: `earlier` is what the forge's search index finds when the card is asked, so a ruling of the last minutes can be missing; the search runs after the item's lock is released.
+- MCP-64: The area is matched as written (`Sicherung` and `Backup` differ); a body that no longer parses, a `state-ref` repository, a second forge host, a repository with a former remote name are not searched.
+- MCP-65: The search cannot answer on a forge error, an incomplete or too large result, an area without a letter or digit word, no tracked owner, or a query over the forge's length limit (see MCP-62).
 
 ## Recording an answer
 
-- [ ] [MCP-29] `record_answer` rules `line` as `aco rule --via chat` does, from `option` or `other` and the shown `card_hash`; it answers `repository`, `item`, the line as RUL-10 prints it and `open` (see E-MCP-08).
-- [ ] [MCP-30] The answer binds like a board ruling: `read_inbox` drops the line, `aco rulings` shows it ruled with `via` `chat`, the board shows it decided and `aco next` no longer calls the item unruled.
-- [ ] [MCP-31] An `other` is stored as given, whatever characters it holds; one that holds a line separator never ends the item's block, and the stored answer reads back equal.
-- [ ] [MCP-32] Every refusal of `aco rule --via chat` holds: it is a tool error with the refusal's sentence and nothing is written, a repeat on a ruled line included (see E-MCP-09).
-- [ ] [MCP-33] A closed item and an item a non-member wrote are ruled, as `aco rule` rules them.
-- [ ] [MCP-34] A line with its head is ruled by the answer and loses `returned_on` and `returned_note`.
-- [ ] [MCP-35] An unknown argument (`via` is none), a wrong type, not exactly one of `option` and `other`, or a blank `other` is a tool error naming each; nothing is read or written (see E-MCP-10).
-- [ ] [MCP-36] A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
-- [ ] [MCP-37] `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
-- [ ] [MCP-38] No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`.
+- MCP-29: `record_answer` rules `line` as `aco rule --via chat` does, from `option` or `other` and the shown `card_hash`; it answers `repository`, `item`, the line as RUL-10 prints it and `open` (see E-MCP-08).
+- MCP-30: The answer binds like a board ruling: `read_inbox` drops the line, `aco rulings` shows it ruled with `via` `chat`, the board shows it decided and `aco next` no longer calls the item unruled.
+- MCP-31: An `other` is stored as given, whatever characters it holds; one that holds a line separator never ends the item's block, and the stored answer reads back equal.
+- MCP-32: Every refusal of `aco rule --via chat` holds: it is a tool error with the refusal's sentence and nothing is written, a repeat on a ruled line included (see E-MCP-09).
+- MCP-33: A closed item and an item a non-member wrote are ruled, as `aco rule` rules them.
+- MCP-34: A line with its head is ruled by the answer and loses `returned_on` and `returned_note`.
+- MCP-35: An unknown argument (`via` is none), a wrong type, not exactly one of `option` and `other`, or a blank `other` is a tool error naming each; nothing is read or written (see E-MCP-10).
+- MCP-36: A write whose check answers `not verified` or `overwritten` is a tool error with that sentence; the answer stands unless the sentence says it was overwritten in the meantime.
+- MCP-37: `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
+- MCP-38: No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`.
 - MCP-40 (retired).
-- [ ] [MCP-39] An open item a member wrote whose readable block's `wait` names `operator` is a step: `steps` lists its `number`, `title`, `step` (that wait's text) and card (MCP-67, E-MCP-11).
-- [ ] [MCP-41] `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
-- [ ] [MCP-42] Only items a member of the repository wrote are steps, as for cards (MCP-14); an item the store could not read is no step.
-- [ ] [MCP-43] Steps come by descending item number; an item with an operator wait and a waiting line is in `items` and in `steps`; one listing of a repository's open items serves both.
+- MCP-39: An open item a member wrote whose readable block's `wait` names `operator` is a step: `steps` lists its `number`, `title`, `step` (that wait's text) and card (MCP-67, E-MCP-11).
+- MCP-41: `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
+- MCP-42: Only items a member of the repository wrote are steps, as for cards (MCP-14); an item the store could not read is no step.
+- MCP-43: Steps come by descending item number; an item with an operator wait and a waiting line is in `items` and in `steps`; one listing of a repository's open items serves both.
 
 ## Marking a step
 
 `step` takes `repository`, `step`, `purpose`, `actions`, `expected`, optionally `answer`, and exactly one of `item` and `title`.
 
-- [ ] [MCP-44] `step` on an open `item` a member wrote sets its `wait.operator` to `step`, leaves `next`, then sets the label `needs-operator`; it answers `repository`, `item`, `step`, `created` false (E-MCP-12).
-- [ ] [MCP-45] The same call again writes no body and sets the label again; it answers the same, so a repeat finishes a call whose label failed.
-- [ ] [MCP-46] The rewritten body keeps every other field of the block, every ruling and every byte outside the block; the body is written before the label, both in the item's turn.
-- [ ] [MCP-47] `step` with a `title` no open item holds opens a task with `wait.operator` `step` and `next` `Act on the operator's answer in now.`, sets the label, `created` true; `read_inbox` lists it (E-MCP-13).
-- [ ] [MCP-48] A `title` that an open, readable item a member wrote holds with that exact `wait.operator` marks it (highest number of several), `created` false; a changed title or `wait.operator` opens a new item.
-- [ ] [MCP-49] `step`, `title`, `purpose`, `actions`, `expected` and `answer` are stripped before use; the stored text and the title matched are the stripped text.
-- [ ] [MCP-66] A step written to an item or opened as one also sets its block's `wait` to `operator = <step>` and `since` today; a repeat of the same step keeps the `since`.
-- [ ] [MCP-50] A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
-- [ ] [MCP-51] A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit <item> --base <body_hash>` as the way (see E-MCP-15).
-- [ ] [MCP-52] A body write whose check answers `not verified` or `overwritten` is a tool error with that sentence and sets no label; the same call again finishes it.
-- [ ] [MCP-53] A label that fails after the body is written or the item opened is a tool error naming the item and the forge's reason; the same call again sets it (see E-MCP-16).
-- [ ] [MCP-54] A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
-- [ ] [MCP-55] An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field is a tool error naming each; nothing is read or written (see E-MCP-17).
-- [ ] [MCP-56] A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
-- [ ] [MCP-67] `step` requires and stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `wait` stays the short `step`.
-- [ ] [MCP-68] `answer`, optional, is what the operator reports and why; without it he answers yes or no. A step without a `step` table lists all four fields as null.
-- [ ] [MCP-69] The same call with the same card fields writes no body (MCP-45); other card fields rewrite the `step` table and keep every other field of the block (MCP-46).
-- [ ] [MCP-70] A missing, non-string or blank `purpose`, `actions` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
-- [ ] [MCP-71] An item labelled `needs-operator` whose block has no operator `wait` is no step: `steps` omits it.
+- MCP-44: `step` on an open `item` a member wrote sets its `wait.operator` to `step`, leaves `next`, then sets the label `needs-operator`; it answers `repository`, `item`, `step`, `created` false (E-MCP-12).
+- MCP-45: The same call again writes no body and sets the label again; it answers the same, so a repeat finishes a call whose label failed.
+- MCP-46: The rewritten body keeps every other field of the block, every ruling and every byte outside the block; the body is written before the label, both in the item's turn.
+- MCP-47: `step` with a `title` no open item holds opens a task with `wait.operator` `step` and `next` `Act on the operator's answer in now.`, sets the label, `created` true; `read_inbox` lists it (E-MCP-13).
+- MCP-48: A `title` that an open, readable item a member wrote holds with that exact `wait.operator` marks it (highest number of several), `created` false; a changed title or `wait.operator` opens a new item.
+- MCP-49: `step`, `title`, `purpose`, `actions`, `expected` and `answer` are stripped before use; the stored text and the title matched are the stripped text.
+- MCP-66: A step written to an item or opened as one also sets its block's `wait` to `operator = <step>` and `since` today; a repeat of the same step keeps the `since`.
+- MCP-50: A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
+- MCP-51: A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit <item> --base <body_hash>` as the way (see E-MCP-15).
+- MCP-52: A body write whose check answers `not verified` or `overwritten` is a tool error with that sentence and sets no label; the same call again finishes it.
+- MCP-53: A label that fails after the body is written or the item opened is a tool error naming the item and the forge's reason; the same call again sets it (see E-MCP-16).
+- MCP-54: A new item whose issue type the forge did not set is a tool error naming the issue; the same call again sets the label and the type stays unset, to be set on the forge by hand.
+- MCP-55: An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field is a tool error naming each; nothing is read or written (see E-MCP-17).
+- MCP-56: A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
+- MCP-67: `step` requires and stores `purpose`, `actions` and `expected`, newlines kept, in the block's `step` table; `steps` lists them and `answer`; `wait` stays the short `step`.
+- MCP-68: `answer`, optional, is what the operator reports and why; without it he answers yes or no. A step without a `step` table lists all four fields as null.
+- MCP-69: The same call with the same card fields writes no body (MCP-45); other card fields rewrite the `step` table and keep every other field of the block (MCP-46).
+- MCP-70: A missing, non-string or blank `purpose`, `actions` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
+- MCP-71: An item labelled `needs-operator` whose block has no operator `wait` is no step: `steps` omits it.
 
 ## Answering a step
 
-- [ ] [MCP-79] `ask` and `step` also answer `link`: the URL `aco board --url` prints for the line asked or the step (BOARD-62, BOARD-64), built by the same producer (ABRD-187).
-- [ ] [MCP-80] Wherever the link cannot be built (`board_port` unset or malformed, the token file missing, malformed or unreadable), `link` is `null` and the call succeeds all the same.
-- [ ] [MCP-72] `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
-- [ ] [MCP-76] It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` stays as it is, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
-- [ ] [MCP-73] `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
-- [ ] [MCP-77] The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
-- [ ] [MCP-74] A `step` that is no longer the item's current step, an item with no step for the operator, or a `result` the step does not ask for is a tool error with a sentence; nothing is written.
-- [ ] [MCP-75] An unknown argument, a wrong type, a `result` outside the three, a blank `step`, or a `text` missing, blank or given with `Erfolgreich` is a tool error; nothing is read or written.
+- MCP-79: `ask` and `step` also answer `link`: the URL `aco board --url` prints for the line asked or the step (BOARD-62, BOARD-64), built by the same producer (ABRD-187).
+- MCP-80: Wherever the link cannot be built (`board_port` unset or malformed, the token file missing, malformed or unreadable), `link` is `null` and the call succeeds all the same.
+- MCP-72: `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
+- MCP-76: It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` stays as it is, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
+- MCP-73: `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
+- MCP-77: The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
+- MCP-74: A `step` that is no longer the item's current step, an item with no step for the operator, or a `result` the step does not ask for is a tool error with a sentence; nothing is written.
+- MCP-75: An unknown argument, a wrong type, a `result` outside the three, a blank `step`, or a `text` missing, blank or given with `Erfolgreich` is a tool error; nothing is read or written.
 
 ## Never
 

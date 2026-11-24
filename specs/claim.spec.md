@@ -66,56 +66,56 @@ CLM-01 and CLM-02 both end with the same fix pointer, `; run git worktree add
 ../<repo>-worktrees/issue-<n>-<slug> -b <agent>/issue-<n>-<slug>`, appended
 to the clause each names below.
 
-- [ ] [CLM-01] Off an isolated worktree, claim refuses `build claims require an isolated non-main worktree branch` plus the fix pointer above, exit `2`.
-- [ ] [CLM-29] CLM-01's default branch is the one the canonical remote's `HEAD` records; with none recorded, or one naming no branch that resolves, `main` and `master` count as default; see CLM-32 first.
-- [ ] [CLM-32] A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before CLM-01 (see E-CLM-09).
-- [ ] [CLM-30] CLM-01, CLM-02, CLM-03, CLM-05 and CLM-33 with `--branch` are judged after the board configuration is read, so its PIN-01/PIN-32 refusal comes first; CLM-04, CLM-20 and CLM-33 without it precede it.
-- [ ] [CLM-02] Sharing main's git dir, claim refuses `build claims require a linked isolated worktree checkout` plus the fix pointer above, exit `2`.
-- [ ] [CLM-03] A `--branch` differing from the checkout's own current branch refuses `claim branch '<branch>' does not match checkout branch '<current>'`, exit `2`.
-- [ ] [CLM-33] On a detached HEAD claim refuses `HEAD is detached; check out the lane branch first`, exit `2`, and writes nothing (see E-CLM-10).
-- [ ] [CLM-04] A `--base` differing from checkout `HEAD` refuses `claim base <base> does not match checkout HEAD <head>; omit --base to use checkout HEAD`, exit `2`.
-- [ ] [CLM-20] A `--base` that is not a full lowercase 40-character commit SHA refuses `base must be a full lowercase commit SHA`, exit `2`.
-- [ ] [CLM-05] A dirty working tree refuses `claim must be acquired before the first worktree edit: <path>`, naming the changed paths, exit `2`, before any write.
+- CLM-01: Off an isolated worktree, claim refuses `build claims require an isolated non-main worktree branch` plus the fix pointer above, exit `2`.
+- CLM-29: CLM-01's default branch is the one the canonical remote's `HEAD` records; with none recorded, or one naming no branch that resolves, `main` and `master` count as default; see CLM-32 first.
+- CLM-32: A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before CLM-01 (see E-CLM-09).
+- CLM-30: CLM-01, CLM-02, CLM-03, CLM-05 and CLM-33 with `--branch` are judged after the board configuration is read, so its PIN-01/PIN-32 refusal comes first; CLM-04, CLM-20 and CLM-33 without it precede it.
+- CLM-02: Sharing main's git dir, claim refuses `build claims require a linked isolated worktree checkout` plus the fix pointer above, exit `2`.
+- CLM-03: A `--branch` differing from the checkout's own current branch refuses `claim branch '<branch>' does not match checkout branch '<current>'`, exit `2`.
+- CLM-33: On a detached HEAD claim refuses `HEAD is detached; check out the lane branch first`, exit `2`, and writes nothing (see E-CLM-10).
+- CLM-04: A `--base` differing from checkout `HEAD` refuses `claim base <base> does not match checkout HEAD <head>; omit --base to use checkout HEAD`, exit `2`.
+- CLM-20: A `--base` that is not a full lowercase 40-character commit SHA refuses `base must be a full lowercase commit SHA`, exit `2`.
+- CLM-05: A dirty working tree refuses `claim must be acquired before the first worktree edit: <path>`, naming the changed paths, exit `2`, before any write.
 
 ## Identity: issue or lane
 
-- [ ] [CLM-06] Lane mode (the positional issue omitted) with no `--scope` refuses `lane claim requires --scope; a lane names no item to derive it from`, exit `2` (see E-CLM-01).
-- [ ] [CLM-07] A lane-mode branch not prefixed `docs/`/`fix/` refuses `branch '<branch>' is not an issueless lane; pass an issue number, or check out a branch prefixed 'docs/' or 'fix/'`, exit `2`.
+- CLM-06: Lane mode (the positional issue omitted) with no `--scope` refuses `lane claim requires --scope; a lane names no item to derive it from`, exit `2` (see E-CLM-01).
+- CLM-07: A lane-mode branch not prefixed `docs/`/`fix/` refuses `branch '<branch>' is not an issueless lane; pass an issue number, or check out a branch prefixed 'docs/' or 'fix/'`, exit `2`.
 
 ## The scope's entries
 
-- [ ] [CLM-38] A `--scope` value holding `*` or `?` refuses `claim scope entries are paths or directories, not glob patterns: '<path>'`, exit `2`, before any write; `[` `]` stay valid (see E-CLM-11).
+- CLM-38: A `--scope` value holding `*` or `?` refuses `claim scope entries are paths or directories, not glob patterns: '<path>'`, exit `2`, before any write; `[` `]` stay valid (see E-CLM-11).
 
 ## Slice-rule checks against the open board
 
-- [ ] [CLM-08] A higher-ranked actionable item free elsewhere refuses `higher-priority actionable item #<n> (score <n>) is free: <title>; use --out-of-order REASON to proceed`, exit `2` (see E-CLM-02).
-- [ ] [CLM-09] `--out-of-order <reason>` turns CLM-08's/CLM-10's refusal into `WARNING: <same sentence>` beside `CLAIMED`, exit `0`; the reason is never stored, only downgrading the check (see E-CLM-03).
-- [ ] [CLM-34] Text shows CLM-08's `<title>` with each display control escaped (NEXT-37), in the refusal and in CLM-09's `WARNING`; `--json`'s check `text` keeps it as stored.
-- [ ] [CLM-10] A target with an open blocker refuses `#<n> is blocked by <blockers> (open); pass --out-of-order REASON to claim it anyway`, exit `2`; `--out-of-order` downgrades this to a warning too.
-- [ ] [CLM-11] A target that is a container refuses `#<n> is a container; claim a child`, exit `2`, unaffected by `--out-of-order`.
-- [ ] [CLM-12] A closed or missing target refuses `issue #<n> is closed` or `issue #<n> does not exist here`, exit `2`.
-- [ ] [CLM-13] A target whose body is complete but empty on its projection keys refuses `#<n> body incomplete: <fields>`, exit `2`.
-- [ ] [CLM-14] A slice-shaped title with no recorded parent prints `WARNING: looks like slice <n> of #<parent> but is no sub-issue of #<parent>; the parent inherits nothing` (PIN-30), claims, exit `0`.
-- [ ] [CLM-28] Under `storage = "state-ref"` a slice-shaped title whose `#<parent>` lies past `aco-ffffff` names no item, so CLM-14 warns nothing.
+- CLM-08: A higher-ranked actionable item free elsewhere refuses `higher-priority actionable item #<n> (score <n>) is free: <title>; use --out-of-order REASON to proceed`, exit `2` (see E-CLM-02).
+- CLM-09: `--out-of-order <reason>` turns CLM-08's/CLM-10's refusal into `WARNING: <same sentence>` beside `CLAIMED`, exit `0`; the reason is never stored, only downgrading the check (see E-CLM-03).
+- CLM-34: Text shows CLM-08's `<title>` with each display control escaped (NEXT-37), in the refusal and in CLM-09's `WARNING`; `--json`'s check `text` keeps it as stored.
+- CLM-10: A target with an open blocker refuses `#<n> is blocked by <blockers> (open); pass --out-of-order REASON to claim it anyway`, exit `2`; `--out-of-order` downgrades this to a warning too.
+- CLM-11: A target that is a container refuses `#<n> is a container; claim a child`, exit `2`, unaffected by `--out-of-order`.
+- CLM-12: A closed or missing target refuses `issue #<n> is closed` or `issue #<n> does not exist here`, exit `2`.
+- CLM-13: A target whose body is complete but empty on its projection keys refuses `#<n> body incomplete: <fields>`, exit `2`.
+- CLM-14: A slice-shaped title with no recorded parent prints `WARNING: looks like slice <n> of #<parent> but is no sub-issue of #<parent>; the parent inherits nothing` (PIN-30), claims, exit `0`.
+- CLM-28: Under `storage = "state-ref"` a slice-shaped title whose `#<parent>` lies past `aco-ffffff` names no item, so CLM-14 warns nothing.
 
 ## Replay and JSON
 
-- [ ] [CLM-15] A replayed request (CLAIM-13) skips every slice-rule check and still prints `CLAIMED issue #<n>: <claim-id>`, even against a now-blocked, lower-ranked target (see E-CLM-04).
-- [ ] [CLM-16] With `--json`, a clean claim's warnings print to stderr not stdout, and land in the payload's `checks` array; without `--json` they print to stdout, ahead of `CLAIMED`.
-- [ ] [CLM-17] With `--json`, any error-level check refuses the envelope, `reason: "precondition_failed"`, then `"issue": <n>, "checks": [...]`, exit `2` (see E-CLM-06).
-- [ ] [CLM-18] A scope tripping the width gate refuses before any write, in the wording `claim-record.spec.md` owns (CLAIM-25, CLAIM-26, CLAIM-29), exit `2`.
-- [ ] [CLM-19] A successful `--json` claim's object carries `versioned_files`, `versioned_files_total`, `share`, `touches` and `checks`, beside the fields CLAIM-* already owns.
-- [ ] [CLM-21] With `--whole` omitted, a target naming its own top-level `whole` admits a wide scope exactly as `--whole REASON` would, both held to BODY-61; that sentence lands on the claim (see E-CLM-05).
-- [ ] [CLM-22] Neither `--whole` nor the target's own body `whole` present, the width gate's refusal ends `; pass --whole REASON or set whole in the body`, exit `2` (see E-CLM-05).
-- [ ] [CLM-23] A higher-ranked item naming neither `scope` nor a `[[slice]]` row is skipped by CLM-08's own walk (`specs/next.spec.md` NEXT-23); claiming past it costs no `--out-of-order`.
-- [ ] [CLM-35] A higher-ranked item waiting on the operator (`specs/next.spec.md` NEXT-39) is skipped by CLM-08's own walk too: claiming past it warns of nothing.
-- [ ] [CLM-36] A `--whole` outside BODY-61's bound refuses `whole reason must be one bounded non-empty line`, exit `2`, before any write.
-- [ ] [CLM-37] An explicit wide scope, or a replayed wide one, naming no `--whole` refuses a malformed target body by its first defect as CLAIM-68, `body_invalid`; `state-ref` refuses PIN-15, `unavailable`.
-- [ ] [CLM-24] Deriving scope for a target missing or a pull request refuses by name before any slice-rule check runs, `reason: "target_invalid"` under `--json` (see E-CLM-07).
-- [ ] [CLM-25] The store's own refusal to write -- the identity or claim id already taken, or a resource conflict -- reports `reason: "claim_conflict"` under `--json`.
-- [ ] [CLM-31] A `state-ref` item closed or edited after the checks read it open refuses CAS-20's sentence (CAS-59), `reason: "unavailable"`, and writes no claim (see E-CLM-08).
-- [ ] [CLM-26] Under `storage = "state-ref"`, `aco claim` resolves the state-ref forge like `aco rule`; `--repo` there refuses the same as PIN-04, `reason: "invalid_usage"`.
-- [ ] [CLM-27] Every other refusal the handler raises -- a checkout precondition, scope grammar, an unsafe branch or claim id -- reports `reason: "unavailable"`; a missing identity refuses through OUT-05.
+- CLM-15: A replayed request (CLAIM-13) skips every slice-rule check and still prints `CLAIMED issue #<n>: <claim-id>`, even against a now-blocked, lower-ranked target (see E-CLM-04).
+- CLM-16: With `--json`, a clean claim's warnings print to stderr not stdout, and land in the payload's `checks` array; without `--json` they print to stdout, ahead of `CLAIMED`.
+- CLM-17: With `--json`, any error-level check refuses the envelope, `reason: "precondition_failed"`, then `"issue": <n>, "checks": [...]`, exit `2` (see E-CLM-06).
+- CLM-18: A scope tripping the width gate refuses before any write, in the wording `claim-record.spec.md` owns (CLAIM-25, CLAIM-26, CLAIM-29), exit `2`.
+- CLM-19: A successful `--json` claim's object carries `versioned_files`, `versioned_files_total`, `share`, `touches` and `checks`, beside the fields CLAIM-* already owns.
+- CLM-21: With `--whole` omitted, a target naming its own top-level `whole` admits a wide scope exactly as `--whole REASON` would, both held to BODY-61; that sentence lands on the claim (see E-CLM-05).
+- CLM-22: Neither `--whole` nor the target's own body `whole` present, the width gate's refusal ends `; pass --whole REASON or set whole in the body`, exit `2` (see E-CLM-05).
+- CLM-23: A higher-ranked item naming neither `scope` nor a `[[slice]]` row is skipped by CLM-08's own walk (`specs/next.spec.md` NEXT-23); claiming past it costs no `--out-of-order`.
+- CLM-35: A higher-ranked item waiting on the operator (`specs/next.spec.md` NEXT-39) is skipped by CLM-08's own walk too: claiming past it warns of nothing.
+- CLM-36: A `--whole` outside BODY-61's bound refuses `whole reason must be one bounded non-empty line`, exit `2`, before any write.
+- CLM-37: An explicit wide scope, or a replayed wide one, naming no `--whole` refuses a malformed target body by its first defect as CLAIM-68, `body_invalid`; `state-ref` refuses PIN-15, `unavailable`.
+- CLM-24: Deriving scope for a target missing or a pull request refuses by name before any slice-rule check runs, `reason: "target_invalid"` under `--json` (see E-CLM-07).
+- CLM-25: The store's own refusal to write -- the identity or claim id already taken, or a resource conflict -- reports `reason: "claim_conflict"` under `--json`.
+- CLM-31: A `state-ref` item closed or edited after the checks read it open refuses CAS-20's sentence (CAS-59), `reason: "unavailable"`, and writes no claim (see E-CLM-08).
+- CLM-26: Under `storage = "state-ref"`, `aco claim` resolves the state-ref forge like `aco rule`; `--repo` there refuses the same as PIN-04, `reason: "invalid_usage"`.
+- CLM-27: Every other refusal the handler raises -- a checkout precondition, scope grammar, an unsafe branch or claim id -- reports `reason: "unavailable"`; a missing identity refuses through OUT-05.
 
 `reason`, by which refusal fired:
 

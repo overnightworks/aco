@@ -29,21 +29,21 @@ those IDs rather than restating them. `<sha>` is the runner's own commit id.
 
 ## The command's own argument shape
 
-- [ ] [BOOT-02] `aco bootstrap` followed by any argument it does not define refuses `aco: error: unrecognized arguments: <extra>` on stderr, exit `2`, before any read (see E-BOOT-04).
+- BOOT-02: `aco bootstrap` followed by any argument it does not define refuses `aco: error: unrecognized arguments: <extra>` on stderr, exit `2`, before any read (see E-BOOT-04).
 
 ## Forge-free, like the other repository-level commands
 
-- [ ] [BOOT-03] `aco --repo OWNER/REPO bootstrap` against any canonical remote host, GitHub or not, prints the ref's own commit id `<sha>`, exit `0`, same as with no `--repo` (see E-BOOT-02).
+- BOOT-03: `aco --repo OWNER/REPO bootstrap` against any canonical remote host, GitHub or not, prints the ref's own commit id `<sha>`, exit `0`, same as with no `--repo` (see E-BOOT-02).
 
 ## A store-level failure never invents JSON
 
 This command defines no `--json`, so its own sink never invents an error object from one.
 
-- [ ] [BOOT-01] A store-level refusal reaching `aco bootstrap` prints only `ERROR: <sentence>` on stderr, exit `2`; stdout stays empty (see E-BOOT-03).
+- BOOT-01: A store-level refusal reaching `aco bootstrap` prints only `ERROR: <sentence>` on stderr, exit `2`; stdout stays empty (see E-BOOT-03).
 
 ## A canonical remote with no URL configured
 
-- [ ] [BOOT-04] A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before any ref is read or written (see E-BOOT-05).
+- BOOT-04: A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2`, before any ref is read or written (see E-BOOT-05).
 
 ## Never
 

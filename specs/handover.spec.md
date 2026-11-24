@@ -30,28 +30,28 @@ its storage names it: `#<n>` under `storage = "github"`, the item id under
 | the lane's claim is already the acting session's | HANDOVER-19 | HANDOVER-12 |
 | `--branch`: `AGENT` is not the holder, no live lane claim, or an ITEM given with it or neither | HANDOVER-20..HANDOVER-22 | HANDOVER-13 |
 
-- [ ] [HANDOVER-01] `aco handover ITEM --from AGENT --reason TEXT` makes the acting session, by CLAIM-75, the holder of the item's live claim, prints `HANDED OVER <label>: <from> -> <to>`, exit `0` (see E-HANDOVER-01).
-- [ ] [HANDOVER-02] Only the holder changes: the claim's role, id, branch, scope, resource and opened commit stay, and the claim is one state-ref commit away from the one before.
-- [ ] [HANDOVER-03] That commit carries the trailers `intent: handover`, then `from: <agent>`, `to: <agent>` and `reason: <text>`, so the state ref's history keeps every takeover.
-- [ ] [HANDOVER-04] The item's `aco` block gains `handover = { from, to, reason, on }`, `on` today's UTC date, written before the claim moves and replacing an earlier one (see E-HANDOVER-01).
-- [ ] [HANDOVER-05] The new holder then lands, releases and rescopes the claim with no override and no `--agent` of the predecessor; the predecessor's next write refuses as a non-holder (see E-HANDOVER-02).
-- [ ] [HANDOVER-15] The claim's stored runs (LANREC-52) stay with the claim: the new holder begins and adds runs, and the previous holder's add refuses as a non-holder's (LANREC-61).
-- [ ] [HANDOVER-06] A `--from` that is not the holder refuses `<label> is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write (see E-HANDOVER-03).
-- [ ] [HANDOVER-07] A session that already holds the claim, with no recorded takeover of the same `--from` and `--reason`, refuses `this session already holds <label>`, exit `2`, before any write.
-- [ ] [HANDOVER-08] An item with no live claim refuses `issue <label> has no active build claim` (REL-09), exit `2`, before any write (see E-HANDOVER-03).
-- [ ] [HANDOVER-09] A `--reason` that is blank, spans more than one line or exceeds 512 characters refuses `reason must be one bounded non-empty line`, exit `2`, before any read of the item.
-- [ ] [HANDOVER-10] A repeat of a standing takeover (the acting session holds the claim, the item records the same `--from` and `--reason`) prints `ALREADY HANDED OVER <label>: <from> -> <to>`, exit `0`, writing nothing.
-- [ ] [HANDOVER-11] A claim write that fails after the record refuses `<label> records the handover, but the claim was not handed over: <detail>; run the same command again`, exit `2`; the same command finishes it.
-- [ ] [HANDOVER-12] `--json` on a success prints the envelope with `reason: "handed_over"`, or `"already_handed_over"` for HANDOVER-10, then `"item": <n>` or `"lane": "<branch>"`, `"from"`, `"to"` (see E-HANDOVER-01).
-- [ ] [HANDOVER-13] `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2`.
-- [ ] [HANDOVER-16] `aco handover --branch BRANCH --from AGENT --reason TEXT` makes the acting session the holder of the lane's live claim, prints `HANDED OVER lane <branch>: <from> -> <to>`, exit `0` (E-HANDOVER-05).
-- [ ] [HANDOVER-17] Only the holder changes, in one state-ref commit with HANDOVER-03's trailers; a lane has no item body, so none is written and the reason lives in that commit alone.
-- [ ] [HANDOVER-18] The new holder then lands, releases and rescopes the lane with no override; their refusals for a lane claim name this route (REL-41, CLAIM-37, CLAIM-38, LANDCMD-10).
-- [ ] [HANDOVER-19] A repeat, the acting session already holding the lane claim and `--from` naming it, prints `ALREADY HANDED OVER lane <branch>: <from> -> <to>`, exit `0`, writing nothing.
-- [ ] [HANDOVER-20] A `--from` that is not the lane claim's holder, the acting session included, refuses `lane '<branch>' is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write.
-- [ ] [HANDOVER-21] An ITEM together with `--branch`, or neither, refuses `name either an item or --branch, not both and not neither`, exit `2`, before any read.
-- [ ] [HANDOVER-22] A branch with no live lane claim refuses `lane '<branch>' has no active build claim` (REL-09), exit `2`, before any write.
-- [ ] [HANDOVER-14] Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
+- HANDOVER-01: `aco handover ITEM --from AGENT --reason TEXT` makes the acting session, by CLAIM-75, the holder of the item's live claim, prints `HANDED OVER <label>: <from> -> <to>`, exit `0` (see E-HANDOVER-01).
+- HANDOVER-02: Only the holder changes: the claim's role, id, branch, scope, resource and opened commit stay, and the claim is one state-ref commit away from the one before.
+- HANDOVER-03: That commit carries the trailers `intent: handover`, then `from: <agent>`, `to: <agent>` and `reason: <text>`, so the state ref's history keeps every takeover.
+- HANDOVER-04: The item's `aco` block gains `handover = { from, to, reason, on }`, `on` today's UTC date, written before the claim moves and replacing an earlier one (see E-HANDOVER-01).
+- HANDOVER-05: The new holder then lands, releases and rescopes the claim with no override and no `--agent` of the predecessor; the predecessor's next write refuses as a non-holder (see E-HANDOVER-02).
+- HANDOVER-15: The claim's stored runs (LANREC-52) stay with the claim: the new holder begins and adds runs, and the previous holder's add refuses as a non-holder's (LANREC-61).
+- HANDOVER-06: A `--from` that is not the holder refuses `<label> is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write (see E-HANDOVER-03).
+- HANDOVER-07: A session that already holds the claim, with no recorded takeover of the same `--from` and `--reason`, refuses `this session already holds <label>`, exit `2`, before any write.
+- HANDOVER-08: An item with no live claim refuses `issue <label> has no active build claim` (REL-09), exit `2`, before any write (see E-HANDOVER-03).
+- HANDOVER-09: A `--reason` that is blank, spans more than one line or exceeds 512 characters refuses `reason must be one bounded non-empty line`, exit `2`, before any read of the item.
+- HANDOVER-10: A repeat of a standing takeover (the acting session holds the claim, the item records the same `--from` and `--reason`) prints `ALREADY HANDED OVER <label>: <from> -> <to>`, exit `0`, writing nothing.
+- HANDOVER-11: A claim write that fails after the record refuses `<label> records the handover, but the claim was not handed over: <detail>; run the same command again`, exit `2`; the same command finishes it.
+- HANDOVER-12: `--json` on a success prints the envelope with `reason: "handed_over"`, or `"already_handed_over"` for HANDOVER-10, then `"item": <n>` or `"lane": "<branch>"`, `"from"`, `"to"` (see E-HANDOVER-01).
+- HANDOVER-13: `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2`.
+- HANDOVER-16: `aco handover --branch BRANCH --from AGENT --reason TEXT` makes the acting session the holder of the lane's live claim, prints `HANDED OVER lane <branch>: <from> -> <to>`, exit `0` (E-HANDOVER-05).
+- HANDOVER-17: Only the holder changes, in one state-ref commit with HANDOVER-03's trailers; a lane has no item body, so none is written and the reason lives in that commit alone.
+- HANDOVER-18: The new holder then lands, releases and rescopes the lane with no override; their refusals for a lane claim name this route (REL-41, CLAIM-37, CLAIM-38, LANDCMD-10).
+- HANDOVER-19: A repeat, the acting session already holding the lane claim and `--from` naming it, prints `ALREADY HANDED OVER lane <branch>: <from> -> <to>`, exit `0`, writing nothing.
+- HANDOVER-20: A `--from` that is not the lane claim's holder, the acting session included, refuses `lane '<branch>' is held by '<holder>', not by '<from>'; pass the holder as --from`, exit `2`, before any write.
+- HANDOVER-21: An ITEM together with `--branch`, or neither, refuses `name either an item or --branch, not both and not neither`, exit `2`, before any read.
+- HANDOVER-22: A branch with no live lane claim refuses `lane '<branch>' has no active build claim` (REL-09), exit `2`, before any write.
+- HANDOVER-14: Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
 
 `reason`, by which refusal fired:
 

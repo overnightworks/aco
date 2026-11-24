@@ -48,115 +48,115 @@ an item as `specs/landing-grammar.spec.md` names it: `#<n>` under
 
 ## The record and its key
 
-- [ ] [CLAIM-01] A first claim writes one record and `aco status` prints `CLAIMED issue #42: <agent> (<role>) base=<sha> branch=<branch> claim=<claim-id>` with one indented line per scope path (see E-CLAIM-01).
-- [ ] [CLAIM-02] An issue claim is one tree entry named `claims/issue-42.toml` under the state ref, whatever its branch is called.
-- [ ] [CLAIM-03] A lane claim's entry name percent-encodes its branch, so the lane `docs/tidy-readme` is stored as `claims/lane-docs%2Ftidy-readme.toml` (see E-CLAIM-02).
-- [ ] [CLAIM-04] The two key prefixes never collide: a lane branch literally named `issue-1` is stored as `claims/lane-issue-1.toml`, never as the entry of issue `#1`.
-- [ ] [CLAIM-05] A claim file carries `claim_id`, `agent`, `role`, `base`, `branch`, `scope`, `opened_commit`, and only then the optional `whole_reason`, `resource_name`, `resource_value`.
-- [ ] [CLAIM-75] Without `--agent`, the agent is `$ACO_AGENT`, else `Grok $GROK_SESSION_ID`, else `Claude $CLAUDE_CODE_SESSION_ID`, the first of them non-empty; none refuses as OUT-05.
-- [ ] [CLAIM-76] `aco handover` (`specs/handover.spec.md`) replaces a live item claim's agent with the acting one; the role, id, branch and scope stay, and the new agent is the holder CLAIM-37 and CLAIM-38 judge.
-- [ ] [CLAIM-10] A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both; only CLAIM-71 refuses that.
-- [ ] [CLAIM-57] A branch that is not a safe Git ref — a leading `-`, `..`, `//`, `@{`, a `.lock` suffix, a dot-segment — refuses `claim marker branch is not a safe Git ref: '<branch>'`, exit `2`.
-- [ ] [CLAIM-58] An agent or role that is blank, padded, holds a control character or display control (NEXT-37) or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before any write.
+- CLAIM-01: A first claim writes one record and `aco status` prints `CLAIMED issue #42: <agent> (<role>) base=<sha> branch=<branch> claim=<claim-id>` with one indented line per scope path (see E-CLAIM-01).
+- CLAIM-02: An issue claim is one tree entry named `claims/issue-42.toml` under the state ref, whatever its branch is called.
+- CLAIM-03: A lane claim's entry name percent-encodes its branch, so the lane `docs/tidy-readme` is stored as `claims/lane-docs%2Ftidy-readme.toml` (see E-CLAIM-02).
+- CLAIM-04: The two key prefixes never collide: a lane branch literally named `issue-1` is stored as `claims/lane-issue-1.toml`, never as the entry of issue `#1`.
+- CLAIM-05: A claim file carries `claim_id`, `agent`, `role`, `base`, `branch`, `scope`, `opened_commit`, and only then the optional `whole_reason`, `resource_name`, `resource_value`.
+- CLAIM-75: Without `--agent`, the agent is `$ACO_AGENT`, else `Grok $GROK_SESSION_ID`, else `Claude $CLAUDE_CODE_SESSION_ID`, the first of them non-empty; none refuses as OUT-05.
+- CLAIM-76: `aco handover` (`specs/handover.spec.md`) replaces a live item claim's agent with the acting one; the role, id, branch and scope stay, and the new agent is the holder CLAIM-37 and CLAIM-38 judge.
+- CLAIM-10: A lane claim and an issue claim never conflict by identity, so a `docs/` lane claims cleanly beside a live issue claim and `aco status` lists both; only CLAIM-71 refuses that.
+- CLAIM-57: A branch that is not a safe Git ref — a leading `-`, `..`, `//`, `@{`, a `.lock` suffix, a dot-segment — refuses `claim marker branch is not a safe Git ref: '<branch>'`, exit `2`.
+- CLAIM-58: An agent or role that is blank, padded, holds a control character or display control (NEXT-37) or exceeds its bound refuses `agent must be one bounded non-empty line`, exit `2`, before any write.
 
 ## A hand-corrupted claim file
 
-- [ ] [CLAIM-06] A claim file carrying a key outside those ten makes the next state read refuse `claim file issue-42.toml at <oid> has unknown keys: ['extra']`, exit `2`.
-- [ ] [CLAIM-07] A claim file missing a required key refuses `claim file issue-42.toml at <oid> is missing ['branch']`, exit `2`.
-- [ ] [CLAIM-08] A claim file carrying `resource_value` without `resource_name` refuses `claim file issue-42.toml at <oid> has resource_value without resource_name`, exit `2`.
-- [ ] [CLAIM-59] A claim file whose `agent`, `role`, `base`, `branch` or `opened_commit` is empty or not text refuses `claim file issue-42.toml at <oid> field 'agent' must be non-empty text`, exit `2`.
-- [ ] [CLAIM-60] A claim file whose `scope` is empty or holds a non-text entry refuses `claim file issue-42.toml at <oid> field 'scope' must be a non-empty list of text`, exit `2`.
-- [ ] [CLAIM-61] A claim file whose `claim_id` is not a claim id refuses `claim file issue-42.toml at <oid> has an invalid claim id`, exit `2`.
-- [ ] [CLAIM-62] A claim file whose `base` or `opened_commit` is not a 40-character lowercase commit id refuses `claim file issue-42.toml at <oid> has a malformed commit id`, exit `2`.
-- [ ] [CLAIM-63] A claim file that is not valid TOML refuses `malformed claim file issue-42.toml at <oid>: <reason>`, exit `2`; a `whole_reason` that is not text refuses `field 'whole_reason' must be text`.
-- [ ] [CLAIM-70] A claim file whose `scope` holds a path CLAIM-20 refuses fails the state read with `claim file issue-42.toml at <oid> has an invalid scope: <CLAIM-20 sentence>`, exit `2`; the file stays on the ref.
+- CLAIM-06: A claim file carrying a key outside those ten makes the next state read refuse `claim file issue-42.toml at <oid> has unknown keys: ['extra']`, exit `2`.
+- CLAIM-07: A claim file missing a required key refuses `claim file issue-42.toml at <oid> is missing ['branch']`, exit `2`.
+- CLAIM-08: A claim file carrying `resource_value` without `resource_name` refuses `claim file issue-42.toml at <oid> has resource_value without resource_name`, exit `2`.
+- CLAIM-59: A claim file whose `agent`, `role`, `base`, `branch` or `opened_commit` is empty or not text refuses `claim file issue-42.toml at <oid> field 'agent' must be non-empty text`, exit `2`.
+- CLAIM-60: A claim file whose `scope` is empty or holds a non-text entry refuses `claim file issue-42.toml at <oid> field 'scope' must be a non-empty list of text`, exit `2`.
+- CLAIM-61: A claim file whose `claim_id` is not a claim id refuses `claim file issue-42.toml at <oid> has an invalid claim id`, exit `2`.
+- CLAIM-62: A claim file whose `base` or `opened_commit` is not a 40-character lowercase commit id refuses `claim file issue-42.toml at <oid> has a malformed commit id`, exit `2`.
+- CLAIM-63: A claim file that is not valid TOML refuses `malformed claim file issue-42.toml at <oid>: <reason>`, exit `2`; a `whole_reason` that is not text refuses `field 'whole_reason' must be text`.
+- CLAIM-70: A claim file whose `scope` holds a path CLAIM-20 refuses fails the state read with `claim file issue-42.toml at <oid> has an invalid scope: <CLAIM-20 sentence>`, exit `2`; the file stays on the ref.
 
 ## A hand-corrupted claim key
 
-- [ ] [CLAIM-09] A claims entry whose name carries neither prefix refuses `claim key has neither the issue nor lane prefix: '<key>'`, exit `2`.
-- [ ] [CLAIM-56] A lane entry name whose escaped bytes are not UTF-8 refuses `claim key does not decode as utf-8: '<key>'`, exit `2`.
-- [ ] [CLAIM-64] An issue entry name carrying `0`, a leading zero, a non-number, over 18 ASCII digits or any non-ASCII digit refuses `claim key has a malformed issue number: '<key>'`, exit `2` (see E-CLAIM-07).
-- [ ] [CLAIM-65] A flat lane entry with a non-ASCII byte refuses `claim key has an unescaped reserved character: '<key>'`, exit `2`; a literal `/` is a nested path silently dropped instead.
-- [ ] [CLAIM-66] A lane entry name carrying an incomplete or non-hexadecimal escape refuses `claim key has a malformed percent-escape: '<key>'`, exit `2`.
+- CLAIM-09: A claims entry whose name carries neither prefix refuses `claim key has neither the issue nor lane prefix: '<key>'`, exit `2`.
+- CLAIM-56: A lane entry name whose escaped bytes are not UTF-8 refuses `claim key does not decode as utf-8: '<key>'`, exit `2`.
+- CLAIM-64: An issue entry name carrying `0`, a leading zero, a non-number, over 18 ASCII digits or any non-ASCII digit refuses `claim key has a malformed issue number: '<key>'`, exit `2` (see E-CLAIM-07).
+- CLAIM-65: A flat lane entry with a non-ASCII byte refuses `claim key has an unescaped reserved character: '<key>'`, exit `2`; a literal `/` is a nested path silently dropped instead.
+- CLAIM-66: A lane entry name carrying an incomplete or non-hexadecimal escape refuses `claim key has a malformed percent-escape: '<key>'`, exit `2`.
 
 ## Identity exclusivity
 
-- [ ] [CLAIM-11] A second claim on an already-claimed issue refuses `issue <label> is claimed by Ada (builder) on issue <label> branch ada/issue-42`, exit `2`, before anything is written (see E-CLAIM-03).
-- [ ] [CLAIM-12] A second claim on an already-claimed lane branch refuses `lane 'docs/tidy-readme' is claimed by Ada (builder) on lane 'docs/tidy-readme' branch docs/tidy-readme`, exit `2`.
-- [ ] [CLAIM-13] Repeating an interrupted claim with the same claim id, agent, role, branch and scope returns that same live claim and writes no second record, exit `0`.
-- [ ] [CLAIM-14] A claim id already on the ledger with different fields refuses `claim id '<claim-id>' is already on this ledger, active or released; release it, then claim again with a fresh claim id`.
-- [ ] [CLAIM-15] A released claim id stays terminal: claiming with it again refuses with that same `already on this ledger, active or released` sentence, exit `2`.
-- [ ] [CLAIM-16] `aco rescope` against a claim id with no live claim on its identity/branch, including a mismatched `--claim-id`, refuses the wording `rescope.spec.md` owns (RESC-14), exit `2`.
-- [ ] [CLAIM-17] `aco release` against a claim id with no live claim on its identity/branch, including a mismatched `--claim-id`, refuses the wording `release.spec.md` owns (REL-09, REL-10), exit `2`.
-- [ ] [CLAIM-71] An exclusive claim, which only `aco adopt` requests, refuses on every write attempt while any live claim holds its branch, issue or lane, with CLAIM-11/12's sentence naming that holder.
-- [ ] [CLAIM-72] Its exact replay returns the live claim as CLAIM-13 says; exclusivity is checked at write time only and never enters the claim record, which reads as an ordinary lane claim.
+- CLAIM-11: A second claim on an already-claimed issue refuses `issue <label> is claimed by Ada (builder) on issue <label> branch ada/issue-42`, exit `2`, before anything is written (see E-CLAIM-03).
+- CLAIM-12: A second claim on an already-claimed lane branch refuses `lane 'docs/tidy-readme' is claimed by Ada (builder) on lane 'docs/tidy-readme' branch docs/tidy-readme`, exit `2`.
+- CLAIM-13: Repeating an interrupted claim with the same claim id, agent, role, branch and scope returns that same live claim and writes no second record, exit `0`.
+- CLAIM-14: A claim id already on the ledger with different fields refuses `claim id '<claim-id>' is already on this ledger, active or released; release it, then claim again with a fresh claim id`.
+- CLAIM-15: A released claim id stays terminal: claiming with it again refuses with that same `already on this ledger, active or released` sentence, exit `2`.
+- CLAIM-16: `aco rescope` against a claim id with no live claim on its identity/branch, including a mismatched `--claim-id`, refuses the wording `rescope.spec.md` owns (RESC-14), exit `2`.
+- CLAIM-17: `aco release` against a claim id with no live claim on its identity/branch, including a mismatched `--claim-id`, refuses the wording `release.spec.md` owns (REL-09, REL-10), exit `2`.
+- CLAIM-71: An exclusive claim, which only `aco adopt` requests, refuses on every write attempt while any live claim holds its branch, issue or lane, with CLAIM-11/12's sentence naming that holder.
+- CLAIM-72: Its exact replay returns the live claim as CLAIM-13 says; exclusivity is checked at write time only and never enters the claim record, which reads as an ordinary lane claim.
 
 ## Scope grammar
 
-- [ ] [CLAIM-18] Each `--scope` value is exactly one path, comma and all, and a comma-bearing value matching no versioned file refuses `matches no versioned file; one --scope path per flag`, exit `2`.
-- [ ] [CLAIM-19] A scope value that is absolute, starts with `~`, carries `..`, is `.`, or opens with `.git` refuses `claim scope must be repository-relative: '<path>'`, exit `2`.
-- [ ] [CLAIM-20] A scope value with surrounding whitespace, a backslash, a TAB, a display control (NEXT-37) or over 512 characters refuses `claim scope entries must be canonical bounded paths`, exit `2`.
-- [ ] [CLAIM-21] A scope naming the same path twice refuses `claim scope contains duplicate paths`, exit `2`.
-- [ ] [CLAIM-22] An empty scope refuses `claim marker scope must be a non-empty list`, exit `2`.
-- [ ] [CLAIM-23] A scope of more than 256 entries refuses `claim marker scope exceeds 256 entries`, exit `2`; 256 entries still claim.
-- [ ] [CLAIM-24] A comma-free path that no file carries yet claims cleanly, since a lane routinely claims files it is about to create; `aco status` shows it verbatim.
+- CLAIM-18: Each `--scope` value is exactly one path, comma and all, and a comma-bearing value matching no versioned file refuses `matches no versioned file; one --scope path per flag`, exit `2`.
+- CLAIM-19: A scope value that is absolute, starts with `~`, carries `..`, is `.`, or opens with `.git` refuses `claim scope must be repository-relative: '<path>'`, exit `2`.
+- CLAIM-20: A scope value with surrounding whitespace, a backslash, a TAB, a display control (NEXT-37) or over 512 characters refuses `claim scope entries must be canonical bounded paths`, exit `2`.
+- CLAIM-21: A scope naming the same path twice refuses `claim scope contains duplicate paths`, exit `2`.
+- CLAIM-22: An empty scope refuses `claim marker scope must be a non-empty list`, exit `2`.
+- CLAIM-23: A scope of more than 256 entries refuses `claim marker scope exceeds 256 entries`, exit `2`; 256 entries still claim.
+- CLAIM-24: A comma-free path that no file carries yet claims cleanly, since a lane routinely claims files it is about to create; `aco status` shows it verbatim.
 
 ## Width
 
-- [ ] [CLAIM-25] A scope of four paths refuses `scope is wide: 4 paths exceeds three; pass --whole REASON`, exit `2`, for a lane claim or a lane rescope; issue-mode claim ends it `or set whole in the body` instead.
-- [ ] [CLAIM-26] Any directory in scope refuses `scope is wide: 1 directory in scope (docs); pass --whole REASON`, exit `2`, for a lane claim or a lane rescope; issue mode adds `or set whole in the body`.
+- CLAIM-25: A scope of four paths refuses `scope is wide: 4 paths exceeds three; pass --whole REASON`, exit `2`, for a lane claim or a lane rescope; issue-mode claim ends it `or set whole in the body` instead.
+- CLAIM-26: Any directory in scope refuses `scope is wide: 1 directory in scope (docs); pass --whole REASON`, exit `2`, for a lane claim or a lane rescope; issue mode adds `or set whole in the body`.
 - CLAIM-27 (retired).
-- [ ] [CLAIM-28] Under twelve versioned files a single named path is never wide on share: `aco claim 42 --scope README.md` prints its `CLAIMED` line, exit `0`.
-- [ ] [CLAIM-29] `--whole "<one sentence>"` admits a wide scope, lands in the record, and `aco status` prints it as an indented `whole: <one sentence>` line (see E-CLAIM-04).
-- [ ] [CLAIM-30] Exactly three named files with no directory are not wide: `aco claim 42 --scope README.md --scope AGENTS.md --scope CLAUDE.md` claims, exit `0`.
+- CLAIM-28: Under twelve versioned files a single named path is never wide on share: `aco claim 42 --scope README.md` prints its `CLAIMED` line, exit `0`.
+- CLAIM-29: `--whole "<one sentence>"` admits a wide scope, lands in the record, and `aco status` prints it as an indented `whole: <one sentence>` line (see E-CLAIM-04).
+- CLAIM-30: Exactly three named files with no directory are not wide: `aco claim 42 --scope README.md --scope AGENTS.md --scope CLAUDE.md` claims, exit `0`.
 
 ## Overlap, advisory
 
-- [ ] [CLAIM-31] A claim prints its cost and its overlaps as one line, `2 of 40 versioned files (5%); overlaps issue <label> on docs/guide.md`, and claims anyway, exit `0`.
-- [ ] [CLAIM-32] A scope meeting no live claim prints `overlaps no other open claims` on that same line, exit `0`.
-- [ ] [CLAIM-33] An overlap names the deeper path, so a live claim on `docs` met by a claim on `docs/guide.md` is named `on docs/guide.md`, never `on docs`.
-- [ ] [CLAIM-34] An overlap of more than three paths names the first three and counts the rest, `docs/a.md, docs/b.md, docs/c.md, and 2 more`.
-- [ ] [CLAIM-35] Sibling prefixes never meet: `docs` and `docs2/guide.md` are disjoint, so `aco status --path docs2/guide.md` prints `UNCLAIMED docs2/guide.md`, exit `0`.
+- CLAIM-31: A claim prints its cost and its overlaps as one line, `2 of 40 versioned files (5%); overlaps issue <label> on docs/guide.md`, and claims anyway, exit `0`.
+- CLAIM-32: A scope meeting no live claim prints `overlaps no other open claims` on that same line, exit `0`.
+- CLAIM-33: An overlap names the deeper path, so a live claim on `docs` met by a claim on `docs/guide.md` is named `on docs/guide.md`, never `on docs`.
+- CLAIM-34: An overlap of more than three paths names the first three and counts the rest, `docs/a.md, docs/b.md, docs/c.md, and 2 more`.
+- CLAIM-35: Sibling prefixes never meet: `docs` and `docs2/guide.md` are disjoint, so `aco status --path docs2/guide.md` prints `UNCLAIMED docs2/guide.md`, exit `0`.
 
 ## Roles
 
-- [ ] [CLAIM-36] An omitted `--role` makes the record a `builder`, and `aco status` prints `<agent> (builder)`.
-- [ ] [CLAIM-37] A rescope by a different agent refuses `only the original claimant may rescope`, REL-41's route, `(holder='Ada (builder)', this session='Bob (builder)')`, exit `2`.
-- [ ] [CLAIM-38] A release by a different agent or role refuses, exit `2`, naming holder and session and, for another agent, the `aco handover` route before the override (REL-12, REL-41).
-- [ ] [CLAIM-39] `--coordinator-override` without `--role coordinator` refuses `a coordinator override requires --role coordinator`, exit `2`.
-- [ ] [CLAIM-40] `--coordinator-override --role coordinator` releases a foreign live claim and removes its record, so `aco status` prints `UNCLAIMED issue #42`, exit `0`.
+- CLAIM-36: An omitted `--role` makes the record a `builder`, and `aco status` prints `<agent> (builder)`.
+- CLAIM-37: A rescope by a different agent refuses `only the original claimant may rescope`, REL-41's route, `(holder='Ada (builder)', this session='Bob (builder)')`, exit `2`.
+- CLAIM-38: A release by a different agent or role refuses, exit `2`, naming holder and session and, for another agent, the `aco handover` route before the override (REL-12, REL-41).
+- CLAIM-39: `--coordinator-override` without `--role coordinator` refuses `a coordinator override requires --role coordinator`, exit `2`.
+- CLAIM-40: `--coordinator-override --role coordinator` releases a foreign live claim and removes its record, so `aco status` prints `UNCLAIMED issue #42`, exit `0`.
 
 ## Resources
 
-- [ ] [CLAIM-41] `--resource <name>` holds the lowest positive integer that name never gave out, and `aco status` prints an indented `resource port=1` line, exit `0`.
-- [ ] [CLAIM-42] An explicit resource value another live claim holds refuses `port 1 is held by Ada (builder) on issue <label>`, exit `2`.
-- [ ] [CLAIM-43] A resource value a released claim once held refuses `port 1 was already consumed and cannot be reused`, exit `2`.
-- [ ] [CLAIM-44] A released resource value is never reassigned: after a release of `port 1`, the next `--resource port` claim succeeds and `aco status` prints its indented `resource port=2` line, exit `0`.
-- [ ] [CLAIM-45] A resource value without a resource name refuses `resource value requires a resource name`, exit `2`.
-- [ ] [CLAIM-46] A resource value that is zero, negative or not an integer refuses `resource value must be a positive integer`, exit `2`.
+- CLAIM-41: `--resource <name>` holds the lowest positive integer that name never gave out, and `aco status` prints an indented `resource port=1` line, exit `0`.
+- CLAIM-42: An explicit resource value another live claim holds refuses `port 1 is held by Ada (builder) on issue <label>`, exit `2`.
+- CLAIM-43: A resource value a released claim once held refuses `port 1 was already consumed and cannot be reused`, exit `2`.
+- CLAIM-44: A released resource value is never reassigned: after a release of `port 1`, the next `--resource port` claim succeeds and `aco status` prints its indented `resource port=2` line, exit `0`.
+- CLAIM-45: A resource value without a resource name refuses `resource value requires a resource name`, exit `2`.
+- CLAIM-46: A resource value that is zero, negative or not an integer refuses `resource value must be a positive integer`, exit `2`.
 
 ## Age and takeover
 
-- [ ] [CLAIM-47] `aco status` prints each live claim's age from the committer date of the commit that added it, the first-parent child of its `opened_commit`, as `Xh Ym`; a fresh claim reads `0h 0m` on an idle ref.
-- [ ] [CLAIM-48] A claim older than one hour is marked, so its `aco status` line ends `3h 12m old`; at or under an hour it ends `0h 59m`.
-- [ ] [CLAIM-49] `aco rescope` replaces only the scope: `claim=<claim-id>`, `base=<sha>` and the printed age keep counting from the first claim (see E-CLAIM-05).
-- [ ] [CLAIM-50] A claim whose `opened_commit` is not an ancestor of the fetched tip refuses `<oid> is not an ancestor of <tip>; the ref may have been rewritten`, exit `2`.
-- [ ] [CLAIM-51] A stale takeover is an override release and an ordinary claim: two state-ref commits, a fresh `claim=<claim-id>`, and no reuse of the released claim's resource integer.
-- [ ] [CLAIM-52] Closing an item never removes its claim: it stays `CLAIMED` in `aco status`, but drops from `aco board`, which reads open issues only; `RECOVERY (close or re-project)` lists an open landed item.
+- CLAIM-47: `aco status` prints each live claim's age from the committer date of the commit that added it, the first-parent child of its `opened_commit`, as `Xh Ym`; a fresh claim reads `0h 0m` on an idle ref.
+- CLAIM-48: A claim older than one hour is marked, so its `aco status` line ends `3h 12m old`; at or under an hour it ends `0h 59m`.
+- CLAIM-49: `aco rescope` replaces only the scope: `claim=<claim-id>`, `base=<sha>` and the printed age keep counting from the first claim (see E-CLAIM-05).
+- CLAIM-50: A claim whose `opened_commit` is not an ancestor of the fetched tip refuses `<oid> is not an ancestor of <tip>; the ref may have been rewritten`, exit `2`.
+- CLAIM-51: A stale takeover is an override release and an ordinary claim: two state-ref commits, a fresh `claim=<claim-id>`, and no reuse of the released claim's resource integer.
+- CLAIM-52: Closing an item never removes its claim: it stays `CLAIMED` in `aco status`, but drops from `aco board`, which reads open issues only; `RECOVERY (close or re-project)` lists an open landed item.
 
 ## The item's own scope
 
-- [ ] [CLAIM-53] Issue-mode `aco claim 42` without `--scope` takes the item's own `scope` into the record and prints the same `CLAIMED issue #42` line an explicit scope would (see E-CLAIM-06).
-- [ ] [CLAIM-54] A `--scope` set differing from the item's own `scope` refuses `claim scope differs from the item's scope; correct the item first`, exit `2`, so no reader claims a false disjointness.
-- [ ] [CLAIM-55] An item naming no `scope` refuses issue-mode `aco claim 42` without `--scope` with `item names no scope; pass --scope`, exit `2`.
-- [ ] [CLAIM-67] An explicit `--scope` matching the item's own `scope` as a set, reordered, still claims: CLAIM-54 refuses only a genuine mismatch, never a reordering.
-- [ ] [CLAIM-68] Deriving scope from a malformed `aco` block names that block's own defect (the family `aco check -` reports) before it ever refuses CLAIM-55's less specific "item names no scope".
-- [ ] [CLAIM-73] Under `storage = "state-ref"`, an issue claim, whatever its scope, on an item PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CLAIM-68's, before any write.
-- [ ] [CLAIM-74] A stored claim whose agent, role, branch or whole reason holds a display control (NEXT-37) reads and lists unchanged: no refusal, exit `0`; `--json` carries it as stored.
+- CLAIM-53: Issue-mode `aco claim 42` without `--scope` takes the item's own `scope` into the record and prints the same `CLAIMED issue #42` line an explicit scope would (see E-CLAIM-06).
+- CLAIM-54: A `--scope` set differing from the item's own `scope` refuses `claim scope differs from the item's scope; correct the item first`, exit `2`, so no reader claims a false disjointness.
+- CLAIM-55: An item naming no `scope` refuses issue-mode `aco claim 42` without `--scope` with `item names no scope; pass --scope`, exit `2`.
+- CLAIM-67: An explicit `--scope` matching the item's own `scope` as a set, reordered, still claims: CLAIM-54 refuses only a genuine mismatch, never a reordering.
+- CLAIM-68: Deriving scope from a malformed `aco` block names that block's own defect (the family `aco check -` reports) before it ever refuses CLAIM-55's less specific "item names no scope".
+- CLAIM-73: Under `storage = "state-ref"`, an issue claim, whatever its scope, on an item PIN-14 or PIN-15 refuses prints that sentence with ITEM-38's repair clause, not CLAIM-68's, before any write.
+- CLAIM-74: A stored claim whose agent, role, branch or whole reason holds a display control (NEXT-37) reads and lists unchanged: no refusal, exit `0`; `--json` carries it as stored.
 
 ## One claim's own `--json` field order
 
-- [ ] [CLAIM-69] Every command's `--json` claim view sits in `specs/output.spec.md`'s envelope (OUT-nn), spreading `issue`/`lane`, `claim_id`, `agent`, `role`, `base`, `branch`, `scope` before any view-only field.
+- CLAIM-69: Every command's `--json` claim view sits in `specs/output.spec.md`'s envelope (OUT-nn), spreading `issue`/`lane`, `claim_id`, `agent`, `role`, `base`, `branch`, `scope` before any view-only field.
 
 ## Never
 

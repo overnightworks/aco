@@ -93,43 +93,43 @@ list reads nothing after it.
 
 ## Checks, refusals and writes
 
-- [ ] [ADOPT-01] Under `storage = "state-ref"` it refuses `aco adopt is a github command; storage = state-ref has no pull requests to adopt`, exit `2`, before any forge read.
-- [ ] [ADOPT-02] A pull request that is not open, closed or merged alike, refuses `pull request #<n> is not open; it cannot be adopted`, exit `2`.
-- [ ] [ADOPT-03] A head branch of another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified` (LAND-12), exit `2`.
-- [ ] [ADOPT-04] A pull request not targeting the default branch refuses `pull request #<n> targets '<branch>', not the default branch '<default>'` (LAND-13), exit `2`.
-- [ ] [ADOPT-05] A live classification line, valid or malformed, refuses `pull request #<n> already carries <line>; adopt never changes a classification line`, exit `2`, unless it is the line ADOPT-26 keeps.
-- [ ] [ADOPT-06] A live claim on the head branch, issue or lane, refuses `lane '<branch>' is claimed by <agent> (<role>) on <subject> branch <branch>`, exit `2`, unless ADOPT-26 resumes.
-- [ ] [ADOPT-07] LAND-17 and LAND-73..76 apply to every kind, LAND-70..71 to `deps`, on the body adopt would write and at the head its first read named: a defect refuses `pull request #<n> <sentence>`, exit `2`.
-- [ ] [ADOPT-08] A `--no-item` other than `deps`, `fix` or `docs`, or none, or an `<n>` that is no positive integer, is a parser refusal: argparse's usage block and sentence on stderr, exit `2` (OUT's parser shape).
-- [ ] [ADOPT-09] With no claim on the branch, a path at `<repo>-worktrees/pr-<n>` refuses `<path> already exists; remove it, then adopt pull request #<n> again`, exit `2`.
-- [ ] [ADOPT-10] A fetched or built head other than the pull request's head, or a head branch the remote no longer has, refuses `pull request #<n> moved while adopt read it; run adopt again`, exit `2`.
-- [ ] [ADOPT-11] A body that would not read `No-Item: <kind>` once the line is added refuses `pull request #<n> body would not read No-Item: <kind> with the line added: <defect>`, exit `2`.
-- [ ] [ADOPT-12] The written body is the body last read, byte for byte, then a newline or blank line as needed, then `No-Item: <kind>`; title, labels, base, branch and commits never change.
-- [ ] [ADOPT-13] With no claim on the branch, a local branch `<branch>` refuses `branch '<branch>' already exists here; remove it, then adopt pull request #<n> again`, exit `2`.
-- [ ] [ADOPT-14] The claim scope is the listing's path set (LAND-74); `--whole REASON` reaches CLM-18's width gate, and an overlap is CLAIM-31's note, never a refusal.
-- [ ] [ADOPT-15] Run in a linked worktree whose git directory names no checkout, it refuses START-24's sentence ending `run adopt from the main checkout`, exit `2`.
-- [ ] [ADOPT-16] A pull request whose listing names no file refuses `pull request #<n> changes no file; there is nothing to adopt`, exit `2`.
-- [ ] [ADOPT-17] A head branch name the claim store refuses as unsafe refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2`, before any write.
-- [ ] [ADOPT-19] Every refusal from adopt's own checks is one line of at most 200 characters with `ERROR: `, foreign text shown with display controls escaped and cut to end in `…`; LAND-77 keeps `No-Item: fix` last.
+- ADOPT-01: Under `storage = "state-ref"` it refuses `aco adopt is a github command; storage = state-ref has no pull requests to adopt`, exit `2`, before any forge read.
+- ADOPT-02: A pull request that is not open, closed or merged alike, refuses `pull request #<n> is not open; it cannot be adopted`, exit `2`.
+- ADOPT-03: A head branch of another repository refuses `pull request #<n> proposes a branch of <repo>; cross-repository pull requests are not classified` (LAND-12), exit `2`.
+- ADOPT-04: A pull request not targeting the default branch refuses `pull request #<n> targets '<branch>', not the default branch '<default>'` (LAND-13), exit `2`.
+- ADOPT-05: A live classification line, valid or malformed, refuses `pull request #<n> already carries <line>; adopt never changes a classification line`, exit `2`, unless it is the line ADOPT-26 keeps.
+- ADOPT-06: A live claim on the head branch, issue or lane, refuses `lane '<branch>' is claimed by <agent> (<role>) on <subject> branch <branch>`, exit `2`, unless ADOPT-26 resumes.
+- ADOPT-07: LAND-17 and LAND-73..76 apply to every kind, LAND-70..71 to `deps`, on the body adopt would write and at the head its first read named: a defect refuses `pull request #<n> <sentence>`, exit `2`.
+- ADOPT-08: A `--no-item` other than `deps`, `fix` or `docs`, or none, or an `<n>` that is no positive integer, is a parser refusal: argparse's usage block and sentence on stderr, exit `2` (OUT's parser shape).
+- ADOPT-09: With no claim on the branch, a path at `<repo>-worktrees/pr-<n>` refuses `<path> already exists; remove it, then adopt pull request #<n> again`, exit `2`.
+- ADOPT-10: A fetched or built head other than the pull request's head, or a head branch the remote no longer has, refuses `pull request #<n> moved while adopt read it; run adopt again`, exit `2`.
+- ADOPT-11: A body that would not read `No-Item: <kind>` once the line is added refuses `pull request #<n> body would not read No-Item: <kind> with the line added: <defect>`, exit `2`.
+- ADOPT-12: The written body is the body last read, byte for byte, then a newline or blank line as needed, then `No-Item: <kind>`; title, labels, base, branch and commits never change.
+- ADOPT-13: With no claim on the branch, a local branch `<branch>` refuses `branch '<branch>' already exists here; remove it, then adopt pull request #<n> again`, exit `2`.
+- ADOPT-14: The claim scope is the listing's path set (LAND-74); `--whole REASON` reaches CLM-18's width gate, and an overlap is CLAIM-31's note, never a refusal.
+- ADOPT-15: Run in a linked worktree whose git directory names no checkout, it refuses START-24's sentence ending `run adopt from the main checkout`, exit `2`.
+- ADOPT-16: A pull request whose listing names no file refuses `pull request #<n> changes no file; there is nothing to adopt`, exit `2`.
+- ADOPT-17: A head branch name the claim store refuses as unsafe refuses `pull request #<n> head branch '<branch>' is no safe branch name`, exit `2`, before any write.
+- ADOPT-19: Every refusal from adopt's own checks is one line of at most 200 characters with `ERROR: `, foreign text shown with display controls escaped and cut to end in `…`; LAND-77 keeps `No-Item: fix` last.
 - ADOPT-18 (retired).
-- [ ] [ADOPT-20] `aco adopt <n> --no-item <kind>` on an open same-repository pull request nobody claims prints E-ADOPT-01's lines, exit `0`; the lane claim names this session's agent as builder.
-- [ ] [ADOPT-21] A claim refused after the build drops both: `removed worktree <path> and branch '<branch>' this adopt created`, exit `2`; START-21 and START-23 hold with `adopt`.
-- [ ] [ADOPT-22] A claim push of unknown outcome keeps both: `the claim's push was sent, its outcome unknown; worktree <path> and branch '<branch>' kept; run adopt again to resume it`, exit `2`.
-- [ ] [ADOPT-23] Right before writing, adopt reads the body again and composes from that copy; ADOPT-05, ADOPT-07 or ADOPT-11 then refuses with the claim kept, exit `2`.
-- [ ] [ADOPT-24] A body write the forge refused prints `pull request #<n> body not written (<error>); the claim stands; run adopt again, or release it`, exit `2`.
-- [ ] [ADOPT-25] A body write of unknown outcome prints `pull request #<n> body write sent, outcome unknown (<error>); the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-26] A rerun by this session's agent as builder, holding the branch's live lane claim with no other claim there, builds and claims nothing: it adds a missing line or keeps a present one, exit `0`.
-- [ ] [ADOPT-27] A write the edit history shows overwritten prints `pull request #<n> body written, but overwritten in the meantime by <editor> at <time>; the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-28] A write the edit history cannot confirm prints `pull request #<n> body written, not verified (<cause>); the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-29] ADOPT-06 holds at the claim write itself (CLAIM-71): a claim landing on the branch after adopt's checks refuses it there, then ADOPT-21 drops the build; the body stays unwritten.
-- [ ] [ADOPT-30] On ADOPT-26's rerun a body with more than one live classification line refuses `pull request #<n> <the parser's defect>; adopt never changes a classification line`, exit `2`.
-- [ ] [ADOPT-31] ADOPT-26's rerun judges ADOPT-02..07 and ADOPT-16 again on the body it would leave, at the head it read; it never builds, fetches, rescopes or checks ADOPT-09, ADOPT-10, ADOPT-13 or ADOPT-17.
-- [ ] [ADOPT-32] A same-agent lane claim under another role, or any claim beside the holder's on the branch, is no such rerun: ADOPT-06 refuses, naming that claim, and nothing is written.
-- [ ] [ADOPT-33] A failed re-read before the write prints `pull request #<n> body could not be read before writing (<error>); the claim stands; run adopt again`, exit `2`.
-- [ ] [ADOPT-34] A re-push of an adopted branch ends no claim; `aco land --head` demands the new head (LANDCMD-31), releases the lane (REL-57) and removes its clean worktree on `base` (REL-61).
-- [ ] [ADOPT-35] `aco release --branch <branch> --abandoned` frees an adopted lane and keeps worktree, branch and `No-Item:` line (REL-33); then `aco land` refuses (LAND-16) and `aco adopt` refuses (ADOPT-05).
-- [ ] [ADOPT-36] A write kept over an unread change prints `pull request #<n> body written over a change by <editor> at <time> adopt had not read; the claim stands; that change is only in the edit history`, exit `2`.
-- [ ] [ADOPT-37] An adopted lane's claim records as `base` the head adopt built (ADOPT-10); a rerun (ADOPT-26) writes no claim and a rescope keeps it (CLAIM-49).
+- ADOPT-20: `aco adopt <n> --no-item <kind>` on an open same-repository pull request nobody claims prints E-ADOPT-01's lines, exit `0`; the lane claim names this session's agent as builder.
+- ADOPT-21: A claim refused after the build drops both: `removed worktree <path> and branch '<branch>' this adopt created`, exit `2`; START-21 and START-23 hold with `adopt`.
+- ADOPT-22: A claim push of unknown outcome keeps both: `the claim's push was sent, its outcome unknown; worktree <path> and branch '<branch>' kept; run adopt again to resume it`, exit `2`.
+- ADOPT-23: Right before writing, adopt reads the body again and composes from that copy; ADOPT-05, ADOPT-07 or ADOPT-11 then refuses with the claim kept, exit `2`.
+- ADOPT-24: A body write the forge refused prints `pull request #<n> body not written (<error>); the claim stands; run adopt again, or release it`, exit `2`.
+- ADOPT-25: A body write of unknown outcome prints `pull request #<n> body write sent, outcome unknown (<error>); the claim stands; run adopt again`, exit `2`.
+- ADOPT-26: A rerun by this session's agent as builder, holding the branch's live lane claim with no other claim there, builds and claims nothing: it adds a missing line or keeps a present one, exit `0`.
+- ADOPT-27: A write the edit history shows overwritten prints `pull request #<n> body written, but overwritten in the meantime by <editor> at <time>; the claim stands; run adopt again`, exit `2`.
+- ADOPT-28: A write the edit history cannot confirm prints `pull request #<n> body written, not verified (<cause>); the claim stands; run adopt again`, exit `2`.
+- ADOPT-29: ADOPT-06 holds at the claim write itself (CLAIM-71): a claim landing on the branch after adopt's checks refuses it there, then ADOPT-21 drops the build; the body stays unwritten.
+- ADOPT-30: On ADOPT-26's rerun a body with more than one live classification line refuses `pull request #<n> <the parser's defect>; adopt never changes a classification line`, exit `2`.
+- ADOPT-31: ADOPT-26's rerun judges ADOPT-02..07 and ADOPT-16 again on the body it would leave, at the head it read; it never builds, fetches, rescopes or checks ADOPT-09, ADOPT-10, ADOPT-13 or ADOPT-17.
+- ADOPT-32: A same-agent lane claim under another role, or any claim beside the holder's on the branch, is no such rerun: ADOPT-06 refuses, naming that claim, and nothing is written.
+- ADOPT-33: A failed re-read before the write prints `pull request #<n> body could not be read before writing (<error>); the claim stands; run adopt again`, exit `2`.
+- ADOPT-34: A re-push of an adopted branch ends no claim; `aco land --head` demands the new head (LANDCMD-31), releases the lane (REL-57) and removes its clean worktree on `base` (REL-61).
+- ADOPT-35: `aco release --branch <branch> --abandoned` frees an adopted lane and keeps worktree, branch and `No-Item:` line (REL-33); then `aco land` refuses (LAND-16) and `aco adopt` refuses (ADOPT-05).
+- ADOPT-36: A write kept over an unread change prints `pull request #<n> body written over a change by <editor> at <time> adopt had not read; the claim stands; that change is only in the edit history`, exit `2`.
+- ADOPT-37: An adopted lane's claim records as `base` the head adopt built (ADOPT-10); a rerun (ADOPT-26) writes no claim and a rescope keeps it (CLAIM-49).
 
 ## Never
 

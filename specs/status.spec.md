@@ -37,10 +37,10 @@ shared sink `specs/ref-store-cas.spec.md`'s own preamble already documents.
 
 ## The empty repository and an unclaimed issue
 
-- [ ] [STAT-01] `aco status` with no issue argument, against no live claims, prints `UNCLAIMED repository`, exit `0` (see E-STAT-02).
-- [ ] [STAT-02] `aco status <n>` against an issue with no live claim prints `UNCLAIMED issue <label>`, `<label>` the storage-aware form STAT-14 owns, exit `0`.
-- [ ] [STAT-03] `aco status --json` against no matching claims prints the envelope, `reason: "unclaimed"`, then `"issue": <n-or-null>, "tip": <tip-or-null>, "claims": []`, then STAT-22's keys.
-- [ ] [STAT-17] `aco status --json` against a matching, non-conflicting claim reports `reason: "claimed"`, `ok: true`, exit `0`.
+- STAT-01: `aco status` with no issue argument, against no live claims, prints `UNCLAIMED repository`, exit `0` (see E-STAT-02).
+- STAT-02: `aco status <n>` against an issue with no live claim prints `UNCLAIMED issue <label>`, `<label>` the storage-aware form STAT-14 owns, exit `0`.
+- STAT-03: `aco status --json` against no matching claims prints the envelope, `reason: "unclaimed"`, then `"issue": <n-or-null>, "tip": <tip-or-null>, "claims": []`, then STAT-22's keys.
+- STAT-17: `aco status --json` against a matching, non-conflicting claim reports `reason: "claimed"`, `ok: true`, exit `0`.
 
 ## `CONFLICT`, status's own read of two claims on one identity
 
@@ -49,8 +49,8 @@ identity coincides -- no command here writes that state; a live claim
 already refuses a second one on the same identity (`specs/claim-record.spec.md`,
 CLAIM-11/CLAIM-12).
 
-- [ ] [STAT-04] Two live claims recorded under the same lane identity both print `CONFLICT` in place of `CLAIMED` at the head of their own line, exit `2`.
-- [ ] [STAT-05] The same pair under `--json` reports `reason: "conflict"`, `ok: false`, and each claim's own `"state": "CONFLICT"`, exit `2`.
+- STAT-04: Two live claims recorded under the same lane identity both print `CONFLICT` in place of `CLAIMED` at the head of their own line, exit `2`.
+- STAT-05: The same pair under `--json` reports `reason: "conflict"`, `ok: false`, and each claim's own `"state": "CONFLICT"`, exit `2`.
 
 ## Status's own overlap note
 
@@ -59,51 +59,51 @@ command's own fact; `aco status` renders overlap separately as one line per
 claim block, positioned after any resource or `whole:` line, naming only
 the peer and its claim id, never the meeting paths.
 
-- [ ] [STAT-06] A claim with a live peer ends its own block with `overlaps issue <label> (<claim-id>), issue <label> (<claim-id>)`, comma-joining every peer; a claim with no peer prints no such line (see E-STAT-05).
-- [ ] [STAT-08] `aco status --json`'s `claims[]` object carries an `"overlaps"` array of `{"issue", "lane", "claim_id", "agent"}` objects, one per peer STAT-06's own line names, `[]` when none.
-- [ ] [STAT-24] `aco status <n>` prints issue #<n>'s own claims and every claim that overlaps one of them or shares its identity, in text and under `--json`.
+- STAT-06: A claim with a live peer ends its own block with `overlaps issue <label> (<claim-id>), issue <label> (<claim-id>)`, comma-joining every peer; a claim with no peer prints no such line (see E-STAT-05).
+- STAT-08: `aco status --json`'s `claims[]` object carries an `"overlaps"` array of `{"issue", "lane", "claim_id", "agent"}` objects, one per peer STAT-06's own line names, `[]` when none.
+- STAT-24: `aco status <n>` prints issue #<n>'s own claims and every claim that overlaps one of them or shares its identity, in text and under `--json`.
 
 ## The lane-shared paths
 
-- [ ] [STAT-19] Text `aco status` over a claim ends with one line `lane-shared: <entry>, <entry>`, each trunk-committed `lane_shared` entry (PIN-37); none configured or no trunk (STAT-31), no such line.
-- [ ] [STAT-20] An entry naming no tracked path (PIN-41) shows as `<entry> (names no tracked path)`, never as a bare grant (see E-STAT-06).
-- [ ] [STAT-21] A trunk copy whose content refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
-- [ ] [STAT-33] The trunk's `.aco/board.toml` holding no file refuses `aco status` whole before any claim prints, with or without `--path`: `unavailable`, exit `2`, under `--json` `reason: "unavailable"`.
-- [ ] [STAT-22] `--json`, also with `--path`, ends with `"lane_shared": [{"path", "tracked"}, ...]` and `"lane_shared_unavailable": null`; on STAT-21's defect `null` and `"<sentence>"`.
-- [ ] [STAT-23] `aco status --path P` with no holder prints `LANE-SHARED P` when P is a tracked file entry or lies below a tracked directory entry (PIN-41); STAT-21's line follows the answer (see E-STAT-06).
+- STAT-19: Text `aco status` over a claim ends with one line `lane-shared: <entry>, <entry>`, each trunk-committed `lane_shared` entry (PIN-37); none configured or no trunk (STAT-31), no such line.
+- STAT-20: An entry naming no tracked path (PIN-41) shows as `<entry> (names no tracked path)`, never as a bare grant (see E-STAT-06).
+- STAT-21: A trunk copy whose content refuses (an unknown key, PIN-38, PIN-39) shows `lane-shared: unavailable (<sentence>)` instead; the claims still print, exit unchanged (see E-STAT-06).
+- STAT-33: The trunk's `.aco/board.toml` holding no file refuses `aco status` whole before any claim prints, with or without `--path`: `unavailable`, exit `2`, under `--json` `reason: "unavailable"`.
+- STAT-22: `--json`, also with `--path`, ends with `"lane_shared": [{"path", "tracked"}, ...]` and `"lane_shared_unavailable": null`; on STAT-21's defect `null` and `"<sentence>"`.
+- STAT-23: `aco status --path P` with no holder prints `LANE-SHARED P` when P is a tracked file entry or lies below a tracked directory entry (PIN-41); STAT-21's line follows the answer (see E-STAT-06).
 
 ## `--json`'s claim object, beside the fields `claim-record.spec.md` owns
 
-- [ ] [STAT-07] `aco status --json`'s `claims[]` object carries `"resource"`/`"resource_value"`, both `null` without a hold, beside CLAIM-41's own printed `resource <name>=<value>` line.
-- [ ] [STAT-09] `aco status --json`'s `claims[]` object carries `"age"` (CLAIM-47's own rendered text) and `"old"` (CLAIM-48's own boolean), so a caller never re-derives either from a timestamp.
+- STAT-07: `aco status --json`'s `claims[]` object carries `"resource"`/`"resource_value"`, both `null` without a hold, beside CLAIM-41's own printed `resource <name>=<value>` line.
+- STAT-09: `aco status --json`'s `claims[]` object carries `"age"` (CLAIM-47's own rendered text) and `"old"` (CLAIM-48's own boolean), so a caller never re-derives either from a timestamp.
 
 ## `--path`, a narrower read that never touches claim age
 
-- [ ] [STAT-10] `aco status --path P` against no holder prints `UNCLAIMED P`, exit `0` (see E-STAT-03).
-- [ ] [STAT-11] `aco status --path P` against one holder prints `CLAIMED P issue <label>: <agent> (<role>) claim=<claim-id>`, with no `base=`, `branch=`, or age field, exit `0` (see E-STAT-03, E-STAT-05).
-- [ ] [STAT-12] `aco status --path P` against more than one holder appends one line, `overlap: issue <label> (<claim-id>), issue <label> (<claim-id>)`, after every holder's own line (see E-STAT-05).
-- [ ] [STAT-13] `aco status --path P --json` prints the envelope, `reason: "unclaimed"`/`"claimed"`, then `"path": P, "claims": [...]`, none carrying an `"overlaps"` key (see E-STAT-03).
-- [ ] [STAT-25] `aco status --path P` prints a holder's `--whole` reason (CLAIM-29) as the indented line `  whole: <reason>` right below that holder's line, and never a `resource` line.
-- [ ] [STAT-26] `aco status --path P --json`'s per-holder object carries `"resource"` and `"resource_value"` (`null` without a hold) and, only when a reason is set, `"whole"` (CLAIM-29).
-- [ ] [STAT-27] `aco status --path P` shows every listed holder as `CLAIMED` (`"state": "CLAIMED"`), even two holders of one identity that plain `aco status` shows as `CONFLICT` (STAT-04).
-- [ ] [STAT-28] `aco status <n> --path P` ignores `<n>` and answers for P alone.
+- STAT-10: `aco status --path P` against no holder prints `UNCLAIMED P`, exit `0` (see E-STAT-03).
+- STAT-11: `aco status --path P` against one holder prints `CLAIMED P issue <label>: <agent> (<role>) claim=<claim-id>`, with no `base=`, `branch=`, or age field, exit `0` (see E-STAT-03, E-STAT-05).
+- STAT-12: `aco status --path P` against more than one holder appends one line, `overlap: issue <label> (<claim-id>), issue <label> (<claim-id>)`, after every holder's own line (see E-STAT-05).
+- STAT-13: `aco status --path P --json` prints the envelope, `reason: "unclaimed"`/`"claimed"`, then `"path": P, "claims": [...]`, none carrying an `"overlaps"` key (see E-STAT-03).
+- STAT-25: `aco status --path P` prints a holder's `--whole` reason (CLAIM-29) as the indented line `  whole: <reason>` right below that holder's line, and never a `resource` line.
+- STAT-26: `aco status --path P --json`'s per-holder object carries `"resource"` and `"resource_value"` (`null` without a hold) and, only when a reason is set, `"whole"` (CLAIM-29).
+- STAT-27: `aco status --path P` shows every listed holder as `CLAIMED` (`"state": "CLAIMED"`), even two holders of one identity that plain `aco status` shows as `CONFLICT` (STAT-04).
+- STAT-28: `aco status <n> --path P` ignores `<n>` and answers for P alone.
 
 ## Storage-aware labels
 
-- [ ] [STAT-14] Under `storage = "state-ref"`, `aco status <item-id>`'s subject reads the `<label>` form `specs/landing-grammar.spec.md` owns: `issue aco-xxxxxx`, never `issue #<n>`.
-- [ ] [STAT-15] `aco status --json`'s `"issue"` field is always the bare item number under either storage pin, never `aco-xxxxxx`, the convention `specs/landing-grammar.spec.md` states.
+- STAT-14: Under `storage = "state-ref"`, `aco status <item-id>`'s subject reads the `<label>` form `specs/landing-grammar.spec.md` owns: `issue aco-xxxxxx`, never `issue #<n>`.
+- STAT-15: `aco status --json`'s `"issue"` field is always the bare item number under either storage pin, never `aco-xxxxxx`, the convention `specs/landing-grammar.spec.md` states.
 
 ## Forge-free
 
-- [ ] [STAT-16] `aco status` resolves no item forge and reads no remote URL beyond its board-config check; an OWNER/REPO `--repo` and a non-GitHub remote are no error, in text, `--json`, or `--path` (see E-STAT-04).
+- STAT-16: `aco status` resolves no item forge and reads no remote URL beyond its board-config check; an OWNER/REPO `--repo` and a non-GitHub remote are no error, in text, `--json`, or `--path` (see E-STAT-04).
 
 ## Every other refusal
 
-- [ ] [STAT-18] A lineage break (STAT-29, STAT-30) or a malformed claim record reports through the shared sink and, under `--json`, `reason: "unavailable"`, exit `2`, never `invalid_usage` (STAT-16).
-- [ ] [STAT-29] Plain `aco status` over a claim whose `opened_commit` the fetched tip does not reach refuses with CLAIM-50's sentence; `--path` reads no claim age and never refuses so (see Never).
-- [ ] [STAT-30] A fetched `refs/aco/state` that does not descend from this worktree's last observation refuses with CAS-11's sentence, in every form, `--path` included.
-- [ ] [STAT-31] With no trunk resolving, `aco status` names no lane-shared files: no `lane-shared:` line; `--json` carries `"lane_shared": []`, `"lane_shared_unavailable": null`; claims and exit are unchanged.
-- [ ] [STAT-32] Text `aco status`, `--path` too, shows each display control in a claim's agent, role, branch and `whole:` reason as NEXT-37's escape; `--json` carries it as stored.
+- STAT-18: A lineage break (STAT-29, STAT-30) or a malformed claim record reports through the shared sink and, under `--json`, `reason: "unavailable"`, exit `2`, never `invalid_usage` (STAT-16).
+- STAT-29: Plain `aco status` over a claim whose `opened_commit` the fetched tip does not reach refuses with CLAIM-50's sentence; `--path` reads no claim age and never refuses so (see Never).
+- STAT-30: A fetched `refs/aco/state` that does not descend from this worktree's last observation refuses with CAS-11's sentence, in every form, `--path` included.
+- STAT-31: With no trunk resolving, `aco status` names no lane-shared files: no `lane-shared:` line; `--json` carries `"lane_shared": []`, `"lane_shared_unavailable": null`; claims and exit are unchanged.
+- STAT-32: Text `aco status`, `--path` too, shows each display control in a claim's agent, role, branch and `whole:` reason as NEXT-37's escape; `--json` carries it as stored.
 
 ## Never
 

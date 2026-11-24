@@ -61,74 +61,74 @@ a bracketed table header alone, as written, with no surrounding space and no com
 
 ## Fence and surroundings
 
-- [ ] [BODY-01] A body with no `aco` fence makes `aco check -` print `body malformed: aco: no aco block` on stderr, exit `2` — never a sentence about another grammar.
-- [ ] [BODY-02] A body whose `aco` fence is opened and never closed makes `aco check -` print `body malformed: aco: unclosed aco block` on stderr, exit `2`.
-- [ ] [BODY-03] A body with two `aco` fences makes `aco check -` print `body malformed: aco: multiple aco blocks; exactly one is allowed` on stderr, exit `2`.
-- [ ] [BODY-04] A fence whose content is not TOML makes `aco check -` print `body malformed: aco: aco block is not valid TOML: <reason>` on stderr, exit `2`.
-- [ ] [BODY-05] An `aco` fence quoted inside a longer documentation fence is not the item's block, so a body carrying only that one prints `body malformed: aco: no aco block`, exit `2`.
-- [ ] [BODY-06] Prose beside the block — headings, a `Blocked by: nichts` line, another tool's section — carries no contract: prose plus one complete block prints `body ok`, exit `0`, except BODY-109.
-- [ ] [BODY-07] A block whose lines end in CRLF is read like any other: a complete CRLF body prints `body ok`, exit `0`; a rewrite keeps CRLF but re-renders the block's fields canonically, not byte-for-byte.
-- [ ] [BODY-109] A header line (BODY-110) outside every fence prints `body malformed: aco: <header> on line <line> is outside the aco block` per line in body order, exit `2`, after BODY-01..04, alone (see E-BODY-20).
-- [ ] [BODY-110] A header line: `[[expectation]]`, `[[expectation.option]]`, `[[slice]]` or `[record]`, 0 to 3 leading spaces, blanks inside brackets or around the dot, trailing blanks, a `#` comment.
+- BODY-01: A body with no `aco` fence makes `aco check -` print `body malformed: aco: no aco block` on stderr, exit `2` — never a sentence about another grammar.
+- BODY-02: A body whose `aco` fence is opened and never closed makes `aco check -` print `body malformed: aco: unclosed aco block` on stderr, exit `2`.
+- BODY-03: A body with two `aco` fences makes `aco check -` print `body malformed: aco: multiple aco blocks; exactly one is allowed` on stderr, exit `2`.
+- BODY-04: A fence whose content is not TOML makes `aco check -` print `body malformed: aco: aco block is not valid TOML: <reason>` on stderr, exit `2`.
+- BODY-05: An `aco` fence quoted inside a longer documentation fence is not the item's block, so a body carrying only that one prints `body malformed: aco: no aco block`, exit `2`.
+- BODY-06: Prose beside the block — headings, a `Blocked by: nichts` line, another tool's section — carries no contract: prose plus one complete block prints `body ok`, exit `0`, except BODY-109.
+- BODY-07: A block whose lines end in CRLF is read like any other: a complete CRLF body prints `body ok`, exit `0`; a rewrite keeps CRLF but re-renders the block's fields canonically, not byte-for-byte.
+- BODY-109: A header line (BODY-110) outside every fence prints `body malformed: aco: <header> on line <line> is outside the aco block` per line in body order, exit `2`, after BODY-01..04, alone (see E-BODY-20).
+- BODY-110: A header line: `[[expectation]]`, `[[expectation.option]]`, `[[slice]]` or `[record]`, 0 to 3 leading spaces, blanks inside brackets or around the dot, trailing blanks, a `#` comment.
 
 ## Projection keys
 
-- [ ] [BODY-08] A block without `version` prints `body malformed: version: version is required and must be 1` on stderr, exit `2`.
-- [ ] [BODY-09] A block whose `version` is any value but the integer `1` prints `body malformed: version: version must be exactly 1` on stderr, exit `2`.
-- [ ] [BODY-10] A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
-- [ ] [BODY-11] A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
-- [ ] [BODY-12] A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
-- [ ] [BODY-13] A top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `step`, `scope`, `size`, `whole`, `planned_at_first_cut`, `expectation`, `slice` is `unknown top-level key`, exit `2`.
-- [ ] [BODY-14] A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
+- BODY-08: A block without `version` prints `body malformed: version: version is required and must be 1` on stderr, exit `2`.
+- BODY-09: A block whose `version` is any value but the integer `1` prints `body malformed: version: version must be exactly 1` on stderr, exit `2`.
+- BODY-10: A block missing `now`, `next` or `done_when` prints one `body malformed: <key>: <key> is required` line per missing key on stderr, exit `2`.
+- BODY-11: A block whose `now`, `next` or `done_when` is not a string prints `body malformed: <key>: <key> must be a string` on stderr, exit `2`.
+- BODY-12: A block whose projection keys are present but not all filled is valid but unfilled: `aco check -` prints `body incomplete: <keys>` on stderr, exit `2` (see E-BODY-02).
+- BODY-13: A top-level key but `version`, `now`, `next`, `done_when`, `wait`, `handover`, `step`, `scope`, `size`, `whole`, `planned_at_first_cut`, `expectation`, `slice` is `unknown top-level key`, exit `2`.
+- BODY-14: A block whose three projection keys are all non-empty and whose optional tables are valid prints `body ok` on stdout, exit `0`, with nothing on stderr (see E-BODY-01).
 
 ## `[record]`, the state-ref item identity
 
-- [ ] [BODY-15] Under `storage = "github"` a `[record]` table is an unknown key: `aco check -` prints `body malformed: record: unknown top-level key record` on stderr, exit `2`.
-- [ ] [BODY-16] Under `storage = "state-ref"` a `[record]` carrying `title`, `state`, `created_at`, `updated_at` is valid: `aco check -` prints `body ok`, exit `0` (see E-BODY-05).
-- [ ] [BODY-17] A `[record]` whose `state` is neither `open` nor `closed` prints `body malformed: record.state: record.state must be open or closed` on stderr, exit `2`.
-- [ ] [BODY-18] A `[record]` with `state = "closed"` and no `closed_at` prints `body malformed: record.closed_at: record.closed_at is required when record.state is closed`, exit `2`.
-- [ ] [BODY-19] A `[record]` timestamp that is not an RFC 3339 UTC instant prints `body malformed: record.created_at: record.created_at must be an RFC 3339 UTC timestamp`, exit `2`.
-- [ ] [BODY-20] A `[record]` key outside the ten allowed keys prints `body malformed: record.<key>: unknown key record.<key>`, exit `2`.
+- BODY-15: Under `storage = "github"` a `[record]` table is an unknown key: `aco check -` prints `body malformed: record: unknown top-level key record` on stderr, exit `2`.
+- BODY-16: Under `storage = "state-ref"` a `[record]` carrying `title`, `state`, `created_at`, `updated_at` is valid: `aco check -` prints `body ok`, exit `0` (see E-BODY-05).
+- BODY-17: A `[record]` whose `state` is neither `open` nor `closed` prints `body malformed: record.state: record.state must be open or closed` on stderr, exit `2`.
+- BODY-18: A `[record]` with `state = "closed"` and no `closed_at` prints `body malformed: record.closed_at: record.closed_at is required when record.state is closed`, exit `2`.
+- BODY-19: A `[record]` timestamp that is not an RFC 3339 UTC instant prints `body malformed: record.created_at: record.created_at must be an RFC 3339 UTC timestamp`, exit `2`.
+- BODY-20: A `[record]` key outside the ten allowed keys prints `body malformed: record.<key>: unknown key record.<key>`, exit `2`.
 
 ## `wait`
 
-- [ ] [BODY-21] A `wait` that is not a table prints `body malformed: wait: wait must be a table` on stderr, exit `2`.
-- [ ] [BODY-22] A `wait` naming none or more than one of `operator`, `until`, `trigger` prints `body malformed: wait: wait must name exactly one of operator, until, trigger`, exit `2`.
-- [ ] [BODY-23] A `wait.since` that is missing or not a TOML local date prints `body malformed: wait.since: wait.since must be a TOML local date`, exit `2`.
-- [ ] [BODY-24] A `wait` key outside `operator`, `until`, `trigger` and `since` prints `body malformed: wait.<key>: unknown key wait.<key>` on stderr, exit `2`.
-- [ ] [BODY-112] A blank or non-string `wait.operator` or `wait.trigger` prints `body malformed: wait.<key>: wait.<key> must be a non-empty string`, exit `2`.
-- [ ] [BODY-113] A `wait.until` that is not a TOML local date prints `body malformed: wait.until: wait.until must be a TOML local date`, exit `2`.
+- BODY-21: A `wait` that is not a table prints `body malformed: wait: wait must be a table` on stderr, exit `2`.
+- BODY-22: A `wait` naming none or more than one of `operator`, `until`, `trigger` prints `body malformed: wait: wait must name exactly one of operator, until, trigger`, exit `2`.
+- BODY-23: A `wait.since` that is missing or not a TOML local date prints `body malformed: wait.since: wait.since must be a TOML local date`, exit `2`.
+- BODY-24: A `wait` key outside `operator`, `until`, `trigger` and `since` prints `body malformed: wait.<key>: unknown key wait.<key>` on stderr, exit `2`.
+- BODY-112: A blank or non-string `wait.operator` or `wait.trigger` prints `body malformed: wait.<key>: wait.<key> must be a non-empty string`, exit `2`.
+- BODY-113: A `wait.until` that is not a TOML local date prints `body malformed: wait.until: wait.until must be a TOML local date`, exit `2`.
 
 ## `handover`
 
-- [ ] [BODY-114] A `handover` that is not a table prints `body malformed: handover: handover must be a table` on stderr, exit `2`; the table is `aco handover`'s record (see HANDOVER-04).
-- [ ] [BODY-115] A blank, non-string or multi-line `handover.from`, `handover.to` or `handover.reason` prints `body malformed: handover.<key>: handover.<key> must be a non-empty one-line string`, exit `2`.
-- [ ] [BODY-116] A `handover.on` that is missing or not a TOML local date prints `body malformed: handover.on: handover.on must be a TOML local date`, exit `2`.
-- [ ] [BODY-117] A `handover` key outside `from`, `to`, `reason` and `on` prints `body malformed: handover.<key>: unknown key handover.<key>` on stderr, exit `2`.
+- BODY-114: A `handover` that is not a table prints `body malformed: handover: handover must be a table` on stderr, exit `2`; the table is `aco handover`'s record (see HANDOVER-04).
+- BODY-115: A blank, non-string or multi-line `handover.from`, `handover.to` or `handover.reason` prints `body malformed: handover.<key>: handover.<key> must be a non-empty one-line string`, exit `2`.
+- BODY-116: A `handover.on` that is missing or not a TOML local date prints `body malformed: handover.on: handover.on must be a TOML local date`, exit `2`.
+- BODY-117: A `handover` key outside `from`, `to`, `reason` and `on` prints `body malformed: handover.<key>: unknown key handover.<key>` on stderr, exit `2`.
 
 ## `[[expectation]]`
 
-- [ ] [BODY-25] An `expectation` key that is not an array of tables prints `body malformed: expectation: expectation must be an array of tables` on stderr, exit `2`.
-- [ ] [BODY-26] An `[[expectation]]` entry that is not a table prints `body malformed: expectation[0]: expectation[0] must be a table` on stderr, exit `2`.
-- [ ] [BODY-27] An entry whose `text` is missing, blank or not a string prints `body malformed: expectation[0].text: expectation[0].text must be a non-empty string`, exit `2`.
+- BODY-25: An `expectation` key that is not an array of tables prints `body malformed: expectation: expectation must be an array of tables` on stderr, exit `2`.
+- BODY-26: An `[[expectation]]` entry that is not a table prints `body malformed: expectation[0]: expectation[0] must be a table` on stderr, exit `2`.
+- BODY-27: An entry whose `text` is missing, blank or not a string prints `body malformed: expectation[0].text: expectation[0].text must be a non-empty string`, exit `2`.
 - BODY-28 (retired).
-- [ ] [BODY-29] A yes/no entry carrying neither `ruling` nor `ruled_on` prints `body malformed: expectation[0]: expectation[0] is an open yes/no line; write an option card`, exit `2` (see E-BODY-18).
+- BODY-29: A yes/no entry carrying neither `ruling` nor `ruled_on` prints `body malformed: expectation[0]: expectation[0] is an open yes/no line; write an option card`, exit `2` (see E-BODY-18).
 - BODY-30 (retired).
-- [ ] [BODY-31] A yes/no entry whose `ruling` is not `yes`, `no` or `later` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be yes, no, or later`, exit `2`.
-- [ ] [BODY-32] A ruled entry whose `ruled_on` is not a TOML local date prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on must be a TOML local date`, exit `2`.
-- [ ] [BODY-33] An entry key its form does not know (a yes/no line: the six keys above) prints `body malformed: expectation[0].<key>: unknown key expectation[0].<key>`, exit `2`; BODY-79/83/84 come first.
+- BODY-31: A yes/no entry whose `ruling` is not `yes`, `no` or `later` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be yes, no, or later`, exit `2`.
+- BODY-32: A ruled entry whose `ruled_on` is not a TOML local date prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on must be a TOML local date`, exit `2`.
+- BODY-33: An entry key its form does not know (a yes/no line: the six keys above) prints `body malformed: expectation[0].<key>: unknown key expectation[0].<key>`, exit `2`; BODY-79/83/84 come first.
 
 ## The card fields `question`, `example`, `picture`
 
-- [ ] [BODY-34] A `question` longer than 160 characters prints `body malformed: expectation[0].question: expectation[0].question must be at most 160 characters` on stderr, exit `2`.
-- [ ] [BODY-35] A `question` of exactly 160 characters is inside the bound: `aco check -` prints `body ok` on stdout, exit `0`.
-- [ ] [BODY-36] An `example` that is blank or not a string prints `body malformed: expectation[0].example: expectation[0].example must be a non-empty string` on stderr, exit `2`.
-- [ ] [BODY-37] A `picture` whose text does not start with `<svg` prints `body malformed: expectation[0].picture: expectation[0].picture must be inline SVG rooted at <svg>`, exit `2`.
-- [ ] [BODY-38] A `picture` over 8192 bytes prints `body malformed: expectation[0].picture: expectation[0].picture must be at most 8192 bytes` on stderr, exit `2`.
-- [ ] [BODY-39] A `picture` containing `<script` in any casing prints `body malformed: expectation[0].picture: expectation[0].picture must not contain <script>`, exit `2`.
-- [ ] [BODY-40] A `picture` carrying an event-handler attribute prints `body malformed: expectation[0].picture: expectation[0].picture must not contain an event-handler attribute`, exit `2`.
-- [ ] [BODY-41] A `picture` whose `href` or `xlink:href` does not start with `#` prints `body malformed: expectation[0].picture: expectation[0].picture must not reference an href outside the document`, exit `2`.
-- [ ] [BODY-42] A `picture` matching two refused contents names the earlier one in the order `<script>, <foreignObject>, on…=, javascript:, data:, href, animated href, url(), <iframe>, <embed>, <object>, srcdoc`.
+- BODY-34: A `question` longer than 160 characters prints `body malformed: expectation[0].question: expectation[0].question must be at most 160 characters` on stderr, exit `2`.
+- BODY-35: A `question` of exactly 160 characters is inside the bound: `aco check -` prints `body ok` on stdout, exit `0`.
+- BODY-36: An `example` that is blank or not a string prints `body malformed: expectation[0].example: expectation[0].example must be a non-empty string` on stderr, exit `2`.
+- BODY-37: A `picture` whose text does not start with `<svg` prints `body malformed: expectation[0].picture: expectation[0].picture must be inline SVG rooted at <svg>`, exit `2`.
+- BODY-38: A `picture` over 8192 bytes prints `body malformed: expectation[0].picture: expectation[0].picture must be at most 8192 bytes` on stderr, exit `2`.
+- BODY-39: A `picture` containing `<script` in any casing prints `body malformed: expectation[0].picture: expectation[0].picture must not contain <script>`, exit `2`.
+- BODY-40: A `picture` carrying an event-handler attribute prints `body malformed: expectation[0].picture: expectation[0].picture must not contain an event-handler attribute`, exit `2`.
+- BODY-41: A `picture` whose `href` or `xlink:href` does not start with `#` prints `body malformed: expectation[0].picture: expectation[0].picture must not reference an href outside the document`, exit `2`.
+- BODY-42: A `picture` matching two refused contents names the earlier one in the order `<script>, <foreignObject>, on…=, javascript:, data:, href, animated href, url(), <iframe>, <embed>, <object>, srcdoc`.
 
 ## Option lines
 
@@ -162,28 +162,28 @@ in this order: `text`, `asked_on`, decided state (BODY-108 right after its `rule
 budget, unknown keys, the card rules of BODY-95..BODY-99, and last BODY-87, only when no
 other refusal fired.
 
-- [ ] [BODY-69] An `option` that is not an array of tables prints `body malformed: expectation[0].option: expectation[0].option must be an array of tables`, exit `2` (see E-BODY-11).
-- [ ] [BODY-70] Fewer than 2 or more than 4 options print `body malformed: expectation[0].option: expectation[0] must carry 2 to 4 options`, exit `2` (see E-BODY-11).
-- [ ] [BODY-71] An option that is not a table prints `body malformed: expectation[0].option[1]: expectation[0].option[1] must be a table`, exit `2` (see E-BODY-11).
-- [ ] [BODY-72] A missing line key other than `picture` and `caption` prints `body malformed: expectation[0].<key>: expectation[0].<key> is required`, exit `2` (see E-BODY-11).
-- [ ] [BODY-73] An option missing a key prints `body malformed: expectation[0].option[1].<key>: expectation[0].option[1].<key> is required`, exit `2` (see E-BODY-11).
-- [ ] [BODY-74] A blank or non-string text key of the line or an option prints `body malformed: <field>: <field> must be a non-empty string`, exit `2`; a long `question` stays BODY-34 (see E-BODY-11).
-- [ ] [BODY-75] Another `decision_kind` prints `body malformed: expectation[0].decision_kind: expectation[0].decision_kind must be product, technical, data_risk, money, access, wording, or release` (see E-BODY-11).
-- [ ] [BODY-76] An `undo` other than `reversible` or `final` prints `body malformed: expectation[0].option[0].undo: expectation[0].option[0].undo must be reversible or final` (see E-BODY-11).
-- [ ] [BODY-77] A `recommended` that is not a present letter prints `body malformed: expectation[0].recommended: expectation[0].recommended must be one of <L>`, exit `2` (see E-BODY-11).
-- [ ] [BODY-78] A `ruling` outside <L> and `other` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be one of <L>, or other`, exit `2`; a bad `ruled_on` keeps BODY-32 (see E-BODY-12).
-- [ ] [BODY-79] An `example` on an option line prints `body malformed: expectation[0].example: expectation[0].example does not belong on an option line`, exit `2`.
-- [ ] [BODY-80] An option's result breaking one rule prints that rule's sentence below, exit `2` (see E-BODY-11):
+- BODY-69: An `option` that is not an array of tables prints `body malformed: expectation[0].option: expectation[0].option must be an array of tables`, exit `2` (see E-BODY-11).
+- BODY-70: Fewer than 2 or more than 4 options print `body malformed: expectation[0].option: expectation[0] must carry 2 to 4 options`, exit `2` (see E-BODY-11).
+- BODY-71: An option that is not a table prints `body malformed: expectation[0].option[1]: expectation[0].option[1] must be a table`, exit `2` (see E-BODY-11).
+- BODY-72: A missing line key other than `picture` and `caption` prints `body malformed: expectation[0].<key>: expectation[0].<key> is required`, exit `2` (see E-BODY-11).
+- BODY-73: An option missing a key prints `body malformed: expectation[0].option[1].<key>: expectation[0].option[1].<key> is required`, exit `2` (see E-BODY-11).
+- BODY-74: A blank or non-string text key of the line or an option prints `body malformed: <field>: <field> must be a non-empty string`, exit `2`; a long `question` stays BODY-34 (see E-BODY-11).
+- BODY-75: Another `decision_kind` prints `body malformed: expectation[0].decision_kind: expectation[0].decision_kind must be product, technical, data_risk, money, access, wording, or release` (see E-BODY-11).
+- BODY-76: An `undo` other than `reversible` or `final` prints `body malformed: expectation[0].option[0].undo: expectation[0].option[0].undo must be reversible or final` (see E-BODY-11).
+- BODY-77: A `recommended` that is not a present letter prints `body malformed: expectation[0].recommended: expectation[0].recommended must be one of <L>`, exit `2` (see E-BODY-11).
+- BODY-78: A `ruling` outside <L> and `other` prints `body malformed: expectation[0].ruling: expectation[0].ruling must be one of <L>, or other`, exit `2`; a bad `ruled_on` keeps BODY-32 (see E-BODY-12).
+- BODY-79: An `example` on an option line prints `body malformed: expectation[0].example: expectation[0].example does not belong on an option line`, exit `2`.
+- BODY-80: An option's result breaking one rule prints that rule's sentence below, exit `2` (see E-BODY-11):
   - both `picture` and `same_as_today`: `body malformed: expectation[0].option[1].same_as_today: expectation[0].option[1] must carry at most one of picture and same_as_today = true`; an option with neither has no result picture and is `body ok`
   - `same_as_today` not `true`: `body malformed: expectation[0].option[1].same_as_today: expectation[0].option[1].same_as_today must be true`
   - a `caption` without a picture: `body malformed: expectation[0].option[1].caption: expectation[0].option[1].caption needs a picture beside it`
-- [ ] [BODY-107] A line `caption` without a line `picture` prints `body malformed: expectation[0].caption: expectation[0].caption needs a picture beside it`, exit `2` (see E-BODY-11).
-- [ ] [BODY-81] Every picture, TODAY's and each option's, keeps BODY-37..BODY-42 under its own path, as `expectation[0].option[0].picture must not contain <script>` (see E-BODY-11).
-- [ ] [BODY-82] All of a line's pictures over 16384 UTF-8 bytes together print `body malformed: expectation[0]: expectation[0] pictures must total at most 16384 bytes`, exit `2` (see E-BODY-11).
-- [ ] [BODY-83] An option-line key (`problem` to `reason`) on a yes/no line prints `body malformed: expectation[0].<key>: expectation[0].<key> belongs to an option line; this line has none` (see E-BODY-11).
-- [ ] [BODY-84] An option key it does not know, `letter` included, prints `body malformed: expectation[0].option[0].<key>: unknown key expectation[0].option[0].<key>`, exit `2` (see E-BODY-11).
-- [ ] [BODY-85] A complete option line, open or ruled with its card's hash, prints `body ok` on stdout, exit `0`; one with no picture at all, TODAY's or any option's, is complete too (see E-BODY-10).
-- [ ] [BODY-86] A partial decided state prints exactly one sentence, by which keys it carries, exit `2`; a ruled line's `card_hash` must be `sha256:` and 64 lowercase hex digits (see E-BODY-12):
+- BODY-107: A line `caption` without a line `picture` prints `body malformed: expectation[0].caption: expectation[0].caption needs a picture beside it`, exit `2` (see E-BODY-11).
+- BODY-81: Every picture, TODAY's and each option's, keeps BODY-37..BODY-42 under its own path, as `expectation[0].option[0].picture must not contain <script>` (see E-BODY-11).
+- BODY-82: All of a line's pictures over 16384 UTF-8 bytes together print `body malformed: expectation[0]: expectation[0] pictures must total at most 16384 bytes`, exit `2` (see E-BODY-11).
+- BODY-83: An option-line key (`problem` to `reason`) on a yes/no line prints `body malformed: expectation[0].<key>: expectation[0].<key> belongs to an option line; this line has none` (see E-BODY-11).
+- BODY-84: An option key it does not know, `letter` included, prints `body malformed: expectation[0].option[0].<key>: unknown key expectation[0].option[0].<key>`, exit `2` (see E-BODY-11).
+- BODY-85: A complete option line, open or ruled with its card's hash, prints `body ok` on stdout, exit `0`; one with no picture at all, TODAY's or any option's, is complete too (see E-BODY-10).
+- BODY-86: A partial decided state prints exactly one sentence, by which keys it carries, exit `2`; a ruled line's `card_hash` must be `sha256:` and 64 lowercase hex digits (see E-BODY-12):
   - `ruling` without `ruled_on`: `body malformed: expectation[0].ruled_on: expectation[0] carries ruling without ruled_on`
   - `ruling` and `ruled_on`: `body malformed: expectation[0].card_hash: expectation[0] is ruled without card_hash`
   - `ruled_on`, no `ruling`: `body malformed: expectation[0].ruling: expectation[0] carries ruled_on without ruling`
@@ -191,27 +191,27 @@ other refusal fired.
   - another `card_hash`: `body malformed: expectation[0].card_hash: expectation[0].card_hash must be sha256: followed by 64 lowercase hex digits`
   - `ruling`, `ruled_on` and `card_hash`: `body malformed: expectation[0].via: expectation[0] is ruled without via`
   - `via` alone: `body malformed: expectation[0].ruling: expectation[0] carries via without ruling`
-- [ ] [BODY-87] A ruled card edited later prints `body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line` until reverted (see E-BODY-13).
-- [ ] [BODY-88] A rewrite writes each present key in the order above, `withdrawn_on` right after `text`, line keys before option tables; it re-reads alike, a second rewrite changes no byte, LF or CRLF.
-- [ ] [BODY-89] `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
-- [ ] [BODY-90] A `via` other than `board`, `chat` or `default` prints `body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2` (see E-BODY-12).
-- [ ] [BODY-91] An `other` breaking one rule prints that rule's sentence below, exit `2`; it is checked after the rest of the decided state (see E-BODY-14):
+- BODY-87: A ruled card edited later prints `body malformed: expectation[0].card_hash: expectation[0] was edited after its ruling; a changed ruling is a new line` until reverted (see E-BODY-13).
+- BODY-88: A rewrite writes each present key in the order above, `withdrawn_on` right after `text`, line keys before option tables; it re-reads alike, a second rewrite changes no byte, LF or CRLF.
+- BODY-89: `card_hash` is `sha256:` and the SHA-256 hex of the shown card's present keys as compact, key-sorted UTF-8 JSON, the option tables under `options` (see E-BODY-10).
+- BODY-90: A `via` other than `board`, `chat` or `default` prints `body malformed: expectation[0].via: expectation[0].via must be board, chat, or default`, exit `2` (see E-BODY-12).
+- BODY-91: An `other` breaking one rule prints that rule's sentence below, exit `2`; it is checked after the rest of the decided state (see E-BODY-14):
   - `expectation[0].other is required when ruling is other`
   - `expectation[0].other belongs only to a line ruled other`
   - `expectation[0].other must be a non-empty string`
 
   Each is prefixed `body malformed: expectation[0].other: `.
-- [ ] [BODY-92] An option line ruled `other` with `ruled_on`, its card's `card_hash`, `via` and a non-empty `other` prints `body ok`, exit `0`; its card edited later prints BODY-87 (see E-BODY-14).
-- [ ] [BODY-93] A `returned_on` or `returned_note` breaking one rule prints that rule's sentence below, exit `2`; it is checked right after `other` (see E-BODY-15):
+- BODY-92: An option line ruled `other` with `ruled_on`, its card's `card_hash`, `via` and a non-empty `other` prints `body ok`, exit `0`; its card edited later prints BODY-87 (see E-BODY-14).
+- BODY-93: A `returned_on` or `returned_note` breaking one rule prints that rule's sentence below, exit `2`; it is checked right after `other` (see E-BODY-15):
   - `expectation[0].<key> belongs only to an open line`
   - `expectation[0].returned_on must be a TOML local date`
   - `expectation[0].returned_note needs returned_on beside it`
   - `expectation[0].returned_note must be a non-empty string`
 
   Each is prefixed `body malformed: expectation[0].<key>: `.
-- [ ] [BODY-94] An open option line with a `returned_on` date and an optional non-empty `returned_note` prints `body ok`, exit `0`; neither key enters `card_hash`, so editing the card stays legal (see E-BODY-15).
-- [ ] [BODY-95] An open or returned option line has these words judged: `question`, `problem`, `caption`, `area`, `topic`, `reason`, option `name`, `effect`, `caption`, `notice`, `cost`, `undo_how` (see E-BODY-16).
-- [ ] [BODY-96] A judged field holding one of the following prints `body malformed: <field>: <field> must not contain <what>`, exit `2` (see E-BODY-16):
+- BODY-94: An open option line with a `returned_on` date and an optional non-empty `returned_note` prints `body ok`, exit `0`; neither key enters `card_hash`, so editing the card stays legal (see E-BODY-15).
+- BODY-95: An open or returned option line has these words judged: `question`, `problem`, `caption`, `area`, `topic`, `reason`, option `name`, `effect`, `caption`, `notice`, `cost`, `undo_how` (see E-BODY-16).
+- BODY-96: A judged field holding one of the following prints `body malformed: <field>: <field> must not contain <what>`, exit `2` (see E-BODY-16):
   - `an issue number`: `#` and digits, as in `#13`
   - `a path`: a word starting `./`, `~/` or `/` and a letter, holding `://`, or with a `/` and a file name after it
   - `a file name`: a word ending `.py`, `.ts`, `.svelte`, `.js`, `.md`, `.toml`, `.json`, `.yml`, `.yaml`, `.html`, `.css` or `.sh`
@@ -219,14 +219,14 @@ other refusal fired.
   - `a snake case name`: lower letters, `_`, lower letters or digits, as in `card_hash`
   - `a camel case name`: two or more lower letters, then an upper and a lower letter, as in `cardHash`
   - `a flag`: `--` and a letter at the start or after a space
-- [ ] [BODY-97] A `problem` of more than 20 words, split at white space, prints `body malformed: <field>: <field> must be at most 20 words`, exit `2` (see E-BODY-16).
-- [ ] [BODY-98] An option `name` of fewer than 2 or more than 5 words prints `body malformed: <field>: <field> must be 2 to 5 words`, exit `2` (see E-BODY-16).
-- [ ] [BODY-99] An `area`, `topic` or option `name` holding a line break, or a space at either end, prints `body malformed: <field>: <field> must be one line without spaces around it`, exit `2` (see E-BODY-16).
-- [ ] [BODY-100] `Ja/Nein`, `A/B/C`, `E-Mail`, `iPhone`, `v5.2` and `C#` break no rule; a ruled line, `contract`, `text`, a picture, `other` and `returned_note` are not judged: `body ok`, exit `0` (see E-BODY-16).
-- [ ] [BODY-101] An open or returned option line without `asked_on` prints `body malformed: expectation[0].asked_on: expectation[0].asked_on is required`, exit `2` (see E-BODY-17).
-- [ ] [BODY-102] An `asked_on` that is no TOML local date (a datetime too) prints `body malformed: expectation[0].asked_on: expectation[0].asked_on must be a TOML local date`, exit `2` (see E-BODY-17).
-- [ ] [BODY-103] A ruled option line may lack `asked_on`: `body ok`, exit `0`; its card hash is the same with and without the key, so BODY-87 never fires on it (see E-BODY-17).
-- [ ] [BODY-108] A ruled line whose `ruled_on` is before its `asked_on` prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on <date> is before asked_on <date>`, exit `2` (see E-BODY-17).
+- BODY-97: A `problem` of more than 20 words, split at white space, prints `body malformed: <field>: <field> must be at most 20 words`, exit `2` (see E-BODY-16).
+- BODY-98: An option `name` of fewer than 2 or more than 5 words prints `body malformed: <field>: <field> must be 2 to 5 words`, exit `2` (see E-BODY-16).
+- BODY-99: An `area`, `topic` or option `name` holding a line break, or a space at either end, prints `body malformed: <field>: <field> must be one line without spaces around it`, exit `2` (see E-BODY-16).
+- BODY-100: `Ja/Nein`, `A/B/C`, `E-Mail`, `iPhone`, `v5.2` and `C#` break no rule; a ruled line, `contract`, `text`, a picture, `other` and `returned_note` are not judged: `body ok`, exit `0` (see E-BODY-16).
+- BODY-101: An open or returned option line without `asked_on` prints `body malformed: expectation[0].asked_on: expectation[0].asked_on is required`, exit `2` (see E-BODY-17).
+- BODY-102: An `asked_on` that is no TOML local date (a datetime too) prints `body malformed: expectation[0].asked_on: expectation[0].asked_on must be a TOML local date`, exit `2` (see E-BODY-17).
+- BODY-103: A ruled option line may lack `asked_on`: `body ok`, exit `0`; its card hash is the same with and without the key, so BODY-87 never fires on it (see E-BODY-17).
+- BODY-108: A ruled line whose `ruled_on` is before its `asked_on` prints `body malformed: expectation[0].ruled_on: expectation[0].ruled_on <date> is before asked_on <date>`, exit `2` (see E-BODY-17).
 
 The card hash belongs to option lines and covers every key listed above except
 the decided state. It never covers the item title, the index, `asked_on`, `ruling`, `ruled_on`,
@@ -241,45 +241,45 @@ keeps its place and its `text` and gains `withdrawn_on`, so every later line
 keeps its index. Inside one entry the refusals print in this order: `text`,
 `withdrawn_on`, then every other key in the order the entry writes them.
 
-- [ ] [BODY-104] An entry of `text` and a local-date `withdrawn_on`, nothing else, prints `body ok`, exit `0`, its index kept; BODY-29..33 and BODY-69..103 do not judge it (see E-BODY-19).
-- [ ] [BODY-105] Any other key beside them prints `body malformed: expectation[0].<key>: expectation[0].<key> does not belong on a withdrawn line`, one per key, exit `2` (see E-BODY-19).
-- [ ] [BODY-106] A `withdrawn_on` that is no TOML local date (a datetime too) prints `body malformed: expectation[0].withdrawn_on: expectation[0].withdrawn_on must be a TOML local date`, exit `2` (see E-BODY-19).
+- BODY-104: An entry of `text` and a local-date `withdrawn_on`, nothing else, prints `body ok`, exit `0`, its index kept; BODY-29..33 and BODY-69..103 do not judge it (see E-BODY-19).
+- BODY-105: Any other key beside them prints `body malformed: expectation[0].<key>: expectation[0].<key> does not belong on a withdrawn line`, one per key, exit `2` (see E-BODY-19).
+- BODY-106: A `withdrawn_on` that is no TOML local date (a datetime too) prints `body malformed: expectation[0].withdrawn_on: expectation[0].withdrawn_on must be a TOML local date`, exit `2` (see E-BODY-19).
 
 ## `[[slice]]`
 
-- [ ] [BODY-43] A `slice` key that is not an array of tables prints `body malformed: slice: slice must be an array of tables` on stderr, exit `2`.
-- [ ] [BODY-44] A `[[slice]]` entry that is not a table prints `body malformed: slice[0]: slice[0] must be a table` on stderr, exit `2`.
-- [ ] [BODY-45] An entry whose `index` is missing, zero, negative or not an integer prints `body malformed: slice[0].index: slice[0].index must be a positive integer`, exit `2`.
-- [ ] [BODY-46] A second entry repeating an earlier `index` prints `body malformed: slice[1].index: slice[1].index duplicates slice index 4` on stderr, exit `2`.
-- [ ] [BODY-47] An entry whose `title` is missing, blank or not a string prints `body malformed: slice[0].title: slice[0].title must be a non-empty string`, exit `2`; one line only (BODY-63).
-- [ ] [BODY-63] A title holding a display control (NEXT-37) prints `body malformed: slice[0].title: slice[0].title of row <i> holds U+000B; a slice title stays on one line`, exit `2` (see E-BODY-06).
-- [ ] [BODY-64] BODY-63 applies wherever a body's shape is judged — `aco check -`, `aco check <n>`, `aco item new`, `aco item edit`; `board`/`next` keep reading a stored body, `next` naming its row (NEXT-32).
-- [ ] [BODY-48] An entry key outside `index`, `title`, `done_when` and `scope` prints `body malformed: slice[0].<key>: unknown key slice[0].<key>`, exit `2`; per-slice dependencies stay in the prose.
-- [ ] [BODY-65] An entry may carry `done_when`, its child's done-when (CUT-25); a blank or non-string one prints `body malformed: slice[0].done_when: slice[0].done_when must be a non-empty string` (E-BODY-07).
-- [ ] [BODY-66] A row `done_when` holding a display control prints `body malformed: slice[0].done_when: slice[0].done_when of row <i> holds U+000B; a slice done_when stays on one line`, exit `2`, as BODY-64.
-- [ ] [BODY-49] A block carrying `slice = []` is valid with nothing left to cut: `aco check -` prints `body ok`, exit `0`, and the empty table stays present in the body.
-- [ ] [BODY-67] A rewrite keeps `slice = []` among the top-level keys, ahead of the first `[[expectation]]` table, so a body whose last row was cut still prints `body ok` (see E-BODY-08).
+- BODY-43: A `slice` key that is not an array of tables prints `body malformed: slice: slice must be an array of tables` on stderr, exit `2`.
+- BODY-44: A `[[slice]]` entry that is not a table prints `body malformed: slice[0]: slice[0] must be a table` on stderr, exit `2`.
+- BODY-45: An entry whose `index` is missing, zero, negative or not an integer prints `body malformed: slice[0].index: slice[0].index must be a positive integer`, exit `2`.
+- BODY-46: A second entry repeating an earlier `index` prints `body malformed: slice[1].index: slice[1].index duplicates slice index 4` on stderr, exit `2`.
+- BODY-47: An entry whose `title` is missing, blank or not a string prints `body malformed: slice[0].title: slice[0].title must be a non-empty string`, exit `2`; one line only (BODY-63).
+- BODY-63: A title holding a display control (NEXT-37) prints `body malformed: slice[0].title: slice[0].title of row <i> holds U+000B; a slice title stays on one line`, exit `2` (see E-BODY-06).
+- BODY-64: BODY-63 applies wherever a body's shape is judged — `aco check -`, `aco check <n>`, `aco item new`, `aco item edit`; `board`/`next` keep reading a stored body, `next` naming its row (NEXT-32).
+- BODY-48: An entry key outside `index`, `title`, `done_when` and `scope` prints `body malformed: slice[0].<key>: unknown key slice[0].<key>`, exit `2`; per-slice dependencies stay in the prose.
+- BODY-65: An entry may carry `done_when`, its child's done-when (CUT-25); a blank or non-string one prints `body malformed: slice[0].done_when: slice[0].done_when must be a non-empty string` (E-BODY-07).
+- BODY-66: A row `done_when` holding a display control prints `body malformed: slice[0].done_when: slice[0].done_when of row <i> holds U+000B; a slice done_when stays on one line`, exit `2`, as BODY-64.
+- BODY-49: A block carrying `slice = []` is valid with nothing left to cut: `aco check -` prints `body ok`, exit `0`, and the empty table stays present in the body.
+- BODY-67: A rewrite keeps `slice = []` among the top-level keys, ahead of the first `[[expectation]]` table, so a body whose last row was cut still prints `body ok` (see E-BODY-08).
 
 ## What a reader does with a defect
 
-- [ ] [BODY-50] An item whose body carries any defect above is named by `aco board` with its first defect sentence as its reason, `body malformed: <field>: <message>`, and is never proposed as a cut or a close.
-- [ ] [BODY-51] An item whose block is valid but carries an empty projection key is skipped by `aco next`, which names it `SKIPPED` with BODY-12's `body incomplete: <keys>`.
-- [ ] [BODY-52] Issue-mode `aco claim <n>` against such an item refuses before any write with the same sentence as a `body-contract` check, exit `2` (see E-BODY-03); under `state-ref` PIN-15 refuses, `unavailable`.
-- [ ] [BODY-68] Every sentence and `--json` field naming a malformed body's defect shows each display control as NEXT-37 does; all other text is byte for byte the same (see E-BODY-09).
+- BODY-50: An item whose body carries any defect above is named by `aco board` with its first defect sentence as its reason, `body malformed: <field>: <message>`, and is never proposed as a cut or a close.
+- BODY-51: An item whose block is valid but carries an empty projection key is skipped by `aco next`, which names it `SKIPPED` with BODY-12's `body incomplete: <keys>`.
+- BODY-52: Issue-mode `aco claim <n>` against such an item refuses before any write with the same sentence as a `body-contract` check, exit `2` (see E-BODY-03); under `state-ref` PIN-15 refuses, `unavailable`.
+- BODY-68: Every sentence and `--json` field naming a malformed body's defect shows each display control as NEXT-37 does; all other text is byte for byte the same (see E-BODY-09).
 
 ## `scope`, the item's own files
 
-- [ ] [BODY-53] A block carrying `scope = ["README.md", "docs"]` is valid, and a `[[slice]]` row may carry its own `scope = ["docs"]` under the same grammar: `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-54] `scope = []` prints `body malformed: scope: scope must name at least one path`, exit `2`; an empty `[[slice]]` row `scope` prints the `slice[0].scope` form. Absent `scope` means unknown, never empty.
-- [ ] [BODY-55] A `scope = ["/etc/passwd"]` entry fails the same way `claim --scope` would: `body malformed: scope: claim scope must be repository-relative: '/etc/passwd'`.
-- [ ] [BODY-111] A `scope = ["frontend/**"]` entry fails as CLM-38 does: `body malformed: scope: claim scope entries are paths or directories, not glob patterns: 'frontend/**'`.
-- [ ] [BODY-56] A valid `scope` renders sorted, deduplicated, ahead of the first `[[expectation]]`/`[[slice]]` table — else TOML binds a bare key to the prior table — so a re-read names the same canonical `scope`.
+- BODY-53: A block carrying `scope = ["README.md", "docs"]` is valid, and a `[[slice]]` row may carry its own `scope = ["docs"]` under the same grammar: `aco check -` prints `body ok`, exit `0`.
+- BODY-54: `scope = []` prints `body malformed: scope: scope must name at least one path`, exit `2`; an empty `[[slice]]` row `scope` prints the `slice[0].scope` form. Absent `scope` means unknown, never empty.
+- BODY-55: A `scope = ["/etc/passwd"]` entry fails the same way `claim --scope` would: `body malformed: scope: claim scope must be repository-relative: '/etc/passwd'`.
+- BODY-111: A `scope = ["frontend/**"]` entry fails as CLM-38 does: `body malformed: scope: claim scope entries are paths or directories, not glob patterns: 'frontend/**'`.
+- BODY-56: A valid `scope` renders sorted, deduplicated, ahead of the first `[[expectation]]`/`[[slice]]` table — else TOML binds a bare key to the prior table — so a re-read names the same canonical `scope`.
 
 ## `size`, the item's own estimate class
 
-- [ ] [BODY-57] A block with no `size` key is valid: absence means "no estimate", never a default class, and `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-58] `size = "S"`, `"M"`, or `"L"` is valid: `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-59] A `size` outside `S`/`M`/`L` prints `body malformed: size: size must be S, M, or L`, exit `2`, the same sentence for every invalid shape.
+- BODY-57: A block with no `size` key is valid: absence means "no estimate", never a default class, and `aco check -` prints `body ok`, exit `0`.
+- BODY-58: `size = "S"`, `"M"`, or `"L"` is valid: `aco check -` prints `body ok`, exit `0`.
+- BODY-59: A `size` outside `S`/`M`/`L` prints `body malformed: size: size must be S, M, or L`, exit `2`, the same sentence for every invalid shape.
 
   ```
   size = "XL"    # not one of S, M, L
@@ -289,9 +289,9 @@ keeps its index. Inside one entry the refusals print in this order: `text`,
 
 ## `whole`, the item's own wide-scope justification
 
-- [ ] [BODY-60] A block with no `whole` key is valid: absence means no stored reason, never a default one, and `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-61] `whole = "<reason>"` is valid for one non-empty line of at most 512 characters, unpadded, with no control character or display control (NEXT-37): `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-62] A `whole` outside BODY-61, or not a string, prints `body malformed: whole: whole reason must be one bounded non-empty line`, exit `2`, the same sentence for every invalid shape.
+- BODY-60: A block with no `whole` key is valid: absence means no stored reason, never a default one, and `aco check -` prints `body ok`, exit `0`.
+- BODY-61: `whole = "<reason>"` is valid for one non-empty line of at most 512 characters, unpadded, with no control character or display control (NEXT-37): `aco check -` prints `body ok`, exit `0`.
+- BODY-62: A `whole` outside BODY-61, or not a string, prints `body malformed: whole: whole reason must be one bounded non-empty line`, exit `2`, the same sentence for every invalid shape.
 
   ```
   whole = ""
@@ -305,17 +305,17 @@ keeps its index. Inside one entry the refusals print in this order: `text`,
 
 ## `planned_at_first_cut`, a container's planned count at its first cut
 
-- [ ] [BODY-118] A block with no `planned_at_first_cut` key is valid: an older container carries none, and `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-119] `planned_at_first_cut = <n>` is valid for an integer `n` of at least 1 (`aco cut` writes it, CUT-45): `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-120] Any other value (`0`, a negative integer, a boolean, a string, a float, an array) prints `body malformed: planned_at_first_cut: planned_at_first_cut must be a positive integer`, exit `2`.
-- [ ] [BODY-121] A rewrite of the block (BODY-07) keeps the key, ahead of `slice = []` and every table.
+- BODY-118: A block with no `planned_at_first_cut` key is valid: an older container carries none, and `aco check -` prints `body ok`, exit `0`.
+- BODY-119: `planned_at_first_cut = <n>` is valid for an integer `n` of at least 1 (`aco cut` writes it, CUT-45): `aco check -` prints `body ok`, exit `0`.
+- BODY-120: Any other value (`0`, a negative integer, a boolean, a string, a float, an array) prints `body malformed: planned_at_first_cut: planned_at_first_cut must be a positive integer`, exit `2`.
+- BODY-121: A rewrite of the block (BODY-07) keeps the key, ahead of `slice = []` and every table.
 
 ## `step`, the detail of a step only the operator can take
 
-- [ ] [BODY-122] A block with no `[step]` table is valid: an older step item carries none, and `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-123] `[step]` with `purpose`, `actions` and `expected`, each a non-empty string that may span lines, and optionally `answer` the same, is valid: `aco check -` prints `body ok`, exit `0`.
-- [ ] [BODY-124] A `[step]` that is no table, lacks or blanks `purpose`, `actions` or `expected`, blanks `answer` or holds another key prints `body malformed: step.<key>: ...`, exit `2` (see E-BODY-21).
-- [ ] [BODY-125] A rewrite of the block (BODY-07) keeps the table, ahead of every `[[expectation]]` and `[[slice]]` table.
+- BODY-122: A block with no `[step]` table is valid: an older step item carries none, and `aco check -` prints `body ok`, exit `0`.
+- BODY-123: `[step]` with `purpose`, `actions` and `expected`, each a non-empty string that may span lines, and optionally `answer` the same, is valid: `aco check -` prints `body ok`, exit `0`.
+- BODY-124: A `[step]` that is no table, lacks or blanks `purpose`, `actions` or `expected`, blanks `answer` or holds another key prints `body malformed: step.<key>: ...`, exit `2` (see E-BODY-21).
+- BODY-125: A rewrite of the block (BODY-07) keeps the table, ahead of every `[[expectation]]` and `[[slice]]` table.
 
 ## Never
 

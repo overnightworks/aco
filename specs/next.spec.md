@@ -87,81 +87,84 @@ other printable space are text.
 
 ## No actionable item
 
-- [ ] [NEXT-01] With nothing to pull, `next` prints `No actionable item.`, still followed by `parallel:`/`scope unknown:`/`close:`, exit `3`; `--json` is `{"ok": false, "reason": "nothing_actionable", ...}`.
+- NEXT-01: With nothing to pull, `next` prints `No actionable item.`, still followed by `parallel:`/`scope unknown:`/`close:`, exit `3`; `--json` is `{"ok": false, "reason": "nothing_actionable", ...}`.
 
 ## A work item action
 
-- [ ] [NEXT-02] The top-ranked item prints `<label> score <s>: <title>`, then `Next: <item's own Next>`, then `Run: aco claim <n>` from a linked worktree on a non-default branch, exit `0` (see E-NEXT-01).
-- [ ] [NEXT-72] An item's score adds 20 per open dependent in any repository, counted as `unblocks_count` (`github`: the listing's count; `state-ref`: open `blocked_by` items); it ranks as `blocker`.
-- [ ] [NEXT-41] From any other checkout, where `claim` refuses, `Run:` is `aco start <n> --slug=<slug>`, the title's slug, else the id: `!!! ???` gives the number under `github`, the id under `state-ref` (E-NEXT-14).
-- [ ] [NEXT-42] A scope `claim` calls wide here (four paths, or a directory such as `src`) and no body `whole` ends `Run:` with `--whole <reason>`; with `whole` set, it is left out (E-NEXT-14).
-- [ ] [NEXT-37] Text shows each display control in a title, `Next`, slice title or `SKIPPED` reason as its escape: `a\x1b[2J` prints as typed; TAB, NBSP and `Größe` as is; `--json` unchanged but BODY-68.
-- [ ] [NEXT-03] An item naming its own top-level `scope` drops `--scope` from `Run:`; a scopeless item's `Run:` ends `--scope <paths>` and gains a further `scope unknown` line (see E-NEXT-02).
-- [ ] [NEXT-30] A scopeless item whose only `[[slice]]` row names paths prints `--scope=<path>` per path of that row, with no `scope unknown`.
-- [ ] [NEXT-04] A still-proposed item that is pulled (NEXT-70 holds the others) adds `expectations unruled: refine before the pull`, a stale ruling `ruled <n> landings ago: refine again at the pull`, never both.
-- [ ] [NEXT-48] A withdrawn line (BODY-104) never adds `expectations unruled` and never dates a ruling; an item of only withdrawn lines adds neither NEXT-04 hint.
-- [ ] [NEXT-23] A scopeless, sliceless item still qualifies as this action (`scope unknown`, NEXT-03); `claim`/`start`'s own precedence check reads a narrower rule (`specs/claim.spec.md` CLM-23).
+- NEXT-02: The top-ranked item prints `<label> score <s>: <title>`, then `Next: <item's own Next>`, then `Run: aco claim <n>` from a linked worktree on a non-default branch, exit `0` (see E-NEXT-01).
+- NEXT-72: An item's score adds 20 per open dependent in any repository, counted as `unblocks_count` (`github`: the listing's count; `state-ref`: open `blocked_by` items); it ranks as `blocker`.
+- NEXT-41: From any other checkout, where `claim` refuses, `Run:` is `aco start <n> --slug=<slug>`, the title's slug, else the id: `!!! ???` gives the number under `github`, the id under `state-ref` (E-NEXT-14).
+- NEXT-42: A scope `claim` calls wide here (four paths, or a directory such as `src`) and no body `whole` ends `Run:` with `--whole <reason>`; with `whole` set, it is left out (E-NEXT-14).
+- NEXT-37: Text shows each display control in a title, `Next`, slice title or `SKIPPED` reason as its escape: `a\x1b[2J` prints as typed; TAB, NBSP and `Größe` as is; `--json` unchanged but BODY-68.
+- NEXT-03: An item naming its own top-level `scope` drops `--scope` from `Run:`; a scopeless item's `Run:` ends `--scope <paths>` and gains a further `scope unknown` line (see E-NEXT-02).
+- NEXT-30: A scopeless item whose only `[[slice]]` row names paths prints `--scope=<path>` per path of that row, with no `scope unknown`.
+- NEXT-04: A still-proposed item that is pulled (NEXT-70 holds the others) adds `expectations unruled: refine before the pull`, a stale ruling `ruled <n> landings ago: refine again at the pull`, never both.
+- NEXT-48: A withdrawn line (BODY-104) never adds `expectations unruled` and never dates a ruling; an item of only withdrawn lines adds neither NEXT-04 hint.
+- NEXT-23: A scopeless, sliceless item still qualifies as this action (`scope unknown`, NEXT-03); `claim`/`start`'s own precedence check reads a narrower rule (`specs/claim.spec.md` CLM-23).
 
 ## A container's own action
 
-- [ ] [NEXT-05] A childless container with an undispatched `[[slice]]` row and no open blocker (NEXT-69) prints `cut_slice <label>: <title>` then `Next: aco cut <n>` (CUT-06), exit `0` (E-NEXT-03).
-- [ ] [NEXT-27] Every argument an advice line prints inside a command is quoted for a POSIX shell, so it runs as printed: scope path `docs/my notes.md` prints `--scope='docs/my notes.md'`.
-- [ ] [NEXT-31] An advice command attaches each option's value as `--<option>=<quoted>`, so a value starting with `-` still reaches it; a cut advice carries no title at all (see E-NEXT-10).
-- [ ] [NEXT-32] A display control in the first uncut row's title or `done_when` withholds `cut`; `SKIPPED`: `slice row <i> <field> holds a line break or control character; make it one printable line` (E-NEXT-10).
-- [ ] [NEXT-36] An item PIN-14/PIN-15 refuses is named under `SKIPPED` as `<item-id>: body malformed: <field>: <message>`; every other item still reads, one it blocks stays blocked (see E-NEXT-11).
-- [ ] [NEXT-38] A container whose every open child, ITEM-54's included, is such an item reads `container; its open children do not read: <item-ids>` under `SKIPPED`, never `close:` (see E-NEXT-12).
+- NEXT-05: A childless container with an undispatched `[[slice]]` row and no open blocker (NEXT-69) prints `cut_slice <label>: <title>` then `Next: aco cut <n>` (CUT-06), exit `0` (E-NEXT-03).
+- NEXT-27: Every argument an advice line prints inside a command is quoted for a POSIX shell, so it runs as printed: scope path `docs/my notes.md` prints `--scope='docs/my notes.md'`.
+- NEXT-31: An advice command attaches each option's value as `--<option>=<quoted>`, so a value starting with `-` still reaches it; a cut advice carries no title at all (see E-NEXT-10).
+- NEXT-32: A display control in the first uncut row's title or `done_when` withholds `cut`; `SKIPPED`: `slice row <i> <field> holds a line break or control character; make it one printable line` (E-NEXT-10).
+- NEXT-36: An item PIN-14/PIN-15 refuses is named under `SKIPPED` as `<item-id>: body malformed: <field>: <message>`; every other item still reads, one it blocks stays blocked (see E-NEXT-11).
+- NEXT-38: A container whose every open child, ITEM-54's included, is such an item reads `container; its open children do not read: <item-ids>` under `SKIPPED`, never `close:` (see E-NEXT-12).
 - NEXT-06 (retired).
-- [ ] [NEXT-07] A childless container without an uncut row prints `close_container <label>: <closed>/<total> children closed, no uncut row` (BOARD-58), whatever its `Next` or blocker, unless NEXT-73 (E-NEXT-04).
-- [ ] [NEXT-73] A childless container without an uncut row holding an open or returned option line or an `operator` wait is never closable: off `close:`, never `close_container`; ruling and answering frees it.
-- [ ] [NEXT-74] A container held as in NEXT-73 stands under `waiting on operator:` (NEXT-70); with a line sent back (NEXT-45) `SKIPPED` reads `held by an option line sent back to its head` (E-NEXT-25).
-- [ ] [NEXT-69] A childless container with an uncut `[[slice]]` row and an open blocker never gets `cut_slice`; `SKIPPED` reads `blocked by <ref>`; the next cuttable item comes first (E-NEXT-20).
-- NEXT-25, NEXT-29, NEXT-33 (retired).
-- [ ] [NEXT-71] A childless container with an uncut row that is itself a child of another item gets `cut_slice` like any other (NEXT-05; CUT-48), whatever that parent's type, state or repository (E-NEXT-22).
+- NEXT-07: A childless container without an uncut row prints `close_container <label>: <closed>/<total> children closed, no uncut row` (BOARD-58), whatever its `Next` or blocker, unless NEXT-73 (E-NEXT-04).
+- NEXT-73: A childless container without an uncut row holding an open or returned option line or an `operator` wait is never closable: off `close:`, never `close_container`; ruling and answering frees it.
+- NEXT-74: A container held as in NEXT-73 stands under `waiting on operator:` (NEXT-70); with a line sent back (NEXT-45) `SKIPPED` reads `held by an option line sent back to its head` (E-NEXT-25).
+- NEXT-69: A childless container with an uncut `[[slice]]` row and an open blocker never gets `cut_slice`; `SKIPPED` reads `blocked by <ref>`; the next cuttable item comes first (E-NEXT-20).
+- NEXT-25 (retired).
+- NEXT-29 (retired).
+- NEXT-33 (retired).
+- NEXT-71: A childless container with an uncut row that is itself a child of another item gets `cut_slice` like any other (NEXT-05; CUT-48), whatever that parent's type, state or repository (E-NEXT-22).
 
 ## `RECOVERY` and `SKIPPED`
 
-- [ ] [NEXT-08] Every other unworkable item is named once under a trailing `SKIPPED` block, `<label>: <reason>`; a container `next` itself recommends cutting or closing is left out of that list.
-- NEXT-26, NEXT-47 (retired).
-- [ ] [NEXT-34] A NEXT-05 container behind the first action (unblocked, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped, never `container; claim a child`.
-- [ ] [NEXT-28] An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
-- [ ] [NEXT-39] An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
-- [ ] [NEXT-70] An item with an open option line, none sent back (NEXT-45), waits on the operator as NEXT-39 says (E-NEXT-21); a childless container so waiting is never cut (E-NEXT-24).
-- [ ] [NEXT-59] A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
-- [ ] [NEXT-61] The label `needs-operator` on an item without an operator `wait` holds nothing: the item is pulled or cut like any other.
-- [ ] [NEXT-60] A container whose open children all live in other repositories reads `container; waiting on <owner>/<repo>#<n>, ...` under `SKIPPED`, never `container; claim a child` (NEXT-38 appends it).
-- [ ] [NEXT-40] `aco next --help` names `wait.operator` as what holds an item for the operator, the `step` tool as the way to set it, and the label `needs-operator` as its GitHub view.
-- [ ] [NEXT-43] An item labelled `idea_label` (PIN-49) is never pulled, cut or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
-- [ ] [NEXT-45] `with head: <label> line <k>, …` follows `ideas:` and names each open item's option lines sent back by `rule --unclear` (RULE-22); absent when none; an unreadable body names none (E-NEXT-16).
+- NEXT-08: Every other unworkable item is named once under a trailing `SKIPPED` block, `<label>: <reason>`; a container `next` itself recommends cutting or closing is left out of that list.
+- NEXT-26 (retired).
+- NEXT-47 (retired).
+- NEXT-34: A NEXT-05 container behind the first action (unblocked, NEXT-69) reads `cut slice "<title>"; run <its cut command>` under `SKIPPED`, `\` and `"` escaped, never `container; claim a child`.
+- NEXT-28: An item `close:` lists is never also named under `SKIPPED`, `waiting on operator:` or `ideas:`, in text or `--json` (see E-NEXT-06).
+- NEXT-39: An item with an `operator` wait is never pulled, cut or first; `waiting on operator: <labels>` lists it unless `close:` does; a claimed one reads `waiting: <step>` in `SKIPPED` (E-NEXT-13, E-NEXT-15).
+- NEXT-70: An item with an open option line, none sent back (NEXT-45), waits on the operator as NEXT-39 says (E-NEXT-21); a childless container so waiting is never cut (E-NEXT-24).
+- NEXT-59: A holding `wait` (`trigger`, or `until <date>` up to it) leaves an item unpulled, a container uncut and never first; a closable one stays in `close:`; `SKIPPED` reads `waiting: <text>` (E-NEXT-15).
+- NEXT-61: The label `needs-operator` on an item without an operator `wait` holds nothing: the item is pulled or cut like any other.
+- NEXT-60: A container whose open children all live in other repositories reads `container; waiting on <owner>/<repo>#<n>, ...` under `SKIPPED`, never `container; claim a child` (NEXT-38 appends it).
+- NEXT-40: `aco next --help` names `wait.operator` as what holds an item for the operator, the `step` tool as the way to set it, and the label `needs-operator` as its GitHub view.
+- NEXT-43: An item labelled `idea_label` (PIN-49) is never pulled, cut or closed, whatever its body or merged pull request; `ideas: <labels>` names it after `waiting on operator:`, not under `SKIPPED`.
+- NEXT-45: `with head: <label> line <k>, …` follows `ideas:` and names each open item's option lines sent back by `rule --unclear` (RULE-22); absent when none; an unreadable body names none (E-NEXT-16).
 
 ## `parallel:`
 
-- [ ] [NEXT-09] `parallel:` lists every further free item the walk placed, `<label> (<n> path[s])`, comma-joined, in board order, alongside the first action (see E-NEXT-05, E-NEXT-18).
-- [ ] [NEXT-21] `parallel:` walks further qualifying actions in board order, skipping a close or recovery item outright, and holds none back for an overlap (see E-NEXT-05, E-NEXT-18).
-- [ ] [NEXT-22] A candidate with a `scope` is placed whatever that scope meets; its `scope` is then met by the candidates after it (see E-NEXT-05, E-NEXT-18).
-- [ ] [NEXT-56] A candidate meeting a live claim's, the first action's or an earlier candidate's scope prints `<label> (<n> path[s]; overlaps issue <label> on <paths>, lane <branch> on <paths>)` (E-NEXT-18).
-- [ ] [NEXT-57] That note lists the live claims first, then the first action, then the earlier candidates, in CLAIM-31's grammar with CLAIM-33's deeper path and CLAIM-34's cap of three paths (E-NEXT-18).
-- [ ] [NEXT-10] Beyond three placed candidates, only the first three are named, followed by `, and <n> more`; `--json`'s own `candidates` array still carries every one (see E-NEXT-05).
-- [ ] [NEXT-16] Once the first action names no scope, the tail collapses to `parallel: unknown (first action names no scope)`; `scope unknown:` is skipped, never printed as `none` (see E-NEXT-02).
-- [ ] [NEXT-17] `scope unknown:` lists, in board order, every candidate the walk could not place for lacking a scope of its own, or `none`; printed whenever the first action does name a scope.
+- NEXT-09: `parallel:` lists every further free item the walk placed, `<label> (<n> path[s])`, comma-joined, in board order, alongside the first action (see E-NEXT-05, E-NEXT-18).
+- NEXT-21: `parallel:` walks further qualifying actions in board order, skipping a close or recovery item outright, and holds none back for an overlap (see E-NEXT-05, E-NEXT-18).
+- NEXT-22: A candidate with a `scope` is placed whatever that scope meets; its `scope` is then met by the candidates after it (see E-NEXT-05, E-NEXT-18).
+- NEXT-56: A candidate meeting a live claim's, the first action's or an earlier candidate's scope prints `<label> (<n> path[s]; overlaps issue <label> on <paths>, lane <branch> on <paths>)` (E-NEXT-18).
+- NEXT-57: That note lists the live claims first, then the first action, then the earlier candidates, in CLAIM-31's grammar with CLAIM-33's deeper path and CLAIM-34's cap of three paths (E-NEXT-18).
+- NEXT-10: Beyond three placed candidates, only the first three are named, followed by `, and <n> more`; `--json`'s own `candidates` array still carries every one (see E-NEXT-05).
+- NEXT-16: Once the first action names no scope, the tail collapses to `parallel: unknown (first action names no scope)`; `scope unknown:` is skipped, never printed as `none` (see E-NEXT-02).
+- NEXT-17: `scope unknown:` lists, in board order, every candidate the walk could not place for lacking a scope of its own, or `none`; printed whenever the first action does name a scope.
 
 ## `close:`
 
-- [ ] [NEXT-18] `close:` unions closable containers (kind, no open child, no uncut `[[slice]]` row, none held by NEXT-73) then recovery items, in board order, first-seen, whatever the first action (E-NEXT-06).
-- [ ] [NEXT-19] `close:` never names a container the forge reports no recognized `kind` for (BOARD-08's own exclusion): such an item is read as ordinary, not as one with nothing left to do.
-- [ ] [NEXT-20] `close:` prints `none` when neither a closable container nor a recovery item exists.
+- NEXT-18: `close:` unions closable containers (kind, no open child, no uncut `[[slice]]` row, none held by NEXT-73) then recovery items, in board order, first-seen, whatever the first action (E-NEXT-06).
+- NEXT-19: `close:` never names a container the forge reports no recognized `kind` for (BOARD-08's own exclusion): such an item is read as ordinary, not as one with nothing left to do.
+- NEXT-20: `close:` prints `none` when neither a closable container nor a recovery item exists.
 
 ## `--json`
 
-- [ ] [NEXT-11] A work-item action's `reason` is `work_item` (`ok: true`), adding `number`, `score`, `title`, `next`, `command`, `ruling_landings`/`ruling_old`/`ruling_hint` per NEXT-04 (E-NEXT-07).
-- [ ] [NEXT-12] A cut proposal's `reason` is `"cut_slice"` (`ok: true`), the object adding `number`, `title`, `slice`, `cut_title`, `command` (see E-NEXT-07).
-- [ ] [NEXT-13] A close proposal's `reason` is `"close_container"` (`ok: true`), adding `number`, `closed`, `total`, `next_step` (always `null`), never `command`.
-- [ ] [NEXT-14] The object always carries `recovery` (`{number, title, step}`), `skipped` (`{number, reason}`), `close`, `waiting_on_operator` (bare number arrays), whatever `reason`; see NEXT-44, NEXT-51, NEXT-52.
-- [ ] [NEXT-15] `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope, overlaps}` each, uncapped), and `scope_unknown` (a bare number array).
-- [ ] [NEXT-58] A candidate's `overlaps` holds one `{issue, lane, claim_id, paths}` per note, `[]` when none: `lane` a lane claim's branch, else `issue` (NEXT-35); `claim_id` null off a claim; `paths` uncapped.
-- [ ] [NEXT-44] The object always carries `ideas`, a bare number array after `waiting_on_operator`, `[]` when no item carries the idea label (NEXT-43).
-- [ ] [NEXT-46] The object always carries `with_head`, after `ideas`: `{number, lines}` per item named by NEXT-45, `lines` the bare line indexes, `[]` when no line is with its head.
-- [ ] [NEXT-35] Under `storage = "state-ref"` each item these fields name, `number` included, is the `aco-xxxxxx` id the text prints, a string in place of the bare number.
-- [ ] [NEXT-24] `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-NEXT-08).
+- NEXT-11: A work-item action's `reason` is `work_item` (`ok: true`), adding `number`, `score`, `title`, `next`, `command`, `ruling_landings`/`ruling_old`/`ruling_hint` per NEXT-04 (E-NEXT-07).
+- NEXT-12: A cut proposal's `reason` is `"cut_slice"` (`ok: true`), the object adding `number`, `title`, `slice`, `cut_title`, `command` (see E-NEXT-07).
+- NEXT-13: A close proposal's `reason` is `"close_container"` (`ok: true`), adding `number`, `closed`, `total`, `next_step` (always `null`), never `command`.
+- NEXT-14: The object always carries `recovery` (`{number, title, step}`), `skipped` (`{number, reason}`), `close`, `waiting_on_operator` (bare number arrays), whatever `reason`; see NEXT-44, NEXT-51, NEXT-52.
+- NEXT-15: `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope, overlaps}` each, uncapped), and `scope_unknown` (a bare number array).
+- NEXT-58: A candidate's `overlaps` holds one `{issue, lane, claim_id, paths}` per note, `[]` when none: `lane` a lane claim's branch, else `issue` (NEXT-35); `claim_id` null off a claim; `paths` uncapped.
+- NEXT-44: The object always carries `ideas`, a bare number array after `waiting_on_operator`, `[]` when no item carries the idea label (NEXT-43).
+- NEXT-46: The object always carries `with_head`, after `ideas`: `{number, lines}` per item named by NEXT-45, `lines` the bare line indexes, `[]` when no line is with its head.
+- NEXT-35: Under `storage = "state-ref"` each item these fields name, `number` included, is the `aco-xxxxxx` id the text prints, a string in place of the bare number.
+- NEXT-24: `--json` on a dispatched refusal (BOARD-02, BOARD-42) prints OUT-nn's envelope with the sentence as `message` and `reason` from the table below, exit `2` (see E-NEXT-08).
 
 `reason`, by which refusal fired:
 
@@ -174,25 +177,25 @@ other printable space are text.
 
 `specs/ahead-of-caller.spec.md` owns the list and what makes an entry red; this section owns what `next` prints and carries.
 
-- [ ] [NEXT-49] After `with head:`, before `SKIPPED`, text prints a line per red entry: `ahead of caller: <path>: item <item> <state> (<reason>)`, `<state>` per NEXT-55.
-- [ ] [NEXT-50] A malformed or unreadable list prints the one line `ahead of caller: unavailable (<sentence>)`; the rest is unchanged. Every foreign part of these lines is escaped as NEXT-37 does.
-- [ ] [NEXT-51] `--json` always carries `ahead_of_caller` after `with_head`: `{path, item, reason, state, error}`; `state` is `open`, `closed`, `missing`, `pull_request`, `unreadable`; `error` else `null`.
-- [ ] [NEXT-52] `--json` always carries `ahead_of_caller_unavailable` after `ahead_of_caller`: `null`, or the sentence NEXT-50 prints, and then `ahead_of_caller` is `[]`.
-- [ ] [NEXT-53] A red entry or an unavailable list never changes the exit status: a red entry beside `No actionable item.` prints its line and exits `3`, as today.
-- [ ] [NEXT-54] `<item>` is this repository's item as NEXT-35 names it (the bare number under `github`, the `aco-xxxxxx` id under `state-ref`), else `<owner>/<repo>#<n>`; `--json` `item` is that number, id or string.
-- [ ] [NEXT-55] `<state>` reads `is closed` for `closed`, `is not found or not accessible` for `missing`, `is a pull request` for `pull_request`, `is unreadable: <error>` for `unreadable`; open prints no line.
+- NEXT-49: After `with head:`, before `SKIPPED`, text prints a line per red entry: `ahead of caller: <path>: item <item> <state> (<reason>)`, `<state>` per NEXT-55.
+- NEXT-50: A malformed or unreadable list prints the one line `ahead of caller: unavailable (<sentence>)`; the rest is unchanged. Every foreign part of these lines is escaped as NEXT-37 does.
+- NEXT-51: `--json` always carries `ahead_of_caller` after `with_head`: `{path, item, reason, state, error}`; `state` is `open`, `closed`, `missing`, `pull_request`, `unreadable`; `error` else `null`.
+- NEXT-52: `--json` always carries `ahead_of_caller_unavailable` after `ahead_of_caller`: `null`, or the sentence NEXT-50 prints, and then `ahead_of_caller` is `[]`.
+- NEXT-53: A red entry or an unavailable list never changes the exit status: a red entry beside `No actionable item.` prints its line and exits `3`, as today.
+- NEXT-54: `<item>` is this repository's item as NEXT-35 names it (the bare number under `github`, the `aco-xxxxxx` id under `state-ref`), else `<owner>/<repo>#<n>`; `--json` `item` is that number, id or string.
+- NEXT-55: `<state>` reads `is closed` for `closed`, `is not found or not accessible` for `missing`, `is a pull request` for `pull_request`, `is unreadable: <error>` for `unreadable`; open prints no line.
 
 ## Recurring audits
 
 `.aco/board.toml` declares audits (PIN-58..62). An entry's *anchor* is the newest issue (`state-ref`: item) carrying its label, open or closed, whose body holds a line `audited through <sha>` once stripped; of several in one body the last counts. `<k>` counts the first-parent trunk landings after that commit, `<d>` the UTC days from its committer date to today.
 
-- [ ] [NEXT-62] Between `RECOVERY` and the action or `No actionable item.`, each due audit prints `audit_due <name>: <sentence>`, `Next: <run>` escaped as NEXT-37 does, and a blank line; `<run>` is never interpreted.
-- [ ] [NEXT-63] `--json` always carries `audits` after `ahead_of_caller_unavailable`: `{name, reason, anchor, sha, landings_since, days_since, run, error}` per due or unavailable entry, `[]` else; `run` is unescaped.
-- [ ] [NEXT-64] `reason` and `<sentence>` follow the table below; `<anchor>` names the issue as NEXT-35 does, `<sha7>` is the commit's first seven characters; `anchor` is its number or id, `sha` the commit or `null`.
-- [ ] [NEXT-65] An audit not due prints nothing and carries no entry. Each entry costs one listing of its label's newest issues, none without an entry, none under `state-ref`; landings come from local git.
-- [ ] [NEXT-66] An anchor commit the local trunk lacks fetches the canonical remote once and reads the trunk again; one still absent is `anchor_off_trunk`, one now found is counted by the rule below.
-- [ ] [NEXT-67] A failed fetch or listing prints `audit <name>: unavailable (<sentence>)`, no `Next:` line; `--json` has `reason` `unavailable`, `error` the sentence; work item and exit status stay (see E-NEXT-19).
-- [ ] [NEXT-68] A due or unavailable audit never changes the exit status or the top-level `reason`: with no actionable item `next` still exits `3` and `reason` is `nothing_actionable`.
+- NEXT-62: Between `RECOVERY` and the action or `No actionable item.`, each due audit prints `audit_due <name>: <sentence>`, `Next: <run>` escaped as NEXT-37 does, and a blank line; `<run>` is never interpreted.
+- NEXT-63: `--json` always carries `audits` after `ahead_of_caller_unavailable`: `{name, reason, anchor, sha, landings_since, days_since, run, error}` per due or unavailable entry, `[]` else; `run` is unescaped.
+- NEXT-64: `reason` and `<sentence>` follow the table below; `<anchor>` names the issue as NEXT-35 does, `<sha7>` is the commit's first seven characters; `anchor` is its number or id, `sha` the commit or `null`.
+- NEXT-65: An audit not due prints nothing and carries no entry. Each entry costs one listing of its label's newest issues, none without an entry, none under `state-ref`; landings come from local git.
+- NEXT-66: An anchor commit the local trunk lacks fetches the canonical remote once and reads the trunk again; one still absent is `anchor_off_trunk`, one now found is counted by the rule below.
+- NEXT-67: A failed fetch or listing prints `audit <name>: unavailable (<sentence>)`, no `Next:` line; `--json` has `reason` `unavailable`, `error` the sentence; work item and exit status stay (see E-NEXT-19).
+- NEXT-68: A due or unavailable audit never changes the exit status or the top-level `reason`: with no actionable item `next` still exits `3` and `reason` is `nothing_actionable`.
 
 | `reason` | when | `<sentence>` |
 |---|---|---|

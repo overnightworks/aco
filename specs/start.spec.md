@@ -74,40 +74,40 @@ claim's gone-worktree rebuild and its reprint, when another fetch moved the trun
 (START-26), removes what this call built (START-18). Only a claim whose push was sent and whose
 outcome the store cannot tell keeps it and says so (START-25); an interrupt removes nothing either.
 
-- [ ] [START-01] No worktree yet at `../<repo>-worktrees/issue-<n>-<slug>`: fetch, create it on `<prefix>/issue-<n>-<slug>` from the trunk, claim it, print `worktree:`/`branch:` (see E-START-01).
-- [ ] [START-02] A title with no usable slug, `--slug` omitted, refuses `no usable slug in this item's title: pass --slug explicitly`, exit 2.
-- [ ] [START-03] No identity resolves a prefix: refuses `branch prefix is required: set ACO_AGENT, GROK_SESSION_ID, or CLAUDE_CODE_SESSION_ID`, exit 2; an unusable one, `claim`'s own sentence, before any worktree.
-- [ ] [START-04] `--scope`/`--whole`/`--out-of-order` pass through verbatim to the claim `start` acquires, exactly as `aco claim <n>` reads them (CLM-06..CLM-18, CLAIM-53..CLAIM-55).
-- [ ] [START-05] `start` never changes the caller's own working directory: it stands wherever it started once `start` returns, whatever worktree it just built or claimed in.
-- [ ] [START-06] A worktree already at the computed path, clean, same branch, with a live claim already on it: looks it up by identity/branch and reprints it verbatim, never minting a second id (see E-START-02).
-- [ ] [START-11] The same clean resume with no live claim (released, abandoned, or reopened after merge) mints a fresh id through the ordinary claim path, exactly as a first build would (see E-START-06).
-- [ ] [START-12] An explicit `--slug` not matching the shape a derived slug would always produce refuses `--slug must be <rule>`, exit 2, before any worktree or branch is touched (see E-START-04).
-- [ ] [START-19] `<repo>` is the caller's checkout if main; from a linked worktree, the one `core.worktree` or a `.git` common directory names; never nested under it (see E-START-12).
-- [ ] [START-24] Run in a linked worktree whose git directory names no checkout refuses `main checkout unknown: git directory <dir> names no checkout; run start from the main checkout`, exit 2.
-- [ ] [START-31] Once the claim holds, a fresh or rebuilt lane branch tracks its own branch on the canonical remote (`refs/heads/<branch>`), never the trunk: a bare `git push` publishes it.
-- [ ] [START-20] Run inside a linked worktree on the live claim's branch, `start` reprints that claim as START-06 does, clean or dirty, whatever slug the path carries; exit 0 (see E-START-13).
+- START-01: No worktree yet at `../<repo>-worktrees/issue-<n>-<slug>`: fetch, create it on `<prefix>/issue-<n>-<slug>` from the trunk, claim it, print `worktree:`/`branch:` (see E-START-01).
+- START-02: A title with no usable slug, `--slug` omitted, refuses `no usable slug in this item's title: pass --slug explicitly`, exit 2.
+- START-03: No identity resolves a prefix: refuses `branch prefix is required: set ACO_AGENT, GROK_SESSION_ID, or CLAUDE_CODE_SESSION_ID`, exit 2; an unusable one, `claim`'s own sentence, before any worktree.
+- START-04: `--scope`/`--whole`/`--out-of-order` pass through verbatim to the claim `start` acquires, exactly as `aco claim <n>` reads them (CLM-06..CLM-18, CLAIM-53..CLAIM-55).
+- START-05: `start` never changes the caller's own working directory: it stands wherever it started once `start` returns, whatever worktree it just built or claimed in.
+- START-06: A worktree already at the computed path, clean, same branch, with a live claim already on it: looks it up by identity/branch and reprints it verbatim, never minting a second id (see E-START-02).
+- START-11: The same clean resume with no live claim (released, abandoned, or reopened after merge) mints a fresh id through the ordinary claim path, exactly as a first build would (see E-START-06).
+- START-12: An explicit `--slug` not matching the shape a derived slug would always produce refuses `--slug must be <rule>`, exit 2, before any worktree or branch is touched (see E-START-04).
+- START-19: `<repo>` is the caller's checkout if main; from a linked worktree, the one `core.worktree` or a `.git` common directory names; never nested under it (see E-START-12).
+- START-24: Run in a linked worktree whose git directory names no checkout refuses `main checkout unknown: git directory <dir> names no checkout; run start from the main checkout`, exit 2.
+- START-31: Once the claim holds, a fresh or rebuilt lane branch tracks its own branch on the canonical remote (`refs/heads/<branch>`), never the trunk: a bare `git push` publishes it.
+- START-20: Run inside a linked worktree on the live claim's branch, `start` reprints that claim as START-06 does, clean or dirty, whatever slug the path carries; exit 0 (see E-START-13).
 
 ## Refusing a target, a collision, or a dirty resume
 
-- [ ] [START-07] A closed target refuses `issue #<n> is closed`; a missing one refuses `issue #<n> does not exist here`; exit 2, before any worktree or branch (see E-START-03).
-- [ ] [START-08] The branch name already taken elsewhere refuses `branch '<branch>' already exists and is not this item's worktree; remove it, or pass --slug to choose a different worktree`, exit 2.
-- [ ] [START-09] A worktree at the computed path on a different branch refuses `worktree <path> exists on branch '<other>', not '<branch>'; remove it, or pass --slug to choose a different worktree`, exit 2.
-- [ ] [START-29] A detached worktree at the computed path refuses `worktree <path> has a detached HEAD; run git -C <path> switch [-c] <branch> first` (`-c` if new; quoted as NEXT-27), exit 2, no writes (E-START-18).
-- [ ] [START-10] A worktree at the computed path with uncommitted changes refuses `worktree <path> is dirty: <paths>; commit or clean it before resuming`, exit 2 (paths named as CLM-05 names them).
-- [ ] [START-13] A worktree at the computed path that is not this repository's own -- a foreign root, this repository's own main checkout, or a different repository's worktree -- refuses by name (see E-START-05).
-- [ ] [START-14] An unsafe branch prefix refuses `agent identity '<prefix>' is not usable in a branch name: '<branch>' is not a safe Git ref`, exit `2`, before any git write (see E-START-07).
-- [ ] [START-15] Something other than a git worktree already sitting at the computed path refuses `path exists and is not a worktree of this repository`, exit `2` (see E-START-08).
-- [ ] [START-16] A live claim on the target held by a different agent or branch is never silently resumed: it falls through to the ordinary claim path, refused by CLAIM-11's own sentence (see E-START-09).
-- [ ] [START-17] A resume's own explicit `--scope` disagreeing with the live claim's stored scope refuses `live claim scope differs; release it first`, exit `2` (see E-START-10).
-- [ ] [START-22] A refusal of the claim's own checks comes before the build: no `worktree:`/`branch:` line, no worktree, no branch; exit 2 (see E-START-11).
-- [ ] [START-28] A canonical `<remote>` with no URL configured refuses before its fetch: `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit 2, nothing built (see E-START-17).
-- [ ] [START-18] A claim refused after the build, even under its push (CAS-57), or a moved trunk (START-26) drops both: `removed worktree <path> and branch '<branch>' this start created`; exit 2 (see E-START-15).
-- [ ] [START-26] A build or gone-worktree rebuild standing on a trunk moved after the checks refuses `the trunk moved after start checked it; run start again`, exit 2, then removes it as START-18 says.
-- [ ] [START-25] Unknown outcome (CAS-56) keeps both, even one that stood (START-11): `the claim's push was sent, its outcome unknown; worktree <path> and branch '<branch>' kept; run start again to resume it`; exit 2.
-- [ ] [START-27] A `state-ref` item closed or edited after the checks read it refuses CAS-20's sentence (CAS-59), no claim, and the build goes (START-18), before or under the claim's push; see E-START-16.
-- [ ] [START-21] When git will not delete that branch, by exit or launch, the line reads `removed worktree <path> this start created; branch '<branch>' kept: <reason>` instead (see E-START-14).
-- [ ] [START-23] When git will not remove that worktree, the refusal and exit 2 stay and the line reads `worktree <path> and branch '<branch>' this start created kept: git failure: <reason>`.
-- [ ] [START-30] A timed-out delete may have run: `removed worktree <path> this start created; branch '<branch>' unknown: git <subcommand> timed out; check git branch --list <branch>` (E-START-19).
+- START-07: A closed target refuses `issue #<n> is closed`; a missing one refuses `issue #<n> does not exist here`; exit 2, before any worktree or branch (see E-START-03).
+- START-08: The branch name already taken elsewhere refuses `branch '<branch>' already exists and is not this item's worktree; remove it, or pass --slug to choose a different worktree`, exit 2.
+- START-09: A worktree at the computed path on a different branch refuses `worktree <path> exists on branch '<other>', not '<branch>'; remove it, or pass --slug to choose a different worktree`, exit 2.
+- START-29: A detached worktree at the computed path refuses `worktree <path> has a detached HEAD; run git -C <path> switch [-c] <branch> first` (`-c` if new; quoted as NEXT-27), exit 2, no writes (E-START-18).
+- START-10: A worktree at the computed path with uncommitted changes refuses `worktree <path> is dirty: <paths>; commit or clean it before resuming`, exit 2 (paths named as CLM-05 names them).
+- START-13: A worktree at the computed path that is not this repository's own -- a foreign root, this repository's own main checkout, or a different repository's worktree -- refuses by name (see E-START-05).
+- START-14: An unsafe branch prefix refuses `agent identity '<prefix>' is not usable in a branch name: '<branch>' is not a safe Git ref`, exit `2`, before any git write (see E-START-07).
+- START-15: Something other than a git worktree already sitting at the computed path refuses `path exists and is not a worktree of this repository`, exit `2` (see E-START-08).
+- START-16: A live claim on the target held by a different agent or branch is never silently resumed: it falls through to the ordinary claim path, refused by CLAIM-11's own sentence (see E-START-09).
+- START-17: A resume's own explicit `--scope` disagreeing with the live claim's stored scope refuses `live claim scope differs; release it first`, exit `2` (see E-START-10).
+- START-22: A refusal of the claim's own checks comes before the build: no `worktree:`/`branch:` line, no worktree, no branch; exit 2 (see E-START-11).
+- START-28: A canonical `<remote>` with no URL configured refuses before its fetch: `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit 2, nothing built (see E-START-17).
+- START-18: A claim refused after the build, even under its push (CAS-57), or a moved trunk (START-26) drops both: `removed worktree <path> and branch '<branch>' this start created`; exit 2 (see E-START-15).
+- START-26: A build or gone-worktree rebuild standing on a trunk moved after the checks refuses `the trunk moved after start checked it; run start again`, exit 2, then removes it as START-18 says.
+- START-25: Unknown outcome (CAS-56) keeps both, even one that stood (START-11): `the claim's push was sent, its outcome unknown; worktree <path> and branch '<branch>' kept; run start again to resume it`; exit 2.
+- START-27: A `state-ref` item closed or edited after the checks read it refuses CAS-20's sentence (CAS-59), no claim, and the build goes (START-18), before or under the claim's push; see E-START-16.
+- START-21: When git will not delete that branch, by exit or launch, the line reads `removed worktree <path> this start created; branch '<branch>' kept: <reason>` instead (see E-START-14).
+- START-23: When git will not remove that worktree, the refusal and exit 2 stay and the line reads `worktree <path> and branch '<branch>' this start created kept: git failure: <reason>`.
+- START-30: A timed-out delete may have run: `removed worktree <path> this start created; branch '<branch>' unknown: git <subcommand> timed out; check git branch --list <branch>` (E-START-19).
 
 ## Never
 

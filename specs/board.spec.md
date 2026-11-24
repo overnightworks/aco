@@ -48,37 +48,76 @@ reason text.
 
 ## No `--json`
 
-- BOARD-15, BOARD-16, BOARD-17, BOARD-18, BOARD-19, BOARD-20, BOARD-21, BOARD-22, BOARD-23, BOARD-28, BOARD-32, BOARD-33, BOARD-34, BOARD-35, BOARD-36, BOARD-37, BOARD-38, BOARD-39, BOARD-40, BOARD-41, BOARD-45, BOARD-46, BOARD-47, BOARD-48, BOARD-49, BOARD-50, BOARD-51, BOARD-52 (retired).
+- BOARD-15 (retired).
+- BOARD-16 (retired).
+- BOARD-17 (retired).
+- BOARD-18 (retired).
+- BOARD-19 (retired).
+- BOARD-20 (retired).
+- BOARD-21 (retired).
+- BOARD-22 (retired).
+- BOARD-23 (retired).
+- BOARD-28 (retired).
+- BOARD-32 (retired).
+- BOARD-33 (retired).
+- BOARD-34 (retired).
+- BOARD-35 (retired).
+- BOARD-36 (retired).
+- BOARD-37 (retired).
+- BOARD-38 (retired).
+- BOARD-39 (retired).
+- BOARD-40 (retired).
+- BOARD-41 (retired).
+- BOARD-45 (retired).
+- BOARD-46 (retired).
+- BOARD-47 (retired).
+- BOARD-48 (retired).
+- BOARD-49 (retired).
+- BOARD-50 (retired).
+- BOARD-51 (retired).
+- BOARD-52 (retired).
 
 - BOARD-55 (retired).
-- BOARD-27, BOARD-31, BOARD-56 (retired).
+- BOARD-27 (retired).
+- BOARD-31 (retired).
+- BOARD-56 (retired).
 
-- [ ] [BOARD-44] `aco board` naming neither `--json` nor `--url` refuses `aco board requires --json or --url`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
+- BOARD-44: `aco board` naming neither `--json` nor `--url` refuses `aco board requires --json or --url`, exit `2`, before any forge, pin, or repository read (see E-BOARD-16).
 
-- [ ] [BOARD-62] `aco board --url` prints the board's address, `http://127.0.0.1:<board_port>/#t=<board token>`, and a newline, nothing else, exit `0` (E-BOARD-30).
-- [ ] [BOARD-64] With an item it prints that step's link, `&s=<owner>/<repo>/<item>`, with `--line K` that card's, `&c=<owner>/<repo>/<item>/<K>`; `<owner>/<repo>` is `--repo` or the checkout's (ABRD-187).
-- [ ] [BOARD-65] `--json` with `--url`, an item or `--line` without `--url`, and `--line` without an item refuse, exit `2`, before any read.
-- [ ] [BOARD-63] `--url` refuses `board_port is not set in <config path>`, exit `2`, creating no file (E-BOARD-31).
-- [ ] [BOARD-66] `--url` refuses, exit `2`, creating no file: `<path> does not exist; start aco serve once to create the board token`, or `board token <path> is unreadable: <reason>`.
+- BOARD-62: `aco board --url` prints the board's address, `http://127.0.0.1:<board_port>/#t=<board token>`, and a newline, nothing else, exit `0` (E-BOARD-30).
+- BOARD-64: With an item it prints that step's link, `&s=<owner>/<repo>/<item>`, with `--line K` that card's, `&c=<owner>/<repo>/<item>/<K>`; `<owner>/<repo>` is `--repo` or the checkout's (ABRD-187).
+- BOARD-65: `--json` with `--url`, an item or `--line` without `--url`, and `--line` without an item refuse, exit `2`, before any read.
+- BOARD-63: `--url` refuses `board_port is not set in <config path>`, exit `2`, creating no file (E-BOARD-31).
+- BOARD-66: `--url` refuses, exit `2`, creating no file: `<path> does not exist; start aco serve once to create the board token`, or `board token <path> is unreadable: <reason>`.
 
 ## The shared forge precondition
 
 `aco next` and `aco rulings` reach this exact check the same way `board`
 does, before either reads a single issue -- cited there, not restated.
 
-- [ ] [BOARD-02] A canonical remote whose host is not GitHub refuses `ERROR: no forge adapter for host <host>`, exit `2`, before any GitHub read is made (see E-BOARD-01).
-- [ ] [BOARD-53] A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-BOARD-20).
-- [ ] [BOARD-01] `board` reaches the same absent- or untracked-`.aco/board.toml` refusal `specs/storage-pin.spec.md` owns (PIN-01/PIN-32), exit `2`, before the host check above ever runs.
-- [ ] [BOARD-42] Under `storage = "state-ref"`, `board`/`next`/`rulings` resolve the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
+- BOARD-02: A canonical remote whose host is not GitHub refuses `ERROR: no forge adapter for host <host>`, exit `2`, before any GitHub read is made (see E-BOARD-01).
+- BOARD-53: A canonical `<remote>` with no URL configured refuses `cannot determine the trunk: canonical remote '<remote>' is not configured`, exit `2` (see E-BOARD-20).
+- BOARD-01: `board` reaches the same absent- or untracked-`.aco/board.toml` refusal `specs/storage-pin.spec.md` owns (PIN-01/PIN-32), exit `2`, before the host check above ever runs.
+- BOARD-42: Under `storage = "state-ref"`, `board`/`next`/`rulings` resolve the state-ref forge like `item show`/`edit`/`close`; `--repo` there refuses the same as those (PIN-04, PIN-05).
 
-- BOARD-03, BOARD-04, BOARD-05, BOARD-06, BOARD-07, BOARD-09, BOARD-10, BOARD-24, BOARD-25, BOARD-29, BOARD-30 (retired).
+- BOARD-03 (retired).
+- BOARD-04 (retired).
+- BOARD-05 (retired).
+- BOARD-06 (retired).
+- BOARD-07 (retired).
+- BOARD-09 (retired).
+- BOARD-10 (retired).
+- BOARD-24 (retired).
+- BOARD-25 (retired).
+- BOARD-29 (retired).
+- BOARD-30 (retired).
 
 ## `--json`
 
-- [ ] [BOARD-11] `board --json` wraps OUT-nn (`reason: "projected"`) around `items`, `ready_now`, `stale`, `recovery`, `landings`, `uncut`, `requests` only, never `repository` (E-BOARD-04).
-- [ ] [BOARD-43] `--json` on a dispatched refusal (BOARD-02, BOARD-42, BOARD-53) prints that envelope with the sentence as `message` and `reason` below, exit `2` (see E-BOARD-15).
-- [ ] [BOARD-08] An item the forge reports no `kind` for, or a non-`container` `kind`, carries `"container": null` even with child counts of its own: never guessed at (see E-BOARD-03).
-- [ ] [BOARD-54] A state-ref item PIN-14/PIN-15 refuses is listed, open, with BODY-50's reason and its read defect, e.g. `body malformed: record: no [record] table`; every other item reads as before (NEXT-36).
+- BOARD-11: `board --json` wraps OUT-nn (`reason: "projected"`) around `items`, `ready_now`, `stale`, `recovery`, `landings`, `uncut`, `requests` only, never `repository` (E-BOARD-04).
+- BOARD-43: `--json` on a dispatched refusal (BOARD-02, BOARD-42, BOARD-53) prints that envelope with the sentence as `message` and `reason` below, exit `2` (see E-BOARD-15).
+- BOARD-08: An item the forge reports no `kind` for, or a non-`container` `kind`, carries `"container": null` even with child counts of its own: never guessed at (see E-BOARD-03).
+- BOARD-54: A state-ref item PIN-14/PIN-15 refuses is listed, open, with BODY-50's reason and its read defect, e.g. `body malformed: record: no [record] table`; every other item reads as before (NEXT-36).
 
 `reason`, by which refusal fired:
 
@@ -86,20 +125,20 @@ does, before either reads a single issue -- cited there, not restated.
 |---|---|
 | PIN-04 (`--repo` under `storage = state-ref`) | `invalid_usage` |
 | BOARD-02 (no forge adapter for host), BOARD-53 (canonical remote with no URL configured), PIN-05 (no resolvable default branch) | `unavailable` |
-- [ ] [BOARD-12] Each `landings` row carries `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null` (LAND-54).
-- [ ] [BOARD-13] Each item's `open_blockers` is split into a same-repository `int` list plus a sibling `foreign_blockers` list of `"<repository>#<n>"` strings, never one mixed list.
-- [ ] [BOARD-14] An `uncut` row's own `scope` key is present, canonical and non-empty only when that row carries a `scope` of its own; a scopeless row's object carries no `scope` key at all, never `"scope": null`.
-- [ ] [BOARD-26] Each item object carries `size` (`"S"`/`"M"`/`"L"`/`null`) alongside its other fields.
+- BOARD-12: Each `landings` row carries `{"item", "committed_at", "sha", "pull_request"}`, exactly one of `sha`/`pull_request` non-`null` (LAND-54).
+- BOARD-13: Each item's `open_blockers` is split into a same-repository `int` list plus a sibling `foreign_blockers` list of `"<repository>#<n>"` strings, never one mixed list.
+- BOARD-14: An `uncut` row's own `scope` key is present, canonical and non-empty only when that row carries a `scope` of its own; a scopeless row's object carries no `scope` key at all, never `"scope": null`.
+- BOARD-26: Each item object carries `size` (`"S"`/`"M"`/`"L"`/`null`) alongside its other fields.
 
   ```
   {"size": "M"}
   {"size": null}
   ```
-- [ ] [BOARD-57] An item labelled `idea_label` carries `"idea": true` in `--json`, `"actionable": false` and `"actionable_reason": "idea"`, whatever its body, `body malformed` included (NEXT-43).
-- [ ] [BOARD-58] A container whose summary counts a child takes its `container` closed and total counts and open children from its sub-issue list; a summary that disagrees refuses nothing, exit `0`.
-- [ ] [BOARD-59] A container's sub-issue in another repository counts in its `container` `closed` and `total`; an open one is only in a sibling `foreign_children` list of `"<repository>#<n>"`, never `open_children`.
-- [ ] [BOARD-60] A sub-issue in another repository is never listed, ranked, claimed or `next`'s pick; while one is open its container is never offered for closing.
-- [ ] [BOARD-61] A container whose only open children are in other repositories carries `"actionable": false` and `"actionable_reason": "container; waiting on <owner>/<repo>#<n>, ..."` (NEXT-60).
+- BOARD-57: An item labelled `idea_label` carries `"idea": true` in `--json`, `"actionable": false` and `"actionable_reason": "idea"`, whatever its body, `body malformed` included (NEXT-43).
+- BOARD-58: A container whose summary counts a child takes its `container` closed and total counts and open children from its sub-issue list; a summary that disagrees refuses nothing, exit `0`.
+- BOARD-59: A container's sub-issue in another repository counts in its `container` `closed` and `total`; an open one is only in a sibling `foreign_children` list of `"<repository>#<n>"`, never `open_children`.
+- BOARD-60: A sub-issue in another repository is never listed, ranked, claimed or `next`'s pick; while one is open its container is never offered for closing.
+- BOARD-61: A container whose only open children are in other repositories carries `"actionable": false` and `"actionable_reason": "container; waiting on <owner>/<repo>#<n>, ..."` (NEXT-60).
 
 ## Never
 
