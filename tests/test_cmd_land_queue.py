@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from cli_fixtures import CliRun, run_cli
 from github_fixtures import LandedWorld, landed_world, landing_readiness, serve_forge
-from lane_record_fixtures import lane_record_object, write_lane_record_file
+from lane_record_fixtures import approving_record_file
 from queue_forge import LANDS, QueueForge, QueueRead
 
 from aco import cmd_land_queue, forge, github, protocol, store
@@ -420,8 +420,7 @@ class TestLandThroughTheMergeQueue:
         self, world: QueueWorld, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         capsys.readouterr()
-        approval = [{"stage": "review", "verdict": "approve", "sha": OTHER_HEAD.ljust(40, "0")}]
-        record = write_lane_record_file(tmp_path, lane_record_object(verdicts=approval))
+        record = approving_record_file(tmp_path, OTHER_HEAD.ljust(40, "0"))
         pin = {
             Pin.QUEUED_HEAD: ["--head", world.landed.landing.head],
             Pin.OTHER_HEAD: ["--head", OTHER_HEAD, "--record", str(record)],
