@@ -34,10 +34,11 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
 | no item, `aco next` names an action at the start or while it waits | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, a line that waited on the operator is no longer open | WAIT-14, WAIT-15 | WAIT-16 |
 | no item, the only item has open option lines, none sent back | WAIT-26 | WAIT-14 |
-| no item, a ruling written by aco, a closed blocker, a released claim or an `until` date that arrives | WAIT-17, WAIT-18, WAIT-19 | — |
+| no item, a ruling written by aco, a closed blocker, a released claim or an `until` date that arrives | WAIT-17, WAIT-18, WAIT-19, WAIT-27, WAIT-28 | — |
+| no item, the repository's probe moved and its open listings did not change | WAIT-27 | — |
 | no item, a recurring audit is due | WAIT-23, WAIT-25 | WAIT-25 |
 | no item, an audit is not due or unavailable, or none is configured | WAIT-23, WAIT-24 | WAIT-25 |
-| no item, a transient failure other than a rate limit while it waits | WAIT-20 | — |
+| no item, a transient failure other than a rate limit while it waits | WAIT-20, WAIT-27 | — |
 | no item, a failure that is not transient | WAIT-20 | WAIT-20 |
 | `--line` without an item, or an item without `--line` | WAIT-21 | WAIT-21 |
 
@@ -79,10 +80,12 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - A ruling through the board, `record_answer` or `aco rule` thus ends it in about two seconds, with the lines of that item that no longer wait; the board read is not needed and `aco next` is not asked.
   - A signal is first looked at after the read that found its item, so the item is read once more then: a ruling in between is not lost.
   - An item that is closed is not reported; one that no longer reads as an item is left to the next board read.
-- WAIT-18: Every minute it checks whether the board changed, and reads it when it did:
+- WAIT-18: Every minute it checks whether the board may have changed; a check that finds a change asks for a read (WAIT-27, WAIT-28), and the state ref's tip asks for one outright:
   - under `storage = "github"`: one conditional request each for the repository's most recently updated issue and for each open blocker in another repository
   - under either storage: a read of the state ref's tip; under `state-ref` it is the only check
-  - an open blocker in another repository that a read found for the first time is read once more after its first probe, for it may have closed in between
+- WAIT-27: A probe hit on the repository's own issues makes it list the open issues and open pull requests, and it reads the board only if they differ from the last read's rows, update times aside.
+  - a check that fails stays owed until one answers (WAIT-20, WAIT-22); it never replaces the hourly read (WAIT-19)
+- WAIT-28: A hit on a blocker in another repository makes it read the board only when the probe's own answer shows that blocker closed, whether or not it was probed before.
 - WAIT-19: It reads the board every hour, and on the first tick on or after 00:00 UTC of the earliest `until` date still ahead; the date is compared on each tick and found again after each read.
 - WAIT-20: A forge answer "not modified" means unchanged, whatever the exit status of the call; "modified" means changed and its tag is sent back as it came (see E-WAIT-08):
   - a transient forge failure, or a failed read of the state ref's tip, prints one `WARNING: the board could not be read, still waiting: <sentence>` to stderr per run of failures; the wait goes on

@@ -207,7 +207,10 @@ An idle head's `aco wait` without an item watches its own board
 repository and a service would save no request. The signal files wake it within
 seconds of a ruling, and a cheap check decides when to read the rest: the state
 ref's tip and, under GitHub storage, one conditional request (`BoardProbe`) for
-the newest updated issue and for each open blocker elsewhere. A board read also
+the newest updated issue and for each open blocker elsewhere. A hit on the newest
+updated issue lists the open issues and pull requests first and reads the board only
+when they differ from the last read's rows; a blocker elsewhere asks for a read only
+when its own answer shows it closed. A board read also
 ends it on a due recurring audit, judged by `board_read.recurring_audit_reading`; the
 anchor is listed again only when the newest trunk landing or the day changed.
 
