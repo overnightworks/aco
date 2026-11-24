@@ -56,6 +56,7 @@ class BoardReading:
     foreign_blockers: tuple[forge.ProbeTarget, ...]
     earliest_until: item_wait.UntilWait | None
     audits_due: tuple[str, ...] = ()
+    listings: board_read.OpenListings = board_read.OpenListings(())
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,17 @@ def read_due(
     return pending or until_reached or now - schedule.last_read >= FULL_READ_SECONDS
 
 
+def listings_differ(before: board_read.OpenListings, after: board_read.OpenListings) -> bool:
+    """Whether the open listings differ in anything but the issues' update times, which a
+    comment or a CI note moves without changing what a board or a line shows."""
+
+    def comparable(listings: board_read.OpenListings) -> tuple[object, ...]:
+        issues = tuple(replace(issue, updated_at="") for issue in listings.issues)
+        return (issues, listings.pull_requests)
+
+    return comparable(before) != comparable(after)
+
+
 def probe_targets(
     repository: str, foreign_blockers: tuple[forge.ProbeTarget, ...]
 ) -> tuple[forge.ProbeTarget, ...]:
@@ -229,11 +241,14 @@ def audits_due(
     return due
 
 
-def read_board(context: RunContext, kept: KeptAudits) -> BoardReading:
-    """One read of the open board and of `aco next`'s decision over it; `kept` holds the
-    audit verdicts between reads."""
-    issues = context.forge.list_open_board_issues()
-    observed = board_read.observed_board(context, issues=issues)
+def read_board(
+    context: RunContext, kept: KeptAudits, listings: board_read.OpenListings | None = None
+) -> BoardReading:
+    """One read of the open board and of `aco next`'s decision over it, over `listings` or,
+    when given none, over the ones it fetches; `kept` holds the audit verdicts between reads."""
+    listings = listings or board_read.fetch_open_listings(context.forge)
+    issues = listings.issues
+    observed = board_read.observed_board(context, listings=listings)
     projected = observed.board
     storage = context.config.storage
     action = workboard.next_action(projected)
@@ -246,6 +261,7 @@ def read_board(context: RunContext, kept: KeptAudits) -> BoardReading:
             (body.parse_body(issue.body, storage=storage).wait for issue in issues), context.today()
         ),
         audits_due=audits_due(context, observed.trunk_landings, kept),
+        listings=listings,
     )
 
 
@@ -300,6 +316,9 @@ class _BoardWatch:
         self._until: item_wait.UntilWait | None = None
         self._schedule = Schedule(clock.now(), clock.now())
         self._pending = False
+        self._listings = board_read.OpenListings(())
+        self._listings_owed = False
+        self._checked: board_read.OpenListings | None = None
         self._failures = FailureRun(_say_still_waiting)
         self._read_before = False
         self._audits = KeptAudits()
@@ -340,6 +359,7 @@ class _BoardWatch:
         end = self._reread_items(moved) if moved else None
         if end is not None:
             return end
+        self._check_listings()
         if self._read_due(now, self._schedule.retry_after):
             return self._read(now)
         if probed or moved:
@@ -353,7 +373,7 @@ class _BoardWatch:
         refused: forge.ForgeTransientError | None = None
         if not held:
             try:
-                self._pending = self._probe_the_forge() or self._pending
+                self._probe_the_forge()
             except forge.ForgeTransientError as failure:
                 refused = failure
         try:
@@ -401,24 +421,36 @@ class _BoardWatch:
         self._pending = self._pending or tip != self._tip
         self._tip = tip
 
-    def _probe_the_forge(self) -> bool:
+    def _probe_the_forge(self) -> None:
         """Under `github` storage one conditional question per target; a target seen the
-        first time only takes its token. Whether a blocker was seen the first time, which
-        may have closed since the read that found it."""
+        first time only takes its token. A moved repository target owes a check of the open
+        listings; a blocker in another repository asks for a read when its answer is closed."""
         if not self._github:
-            return False
+            return
         targets = probe_targets(self._context.repository_id.path, self._blockers)
         self._tokens = {
             target: token for target, token in self._tokens.items() if target in targets
         }
-        first_blocker = False
         for target in targets:
             known = self._tokens.get(target)
             answer = self._context.board_probe.changed_since(target, known)
             self._tokens[target] = answer.token
-            self._pending = self._pending or (answer.changed and known is not None)
-            first_blocker = first_blocker or (known is None and target.number is not None)
-        return first_blocker
+            if target.number is None:
+                self._listings_owed = self._listings_owed or (answer.changed and known is not None)
+            else:
+                self._pending = self._pending or answer.closed
+
+    def _check_listings(self) -> None:
+        """A check owed is made once no read is pending: the open listings are fetched and a
+        read is asked for only when they differ from the last read's; the rows it fetched go
+        to that read. A failed check stays owed."""
+        if not self._listings_owed or self._pending:
+            return
+        fetched = board_read.fetch_open_listings(self._context.observed_afresh().forge)
+        self._listings_owed = False
+        if listings_differ(self._listings, fetched):
+            self._checked = fetched
+            self._pending = True
 
     def _reread_items(self, items: Sequence[int]) -> BoardEnd | None:
         """Only the items whose signal moved are read again; the signals' times are taken
@@ -452,11 +484,11 @@ class _BoardWatch:
     def _read(self, now: float) -> BoardEnd | None:
         """A fresh read; the signals' times are taken before it, so a ruling during
         it moves them again, and an item first watched reads as moved. It ends the wait or
-        becomes what the next ticks compare to; a blocker first probed after it is read
-        for once more."""
+        becomes what the next ticks compare to; the blockers it found are probed after it."""
         before = {item: self._modified(item) for item in self._signals}
         context = self._context.observed_afresh() if self._read_before else self._context
-        reading = read_board(context, self._audits)
+        checked, self._checked = self._checked, None
+        reading = read_board(context, self._audits, checked)
         self._read_before = True
         end = ending(self._waiting, reading)
         if end is not None:
@@ -466,13 +498,13 @@ class _BoardWatch:
         self._until = reading.earliest_until
         watched = sorted({item for item, _index in self._waiting})
         self._signals = {item: before.get(item, _UNSEEN) for item in watched}
+        self._listings = reading.listings
+        self._listings_owed = False
         self._pending = False
         self._failures.end()
         self._schedule = Schedule(now, now)
-        if not self._probe_the_forge():
-            return None
-        self._pending = True
-        return self._read(now)
+        self._probe_the_forge()
+        return None
 
 
 def wait_for_board(context: RunContext, clock: WaitClock) -> BoardEnd:

@@ -2,6 +2,7 @@
 sends the last answer's ETag and reads the status line, because `gh` exits
 non-zero on the 304 that means unchanged."""
 
+import json
 from collections.abc import Callable
 
 from . import forge, github_failure, github_paging
@@ -13,6 +14,8 @@ its decoded output and exit status, whatever that status is."""
 _PURPOSE = "GitHub board probe"
 _CHANGED = 200
 _NOT_MODIFIED = 304
+_CLOSED = "closed"
+_OPEN = "open"
 _NEWEST_UPDATED = "issues?state=all&sort=updated&direction=desc&per_page=1"
 
 
@@ -24,6 +27,17 @@ def _path(target: forge.ProbeTarget) -> str:
 def _command(target: forge.ProbeTarget, token: str | None) -> list[str]:
     conditional = [] if token is None else ["-H", f"If-None-Match: {token}"]
     return ["gh", "api", "-i", *conditional, _path(target)]
+
+
+def _is_closed(body: str) -> bool:
+    """Whether the answered issue's `state` is `closed`; anything but `open` or `closed` is malformed."""
+    try:
+        state = json.loads(body).get("state")
+    except (ValueError, AttributeError) as error:
+        raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned no issue") from error
+    if state not in {_OPEN, _CLOSED}:
+        raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned the issue state {state!r}")
+    return state == _CLOSED
 
 
 class GitHubBoardProbe:
@@ -40,7 +54,7 @@ class GitHubBoardProbe:
         decoded, exit_status = self._run(
             _command(target, token), purpose=_PURPOSE, repository=repository
         )
-        head, _body = github_paging.split_answer(decoded)
+        head, body = github_paging.split_answer(decoded)
         status = github_paging.status(head)
         if status == _NOT_MODIFIED and token is not None:
             return forge.ProbeAnswer(changed=False, token=token)
@@ -49,7 +63,8 @@ class GitHubBoardProbe:
         etag = github_paging.header(head, "etag")
         if etag is None:
             raise forge.ForgeMalformedResponseError(f"{_PURPOSE} returned no ETag")
-        return forge.ProbeAnswer(changed=True, token=etag)
+        closed = target.number is not None and _is_closed(body)
+        return forge.ProbeAnswer(changed=True, token=etag, closed=closed)
 
     def _failure(self, decoded: str, exit_status: int, repository: str) -> forge.ForgeError:
         """The failure of a refused probe; a rate limit carries the reset its owner states,

@@ -64,7 +64,7 @@ def test_the_request_is_conditional_on_the_token_it_is_given(
     conditional: list[str],
 ) -> None:
     """Spec: WAIT-18 -- one conditional request for the newest updated issue, one per blocker."""
-    gh = _Gh(0, f"HTTP/2.0 200 OK\nEtag: {ETAG}\n\n[]")
+    gh = _Gh(0, f'HTTP/2.0 200 OK\nEtag: {ETAG}\n\n{{"state": "open"}}')
     github_probe.GitHubBoardProbe(gh).changed_since(target, token)
     assert gh.commands == [["gh", "api", "-i", *conditional, path]]
 

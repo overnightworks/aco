@@ -129,7 +129,7 @@ def rule_through_aco(client: FakeForge, capsys: pytest.CaptureFixture[str], line
 def close_the_blocker(client: FakeForge, probe: FakeBoardProbe) -> Callable[[], None]:
     def close() -> None:
         client.board_dependencies = blocked_board(closed=True).board_dependencies
-        probe.change(forge.ProbeTarget(FOREIGN, 3))
+        probe.close(forge.ProbeTarget(FOREIGN, 3))
 
     return close
 
@@ -390,19 +390,20 @@ class TestWaitingOnTheBoard:
         assert re.fullmatch(r"CHANGED #7 line 3: ruled A \d{4}-\d{2}-\d{2}\n", result.stdout)
         assert len(ticks.pauses) == 3
 
-    def test_a_blocker_that_closes_before_its_first_probe_wakes_it_at_once(
+    def test_a_blocker_closed_at_its_first_probe_wakes_it_at_the_next_poll(
         self,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
         probe: BlockerSightingProbe,
     ) -> None:
-        """Spec: WAIT-14, WAIT-18 -- the token a blocker takes at its first probe is of a
-        blocker the read found open, so a read follows that probe."""
+        """Spec: WAIT-14, WAIT-28 -- a blocker whose first answer shows it closed wakes the
+        wait with the item, with no second read."""
         client = serve_forge(monkeypatch, blocked_board(closed=False))
         ticks = install(monkeypatch, lambda: 0)
 
         def close_the_blocker_at_its_first_sighting() -> None:
             client.board_dependencies = blocked_board(closed=True).board_dependencies
+            probe.closed.add(forge.ProbeTarget(FOREIGN, 3))
 
         probe.at_the_first_sighting = close_the_blocker_at_its_first_sighting
         result = run_cli(["wait"], capsys)
@@ -411,7 +412,7 @@ class TestWaitingOnTheBoard:
             "",
             ACTIONABLE_AFTER_THE_BLOCKER,
         )
-        assert ticks.pauses == []
+        assert ticks.pauses == [cmd_wait.SIGNAL_POLL_SECONDS]
 
     def test_a_read_for_a_new_blocker_that_fails_is_retried_until_it_answers(
         self,
@@ -419,13 +420,14 @@ class TestWaitingOnTheBoard:
         capsys: pytest.CaptureFixture[str],
         probe: BlockerSightingProbe,
     ) -> None:
-        """Spec: WAIT-14, WAIT-18, WAIT-20 -- the read that follows a blocker's first probe
+        """Spec: WAIT-14, WAIT-28, WAIT-20 -- the read a blocker's first answer asks for
         stays owed while it fails, though the probes after it find nothing moved."""
         client, the_board_gains_a_blocked_item = serve_the_card_board(monkeypatch, probe)
         ticks = install(monkeypatch, lambda: 0)
 
         def the_board_cannot_be_read_again() -> None:
             client.board_failure = forge.ForgeTransientError(DOWN)
+            probe.closed.add(forge.ProbeTarget(FOREIGN, 3))
 
         def the_board_is_readable_and_the_blocker_closed() -> None:
             client.board_failure = None
@@ -445,8 +447,8 @@ class TestWaitingOnTheBoard:
         capsys: pytest.CaptureFixture[str],
         probe: BlockerSightingProbe,
     ) -> None:
-        """Spec: WAIT-14, WAIT-18, WAIT-20 -- a blocker the read found open but whose first
-        probe failed is read for once more at its first probe that answers, not at the hour."""
+        """Spec: WAIT-14, WAIT-28, WAIT-20 -- a blocker whose first probe failed is judged at
+        its first probe that answers, not at the hour."""
         client, the_board_gains_a_blocked_item = serve_the_card_board(monkeypatch, probe)
         ticks = install(monkeypatch, lambda: 0)
 
@@ -551,7 +553,7 @@ class TestFailingWhileItWaits:
 
         def the_board_changes_but_cannot_be_read() -> None:
             client.board_failure = forge.ForgeTransientError(DOWN)
-            probe.change(forge.ProbeTarget(FOREIGN, 3))
+            probe.close(forge.ProbeTarget(FOREIGN, 3))
 
         def the_board_is_readable_and_the_blocker_closed() -> None:
             client.board_failure = None

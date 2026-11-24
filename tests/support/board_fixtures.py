@@ -63,17 +63,26 @@ class FakeBoardProbe:
     tokens: dict[forge.ProbeTarget, str] = field(default_factory=dict)
     failure: forge.ForgeError | None = None
     asked: list[forge.ProbeTarget] = field(default_factory=list)
+    closed: set[forge.ProbeTarget] = field(default_factory=set)
+    billed: int = 0
 
     def changed_since(self, target: forge.ProbeTarget, token: str | None) -> forge.ProbeAnswer:
         self.asked.append(target)
         if self.failure is not None:
             raise self.failure
         current = self.tokens.setdefault(target, "first")
-        return forge.ProbeAnswer(changed=current != token, token=current)
+        changed = current != token
+        self.billed += changed
+        return forge.ProbeAnswer(changed=changed, token=current, closed=changed and target in self.closed)
 
     def change(self, target: forge.ProbeTarget) -> None:
         """What the forge answers for `target` from now on differs from what it answered."""
         self.tokens[target] = f"{self.tokens.get(target, 'first')}+"
+
+    def close(self, target: forge.ProbeTarget) -> None:
+        """`target` is closed from now on, and its answer differs from what it answered."""
+        self.closed.add(target)
+        self.change(target)
 
 
 def serve_board_probe(monkeypatch: pytest.MonkeyPatch, probe: FakeBoardProbe) -> FakeBoardProbe:

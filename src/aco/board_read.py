@@ -3,7 +3,7 @@ and live-body gates before item rewrites."""
 
 import sys
 from collections.abc import Callable, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -206,6 +206,34 @@ class LandingReads:
     trunk_ref: str
 
 
+@dataclass(frozen=True)
+class OpenListings:
+    """The open issue listing a board is built from and, when a caller already holds them,
+    the open pull request rows (`None`: the build lists them), bundled so `build_board`
+    stays under the five-argument ceiling and a watch compares the rows its board used."""
+
+    issues: tuple[workboard.Issue, ...]
+    pull_requests: tuple[workboard.PullRequest, ...] | None = None
+
+
+def _open_pull_requests(
+    pool: ThreadPoolExecutor, client: forge.BoardSource, listings: OpenListings
+) -> Future[tuple[workboard.PullRequest, ...]]:
+    """The open pull request rows: the listing on `pool`, or the rows `listings` holds."""
+    held = listings.pull_requests
+    if held is None:
+        return pool.submit(client.list_open_board_pull_requests)
+    return pool.submit(lambda: held)
+
+
+def fetch_open_listings(client: forge.BoardSource) -> OpenListings:
+    """The open issue and open pull request listings, read concurrently."""
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        issues = pool.submit(client.list_open_board_issues)
+        pull_requests = pool.submit(client.list_open_board_pull_requests)
+        return OpenListings(issues.result(), pull_requests.result())
+
+
 def trunk_landing_items(
     trunk_landings: tuple[checkout.TrunkLanding, ...],
 ) -> tuple[workboard.TrunkLandingItem, ...]:
@@ -235,7 +263,7 @@ def build_board(
     context: RunContext,
     claims: tuple[protocol.ActiveClaim, ...],
     *,
-    issues: tuple[workboard.Issue, ...] | None = None,
+    listings: OpenListings | None = None,
     history: ClaimHistory | None = None,
     landing: LandingReads | None = None,
 ) -> workboard.Board:
@@ -243,8 +271,8 @@ def build_board(
     now = datetime.now(UTC)
     client = context.forge
     config = context.config
-    if issues is None:
-        issues = client.list_open_board_issues()
+    listings = listings or OpenListings(client.list_open_board_issues())
+    issues = listings.issues
     since = workboard.merged_pull_request_floor(issues, now)
     # The summary only hints whether a sub-issue list is worth fetching: one
     # saying 0 (or absent, `children_total is None`) skips the request.
@@ -260,7 +288,7 @@ def build_board(
     # even once these two base reads finish and free their own pool's workers. The dependency
     # wave runs afterward instead (below), so it never overlaps them.
     with ThreadPoolExecutor(max_workers=2) as pool:
-        open_pull_requests = pool.submit(client.list_open_board_pull_requests)
+        open_pull_requests = _open_pull_requests(pool, client, listings)
         merged_pull_requests = pool.submit(client.list_recent_merged_board_pull_requests, since)
         children = _fetch_children(client, container_numbers)
         open_pull_request_rows = open_pull_requests.result()
@@ -359,16 +387,16 @@ def _store_observation_and_issues(context: RunContext) -> _StoreAndIssues:
 def observed_board(
     context: RunContext,
     *,
-    issues: tuple[workboard.Issue, ...] | None = None,
+    listings: OpenListings | None = None,
 ) -> _ObservedBoard:
     """`board`/`next` share this: the store's live claims, projected
     onto forge board data (claims come from the store; the
     forge is the board's own data source)."""
-    if issues is None:
+    if listings is None:
         fetched = _store_observation_and_issues(context)
-        observed, issues = fetched.observed, fetched.issues
+        observed, listings = fetched.observed, OpenListings(fetched.issues)
     else:
-        # A caller that already fetched `issues` itself (`next`) has
+        # A caller that already fetched the listings itself (`next`) has
         # nothing left to overlap the state fetch with.
         observed = context.observation
     live_claims = tuple(observed.claims.values())
@@ -378,7 +406,7 @@ def observed_board(
     projected = build_board(
         context,
         live_claims,
-        issues=issues,
+        listings=listings,
         history=ClaimHistory(claim_ages(context.toplevel, observed), trunk_landings),
     )
     return _ObservedBoard(projected, live_claims, trunk_landings)

@@ -111,7 +111,7 @@ def _release_landing(
     projected = board_read.build_board(
         context,
         tuple(new_state.claims.values()),
-        issues=issues,
+        listings=board_read.OpenListings(issues),
         history=board_read.ClaimHistory(ages=board_read.claim_ages(context.toplevel, new_state)),
         landing=board_read.LandingReads(dependencies, trunk_ref),
     )
