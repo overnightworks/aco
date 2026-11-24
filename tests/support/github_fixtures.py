@@ -22,12 +22,10 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from landing_world_parts import landing_listing, observe_merge_entry
-from lane_record_fixtures import approving_record_file
-from lane_run_entries import seed_approving_runs
+from lane_run_entries import seed_landing_claim
 from store_fixtures import (
     claim_intent,
     lineage_observation,
-    publish_claims_from_a_second_clone,
     state_ref_tip,
 )
 
@@ -71,13 +69,6 @@ def landing_pull_request(
         MERGE_COMMIT_SHA,
         author_is_dependency_bot,
     )
-
-
-def land_command_with_record(directory: Path) -> list[str]:
-    """`aco land` of pull request 12 at the merge commit's sha, with a lane record file in
-    `directory` approving it, for a lane whose claim stores no run."""
-    record = approving_record_file(directory, MERGE_COMMIT_SHA)
-    return ["--repo", REPOSITORY, "land", "12", "--head", MERGE_COMMIT_SHA, "--record", str(record)]
 
 
 def landing_readiness(
@@ -546,21 +537,6 @@ class LandingWorld:
 class LaneLandingWorld(LandingWorld):
     head: str
     entry_lineage: list[tuple[object, object]]
-
-
-def seed_landing_claim(
-    clone: Path, remote: Path, intent: protocol.ClaimIntent, head: str, *, stored_run: bool
-) -> protocol.ClaimState:
-    """Publish the lane's claim, and the one stored run approving `head` that lets it land
-    where `stored_run` is set, both from a second clone; the state after them."""
-    published = publish_claims_from_a_second_clone(clone, remote, (intent,))
-    observed = tuple(
-        (c.identity, c.branch, c.agent, c.role, str(c.claim_id)) for c in published.claims.values()
-    )
-    assert observed == ((intent.identity, intent.branch, intent.agent, intent.role, "landing"),)
-    if not stored_run:
-        return published
-    return seed_approving_runs(clone, remote, published.claims.values(), head)
 
 
 def lane_landing_world(

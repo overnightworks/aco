@@ -48,9 +48,6 @@
 [function_lines."src/aco/cmd_cut.py"]
 "_adopt_existing_child" = 67
 
-[function_lines."src/aco/cmd_land.py"]
-"_land_preflight" = 70
-
 [function_lines."src/aco/cmd_release.py"]
 "_cmd_release_landed" = 94
 "release_transition" = 69
@@ -61,7 +58,7 @@
 
 [function_lines."tests/support/github_fixtures.py"]
 "landed_observations" = 61
-"lane_landing_world" = 65
+"lane_landing_world" = 62
 
 [function_lines."tests/test_checkout.py"]
 "_trunk_history_repository" = 62
@@ -406,7 +403,6 @@ uncited = [
     "LANDCMD-70",
     "LANDCMD-75",
     "LANDCMD-76",
-    "LANDCMD-77",
     "LANREC-02",
     "LANREC-05",
     "LANREC-46",

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from cli_fixtures import real_git
 from lane_record_fixtures import four, lane_record_object, marked
+from store_fixtures import publish_claims_from_a_second_clone
 
 from aco import lane_record, lane_runs, protocol, store
 from aco.routing_line import RoutingStage
@@ -84,3 +85,31 @@ def seed_approving_runs(
         content = lane_runs.serialize_runs(runs)
         commit_runs_file(seed, remote, claim.claim_id, content, agent=claim.agent)
     return store.peek_state(worktree=seed, remote=str(remote))
+
+
+def publish_claims_with_runs(
+    clone: Path,
+    remote: Path,
+    intents: Iterable[protocol.ClaimIntent],
+    head: str,
+    *,
+    stored_run: bool = True,
+) -> protocol.ClaimState:
+    """Publish `intents` from a second clone, with one stored run approving `head` for each claim
+    that lets it land where `stored_run` is set; the state after them."""
+    published = publish_claims_from_a_second_clone(clone, remote, tuple(intents))
+    if not stored_run:
+        return published
+    return seed_approving_runs(clone, remote, published.claims.values(), head)
+
+
+def seed_landing_claim(
+    clone: Path, remote: Path, intent: protocol.ClaimIntent, head: str, *, stored_run: bool
+) -> protocol.ClaimState:
+    """The lane's one claim, published as `publish_claims_with_runs` does."""
+    seeded = publish_claims_with_runs(clone, remote, (intent,), head, stored_run=stored_run)
+    observed = tuple(
+        (c.identity, c.branch, c.agent, c.role, str(c.claim_id)) for c in seeded.claims.values()
+    )
+    assert observed == ((intent.identity, intent.branch, intent.agent, intent.role, "landing"),)
+    return seeded
