@@ -25,6 +25,7 @@ FILE_EXTENSIONS = (
 LINE_TEXT_KEYS = ("question", "problem", "caption", "area", "topic", "reason")
 OPTION_TEXT_KEYS = ("name", "effect", "caption", "notice", "cost", "undo_how")
 PROBLEM_MAXIMUM_WORDS = 20
+STEP_MAXIMUM_WORDS = 15
 OPTION_NAME_MINIMUM_WORDS = 2
 OPTION_NAME_MAXIMUM_WORDS = 5
 _ONE_LINE_KEYS = frozenset({"area", "topic", "name"})
@@ -73,13 +74,23 @@ _JARGON_RULES: tuple[tuple[str, Callable[[str], bool]], ...] = (
 )
 
 
+def word_count(text: str) -> int:
+    """The whitespace-separated words of `text`: the one count every word limit uses."""
+    return len(text.split())
+
+
+def is_one_line(text: str) -> bool:
+    """Whether `text` holds no line break at all, a trailing one included."""
+    return text == "".join(text.splitlines())
+
+
 def _length_reasons(key: str, text: str) -> Iterator[str]:
-    words = len(text.split())
+    words = word_count(text)
     if key == "problem" and words > PROBLEM_MAXIMUM_WORDS:
         yield f"must be at most {PROBLEM_MAXIMUM_WORDS} words"
     if key == "name" and not OPTION_NAME_MINIMUM_WORDS <= words <= OPTION_NAME_MAXIMUM_WORDS:
         yield f"must be {OPTION_NAME_MINIMUM_WORDS} to {OPTION_NAME_MAXIMUM_WORDS} words"
-    if key in _ONE_LINE_KEYS and (text != text.strip() or len(text.splitlines()) > 1):
+    if key in _ONE_LINE_KEYS and (text != text.strip() or not is_one_line(text)):
         yield "must be one line without spaces around it"
 
 

@@ -117,9 +117,9 @@ def operator_wait_table(
     step: str, today: date, block: Mapping[str, object] | None = None
 ) -> dict[str, object]:
     """The `wait` table that holds `step` for the operator. A `block` already
-    holding that step for the operator keeps its `since`, so a repeat is no new wait."""
+    holding a step for the operator keeps its `since`, so a rewrite keeps its age."""
     held = None if block is None or wait_defects(block) else parse_wait(block)
-    since = held.since if isinstance(held, OperatorWait) and held.step == step else today
+    since = held.since if isinstance(held, OperatorWait) else today
     return {OPERATOR_KEY: step, SINCE_KEY: since}
 
 

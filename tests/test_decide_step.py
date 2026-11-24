@@ -18,7 +18,7 @@ from aco.session import RunContext
 NUMBER = 90
 STEP = "Rotate the deploy key."
 TODAY = date(2026, 11, 8)
-_CARD = item_step.StepCard("Why.", "Do this.\nThen that.", "See it.", None)
+_CARD = item_step.StepCard("Why.", "make rotate", "See it.")
 
 
 @dataclass
@@ -70,7 +70,7 @@ def test_the_step_keeps_a_multi_line_next_and_every_other_field_and_byte(clone: 
     assert new.data == {
         **old.data,
         "wait": {"operator": STEP, "since": TODAY},
-        "step": {"purpose": "Why.", "actions": "Do this.\nThen that.", "expected": "See it."},
+        "step": {"purpose": "Why.", "paste": "make rotate", "expected": "See it."},
     }
     assert written[: new.content_start] == before[: old.content_start]
     assert written[new.content_end :] == before[old.content_end :]
@@ -89,6 +89,24 @@ def test_a_repeat_on_a_later_day_keeps_the_day_the_wait_began(clone: Path) -> No
 
     assert body.parse_body(client.item_bodies[NUMBER]).wait == item_wait.OperatorWait(STEP, TODAY)
     assert len(client.body_writes) == 1
+
+
+def test_a_rewrite_with_other_words_on_a_later_day_keeps_the_day_the_wait_began(
+    clone: Path,
+) -> None:
+    """Spec: MCP-66"""
+    context, client = _world(clone, _stepped_item())
+    _mark(context)
+    client.issue_references[NUMBER] = forge.ItemReference(
+        forge.ItemState.OPEN, "Titel", client.item_bodies[NUMBER], author_is_member=True
+    )
+    context.today = lambda: date(2026, 11, 20)
+
+    _mark(context, "Rotate the deploy key with the new tool.")
+
+    assert body.parse_body(client.item_bodies[NUMBER]).wait == item_wait.OperatorWait(
+        "Rotate the deploy key with the new tool.", TODAY
+    )
 
 
 def test_the_step_replaces_a_wait_of_another_kind(clone: Path) -> None:

@@ -33,7 +33,7 @@ a bracketed table header alone, as written, with no surrounding space and no com
 | `[record]` under `storage = "state-ref"` | BODY-16..BODY-20 | — | — |
 | `wait` defective | BODY-21..BODY-24, BODY-112, BODY-113 | BODY-50 | BODY-52 |
 | `handover` defective | BODY-114..BODY-117 | BODY-50 | BODY-52 |
-| `step` valid or defective | BODY-122..BODY-125 | BODY-50 (defective only) | BODY-52 (defective only) |
+| `step` valid or defective | BODY-122..BODY-128 | BODY-50 (defective only) | BODY-52 (defective only) |
 | `[[expectation]]` defective | BODY-25..BODY-33 | BODY-50 | BODY-52 |
 | card field defective | BODY-34, BODY-36..BODY-42 | BODY-50 | BODY-52 |
 | `question` of exactly 160 characters | BODY-35 | — | — |
@@ -314,8 +314,11 @@ keeps its index. Inside one entry the refusals print in this order: `text`,
 
 - BODY-122: A block with no `[step]` table is valid: an older step item carries none, and `aco check -` prints `body ok`, exit `0`.
 - BODY-123: `[step]` with `purpose`, `actions` and `expected`, each a non-empty string that may span lines, and optionally `answer` the same, is valid: `aco check -` prints `body ok`, exit `0`.
-- BODY-124: A `[step]` that is no table, lacks or blanks `purpose`, `actions` or `expected`, blanks `answer` or holds another key prints `body malformed: step.<key>: ...`, exit `2` (see E-BODY-21).
-- BODY-125: A rewrite of the block (BODY-07) keeps the table, ahead of every `[[expectation]]` and `[[slice]]` table.
+- BODY-124: A `[step]` that is no table, lacks or blanks `purpose`, `expected` or its `paste` or `actions`, blanks `answer` or holds another key prints `body malformed: step.<key>: ...`, exit `2` (E-BODY-21).
+- BODY-125: A rewrite of the block (BODY-07) keeps the table of either form, ahead of every `[[expectation]]` and `[[slice]]` table.
+- BODY-126: `[step]` with `purpose`, `paste` and `expected`, each a non-empty string, is valid even when `paste` spans lines: `aco check -` prints `body ok`, exit `0`.
+- BODY-127: A `[step]` that holds `paste` and also `actions` or `answer` prints `body malformed: step.<key>: unknown key step.<key>`, exit `2` (see E-BODY-22).
+- BODY-128: Any write of the block that neither answers nor takes back the step keeps its `[step]` table of either form key for key and value for value, so a rewrite never drops a key.
 
 ## Never
 
@@ -1150,5 +1153,28 @@ expected = "A new key shows."
 ```
 BODY
 2> body malformed: step.purpose: step.purpose must be a non-empty string
+exit 2
+````
+
+### E-BODY-22 — a step table with a paste and actions
+
+Setup: bare-remote, `storage = "github"`.
+
+````console
+$ aco check - <<'BODY'
+```aco
+version = 1
+now = "Open."
+next = "Rotate the key."
+done_when = "It is rotated."
+
+[step]
+purpose = "The old key leaked."
+paste = "make rotate"
+expected = "A new key shows."
+actions = "Open the link."
+```
+BODY
+2> body malformed: step.actions: unknown key step.actions
 exit 2
 ````

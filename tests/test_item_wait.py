@@ -158,8 +158,8 @@ def test_only_a_date_wait_ends_by_itself(wait: item_wait.ItemWait, today: date, 
             {"wait": {"operator": "Other.", "since": SINCE}},
             "Step.",
             date(2026, 11, 9),
-            date(2026, 11, 9),
-            id="other-step",
+            SINCE,
+            id="other-step-keeps-since",
         ),
         pytest.param(
             {"wait": {"until": DEADLINE, "since": SINCE}},
@@ -180,6 +180,7 @@ def test_only_a_date_wait_ends_by_itself(wait: item_wait.ItemWait, today: date, 
 def test_a_step_wait_carries_the_step_and_the_day_it_began(
     block: dict[str, object], step: str, today: date, since: date
 ) -> None:
+    """Spec: MCP-66"""
     table = item_wait.operator_wait_table(step, today, block)
 
     assert table == {"operator": step, "since": since}
