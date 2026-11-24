@@ -1,6 +1,6 @@
 """`aco wait` without an item over a forge that answers cut short (`specs/wait.spec.md`,
-WAIT-29, WAIT-30), through the real entry and the real GitHub probe over a fake `gh` runner,
-with only the forge, the pause and the clock injected and a `gh` on `PATH`."""
+WAIT-29, WAIT-30), through the real entry and the real GitHub probe over a fake `gh` on `PATH`,
+with only the forge, the pause and the clock injected."""
 
 import json
 import os
