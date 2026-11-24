@@ -136,13 +136,16 @@ def require_lane_record(
     """Refuse a landing of `claim` that has no lane record: no `--record` and no stored run, a
     runs file with no entry included (LANREC-100)."""
     if record_file is None and _runs_stored_for(toplevel, observed, claim) is None:
-        label = protocol.claim_label(claim, protocol.forge_item_label)
         raise protocol.ClaimUnavailableError(
             report.bounded_refusal(
-                f"{label} has no lane record (no stored runs, no --record), "
+                f"{_forge_label(claim)} has no lane record (no stored runs, no --record), "
                 f"so no review is known to have judged {reviewed}"
             )
         )
+
+
+def _forge_label(claim: protocol.ActiveClaim) -> str:
+    return protocol.claim_label(claim, protocol.forge_item_label)
 
 
 def _runs_stored_for(
@@ -153,8 +156,7 @@ def _runs_stored_for(
     blob = observed.runs.get(claim.claim_id)
     if blob is None:
         return None
-    label = protocol.claim_label(claim, protocol.forge_item_label)
-    runs = lane_runs.read_stored_runs(toplevel, blob, label)
+    runs = lane_runs.read_stored_runs(toplevel, blob, _forge_label(claim))
     return runs if runs.holds_runs() else None
 
 

@@ -155,18 +155,18 @@ def refusal_of_landing(
     return None
 
 
-def test_a_claim_without_a_runs_file_and_without_a_record_file_has_no_lane_record(
-    repository: Path,
+@pytest.mark.parametrize(
+    "stored",
+    [None, ()],
+    ids=["no-runs-file", "a-runs-file-without-an-entry"],
+)
+def test_a_claim_without_stored_runs_and_without_a_record_file_has_no_lane_record(
+    repository: Path, stored: tuple[()] | None
 ) -> None:
     """Spec: LANREC-100."""
-    refusal = refusal_of_landing(repository, None)
+    blob = None if stored is None else runs_blob(repository, stored)
 
-    assert refusal == NO_LANE_RECORD.format(label="#72")
-
-
-def test_a_runs_file_without_an_entry_counts_as_no_stored_runs(repository: Path) -> None:
-    """Spec: LANREC-100."""
-    refusal = refusal_of_landing(repository, runs_blob(repository, ()))
+    refusal = refusal_of_landing(repository, blob)
 
     assert refusal == NO_LANE_RECORD.format(label="#72")
 

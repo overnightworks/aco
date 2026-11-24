@@ -50,13 +50,21 @@ def test_a_landing_of_a_claim_with_no_stored_run_and_no_record_file_refuses_befo
     assert observed == expected
 
 
-def test_the_same_landing_with_a_record_file_merges(
-    lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    "world", ["lane", "issue_less_lane"], ids=["issue-claim", "issue-less-claim"]
+)
+def test_a_landing_with_a_record_file_merges(
+    world: str,
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Spec: LANREC-100. Example: E-LANREC-22."""
-    result = run_cli(["land", *land_arguments_with_record(tmp_path, lane.head, NUMBER)], capsys)
+    """Spec: LANREC-100, LANREC-102. Example: E-LANREC-22."""
+    landing: LaneLandingWorld = request.getfixturevalue(world)
 
-    assert (result.status, result.stderr, lane.forge.landings[NUMBER].merged) == (0, "", True)
+    result = run_cli(["land", *land_arguments_with_record(tmp_path, landing.head, NUMBER)], capsys)
+
+    assert (result.status, result.stderr, landing.forge.landings[NUMBER].merged) == (0, "", True)
 
 
 def test_a_rerun_of_a_merged_pull_request_needs_no_record_file(
@@ -117,17 +125,6 @@ def issue_less_lane(
         body=FOREIGN_BODY,
         stored_run=False,
     ).landing
-
-
-def test_an_issue_less_lane_lands_with_a_record_file(
-    issue_less_lane: LaneLandingWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Spec: LANREC-102."""
-    result = run_cli(
-        ["land", *land_arguments_with_record(tmp_path, issue_less_lane.head, NUMBER)], capsys
-    )
-
-    assert (result.status, result.stderr) == (0, "")
 
 
 def test_an_issue_less_lane_without_a_record_file_refuses_and_names_its_claim_id(
