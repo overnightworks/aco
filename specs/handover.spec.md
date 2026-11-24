@@ -98,7 +98,7 @@ the issue body's block ends with
 
 ### E-HANDOVER-02 — the new holder lands without an override
 
-Setup: E-HANDOVER-01's, pull request `#57` open, mergeable, every check green, its head branch the claim's branch
+Setup: E-HANDOVER-01's, pull request `#57` open, mergeable, every check green, its head branch the claim's branch, and the claim storing one run that approves `<sha>` with risk `normal`
 
 ```console
 $ aco land 57 --head <sha>
