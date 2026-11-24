@@ -33,10 +33,12 @@ from lane_record_runs_world import (
     World,
     add_arguments,
     begin_arguments,
+    chained_runs,
     commit_on,
+    record_stating,
 )
 
-from aco import protocol, store, workboard
+from aco import lane_runs, protocol, store, workboard
 from aco.routing_line import RoutingStage
 
 ENVELOPE_KEYS = ["ok", "reason", "item", "claim_id", "runs", "complete", "lane"]
@@ -490,10 +492,16 @@ def git_failing_to_read_blob(
 
 @pytest.mark.parametrize("flags", [(), ("--json",)], ids=["text", "json"])
 @pytest.mark.parametrize(
-    ("readable", "defect"),
+    ("content", "readable", "defect"),
     [
-        pytest.param(True, "not valid JSON", id="not-the-stored-shape"),
-        pytest.param(False, "the object is gone", id="not-readable"),
+        pytest.param(b"not json", True, "not valid JSON", id="not-the-stored-shape"),
+        pytest.param(b"not json", False, "the object is gone", id="not-readable"),
+        pytest.param(
+            lane_runs.serialize_runs(chained_runs(record_stating())).replace(b"normal", b"routine"),
+            True,
+            "risk must be material or normal",
+            id="a-risk-class-outside-the-grammar",
+        ),
     ],
 )
 def test_stored_runs_that_cannot_be_used_refuse_as_unavailable(
@@ -501,11 +509,12 @@ def test_stored_runs_that_cannot_be_used_refuse_as_unavailable(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     flags: tuple[str, ...],
+    content: bytes,
     readable: bool,
     defect: str,
 ) -> None:
-    """Spec: LANREC-87, LANREC-89, LANREC-62."""
-    stored_runs = store.hash_blob(world.directory, b"not json")
+    """Spec: LANREC-87, LANREC-89, LANREC-62, LANREC-103."""
+    stored_runs = store.hash_blob(world.directory, content)
     world.commit_state(
         protocol.RunsWriteIntent(
             claim_id=world.claim().claim_id,

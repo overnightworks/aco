@@ -196,8 +196,11 @@ def routing_trailers_of(remote: Path) -> tuple[str, ...]:
 
 
 def record_stating(**changes: object) -> lane_record.LaneRecordFile:
-    """The lane record file of `lane_record_object` with `changes`, parsed."""
-    return lane_record.parse_record_file(json.dumps(lane_record_object(**changes)).encode())
+    """The lane record file of `lane_record_object` with `changes`, parsed; a change to `None`
+    leaves the field out."""
+    content = lane_record_object(**changes)
+    stated = {name: value for name, value in content.items() if value is not None}
+    return lane_record.parse_record_file(json.dumps(stated).encode())
 
 
 def chained_runs(*records: lane_record.LaneRecordFile | None) -> lane_runs.RunsFile:

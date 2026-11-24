@@ -124,3 +124,27 @@ def test_a_landing_whose_record_ends_in_a_revise_verdict_refuses_before_any_writ
     sentence = f"the lane record's last verdict is revise at {stage}, not approve"
     observed, expected = refusal_observations(lane, result, sentence)
     assert observed == expected
+
+
+@pytest.mark.parametrize("merged", [False, True], ids=["first-run", "rerun"])
+def test_a_landing_whose_record_states_no_risk_class_refuses_before_any_write(
+    lane: LaneLandingWorld,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    merged: bool,
+) -> None:
+    """Spec: LANREC-99, LANREC-40, LANDCMD-77. Example: E-LANREC-21. Nothing is merged, deleted
+    or written, a rerun of a merged pull request included."""
+    content = lane_record_object(verdicts=verdict_on(lane.head))
+    del content["risk"]
+    record = write_lane_record_file(tmp_path, content)
+    if merged:
+        landing = lane.forge.landings[12]
+        lane.forge.landings[12] = replace(landing, merged=True, merge_commit=MERGE_COMMIT_SHA)
+    capsys.readouterr()
+
+    result = run_cli(["land", "12", "--head", lane.head, "--record", str(record)], capsys)
+
+    sentence = "the lane record states no risk class; record risk as material or normal"
+    observed, expected = refusal_observations(lane, result, sentence)
+    assert observed == expected
