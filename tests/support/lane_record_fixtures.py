@@ -172,3 +172,10 @@ def approving_record_file(directory: Path, head: str) -> Path:
     """A valid lane record file in `directory` whose last verdict approves `head`."""
     approval = [{"stage": "review", "verdict": "approve", "sha": head}]
     return write_lane_record_file(directory, lane_record_object(verdicts=approval))
+
+
+def land_arguments_with_record(directory: Path, head: str, pull_request: int) -> list[str]:
+    """The arguments after `aco land` for `pull_request` at `head`, with a lane record file in
+    `directory` approving it, for a lane whose claim stores no run."""
+    record = approving_record_file(directory, head)
+    return [str(pull_request), "--head", head, "--record", str(record)]

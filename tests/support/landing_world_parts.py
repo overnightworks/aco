@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from board_fixtures import REPOSITORY
 from cli_fixtures import pull_request_listing
-from lane_record_fixtures import approving_record_file
+from lane_record_fixtures import land_arguments_with_record
 from store_fixtures import lineage_observation
 
 from aco import forge
@@ -25,8 +25,7 @@ def landing_listing(head: str, *paths: str) -> forge.PullRequestChanges:
 def land_command_with_record(directory: Path, head: str) -> list[str]:
     """`aco land` of pull request 12 at `head`, with a lane record file in `directory` approving
     it, for a lane whose claim stores no run."""
-    record = approving_record_file(directory, head)
-    return ["--repo", REPOSITORY, "land", "12", "--head", head, "--record", str(record)]
+    return ["--repo", REPOSITORY, "land", *land_arguments_with_record(directory, head, 12)]
 
 
 def observe_merge_entry(

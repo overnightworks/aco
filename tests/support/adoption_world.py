@@ -21,7 +21,7 @@ from cli_fixtures import (
     worktrees_and_branches,
 )
 from github_fixtures import FakeForge, landing_readiness, serve_forge
-from lane_record_fixtures import approving_record_file
+from lane_record_fixtures import land_arguments_with_record
 from store_fixtures import state_ref_tip
 
 from aco import forge, protocol, store
@@ -73,8 +73,7 @@ class AdoptionWorld:
         """The `aco land` arguments for the pull request: the head reviewed (the world's by
         default) and a lane record file approving it, since an adopted lane stores no run."""
         head = self.head if reviewed is None else reviewed
-        record = approving_record_file(self.clone.parent, head)
-        return [str(ADOPTED_PULL_REQUEST), "--head", head, "--record", str(record)]
+        return land_arguments_with_record(self.clone.parent, head, ADOPTED_PULL_REQUEST)
 
     def list_files(self, *paths: str) -> None:
         self.forge.changes_by_number[ADOPTED_PULL_REQUEST] = pull_request_listing(
