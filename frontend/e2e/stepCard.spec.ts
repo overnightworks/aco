@@ -28,6 +28,7 @@ for (const viewport of [
 			await openSteps(page);
 
 			const card = page.getByRole('article', { name: /Release the build/ });
+			await expect(card.getByText('Decide.', { exact: true })).toBeVisible();
 			await expect(card.getByText('Release the build.', { exact: true })).toBeVisible();
 			await expect(card.locator('pre')).toHaveText(COMMAND);
 			await expect(card.getByText('The page shows green.')).toBeVisible();
@@ -49,6 +50,7 @@ for (const viewport of [
 			await openSteps(page);
 
 			const card = page.getByRole('article', { name: /Release the build/ });
+			await expect(card.getByText('Decide.', { exact: true })).toBeVisible();
 			const open = card.getByRole('link', { name: 'Öffnen' });
 			await expect(open).toHaveAttribute('href', LINK);
 			await expect(open).toHaveAttribute('target', '_blank');

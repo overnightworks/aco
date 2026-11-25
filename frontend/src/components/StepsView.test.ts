@@ -21,10 +21,11 @@ function stubClipboard(writeText: (text: string) => Promise<void>) {
 	vi.stubGlobal('navigator', { clipboard: { writeText } });
 }
 
-test('ABRD-159: a step of the paste form shows its title, purpose, command in a box, expected result and the yes or no answer', () => {
+test('ABRD-159: a step of the paste form shows its title, step line, purpose, command in a box, expected result and the yes or no answer', () => {
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
 
 	const card = screen.getByRole('article', { name: /Release/ });
+	expect(within(card).getByText('Run the release.')).toBeInTheDocument();
 	expect(within(card).getByText('Release the build.')).toBeInTheDocument();
 	expect(card.querySelector('pre')?.textContent).toBe('make release');
 	expect(within(card).getByText('The page shows green.')).toBeInTheDocument();

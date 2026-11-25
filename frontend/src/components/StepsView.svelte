@@ -76,6 +76,7 @@
 						{/each}
 					{:else}
 						{@const paste = pasteOf(step)}
+						<p>{step.step}</p>
 						<p>{step.purpose}</p>
 						{#if 'link' in paste}
 							<a class="open" href={paste.link} target="_blank" rel="noopener noreferrer">
