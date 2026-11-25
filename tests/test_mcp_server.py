@@ -343,7 +343,9 @@ def test_a_step_call_on_an_item_hands_the_stripped_step_to_the_writer_and_answer
     None
 ):
     """Spec: MCP-49, MCP-67"""
-    arguments = _step_arguments(step="  Rotate the key.\n", purpose=" Why.\n", paste=" make rotate ")
+    arguments = _step_arguments(
+        step="  Rotate the key.\n", purpose=" Why.\n", paste=" make rotate "
+    )
 
     result = _answer(_call(arguments, name="step"))["result"]
 

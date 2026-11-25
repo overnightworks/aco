@@ -358,3 +358,19 @@ def test_a_step_answer_on_a_state_ref_item_clears_the_step_and_writes_now_withou
         commits + 1,
         "open",
     )
+
+
+def test_a_hand_written_paste_step_on_a_state_ref_item_is_listed_in_the_paste_form(
+    checkout: _StateRefCheckout, state_ref_board: BoardClient
+) -> None:
+    """Spec: ABRD-157"""
+    step = {"purpose": "Why.", "paste": "make rotate", "expected": "See it."}
+    checkout.seed({f"{_FIRST_ID}.md": _item_file(wait=OPERATOR_WAIT, step=step)})
+
+    listed = state_ref_board.listed_step(_FIRST)
+
+    assert (listed["form"], listed["paste_kind"], listed["paste"]) == (
+        "paste",
+        "command",
+        "make rotate",
+    )

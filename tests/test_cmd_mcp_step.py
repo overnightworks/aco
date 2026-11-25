@@ -4,6 +4,7 @@ left, and what each refusal and each failure after a write leaves behind."""
 
 import json
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +36,7 @@ def _step_line(request_id: int = 1, /, **changes: object) -> str:
         "step": STEP,
         "item": 1,
         "purpose": "The old key must not outlive the rotation.",
-        "actions": "Open the vault link.\nClick Rotate.",
+        "paste": "make rotate",
         "expected": "The vault shows a new key.",
         **changes,
     }
@@ -107,6 +108,7 @@ def _witness_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, operation: st
 def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_turn(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Spec: MCP-66, MCP-67, MCP-39"""
     here.put_item(1, complete_contract("S1 Prepare the vault.\nS2 Rotate the key."), title="Key")
     before = body.locate_block(here.stored_body(1)).data
     lock_held_at_body = _witness_lock(monkeypatch, tmp_path, "update_item_body")
@@ -134,9 +136,12 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
             "number": 1,
             "title": "Key",
             "step": STEP,
+            "form": "paste",
             "purpose": "The old key must not outlive the rotation.",
-            "actions": "Open the vault link.\nClick Rotate.",
+            "paste": "make rotate",
+            "paste_kind": "command",
             "expected": "The vault shows a new key.",
+            "actions": None,
             "answer": None,
         }
     ]
@@ -145,6 +150,7 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
 def test_the_same_call_again_writes_no_body_and_calls_the_label_again(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Spec: MCP-69"""
     first, again = _serve(monkeypatch, _step_line(1), _step_line(2))
 
     assert again["structuredContent"] == first["structuredContent"]
@@ -155,16 +161,16 @@ def test_the_same_call_again_writes_no_body_and_calls_the_label_again(
 def test_a_call_with_other_fields_rewrites_the_step_table_and_keeps_the_rest_of_the_block(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    other = _step_line(2, answer="Report the new key id.", purpose="Why.")
+    """Spec: MCP-69"""
+    other = _step_line(2, paste="make rotate-again", purpose="Why.")
 
     _serve(monkeypatch, _step_line(1), other)
 
     stored = body.locate_block(here.stored_body(1)).data
     assert stored["step"] == {
         "purpose": "Why.",
-        "actions": "Open the vault link.\nClick Rotate.",
+        "paste": "make rotate-again",
         "expected": "The vault shows a new key.",
-        "answer": "Report the new key id.",
     }
     assert stored["wait"] == {"operator": STEP, "since": board_forge.RULING_DAY}
     assert _writes(here) == [
@@ -173,6 +179,25 @@ def test_a_call_with_other_fields_rewrites_the_step_table_and_keeps_the_rest_of_
         ("update_item_body", 1),
         ("add_label", 1),
     ]
+
+
+def test_a_step_replaces_an_older_table_and_keeps_the_day_the_wait_began(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: MCP-66, MCP-67"""
+    older = {"purpose": "Why.", "actions": "Do this.", "expected": "See it.", "answer": "Say."}
+    wait = {"operator": "Another step.", "since": date(2026, 8, 1)}
+    here.put_item(1, complete_contract("S1 Prepare.", wait=wait, step=older), title="Key")
+
+    _serve(monkeypatch, _step_line(1))
+
+    stored = body.locate_block(here.stored_body(1)).data
+    assert stored["step"] == {
+        "purpose": "The old key must not outlive the rotation.",
+        "paste": "make rotate",
+        "expected": "The vault shows a new key.",
+    }
+    assert stored["wait"] == {"operator": STEP, "since": date(2026, 8, 1)}
 
 
 def test_a_step_without_a_purpose_is_a_tool_error_naming_it_and_writes_nothing(
@@ -211,7 +236,7 @@ def test_a_title_opens_a_labelled_task_whose_body_is_complete_and_the_inbox_list
     assert _writes(here) == [("create_issue", 2), ("add_label", 2)]
     assert data["step"] == {
         "purpose": "The old key must not outlive the rotation.",
-        "actions": "Open the vault link.\nClick Rotate.",
+        "paste": "make rotate",
         "expected": "The vault shows a new key.",
     }
     assert [step["number"] for step in _steps_of(inbox)] == [2]
@@ -373,6 +398,7 @@ def test_a_state_ref_repository_refuses_before_any_lookup_or_write(
     here: board_forge.BoardForge,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Spec: MCP-51"""
     write_repository_config(here.directory, 'storage = "state-ref"\n')
 
     [result] = _serve(monkeypatch, _step_line(1, **changes))

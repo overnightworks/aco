@@ -4,7 +4,7 @@ test passes."""
 
 import json
 from collections.abc import Mapping
-from typing import NoReturn
+from typing import Any, NoReturn
 
 import pytest
 
@@ -44,7 +44,7 @@ def _tools(step: mcp_server.Step) -> mcp_server.Tools:
     return mcp_server.Tools(lambda: {}, _unused, _unused, step, _unused)
 
 
-def _reply(message: dict[str, object], step: mcp_server.Step = _refused_step) -> dict[str, object]:
+def _reply(message: dict[str, object], step: mcp_server.Step = _refused_step) -> dict[str, Any]:
     line = mcp_server.reply(json.dumps(message), _tools(step))
     assert line is not None
     return json.loads(line)["result"]
@@ -93,7 +93,9 @@ def test_the_step_schema_requires_the_repository_the_step_and_its_card() -> None
         ),
         pytest.param({"step": "Do a\nthen b."}, "step must be one line", id="step-lines"),
         pytest.param({"purpose": "Why a\nand b."}, "purpose must be one line", id="purpose-lines"),
-        pytest.param({"expected": "See a\nand b."}, "expected must be one line", id="expected-lines"),
+        pytest.param(
+            {"expected": "See a\nand b."}, "expected must be one line", id="expected-lines"
+        ),
         pytest.param({"paste": "a\nb"}, _ONE_LINE, id="paste-lines"),
         pytest.param({"paste": "ftp://host/x"}, _LINK, id="paste-foreign-link"),
         pytest.param({"paste": "http://127.0.0.1.example.test/x"}, _LINK, id="paste-lookalike"),

@@ -81,15 +81,14 @@ _ENVELOPE_KEYS: Final = (_REPOSITORY, _ITEM)
 _TITLE: Final = "title"
 _STEP_CARD_PURPOSES: Final = {
     item_step.PURPOSE_KEY: "why the operator takes the step, in a sentence",
-    item_step.ACTIONS_KEY: (
-        "what the operator does: a paste-ready command block, or the exact link with each click"
+    item_step.PASTE_KEY: (
+        "the one command line to copy (an optional cd and the command, nothing to fill in) "
+        "or the one link to open (https, or http to 127.0.0.1)"
     ),
     item_step.EXPECTED_KEY: "what the operator sees when it worked",
-    item_step.ANSWER_KEY: (
-        "what the operator reports back and why; leave out when yes or no is the answer"
-    ),
 }
 _STEP_KEYS: Final = (_REPOSITORY, STEP, _ITEM, _TITLE, *_STEP_CARD_PURPOSES)
+_RULED_KEYS: Final = (STEP, *item_step.REQUIRED_KEYS)
 _OPTION: Final = "option"
 _OTHER: Final = "other"
 _RESULT: Final = "result"
@@ -280,9 +279,11 @@ _TOOLS: Final = (
             "Marks a step that only the operator can take, such as a secret to set or an "
             "approval to give: the item gets that wait and the label needs-operator, its next "
             "stays as it is, so the step shows in read_inbox "
-            "under steps. The step is a short line; purpose, actions and expected are "
-            "required and answer is optional, each stored on the item and shown in "
-            "read_inbox. Give an open item's number as item, or a title to open a new item "
+            "under steps. The step is a short line of at most 15 words, the one short action; "
+            "purpose, paste and expected are required, each one line, stored on the item "
+            "and shown in read_inbox: the paste is one command or one link, a script's one "
+            "call for anything longer, and a step that breaks a rule is refused. "
+            "Give an open item's number as item, or a title to open a new item "
             "for the step; a title that an open item of the operator's already holds with "
             "this step marks that item instead. An answer on the board clears the wait, "
             "the step and the label; an answer in chat goes through answer_step. The "
@@ -500,13 +501,10 @@ def _answer_step(answer_step: AnswerStep, arguments: Mapping[str, object]) -> Ma
 
 def _step_card(arguments: Mapping[str, object]) -> item_step.StepCard:
     """The card of `step` arguments whose defects were already refused."""
-    purpose, actions, expected = (
+    purpose, paste, expected = (
         cast(str, arguments[key]).strip() for key in item_step.REQUIRED_KEYS
     )
-    answer = arguments.get(item_step.ANSWER_KEY)
-    return item_step.StepCard(
-        purpose, actions, expected, None if answer is None else cast(str, answer).strip()
-    )
+    return item_step.StepCard(purpose, paste, expected)
 
 
 def _is_integer(value: object) -> bool:
@@ -577,6 +575,9 @@ def _step_defects(arguments: Mapping[str, object]) -> list[str]:
         if _is_blank(arguments, key)
     )
     defects.extend(_step_card_defects(arguments))
+    defects.extend(
+        item_step.step_rule_defects(*(_stripped_text(arguments, key) for key in _RULED_KEYS))
+    )
     return defects
 
 
@@ -615,6 +616,12 @@ def _step_card_defects(arguments: Mapping[str, object]) -> list[str]:
         if key in arguments and not isinstance(arguments[key], str)
     )
     return defects
+
+
+def _stripped_text(arguments: Mapping[str, object], key: str) -> str:
+    """The stripped string `key` holds, empty when it is none, which no rule refuses."""
+    value = arguments.get(key)
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _is_blank(arguments: Mapping[str, object], key: str) -> bool:

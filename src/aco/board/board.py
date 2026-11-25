@@ -17,7 +17,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 
-from .. import expectations, inbox, rulings
+from .. import expectations, inbox, item_step, rulings
 from ..progress import Progress, ProgressUnavailable
 from .ports import (
     CardChanged,
@@ -58,10 +58,7 @@ def step_fingerprint(repo: str, item: int, step: inbox.Step) -> str:
             repo,
             item,
             step.wait_text,
-            card and card.purpose,
-            card and card.actions,
-            card and card.expected,
-            card and card.answer,
+            card and item_step.step_table(card),
         ],
         ensure_ascii=False,
     )

@@ -293,7 +293,7 @@ def _listed(table: dict[str, object] | None, step: str = "Rotate.") -> dict[str,
     """What `step_json` lists for an item whose operator `wait` is `step` and whose block
     holds `table`."""
     wait = {"operator": step, "since": date(2026, 11, 1)}
-    fields = {} if table is None else {"step": table}
+    fields: dict[str, Any] = {} if table is None else {"step": table}
     issues = (_step_issue(9, body_text=complete_contract("Work.", wait=wait, **fields)),)
     [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
     return inbox.step_json(found)
