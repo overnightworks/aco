@@ -23,7 +23,7 @@ REQUIRED_KEYS = (PURPOSE_KEY, PASTE_KEY, EXPECTED_KEY)
 _OLD_REQUIRED_KEYS = (PURPOSE_KEY, ACTIONS_KEY, EXPECTED_KEY)
 _OLD_KEYS = frozenset((*_OLD_REQUIRED_KEYS, ANSWER_KEY))
 _SCHEME_AND_SLASHES = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
-_ALLOWED_LINK = re.compile(r"https://\S+|http://127\.0\.0\.1(?:[:/?#]\S*)?")
+_ALLOWED_LINK = re.compile(r"https://\S+|http://127\.0\.0\.1(?::[0-9]+)?(?:[/?#]\S*)?")
 _LEADING_CD = re.compile(r"^cd [^\s;&|$`<>()]+ && ")
 _COMMAND_JOINERS = ("&&", "||", ";", "|", "&", "$(", "`")
 
