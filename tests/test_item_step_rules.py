@@ -98,6 +98,7 @@ def test_a_paste_over_one_line_is_refused(paste: str) -> None:
         pytest.param("http://127.0.0.10/x", [_LINK], id="other-loopback-address"),
         pytest.param("http://127.0.0.1:80@evil.example/x", [_LINK], id="loopback-userinfo-host"),
         pytest.param("http://127.0.0.1:@evil.example/x", [_LINK], id="loopback-empty-port-host"),
+        pytest.param("http://127.0.0.1:\uff18\uff10/x", [_LINK], id="loopback-fullwidth-port"),
         pytest.param("http://example.test/x", [_LINK], id="http-elsewhere"),
         pytest.param("ftp://host/x", [_LINK], id="ftp"),
         pytest.param("file:///etc/passwd", [_LINK], id="file"),
