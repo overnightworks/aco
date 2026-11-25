@@ -66,7 +66,7 @@ def _repo(board: BoardClient) -> dict[str, Any]:
 def test_a_step_with_its_table_lists_its_form_and_every_stored_field(
     repository: BoardForge, board: BoardClient, table: dict[str, str], listed: dict[str, object]
 ) -> None:
-    """Spec: ABRD-157"""
+    """Spec: ABRD-157, MCP-39, MCP-94"""
     repository.put_item(
         7, complete_contract("Run it.", wait=OPERATOR_WAIT, step=table), title="Release"
     )
@@ -78,18 +78,21 @@ def test_a_step_with_its_table_lists_its_form_and_every_stored_field(
         "number": 7,
         "title": "Release",
         "step": OPERATOR_WAIT["operator"],
+        "since": "2026-08-31",
+        "url": "https://github.com/board-forge/repository/issues/7",
         "answer": None,
         **listed,
     }
 
 
-def test_a_step_lists_a_fingerprint_that_follows_its_text_and_every_field_of_its_card(
+def test_a_step_lists_a_fingerprint_that_follows_its_text_its_since_and_every_field_of_its_card(
     repository: BoardForge, board: BoardClient
 ) -> None:
     """Spec: ABRD-163"""
     variants = [
         (OPERATOR_WAIT, STEP_TABLE),
         ({**OPERATOR_WAIT, "operator": "Another."}, STEP_TABLE),
+        ({**OPERATOR_WAIT, "since": date(2026, 9, 1)}, STEP_TABLE),
         *((OPERATOR_WAIT, {**STEP_TABLE, key: "Other."}) for key in STEP_TABLE),
         (OPERATOR_WAIT, OLD_STEP_TABLE),
         (OPERATOR_WAIT, {**OLD_STEP_TABLE, "answer": "the report"}),
@@ -130,20 +133,42 @@ def test_a_step_with_an_answer_lists_it(repository: BoardForge, board: BoardClie
 def test_a_step_without_a_table_lists_null_purpose_and_actions_and_the_old_form(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """Spec: ABRD-157"""
+    """Spec: ABRD-157, MCP-94"""
     repository.put_item(
         8, complete_contract("Run it.", wait={"operator": "Old.", "since": date(2026, 8, 31)})
     )
 
     (step,) = _repo(board)["steps"]
 
-    assert (step["number"], step["step"], step["purpose"], step["actions"], step["form"]) == (
+    assert (
+        step["number"],
+        step["step"],
+        step["purpose"],
+        step["actions"],
+        step["form"],
+        step["since"],
+        step["url"],
+    ) == (
         8,
         "Old.",
         None,
         None,
         "old",
+        "2026-08-31",
+        "https://github.com/board-forge/repository/issues/8",
     )
+
+
+def test_steps_come_newest_since_first_then_by_descending_number_in_the_board_read(
+    repository: BoardForge, board: BoardClient
+) -> None:
+    """Spec: MCP-43"""
+    for number, day in ((3, date(2026, 9, 2)), (4, date(2026, 9, 1)), (5, date(2026, 9, 2))):
+        repository.put_item(
+            number, complete_contract("Run it.", wait={**OPERATOR_WAIT, "since": day})
+        )
+
+    assert [step["number"] for step in _repo(board)["steps"]] == [5, 3, 4]
 
 
 def test_a_step_of_a_non_member_is_not_listed(repository: BoardForge, board: BoardClient) -> None:

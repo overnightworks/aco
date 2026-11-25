@@ -224,6 +224,7 @@ def test_a_repository_whose_read_fails_is_listed_as_unavailable_beside_the_other
 def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
     root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Spec: MCP-39, MCP-94"""
     here = repository_with_card(root / "here", 1, "Here")
     waiting = complete_contract("Work.", wait={**OPERATOR_WAIT, "operator": "Rotate the key."})
     here.put_item(2, waiting, title="Key")
@@ -253,7 +254,14 @@ def test_a_step_shows_in_the_inbox_read_and_each_repository_is_listed_once(
     }
     assert exit_code == 0
     assert entries["board-forge/here"]["steps"] == [
-        {**_NO_CARD, "number": 2, "title": "Key", "step": "Rotate the key."},
+        {
+            **_NO_CARD,
+            "number": 2,
+            "title": "Key",
+            "step": "Rotate the key.",
+            "since": cast("date", OPERATOR_WAIT["since"]).isoformat(),
+            "url": "https://github.com/board-forge/here/issues/2",
+        },
     ]
     assert [item["number"] for item in entries["board-forge/here"]["items"]] == [1]
     assert entries["board-forge/elsewhere"]["steps"] == []

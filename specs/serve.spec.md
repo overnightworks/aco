@@ -40,7 +40,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a read sent before an item's stored answer arrived | ABRD-98 | — | — |
 | a read while a card waits | ABRD-105 | — | — |
 | a link naming a card or a step | ABRD-188, ABRD-189, ABRD-191, ABRD-192 | — | — |
-| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163, ABRD-195, ABRD-196, ABRD-197 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
+| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163, ABRD-195, ABRD-196, ABRD-197, ABRD-198, ABRD-199 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
 | a malformed step answer | — | — | ABRD-164, ABRD-165 |
 | a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
 | an answer that does not fit its step | — | — | ABRD-167 |
@@ -175,7 +175,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
 `frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageLeave.spec.ts` (ABRD-152, ABRD-153), `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`, `frontend/e2e/quietStates.spec.ts` (ABRD-127, ABRD-128),
-`frontend/e2e/refresh.spec.ts`, `frontend/e2e/stepCard.spec.ts` (ABRD-159, ABRD-160, ABRD-195, ABRD-196, ABRD-197), `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
+`frontend/e2e/refresh.spec.ts`, `frontend/e2e/stepCard.spec.ts` (ABRD-159, ABRD-160, ABRD-195, ABRD-196, ABRD-197, ABRD-198, ABRD-199), `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
@@ -254,13 +254,13 @@ A closed child counts however it closed, not-planned included. A container whose
 
 ## Steps
 
-- ABRD-157: A repo's `steps` lists member items waiting on the operator, each `{"number", "title", "step", "form", "purpose", "paste", "paste_kind", "expected", "actions", "answer"}`; a failed repo has none.
+- ABRD-157: A repo's `steps` lists member items waiting on the operator with the keys of MCP-39 and MCP-68 and a `fingerprint` (ABRD-163); a failed repo has none.
 - ABRD-158: An item a non-member wrote, or one that waits on nobody, is no step.
 - ABRD-159: The tab `Steps n` shows per step its title and `step` line; a step of form `paste` also its purpose, its paste (ABRD-195), `Expected` and `Antwort: Ja / Nein`; n counts the steps.
 - ABRD-160: `Copy` beside a command puts exactly its paste on the clipboard and then reads `Copied`; a refused copy reads `Copy failed, try again`.
 - ABRD-161: A step with no `[step]` table shows its number, title, one-line `step` and the mark `alte Form` (ABRD-197), with `Erfolgreich` and `Fehlgeschlagen` and no `Copy`.
 - ABRD-162: With no step the tab says `No step is waiting for you.`; a repo that could not be read shows `Not read` and its sentence instead, never an empty list.
-- ABRD-163: Each `steps` entry also carries `fingerprint`, which follows its repo, item, `step` and the stored fields of its card, so it changes when any of them does.
+- ABRD-163: Each `steps` entry also carries `fingerprint`, which follows its repo, item, `step`, `since` and the stored fields of its card, so it changes when any of them does.
 - ABRD-164: `POST /api/step` takes `repo`, `item`, `fingerprint` and `result`: `yes` with no `text`, or `no` or `report` with a `text`; any other key or shape is refused `bad request: step` (see E-ABRD-22).
 - ABRD-165: A step answer's `text` follows ABRD-05's rules and is not blank; a refused one reaches no forge.
 - ABRD-166: A step no longer as shown on the item's fresh read (ABRD-113), because it changed, was answered, closed or removed, answers `failed` `This step changed; reload.`, nothing written (see E-ABRD-23).
@@ -280,6 +280,8 @@ A closed child counts however it closed, not-planned included. A container whose
 - ABRD-195: A paste of kind `command` shows in a box with `Copy`; one of kind `link` shows as the button `Öffnen` and no box.
 - ABRD-196: `Öffnen` links to the paste and opens it in a new tab with `rel="noopener noreferrer"`; only a step of form `paste` and kind `link` renders as a link, no other scheme and no old step.
 - ABRD-197: A step of form `old` shows the mark `alte Form` and its stored purpose, actions or paste, and expected as plain text, with no `Copy` and no `Öffnen`.
+- ABRD-198: Each step, old form too, shows `wartet seit <DD.MM.YYYY>` from `since` and `#<n>` as a link to `url`, in a new tab with `rel="noopener noreferrer"`; a `null` `url` leaves `#<n>` plain.
+- ABRD-199: The Steps view has one group per repository with a step, by its first step's `since` newest first, then higher item; ties keep configured order; a repository whose read failed stands last.
 
 Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_answers.py`, `frontend/e2e/stepCard.spec.ts` and `frontend/e2e/stepAnswer.spec.ts` (390 and 1280 px).
 

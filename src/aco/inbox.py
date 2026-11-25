@@ -17,6 +17,7 @@ import os
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
 from pathlib import Path
 
@@ -75,8 +76,12 @@ class Step:
     title: str
     wait_text: str
     """The text of the item's operator `wait`."""
+    since: date
+    """The day the operator `wait` began."""
     card: item_step.StoredStepCard | None = None
     """The block's `step` table; `None` for a step marked without one."""
+    url: str | None = None
+    """The item's page, set by the listing; derived, so no part of the step's fingerprint."""
 
     @property
     def form(self) -> StepForm:
@@ -105,19 +110,29 @@ def step_in(number: int, title: str, item_body: str, *, storage: body.Storage) -
     if not item_wait.waits_on_operator(wait):
         return None
     card = item_step.parse_step(body.locate_block(item_body).data)
-    return Step(number, title, wait.step, card)
+    return Step(number, title, wait.step, wait.since, card)
 
 
-def steps(issues: Iterable[workboard.Issue], *, storage: body.Storage) -> tuple[Step, ...]:
+def item_url(repository: forge.RepositoryId, number: int, *, storage: body.Storage) -> str | None:
+    """The page of item `number`; `None` under `storage = "state-ref"`, whose items are no
+    forge pages."""
+    if storage is body.Storage.STATE_REF:
+        return None
+    return f"https://{repository.host}/{repository.path}/issues/{number}"
+
+
+def steps(
+    issues: Iterable[workboard.Issue], *, repository: forge.RepositoryId, storage: body.Storage
+) -> tuple[Step, ...]:
     """The members' readable items among `issues` whose `wait` names the
-    operator, by descending number."""
+    operator, newest `since` first, then by descending number."""
     found = [
-        step
+        replace(step, url=item_url(repository, issue.number, storage=storage))
         for issue in issues
         if issue.author_is_member and issue.unreadable is None
         if (step := step_in(issue.number, issue.title, issue.body, storage=storage)) is not None
     ]
-    return tuple(sorted(found, key=lambda step: -step.number))
+    return tuple(sorted(found, key=lambda step: (-step.since.toordinal(), -step.number)))
 
 
 @dataclass(frozen=True)
@@ -143,9 +158,7 @@ def plans(
         Plan(
             issue.number,
             issue.title,
-            None
-            if storage is body.Storage.STATE_REF
-            else f"https://{repository.host}/{repository.path}/issues/{issue.number}",
+            item_url(repository, issue.number, storage=storage),
             issue.updated_at[:_DAY_LENGTH],
         )
         for issue in issues
@@ -170,12 +183,17 @@ class Reading:
 def read_issues(
     issues: Iterable[workboard.Issue],
     *,
+    repository: forge.RepositoryId,
     storage: body.Storage,
     plans: tuple[Plan, ...] = (),
 ) -> Reading:
     """The rows and the steps among `issues`, which are listed once, with `plans`."""
     listed = tuple(issues)
-    return Reading(rows(listed, storage=storage), steps(listed, storage=storage), plans)
+    return Reading(
+        rows(listed, storage=storage),
+        steps(listed, repository=repository, storage=storage),
+        plans,
+    )
 
 
 def read_context(context: session.RunContext, *, with_progress: bool = False) -> Reading:
@@ -185,10 +203,12 @@ def read_context(context: session.RunContext, *, with_progress: bool = False) ->
     state ref's lane records."""
     listed = tuple(context.forge.list_open_board_issues())
     storage = context.config.storage
+    repository = context.forge.repository
     reading = read_issues(
         listed,
+        repository=repository,
         storage=storage,
-        plans=plans(listed, repository=context.forge.repository, storage=storage),
+        plans=plans(listed, repository=repository, storage=storage),
     )
     if not with_progress:
         return reading
@@ -342,13 +362,15 @@ def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbo
 
 
 def step_json(step: Step) -> dict[str, object]:
-    """The step as JSON; a field the stored table lacks is `null`, and `paste_kind` is
-    `null` unless the step is of the paste form."""
+    """The step as JSON, `since` as `YYYY-MM-DD`; a field the stored table lacks is `null`,
+    and `paste_kind` is `null` unless the step is of the paste form."""
     table = {} if step.card is None else item_step.step_table(step.card)
     return {
         "number": step.number,
         "title": step.title,
         "step": step.wait_text,
+        "since": step.since.isoformat(),
+        "url": step.url,
         "form": step.form,
         item_step.PURPOSE_KEY: table.get(item_step.PURPOSE_KEY),
         item_step.PASTE_KEY: table.get(item_step.PASTE_KEY),

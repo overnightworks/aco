@@ -49,7 +49,7 @@ def wire_fingerprint(repo: str, item: int, line: expectations.OptionLine) -> str
 
 def step_fingerprint(repo: str, item: int, step: inbox.Step) -> str:
     """The fingerprint a step carries across the wire (ABRD-163): it follows the
-    item, the step's text and every field its card shows, and binds the `repo`
+    item, the step's text, its `since` and every field its card shows, and binds the `repo`
     label it was read under, as `wire_fingerprint` does for a line. The JSON API
     and `checked_step` share this one function."""
     card = step.card
@@ -58,6 +58,7 @@ def step_fingerprint(repo: str, item: int, step: inbox.Step) -> str:
             repo,
             item,
             step.wait_text,
+            step.since.isoformat(),
             card and item_step.step_table(card),
         ],
         ensure_ascii=False,
@@ -73,7 +74,8 @@ class RepoSnapshot:
     progress: Progress | ProgressUnavailable | None = None
     """This repo's progress view; `None` when the source gave none."""
     steps: tuple[inbox.Step, ...] = ()
-    """The members' steps waiting on the operator, by descending number."""
+    """The members' steps waiting on the operator, newest `since` first, then by
+    descending number."""
 
 
 @dataclass(frozen=True)
