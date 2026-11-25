@@ -75,7 +75,7 @@ def test_every_broken_rule_is_named_in_one_refusal() -> None:
 
 
 @pytest.mark.parametrize("key", ["actions", "answer"])
-def test_the_older_card_fields_are_unknownstep_arguments(key: str) -> None:
+def test_the_older_card_fields_are_unknown_arguments(key: str) -> None:
     """Spec: MCP-55, MCP-67"""
     assert _refusal(step_arguments(**{key: "Say."})) == f"unknown argument: {key}"
 
