@@ -177,24 +177,40 @@ interface ProgressUnknown {
 	error: string;
 }
 
-/** A step waiting on the operator (ABRD-157): `step` is its one line; the other fields are
- * `null` where the stored `step` table lacks them. `form` is `paste` when its paste keeps the
- * tool's rules, else `old`, which only a stored older step or a table-less one has. */
-export interface StepRead {
+/** What every step waiting on the operator lists (ABRD-157): `step` is its one line. */
+interface StepBase {
 	number: number;
 	title: string;
 	step: string;
-	form: 'paste' | 'old';
-	purpose: string | null;
-	paste: string | null;
-	/** `null` unless `form` is `paste`. */
-	paste_kind: 'command' | 'link' | null;
-	expected: string | null;
-	actions: string | null;
 	answer: string | null;
 	/** The step as listed, bound to its repo, item and card (ABRD-163); an answer posts it back. */
 	fingerprint: string;
 }
+
+/** A step whose paste keeps the tool's rules: one command or one link, and the card's other
+ * fields. */
+export interface PasteStepRead extends StepBase {
+	form: 'paste';
+	purpose: string;
+	paste: string;
+	paste_kind: 'command' | 'link';
+	expected: string;
+	actions: null;
+}
+
+/** A stored older step, or a table-less one: each field is `null` where the stored `step`
+ * table lacks it. */
+export interface OldStepRead extends StepBase {
+	form: 'old';
+	purpose: string | null;
+	paste: string | null;
+	paste_kind: null;
+	expected: string | null;
+	actions: string | null;
+}
+
+/** A step waiting on the operator (ABRD-157). */
+export type StepRead = PasteStepRead | OldStepRead;
 
 export interface RepoReading {
 	name: string;

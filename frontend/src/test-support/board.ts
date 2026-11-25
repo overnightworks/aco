@@ -16,7 +16,8 @@ import type {
 	ProgressRead,
 	RepoReading,
 	RuledOptionLine,
-	StepRead,
+	OldStepRead,
+	PasteStepRead,
 	YesNoLine
 } from '../types';
 
@@ -141,7 +142,7 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 }
 
 /** A step waiting on the operator, as `GET /api/board` lists it, in the paste form. */
-export function stepRead(overrides: Partial<StepRead> = {}): StepRead {
+export function stepRead(overrides: Partial<PasteStepRead> = {}): PasteStepRead {
 	return {
 		number: 7,
 		title: 'Release',
@@ -159,14 +160,21 @@ export function stepRead(overrides: Partial<StepRead> = {}): StepRead {
 }
 
 /** A step stored with `actions`, as `GET /api/board` lists it: the old form. */
-export function oldStepRead(overrides: Partial<StepRead> = {}): StepRead {
-	return stepRead({
+export function oldStepRead(overrides: Partial<OldStepRead> = {}): OldStepRead {
+	return {
+		number: 7,
+		title: 'Release',
+		step: 'Run the release.',
 		form: 'old',
+		purpose: 'Release the build.',
 		paste: null,
 		paste_kind: null,
+		expected: 'The page shows green.',
 		actions: 'open https://example.test/run\nclick Run',
+		answer: null,
+		fingerprint: 'step-fingerprint',
 		...overrides
-	});
+	};
 }
 
 /** `POST /api/rule`'s answer for a stored card: the written item as listed, with

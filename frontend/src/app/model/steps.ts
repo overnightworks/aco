@@ -1,4 +1,4 @@
-import type { StepRead, StepRequest } from '../../types';
+import type { OldStepRead, PasteStepRead, StepRead, StepRequest } from '../../types';
 
 export const STEPS_TAB_LABEL = 'Steps';
 export const STEPS_REGION_LABEL = 'Steps for you';
@@ -16,15 +16,14 @@ export function answerText(step: StepRead): string {
 	return `Antwort: ${step.answer ?? YES_OR_NO_ANSWER}`;
 }
 
-/** The paste to copy, or the link to open: only a step of form `paste` has either. */
-export function pasteOf(step: StepRead): { command: string } | { link: string } | null {
-	if (step.form !== 'paste' || step.paste === null) return null;
+/** The paste to copy, or the link to open. */
+export function pasteOf(step: PasteStepRead): { command: string } | { link: string } {
 	return step.paste_kind === 'link' ? { link: step.paste } : { command: step.paste };
 }
 
 /** What an old-form step stored besides its line, as plain text: purpose, actions or paste,
  * expected, those it holds. */
-export function storedTexts(step: StepRead): string[] {
+export function storedTexts(step: OldStepRead): string[] {
 	return [step.purpose, step.actions ?? step.paste, step.expected].filter((text) => text !== null);
 }
 

@@ -77,11 +77,11 @@
 					{:else}
 						{@const paste = pasteOf(step)}
 						<p>{step.purpose}</p>
-						{#if paste !== null && 'link' in paste}
+						{#if 'link' in paste}
 							<a class="open" href={paste.link} target="_blank" rel="noopener noreferrer">
 								{OPEN_LABEL}
 							</a>
-						{:else if paste !== null}
+						{:else}
 							<pre>{paste.command}</pre>
 							<button type="button" class="copy" onclick={() => copy(copyKey, paste.command)}>
 								{copies[copyKey] ?? COPY_LABEL}
