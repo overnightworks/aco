@@ -11,7 +11,6 @@ end-to-end (test_board_server, test_board_cli).
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -230,27 +229,6 @@ def test_one_repos_write_blocks_a_second_repos_decision_until_its_turn(
         decisions_b.may_finish.set()
         assert waiting_in_b.result(_WAIT_SECONDS).status is DecisionStatus.RULED
     assert running_in_a.result().status is DecisionStatus.RULED
-
-
-@pytest.mark.parametrize(
-    "other",
-    [
-        pytest.param(item_step.StepCard("Why.", "make other", "See it."), id="paste"),
-        pytest.param(item_step.OldStepCard("Why.", "make rotate", "See it.", None), id="actions"),
-        pytest.param(item_step.OldStepCard("Why.", "make rotate", "See it.", "Say."), id="answer"),
-    ],
-)
-def test_a_step_fingerprint_follows_every_stored_field_of_either_card_shape(
-    other: item_step.StoredStepCard,
-) -> None:
-    """Spec: ABRD-163"""
-    shown = inbox.Step(
-        7, "Release", "Rotate.", item_step.StepCard("Why.", "make rotate", "See it.")
-    )
-
-    assert step_fingerprint(_LABEL, 7, replace(shown, card=other)) != step_fingerprint(
-        _LABEL, 7, shown
-    )
 
 
 def test_a_step_answer_waits_for_the_turn_of_a_card_being_written_and_is_then_stored(

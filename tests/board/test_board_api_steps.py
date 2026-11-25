@@ -86,7 +86,7 @@ def test_a_step_with_its_table_lists_its_form_and_every_stored_field(
 def test_a_step_lists_a_fingerprint_that_follows_its_text_and_every_field_of_its_card(
     repository: BoardForge, board: BoardClient
 ) -> None:
-    """ABRD-163."""
+    """Spec: ABRD-163"""
     variants = [
         (OPERATOR_WAIT, STEP_TABLE),
         ({**OPERATOR_WAIT, "operator": "Another."}, STEP_TABLE),

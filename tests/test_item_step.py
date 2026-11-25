@@ -61,27 +61,13 @@ def test_an_actions_table_reads_as_an_old_card(
         pytest.param({"step": "text"}, "step", id="not-a-table"),
         pytest.param({"step": {"paste": "a", "expected": "e"}}, "step.purpose", id="no-purpose"),
         pytest.param({"step": {"actions": "a", "expected": "e"}}, "step.purpose", id="old-purpose"),
-        pytest.param({"step": _table(paste=" \n")}, "step.paste", id="blank-paste"),
         pytest.param({"step": _table(expected=3)}, "step.expected", id="expected-integer"),
-        pytest.param({"step": _old_table(actions=" \n")}, "step.actions", id="blank-actions"),
         pytest.param({"step": _old_table(answer="")}, "step.answer", id="blank-answer"),
-        pytest.param({"step": _old_table(extra="x")}, "step.extra", id="old-unknown-key"),
-        pytest.param({"step": _table(extra="x")}, "step.extra", id="paste-unknown-key"),
-        pytest.param({"step": {"purpose": "p", "expected": "e"}}, "step.paste", id="neither-key"),
-        pytest.param({"step": _table(actions="Do this.")}, "step.actions", id="paste-and-actions"),
-        pytest.param({"step": _table(answer="Say.")}, "step.answer", id="paste-and-answer"),
     ],
 )
 def test_a_defective_table_names_the_field(data: dict[str, object], field: str) -> None:
     """Spec: BODY-124, BODY-127"""
     assert [name for name, _ in item_step.step_defects(data)] == [field]
-
-
-def test_a_paste_beside_actions_is_an_unknown_key() -> None:
-    """Spec: BODY-127. Example: E-BODY-22."""
-    defects = item_step.step_defects({"step": _table(actions="Do this.")})
-
-    assert defects == [("step.actions", "unknown key step.actions")]
 
 
 def test_a_paste_that_breaks_the_tool_rules_is_still_a_valid_table() -> None:

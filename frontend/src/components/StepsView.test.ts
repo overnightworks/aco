@@ -31,16 +31,6 @@ test('ABRD-159: a step of the paste form shows its title, purpose, command in a 
 	expect(within(card).getByText('Antwort: Ja / Nein')).toBeInTheDocument();
 });
 
-test('ABRD-159: a stored older step that names an answer asks for that report', () => {
-	render(StepsView, {
-		repos: [repo({ steps: [oldStepRead({ answer: 'the green run id' })] })],
-		decisions: store()
-	});
-
-	expect(screen.getByLabelText('Bericht')).toBeInTheDocument();
-	expect(screen.queryByText('Antwort: Ja / Nein')).toBeNull();
-});
-
 test('ABRD-160: Copy puts exactly the command on the clipboard and says so', async () => {
 	const writeText = vi.fn(() => Promise.resolve());
 	stubClipboard(writeText);

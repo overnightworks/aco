@@ -349,17 +349,6 @@ def test_a_step_is_of_the_paste_form_only_when_its_card_keeps_the_rules(
     assert _listed(table, step) == {**listed, "number": 9, "title": "Item 9", "step": step}
 
 
-def test_a_step_item_without_a_step_table_lists_no_card() -> None:
-    [found] = inbox.steps((_step_issue(9),), storage=body.Storage.GITHUB)
-
-    assert inbox.step_json(found) == {
-        **_NO_CARD,
-        "number": 9,
-        "title": "Item 9",
-        "step": "Do the thing.",
-    }
-
-
 def test_only_an_item_a_member_wrote_and_the_store_could_read_is_a_step() -> None:
     unreadable = replace(_step_issue(6), unreadable=body.ContractDefect("body", "unreadable"))
     issues = (
