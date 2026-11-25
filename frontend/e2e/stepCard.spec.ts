@@ -134,7 +134,7 @@ for (const viewport of [
 				page.getByRole('link', { name: 'Öffnen' }).click()
 			]);
 
-			await opened.waitForURL(`${target}/`);
+			await opened.waitForURL(target);
 		});
 
 		test('ABRD-199: the repository whose first step waits since the newer day stands first', async ({
