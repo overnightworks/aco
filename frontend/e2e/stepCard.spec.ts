@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
-import { arrange, item, oldStepTable, stepTable } from './itemFixture';
+import { arrange, item, oldStepTable, openSteps, stepTable } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 test.describe.configure({ mode: 'serial' });
@@ -14,15 +14,6 @@ for (const viewport of [
 ]) {
 	test.describe(`${viewport.width}px steps view`, () => {
 		test.use({ viewport, permissions: ['clipboard-read', 'clipboard-write'] });
-
-		async function openSteps(page: Page): Promise<void> {
-			const { appUrl, token } = readBoardRuntime();
-			await page.goto(`${appUrl}#t=${token}`);
-			await page
-				.getByRole('navigation', { name: 'Views' })
-				.getByRole('button', { name: /^Steps/ })
-				.click();
-		}
 
 		async function fitsTheWidth(page: Page): Promise<boolean> {
 			return page.evaluate(

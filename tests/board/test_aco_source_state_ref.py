@@ -374,3 +374,20 @@ def test_a_hand_written_paste_step_on_a_state_ref_item_is_listed_in_the_paste_fo
         "command",
         "make rotate",
     )
+
+
+def test_an_item_edit_on_a_state_ref_item_keeps_an_older_step_table_with_its_answer_key_for_key(
+    checkout: _StateRefCheckout, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: BODY-128"""
+    step = {
+        "purpose": "Why.",
+        "actions": "Do\nthis.",
+        "expected": "See it.",
+        "answer": "Report the id.",
+    }
+    edited = _item_file(*_two_open_lines(), step=step)
+
+    assert edit_item(_FIRST_ID, capsys, stdin=edited.decode()).status == 0
+
+    assert checkout.block(_FIRST_ID)["step"] == step

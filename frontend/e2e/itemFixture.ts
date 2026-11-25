@@ -7,6 +7,7 @@
  * index is its position among its item's entries.
  */
 
+import type { Page } from '@playwright/test';
 import { readBoardRuntime } from './runtime';
 
 type Outcome = 'yes' | 'no' | 'later';
@@ -248,4 +249,14 @@ export function oldStepTable(overrides: Partial<OldStepTable> = {}): OldStepTabl
 		expected: 'The page shows green.',
 		...overrides
 	};
+}
+
+/** Opens the board and its Steps view. */
+export async function openSteps(page: Page): Promise<void> {
+	const { appUrl, token } = readBoardRuntime();
+	await page.goto(`${appUrl}#t=${token}`);
+	await page
+		.getByRole('navigation', { name: 'Views' })
+		.getByRole('button', { name: /^Steps/ })
+		.click();
 }

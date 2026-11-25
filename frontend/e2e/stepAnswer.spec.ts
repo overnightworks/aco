@@ -1,21 +1,11 @@
 import type { Page } from '@playwright/test';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 import { expect, test } from './consoleGuard';
-import { arrange, item, oldStepTable, stepTable, storedNow } from './itemFixture';
-import { readBoardRuntime } from './runtime';
+import { arrange, item, oldStepTable, openSteps, stepTable, storedNow } from './itemFixture';
 
 test.describe.configure({ mode: 'serial' });
 
 const SAVED_WITHIN_MS = (UNDO_SECONDS + 7) * 1000;
-
-async function openSteps(page: Page): Promise<void> {
-	const { appUrl, token } = readBoardRuntime();
-	await page.goto(`${appUrl}#t=${token}`);
-	await page
-		.getByRole('navigation', { name: 'Views' })
-		.getByRole('button', { name: /^Steps/ })
-		.click();
-}
 
 const answeredOnBoard = (outcome: string): RegExp =>
 	new RegExp(`^The operator answered ".+" on the board on \\d{4}-\\d{2}-\\d{2}: ${outcome}$`);

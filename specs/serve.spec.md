@@ -254,7 +254,7 @@ A closed child counts however it closed, not-planned included. A container whose
 
 ## Steps
 
-- ABRD-157: A repo's `steps` lists its members' items waiting on the operator, each `{"number", "title", "step", "form", "purpose", "paste", "paste_kind", "expected", "actions", "answer"}`; a failed repo none.
+- ABRD-157: A repo's `steps` lists member items waiting on the operator, each `{"number", "title", "step", "form", "purpose", "paste", "paste_kind", "expected", "actions", "answer"}`; a failed repo has none.
 - ABRD-158: An item a non-member wrote, or one that waits on nobody, is no step.
 - ABRD-159: The tab `Steps n` shows per step its title and `step` line; a step of form `paste` also its purpose, its paste (ABRD-195), `Expected` and `Antwort: Ja / Nein`; n counts the steps.
 - ABRD-160: `Copy` beside a command puts exactly its paste on the clipboard and then reads `Copied`; a refused copy reads `Copy failed, try again`.
