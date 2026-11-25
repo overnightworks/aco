@@ -32,7 +32,10 @@ from aco import body_fence, cli, expectations, forge, repositories, session
 from aco.board.aco_source import AcoSource
 
 _WAIT_SECONDS = 30
-_NO_CARD = dict.fromkeys(("purpose", "actions", "expected", "answer"))
+_NO_CARD = {
+    **dict.fromkeys(("purpose", "paste", "paste_kind", "expected", "actions", "answer")),
+    "form": "old",
+}
 _CHILD_PROGRAM = (
     "import board_forge, sys; from aco import cli, session; "
     "session.run_context = board_forge.run_context; raise SystemExit(cli.main(['mcp', '--direct']))"

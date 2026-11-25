@@ -198,24 +198,6 @@ def test_tools_list_offers_step_as_a_repeatable_write_that_keeps_next() -> None:
     assert tool["description"]
 
 
-def test_the_step_schema_requires_the_repository_the_step_and_its_card_but_the_answer() -> None:
-    schema = _tools()["step"]["inputSchema"]
-
-    assert set(schema["properties"]) == {
-        "repository",
-        "step",
-        "item",
-        "title",
-        "purpose",
-        "actions",
-        "expected",
-        "answer",
-    }
-    assert set(schema["required"]) == {"repository", "step", "purpose", "actions", "expected"}
-    assert schema["properties"]["item"]["type"] == "integer"
-    assert schema["additionalProperties"] is False
-
-
 def test_no_tool_schema_carries_a_combinator_at_its_top() -> None:
     combinators = {"oneOf", "anyOf", "allOf"}
 
@@ -351,7 +333,7 @@ def _step_arguments(**changes: object) -> dict[str, object]:
         "step": "Rotate the key.",
         "item": 7,
         "purpose": "Why.",
-        "actions": "Do this.",
+        "paste": "make rotate",
         "expected": "See that.",
         **changes,
     }
@@ -360,7 +342,8 @@ def _step_arguments(**changes: object) -> dict[str, object]:
 def test_a_step_call_on_an_item_hands_the_stripped_step_to_the_writer_and_answers_its_json() -> (
     None
 ):
-    arguments = _step_arguments(step="  Rotate the key.\n", purpose=" Why.\n", answer=" Say why ")
+    """Spec: MCP-49, MCP-67"""
+    arguments = _step_arguments(step="  Rotate the key.\n", purpose=" Why.\n", paste=" make rotate ")
 
     result = _answer(_call(arguments, name="step"))["result"]
 
@@ -368,22 +351,11 @@ def test_a_step_call_on_an_item_hands_the_stripped_step_to_the_writer_and_answer
         "repository": "owner/repo",
         "step": "Rotate the key.",
         "target": 7,
-        "card": {
-            "purpose": "Why.",
-            "actions": "Do this.",
-            "expected": "See that.",
-            "answer": "Say why",
-        },
+        "card": {"purpose": "Why.", "paste": "make rotate", "expected": "See that."},
     }
     assert result["isError"] is False
     assert result["structuredContent"] == expected
     assert json.loads(result["content"][0]["text"]) == expected
-
-
-def test_a_step_call_without_an_answer_hands_the_writer_a_card_without_one() -> None:
-    result = _answer(_call(_step_arguments(), name="step"))["result"]
-
-    assert result["structuredContent"]["card"]["answer"] is None
 
 
 def test_a_step_call_with_a_title_hands_the_stripped_title_to_the_writer() -> None:
@@ -466,9 +438,9 @@ _ARGUMENT_DEFECTS = {
             id="no-purpose",
         ),
         pytest.param(
-            _without(_step_arguments(), "actions"),
-            "actions is required: what the operator does",
-            id="no-actions",
+            _without(_step_arguments(), "paste"),
+            "paste is required: the one command line to copy",
+            id="no-paste",
         ),
         pytest.param(
             _without(_step_arguments(), "expected"),
@@ -478,15 +450,11 @@ _ARGUMENT_DEFECTS = {
         pytest.param(
             _step_arguments(purpose=" \n"), "purpose must not be blank", id="blank-purpose"
         ),
-        pytest.param(
-            _step_arguments(actions=" \n"), "actions must not be blank", id="blank-actions"
-        ),
+        pytest.param(_step_arguments(paste=" \n"), "paste must not be blank", id="blank-paste"),
         pytest.param(
             _step_arguments(expected=" \n"), "expected must not be blank", id="blank-expected"
         ),
-        pytest.param(_step_arguments(answer=" "), "answer must not be blank", id="blank-answer"),
         pytest.param(_step_arguments(expected=3), "expected must be a string", id="expected-int"),
-        pytest.param(_step_arguments(answer=3), "answer must be a string", id="answer-int"),
         pytest.param(_step_arguments(item=True), "item must be an integer", id="item-boolean"),
         pytest.param(_step_arguments(item="7"), "item must be an integer", id="item-string"),
         pytest.param(_step_arguments(item=7.5), "item must be an integer", id="item-float"),
