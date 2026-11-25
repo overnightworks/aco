@@ -82,6 +82,8 @@ export interface Item {
 	waiting?: true;
 	/** The step table of an item that waits on the operator; it waits without `waiting`. */
 	step?: StepTable | OldStepTable;
+	/** The day (`YYYY-MM-DD`) its wait on the operator began; the server's default day if left out. */
+	since?: string;
 }
 
 /** The first arranged item's open cards are asked on this day, each later one a day before. */

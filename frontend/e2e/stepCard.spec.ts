@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './consoleGuard';
+import { routeRepositories } from './decideRow';
 import { arrange, item, oldStepTable, openSteps, stepTable } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
@@ -90,6 +91,65 @@ for (const viewport of [
 
 			expect(await fitsTheWidth(page)).toBe(true);
 			await page.screenshot({ path: testInfo.outputPath(`steps-old-${viewport.width}.png`) });
+		});
+
+		test('ABRD-198: each step shows wartet seit and links #n to its item, and a long title fits', async ({
+			page
+		}, testInfo) => {
+			const longTitle = `Release ${'the very long build title '.repeat(6)}`;
+			await arrange([
+				{ ...item(7, longTitle), step: stepTable(), since: '2026-11-01' },
+				{ ...item(6, 'Old step'), step: oldStepTable(), since: '2026-10-05' },
+				{ ...item(5, 'No table'), waiting: true, since: '2026-10-05' }
+			]);
+			await openSteps(page);
+
+			for (const [title, date] of [
+				[/Release the very long/, '01.11.2026'],
+				[/Old step/, '05.10.2026'],
+				[/No table/, '05.10.2026']
+			] as const) {
+				await expect(
+					page.getByRole('article', { name: title }).getByText(`wartet seit ${date}`)
+				).toBeVisible();
+			}
+			const link = page.getByRole('article', { name: /Release the very long/ }).getByRole('link', {
+				name: '#7'
+			});
+			await expect(link).toHaveAttribute('href', /\/issues\/7$/);
+			await expect(link).toHaveAttribute('target', '_blank');
+			await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+
+			expect(await fitsTheWidth(page)).toBe(true);
+			await page.screenshot({ path: testInfo.outputPath(`steps-since-${viewport.width}.png`) });
+		});
+
+		test('ABRD-196: Öffnen on a link paste opens its target in a new tab', async ({ page }) => {
+			const target = readBoardRuntime().appUrl;
+			await arrange([{ ...item(7, 'Release the build'), step: stepTable({ paste: target }) }]);
+			await openSteps(page);
+
+			const [opened] = await Promise.all([
+				page.waitForEvent('popup'),
+				page.getByRole('link', { name: 'Öffnen' }).click()
+			]);
+
+			await opened.waitForURL(`${target}/`);
+		});
+
+		test('ABRD-199: the repository whose first step waits since the newer day stands first', async ({
+			page
+		}, testInfo) => {
+			await arrange([{ ...item(7, 'Release the build'), step: stepTable(), since: '2026-11-01' }]);
+			await routeRepositories(page, ['Projekt A', 'Projekt B'], () => ({}), {
+				'Projekt A': (served) => ({
+					steps: served.steps.map((step) => ({ ...step, since: '2026-10-01' }))
+				})
+			});
+			await openSteps(page);
+
+			await expect(page.getByRole('heading', { level: 2 })).toHaveText(['Projekt B', 'Projekt A']);
+			await page.screenshot({ path: testInfo.outputPath(`steps-groups-${viewport.width}.png`) });
 		});
 
 		test('ABRD-162: with no step the view says nothing waits', async ({ page }) => {

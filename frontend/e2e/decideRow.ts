@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { TOKEN_HEADER } from '../src/client';
+import type { RepoReading } from '../src/types';
 import { repoReading } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
@@ -40,11 +41,13 @@ export async function servedRepository(): Promise<string> {
 
 /** Rewrites every `GET /api/board` to the served repository's reading under each of `names`.
  * `failing` names, by the number of the read (0 for the first), the repositories whose read
- * fails and the sentence each carries; they arrive with no items. */
+ * fails and the sentence each carries; they arrive with no items. `overrides` names, per
+ * repository, what to change in a copy of the served reading. */
 export async function routeRepositories(
 	page: Page,
 	names: string[],
-	failing: (read: number) => Record<string, string> = () => ({})
+	failing: (read: number) => Record<string, string> = () => ({}),
+	overrides: Record<string, (served: RepoReading) => Partial<RepoReading>> = {}
 ): Promise<void> {
 	let reads = 0;
 	await page.route('**/api/board', async (route) => {
@@ -54,7 +57,9 @@ export async function routeRepositories(
 		await route.fulfill({
 			json: {
 				repos: names.map((name) =>
-					name in failed ? repoReading(name, { error: failed[name] }) : { ...board.repos[0], name }
+					name in failed
+						? repoReading(name, { error: failed[name] })
+						: { ...board.repos[0], name, ...overrides[name]?.(board.repos[0]) }
 				)
 			}
 		});

@@ -411,11 +411,14 @@ TRIGGER_WAIT = {"trigger": WAIT_TRIGGER, "since": date(2026, 8, 31)}
 OPERATOR_WAIT = {"operator": "Decide.", "since": date(2026, 8, 31)}
 
 
-def holding_for_the_operator(raw_body: str, step: Mapping[str, str] | None = None) -> str:
-    """`raw_body` with an operator `wait` in its block, and `step` as its `[step]` table when
-    given, written by the production writer."""
+def holding_for_the_operator(
+    raw_body: str, step: Mapping[str, str] | None = None, since: date | None = None
+) -> str:
+    """`raw_body` with an operator `wait` in its block, since `since` when given, and `step`
+    as its `[step]` table when given, written by the production writer."""
     located = locate_block(raw_body)
-    held = {**located.data, "wait": OPERATOR_WAIT}
+    wait = OPERATOR_WAIT if since is None else {**OPERATOR_WAIT, "since": since}
+    held = {**located.data, "wait": wait}
     return replace_block(raw_body, located, held if step is None else {**held, "step": dict(step)})
 
 

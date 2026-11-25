@@ -89,7 +89,12 @@ def _dated(entry: Mapping[str, object]) -> dict[str, object]:
 
 def _held(raw_body: str, arranged: Mapping[str, object]) -> str:
     step = arranged.get("step")
-    return holding_for_the_operator(raw_body, step if isinstance(step, dict) else None)
+    since = arranged.get("since")
+    return holding_for_the_operator(
+        raw_body,
+        step if isinstance(step, dict) else None,
+        date.fromisoformat(since) if isinstance(since, str) else None,
+    )
 
 
 def _stored_item(arranged: Mapping[str, object]) -> StoredItem:

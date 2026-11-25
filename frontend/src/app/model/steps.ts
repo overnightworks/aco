@@ -39,10 +39,14 @@ export function waitingSinceText(step: StepRead): string {
  * whose read failed stands last. Each repo's steps arrive newest first (MCP-43). */
 export function stepGroups(repos: RepoReading[]): RepoReading[] {
 	const failed = repos.filter((repo) => repo.error !== null);
-	const withSteps = repos.filter((repo) => repo.error === null && repo.steps.length > 0);
-	const newestFirst = (a: RepoReading, b: RepoReading) =>
-		b.steps[0].since.localeCompare(a.steps[0].since) || b.steps[0].number - a.steps[0].number;
-	return [...withSteps.sort(newestFirst), ...failed];
+	const withFirst = repos.flatMap((repo) => {
+		const [first] = repo.steps;
+		return repo.error === null && first !== undefined ? [{ repo, first }] : [];
+	});
+	withFirst.sort(
+		(a, b) => b.first.since.localeCompare(a.first.since) || b.first.number - a.first.number
+	);
+	return [...withFirst.map(({ repo }) => repo), ...failed];
 }
 
 /** The steps of every repo that could be read; a repo that failed has none to count. */
