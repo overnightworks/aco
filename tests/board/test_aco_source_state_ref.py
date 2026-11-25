@@ -358,3 +358,36 @@ def test_a_step_answer_on_a_state_ref_item_clears_the_step_and_writes_now_withou
         commits + 1,
         "open",
     )
+
+
+def test_a_hand_written_paste_step_on_a_state_ref_item_is_listed_in_the_paste_form(
+    checkout: _StateRefCheckout, state_ref_board: BoardClient
+) -> None:
+    """Spec: ABRD-157"""
+    step = {"purpose": "Why.", "paste": "make rotate", "expected": "See it."}
+    checkout.seed({f"{_FIRST_ID}.md": _item_file(wait=OPERATOR_WAIT, step=step)})
+
+    listed = state_ref_board.listed_step(_FIRST)
+
+    assert (listed["form"], listed["paste_kind"], listed["paste"]) == (
+        "paste",
+        "command",
+        "make rotate",
+    )
+
+
+def test_an_item_edit_on_a_state_ref_item_keeps_an_older_step_table_with_its_answer_key_for_key(
+    checkout: _StateRefCheckout, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: BODY-128"""
+    step = {
+        "purpose": "Why.",
+        "actions": "Do\nthis.",
+        "expected": "See it.",
+        "answer": "Report the id.",
+    }
+    edited = _item_file(*_two_open_lines(), step=step)
+
+    assert edit_item(_FIRST_ID, capsys, stdin=edited.decode()).status == 0
+
+    assert checkout.block(_FIRST_ID)["step"] == step

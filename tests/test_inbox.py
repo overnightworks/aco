@@ -36,7 +36,10 @@ from aco.lane_record import LaneOutcome, LaneRecord
 from aco.routing_line import RoutingLine
 
 _CARD = card_body(card())
-_NO_CARD = dict.fromkeys(("purpose", "actions", "expected", "answer"))
+_NO_CARD = {
+    **dict.fromkeys(("purpose", "paste", "paste_kind", "expected", "actions", "answer")),
+    "form": "old",
+}
 
 
 @pytest.mark.parametrize(
@@ -281,25 +284,69 @@ def test_a_steps_text_is_its_operator_wait_not_the_blocks_next() -> None:
     assert found.wait_text == "Rotate the key."
 
 
-def test_a_step_item_with_a_step_table_lists_its_card() -> None:
-    table = {"purpose": "Why.", "actions": "Do\nthis.", "expected": "See that.", "answer": "Say."}
-    wait = {"operator": "Rotate.", "since": date(2026, 11, 1)}
-    issues = (_step_issue(9, body_text=complete_contract("Work.", wait=wait, step=table)),)
+_PASTE = {"purpose": "Why.", "paste": "make rotate", "expected": "See that."}
+_OLD_TABLE = {"purpose": "Why.", "actions": "Do\nthis.", "expected": "See that.", "answer": "Say."}
+_LONG_STEP = " ".join(["word"] * 16)
 
+
+def _listed(table: dict[str, object] | None, step: str = "Rotate.") -> dict[str, object]:
+    """What `step_json` lists for an item whose operator `wait` is `step` and whose block
+    holds `table`."""
+    wait = {"operator": step, "since": date(2026, 11, 1)}
+    fields: dict[str, Any] = {} if table is None else {"step": table}
+    issues = (_step_issue(9, body_text=complete_contract("Work.", wait=wait, **fields)),)
     [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
+    return inbox.step_json(found)
 
-    assert inbox.step_json(found) == {**table, "number": 9, "title": "Item 9", "step": "Rotate."}
 
-
-def test_a_step_item_without_a_step_table_lists_no_card() -> None:
-    [found] = inbox.steps((_step_issue(9),), storage=body.Storage.GITHUB)
-
-    assert inbox.step_json(found) == {
-        **_NO_CARD,
-        "number": 9,
-        "title": "Item 9",
-        "step": "Do the thing.",
-    }
+@pytest.mark.parametrize(
+    ("table", "step", "listed"),
+    [
+        pytest.param(
+            _PASTE,
+            "Rotate.",
+            {**_NO_CARD, **_PASTE, "form": "paste", "paste_kind": "command"},
+            id="command",
+        ),
+        pytest.param(
+            {**_PASTE, "paste": "https://example.test/run"},
+            "Rotate.",
+            {**_NO_CARD, **_PASTE, "paste": "https://example.test/run", "form": "paste"}
+            | {"paste_kind": "link"},
+            id="link",
+        ),
+        pytest.param(
+            {**_PASTE, "paste": "make a; make b"},
+            "Rotate.",
+            {**_NO_CARD, **_PASTE, "paste": "make a; make b", "form": "old"},
+            id="stored-paste-breaking-a-rule",
+        ),
+        pytest.param(
+            {**_PASTE, "paste": "javascript://x"},
+            "Rotate.",
+            {**_NO_CARD, **_PASTE, "paste": "javascript://x", "form": "old"},
+            id="stored-paste-with-a-foreign-scheme",
+        ),
+        pytest.param(
+            _PASTE,
+            _LONG_STEP,
+            {**_NO_CARD, **_PASTE, "form": "old"},
+            id="stored-step-line-breaking-a-rule",
+        ),
+        pytest.param(
+            _OLD_TABLE,
+            "Rotate.",
+            {**_NO_CARD, **_OLD_TABLE, "form": "old"},
+            id="actions-with-answer",
+        ),
+        pytest.param(None, "Rotate.", {**_NO_CARD, "form": "old"}, id="no-table"),
+    ],
+)
+def test_a_step_is_of_the_paste_form_only_when_its_card_keeps_the_rules(
+    table: dict[str, object] | None, step: str, listed: dict[str, object]
+) -> None:
+    """Spec: MCP-39, MCP-68, MCP-89"""
+    assert _listed(table, step) == {**listed, "number": 9, "title": "Item 9", "step": step}
 
 
 def test_only_an_item_a_member_wrote_and_the_store_could_read_is_a_step() -> None:

@@ -17,6 +17,7 @@ import os
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from pathlib import Path
 
 from . import (
@@ -60,14 +61,40 @@ def waiting_rows(rows_read: Iterable[rulings.Row]) -> tuple[rulings.Row, ...]:
     return tuple(waiting)
 
 
+class StepForm(StrEnum):
+    """How a step shows: `PASTE` keeps the rules of the `step` tool, `OLD` is every other
+    step, which is read forgivingly and shown without a copy."""
+
+    PASTE = "paste"
+    OLD = "old"
+
+
 @dataclass(frozen=True)
 class Step:
     number: int
     title: str
     wait_text: str
     """The text of the item's operator `wait`."""
-    card: item_step.StepCard | None = None
+    card: item_step.StoredStepCard | None = None
     """The block's `step` table; `None` for a step marked without one."""
+
+    @property
+    def form(self) -> StepForm:
+        """`PASTE` when the card holds a paste and it and the step line keep the rules."""
+        card = self.card
+        if isinstance(card, item_step.StepCard) and not item_step.step_rule_defects(
+            self.wait_text, card.purpose, card.paste, card.expected
+        ):
+            return StepForm.PASTE
+        return StepForm.OLD
+
+    @property
+    def paste_kind(self) -> item_step.PasteKind | None:
+        """What the paste is, `None` unless the step is of the paste form."""
+        card = self.card
+        if isinstance(card, item_step.StepCard) and self.form is StepForm.PASTE:
+            return item_step.paste_kind(card.paste)
+        return None
 
 
 def step_in(number: int, title: str, item_body: str, *, storage: body.Storage) -> Step | None:
@@ -315,15 +342,20 @@ def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbo
 
 
 def step_json(step: Step) -> dict[str, object]:
-    card = step.card
+    """The step as JSON; a field the stored table lacks is `null`, and `paste_kind` is
+    `null` unless the step is of the paste form."""
+    table = {} if step.card is None else item_step.step_table(step.card)
     return {
         "number": step.number,
         "title": step.title,
         "step": step.wait_text,
-        item_step.PURPOSE_KEY: card and card.purpose,
-        item_step.ACTIONS_KEY: card and card.actions,
-        item_step.EXPECTED_KEY: card and card.expected,
-        item_step.ANSWER_KEY: card and card.answer,
+        "form": step.form,
+        item_step.PURPOSE_KEY: table.get(item_step.PURPOSE_KEY),
+        item_step.PASTE_KEY: table.get(item_step.PASTE_KEY),
+        "paste_kind": step.paste_kind,
+        item_step.EXPECTED_KEY: table.get(item_step.EXPECTED_KEY),
+        item_step.ACTIONS_KEY: table.get(item_step.ACTIONS_KEY),
+        item_step.ANSWER_KEY: table.get(item_step.ANSWER_KEY),
     }
 
 

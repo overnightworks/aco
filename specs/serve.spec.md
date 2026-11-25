@@ -40,7 +40,7 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | a read sent before an item's stored answer arrived | ABRD-98 | — | — |
 | a read while a card waits | ABRD-105 | — | — |
 | a link naming a card or a step | ABRD-188, ABRD-189, ABRD-191, ABRD-192 | — | — |
-| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
+| an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163, ABRD-195, ABRD-196, ABRD-197 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
 | a malformed step answer | — | — | ABRD-164, ABRD-165 |
 | a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
 | an answer that does not fit its step | — | — | ABRD-167 |
@@ -175,7 +175,7 @@ The card key rules: `lines` is a non-empty list of objects, each with a positive
 The browser proofs are `frontend/e2e/decide.spec.ts`,
 `frontend/e2e/decideOption.spec.ts`, `frontend/e2e/decided.spec.ts`, `frontend/e2e/escapeRow.spec.ts`, `frontend/e2e/failedRead.spec.ts`,
 `frontend/e2e/groupCard.spec.ts`, `frontend/e2e/houseFonts.spec.ts` (ABRD-124), `frontend/e2e/openList.spec.ts`, `frontend/e2e/optionCard.spec.ts`, `frontend/e2e/pageLeave.spec.ts` (ABRD-152, ABRD-153), `frontend/e2e/pageFrame.spec.ts`, `frontend/e2e/pictureEnlargement.spec.ts`, `frontend/e2e/picturelessCard.spec.ts`, `frontend/e2e/quietStates.spec.ts` (ABRD-127, ABRD-128),
-`frontend/e2e/refresh.spec.ts`, `frontend/e2e/stepCard.spec.ts` (ABRD-159, ABRD-160), `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
+`frontend/e2e/refresh.spec.ts`, `frontend/e2e/stepCard.spec.ts` (ABRD-159, ABRD-160, ABRD-195, ABRD-196, ABRD-197), `frontend/e2e/unclear.spec.ts` and `frontend/e2e/withHead.spec.ts`; ordering is additionally proven by
 `frontend/src/app/model/boardSummary.test.ts`.
 
 ## Multiple repositories
@@ -254,13 +254,13 @@ A closed child counts however it closed, not-planned included. A container whose
 
 ## Steps
 
-- ABRD-157: A repo's `steps` lists its members' readable items whose `wait` names the operator, each `{"number", "title", "step", "purpose", "actions", "expected", "answer"}`; a failed repo has none.
+- ABRD-157: A repo's `steps` lists member items waiting on the operator, each `{"number", "title", "step", "form", "purpose", "paste", "paste_kind", "expected", "actions", "answer"}`; a failed repo has none.
 - ABRD-158: An item a non-member wrote, or one that waits on nobody, is no step.
-- ABRD-159: The tab `Steps n` shows per step its title, purpose, the actions in a block, `Expected` and its result, then `Antwort: Ja / Nein` or, if the step names one, `Antwort: <answer>`; n counts the steps.
-- ABRD-160: `Copy` beside the block puts exactly the block's text on the clipboard and then reads `Copied`; a refused copy reads `Copy failed, try again`.
-- ABRD-161: A step without its fields (`null`) shows its number, title and one-line `step` only, with no button.
+- ABRD-159: The tab `Steps n` shows per step its title and `step` line; a step of form `paste` also its purpose, its paste (ABRD-195), `Expected` and `Antwort: Ja / Nein`; n counts the steps.
+- ABRD-160: `Copy` beside a command puts exactly its paste on the clipboard and then reads `Copied`; a refused copy reads `Copy failed, try again`.
+- ABRD-161: A step with no `[step]` table shows its number, title, one-line `step` and the mark `alte Form` (ABRD-197), with `Erfolgreich` and `Fehlgeschlagen` and no `Copy`.
 - ABRD-162: With no step the tab says `No step is waiting for you.`; a repo that could not be read shows `Not read` and its sentence instead, never an empty list.
-- ABRD-163: Each `steps` entry also carries `fingerprint`, which follows its repo, item, `step` and the four fields of its card, so it changes when any of them does.
+- ABRD-163: Each `steps` entry also carries `fingerprint`, which follows its repo, item, `step` and the stored fields of its card, so it changes when any of them does.
 - ABRD-164: `POST /api/step` takes `repo`, `item`, `fingerprint` and `result`: `yes` with no `text`, or `no` or `report` with a `text`; any other key or shape is refused `bad request: step` (see E-ABRD-22).
 - ABRD-165: A step answer's `text` follows ABRD-05's rules and is not blank; a refused one reaches no forge.
 - ABRD-166: A step no longer as shown on the item's fresh read (ABRD-113), because it changed, was answered, closed or removed, answers `failed` `This step changed; reload.`, nothing written (see E-ABRD-23).
@@ -272,11 +272,14 @@ A closed child counts however it closed, not-planned included. A container whose
 - ABRD-171: The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.
 - ABRD-172: A stored answer leaves `next` as it is, in one body write, and answers `answered` with no `item`.
 
-- ABRD-173: A step with its fields shows `Erfolgreich` and `Fehlgeschlagen`; `Erfolgreich` posts `yes`. A step that names an answer shows a text field `Bericht` with `Senden` instead, which posts `report`.
+- ABRD-173: Every step shows `Erfolgreich` and `Fehlgeschlagen`; `Erfolgreich` posts `yes`. A stored step that names an answer shows a text field `Bericht` with `Senden` instead, which posts `report`.
 - ABRD-174: `Fehlgeschlagen` opens a field `Notiz`; `Senden` stays disabled while it is blank and then posts `no` with the note.
 - ABRD-175: An answer starts the 8 second window of ABRD-58 with the strip `Saves shortly: <answer> · #n` and `Undo` in the card; `Undo` posts nothing, and leaving the page posts it at once (ABRD-152).
 - ABRD-176: A stored answer removes the card after a re-read; a refused one keeps the card and shows its sentence, with `Neu laden`; the answer buttons stay disabled until `Neu laden`.
 - ABRD-177: `Copied` reads `Copy` again once the step's card has changed.
+- ABRD-195: A paste of kind `command` shows in a box with `Copy`; one of kind `link` shows as the button `Öffnen` and no box.
+- ABRD-196: `Öffnen` links to the paste and opens it in a new tab with `rel="noopener noreferrer"`; only a step of form `paste` and kind `link` renders as a link, no other scheme and no old step.
+- ABRD-197: A step of form `old` shows the mark `alte Form` and its stored purpose, actions or paste, and expected as plain text, with no `Copy` and no `Öffnen`.
 
 Proofs: `tests/board/test_board_api_steps.py`, `tests/board/test_board_api_step_answers.py`, `frontend/e2e/stepCard.spec.ts` and `frontend/e2e/stepAnswer.spec.ts` (390 and 1280 px).
 

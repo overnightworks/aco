@@ -22,7 +22,7 @@ from option_cards import (
     returned_card,
 )
 
-from aco.card_rules import card_rule_defects
+from aco.card_rules import card_rule_defects, is_one_line, word_count
 from aco.expectation_grammar import card_hash
 
 ISSUE_NUMBER = "an issue number"
@@ -268,3 +268,31 @@ class TestCardRulesThroughCheck:
     ) -> None:
         """Spec: BODY-94, BODY-95 -- a revised, rule-keeping card stays ok."""
         assert check_defects(capsys, card_body(returned_card())) == (0, [])
+
+
+@pytest.mark.parametrize(
+    ("text", "words"),
+    [
+        pytest.param("", 0, id="empty"),
+        pytest.param("  \n ", 0, id="blank"),
+        pytest.param("Ein Wort", 2, id="two-words"),
+        pytest.param(" drei  Wörter\nauf zwei Zeilen ", 5, id="spaces-and-lines"),
+    ],
+)
+def test_words_are_the_whitespace_separated_parts(text: str, words: int) -> None:
+    assert word_count(text) == words
+
+
+@pytest.mark.parametrize(
+    ("text", "one_line"),
+    [
+        pytest.param("", True, id="empty"),
+        pytest.param("eine Zeile mit Leerzeichen", True, id="spaces"),
+        pytest.param("zwei\nZeilen", False, id="newline"),
+        pytest.param("zwei\rZeilen", False, id="carriage-return"),
+        pytest.param("zwei\r\nZeilen", False, id="crlf"),
+        pytest.param("eine\n", False, id="trailing-newline"),
+    ],
+)
+def test_a_text_is_one_line_when_it_holds_no_line_break(text: str, one_line: bool) -> None:
+    assert is_one_line(text) is one_line

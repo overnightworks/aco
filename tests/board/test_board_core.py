@@ -37,7 +37,7 @@ from aco.item_step import StepSucceeded
 
 _WAIT_SECONDS = 5
 _LABEL = "repo"
-_STEP = {"purpose": "Why.", "actions": "Do this.", "expected": "See it."}
+_STEP = {"purpose": "Why.", "paste": "make rotate", "expected": "See it."}
 
 
 def test_a_snapshot_reads_a_ruled_yes_no_lines_ruling_and_date(repository: BoardForge) -> None:

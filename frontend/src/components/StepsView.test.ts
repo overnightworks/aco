@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import type { postStep } from '../client';
 import { UNDO_SECONDS } from '../app/model/decision';
 import { afterEach, expect, test, vi } from 'vitest';
-import { inertBoard, repo, stepRead } from '../test-support/board';
+import { inertBoard, oldStepRead, repo, stepRead } from '../test-support/board';
 import { DecisionStore } from '../app/state/decision.svelte';
 import StepsView from './StepsView.svelte';
 
@@ -21,34 +21,28 @@ function stubClipboard(writeText: (text: string) => Promise<void>) {
 	vi.stubGlobal('navigator', { clipboard: { writeText } });
 }
 
-test('ABRD-159: a step shows its title, purpose, actions in a block, expected result and the yes or no answer', () => {
+test('ABRD-159: a step of the paste form shows its title, step line, purpose, command in a box, expected result and the yes or no answer', () => {
 	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
 
 	const card = screen.getByRole('article', { name: /Release/ });
+	expect(within(card).getByText('Run the release.')).toBeInTheDocument();
 	expect(within(card).getByText('Release the build.')).toBeInTheDocument();
-	expect(card.querySelector('pre')?.textContent).toBe('open https://example.test/run\nclick Run');
+	expect(card.querySelector('pre')?.textContent).toBe('make release');
 	expect(within(card).getByText('The page shows green.')).toBeInTheDocument();
 	expect(within(card).getByText('Antwort: Ja / Nein')).toBeInTheDocument();
 });
 
-test('ABRD-159: a step that names an answer shows that report', () => {
+test('ABRD-160: Copy puts exactly the command on the clipboard and says so', async () => {
+	const writeText = vi.fn(() => Promise.resolve());
+	stubClipboard(writeText);
 	render(StepsView, {
-		repos: [repo({ steps: [stepRead({ answer: 'the green run id' })] })],
+		repos: [repo({ steps: [stepRead({ paste: 'cd ~/repo && make release' })] })],
 		decisions: store()
 	});
 
-	expect(screen.getByText('Antwort: the green run id')).toBeInTheDocument();
-	expect(screen.queryByText('Antwort: Ja / Nein')).toBeNull();
-});
-
-test('ABRD-160: Copy puts exactly the block text on the clipboard and says so', async () => {
-	const writeText = vi.fn(() => Promise.resolve());
-	stubClipboard(writeText);
-	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
-
 	await fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
 
-	expect(writeText).toHaveBeenCalledWith('open https://example.test/run\nclick Run');
+	expect(writeText).toHaveBeenCalledWith('cd ~/repo && make release');
 	expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
 });
 
@@ -61,16 +55,77 @@ test('ABRD-160: a refused copy says so and offers the copy again', async () => {
 	expect(await screen.findByRole('button', { name: 'Copy failed, try again' })).toBeInTheDocument();
 });
 
-test('ABRD-161: a step without the fields shows its one line only and no button', () => {
+test('ABRD-195: a link paste shows the button Öffnen and no box or Copy', () => {
+	render(StepsView, {
+		repos: [
+			repo({
+				steps: [stepRead({ paste: 'https://example.test/run', paste_kind: 'link' })]
+			})
+		],
+		decisions: store()
+	});
+
+	expect(screen.getByRole('link', { name: 'Öffnen' })).toBeInTheDocument();
+	expect(document.querySelector('pre')).toBeNull();
+	expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
+});
+
+test('ABRD-196: Öffnen opens the paste in a new tab without an opener', () => {
+	render(StepsView, {
+		repos: [
+			repo({
+				steps: [stepRead({ paste: 'http://127.0.0.1:8765/run', paste_kind: 'link' })]
+			})
+		],
+		decisions: store()
+	});
+
+	const link = screen.getByRole('link', { name: 'Öffnen' });
+	expect(link).toHaveAttribute('href', 'http://127.0.0.1:8765/run');
+	expect(link).toHaveAttribute('target', '_blank');
+	expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+});
+
+test.each([
+	['javascript:', 'javascript://x'],
+	['ftp://', 'ftp://host/x']
+])('ABRD-196: a stored %s paste of the old form is no link', (_name, paste) => {
+	render(StepsView, {
+		repos: [repo({ steps: [oldStepRead({ actions: null, paste, expected: 'Done.' })] })],
+		decisions: store()
+	});
+
+	expect(screen.queryByRole('link')).toBeNull();
+	expect(screen.getByText(paste)).toBeInTheDocument();
+});
+
+test.each([
+	['actions', oldStepRead({ actions: 'click Run' })],
+	['an answer', oldStepRead({ actions: 'click Run', answer: 'the report' })],
+	['a rule-breaking paste', oldStepRead({ actions: null, paste: 'make a; make b' })]
+])(
+	'ABRD-197: an old step with %s shows alte Form and its stored text, no Copy or Öffnen',
+	(_name, step) => {
+		render(StepsView, { repos: [repo({ steps: [step] })], decisions: store() });
+
+		expect(screen.getByText('alte Form')).toBeInTheDocument();
+		expect(screen.getByText(step.actions ?? step.paste ?? '')).toBeInTheDocument();
+		expect(screen.getByText('The page shows green.')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
+		expect(screen.queryByRole('link', { name: 'Öffnen' })).toBeNull();
+		expect(document.querySelector('pre')).toBeNull();
+	}
+);
+
+test('ABRD-161: a step without a table shows its line and alte Form, with both answer buttons and no Copy', () => {
 	render(StepsView, {
 		repos: [
 			repo({
 				steps: [
-					stepRead({
+					oldStepRead({
 						purpose: null,
 						actions: null,
 						expected: null,
-						answer: null,
 						step: 'Run the release dispatch.'
 					})
 				]
@@ -80,7 +135,10 @@ test('ABRD-161: a step without the fields shows its one line only and no button'
 	});
 
 	expect(screen.getByText('Run the release dispatch.')).toBeInTheDocument();
-	expect(screen.queryByRole('button')).toBeNull();
+	expect(screen.getByText('alte Form')).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Erfolgreich' })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Fehlgeschlagen' })).toBeInTheDocument();
+	expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
 	expect(screen.queryByText(/Antwort/)).toBeNull();
 });
 
@@ -133,9 +191,9 @@ test('ABRD-174: Fehlgeschlagen cannot send without a note', async () => {
 	expect(send).toBeEnabled();
 });
 
-test('ABRD-173: a step that asks for a report offers a report field with Senden and no Erfolgreich', async () => {
+test('ABRD-173: a stored older step that asks for a report offers a report field with Senden and no Erfolgreich', async () => {
 	render(StepsView, {
-		repos: [repo({ steps: [stepRead({ answer: 'the green run id' })] })],
+		repos: [repo({ steps: [oldStepRead({ answer: 'the green run id' })] })],
 		decisions: store()
 	});
 
@@ -167,7 +225,7 @@ test('ABRD-177: a step whose card changed offers Copy again instead of Copied', 
 	expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
 
 	await rerender({
-		repos: [repo({ steps: [stepRead({ fingerprint: 'two', actions: 'click Stop' })] })],
+		repos: [repo({ steps: [stepRead({ fingerprint: 'two', paste: 'make stop' })] })],
 		decisions
 	});
 
