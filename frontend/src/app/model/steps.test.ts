@@ -6,31 +6,33 @@ function names(groups: { name: string }[]) {
 	return groups.map((group) => group.name);
 }
 
-test('ABRD-199: the repo whose first step has the newer since stands first', () => {
-	const groups = stepGroups([
-		repo({ name: 'older', steps: [stepRead({ since: '2026-10-01', number: 9 })] }),
-		repo({ name: 'newer', steps: [stepRead({ since: '2026-11-01', number: 1 })] })
-	]);
-
-	expect(names(groups)).toEqual(['newer', 'older']);
-});
-
-test('ABRD-199: equal first dates put the higher item first', () => {
-	const groups = stepGroups([
-		repo({ name: 'low', steps: [stepRead({ number: 3 })] }),
-		repo({ name: 'high', steps: [stepRead({ number: 8 })] })
-	]);
-
-	expect(names(groups)).toEqual(['high', 'low']);
-});
-
-test('ABRD-199: equal dates and items keep the configured order', () => {
-	const groups = stepGroups([
-		repo({ name: 'first', steps: [stepRead()] }),
-		repo({ name: 'second', steps: [stepRead()] })
-	]);
-
-	expect(names(groups)).toEqual(['first', 'second']);
+test.each([
+	{
+		behaviour: 'the repo whose first step has the newer since stands first',
+		repos: [
+			repo({ name: 'older', steps: [stepRead({ since: '2026-10-01', number: 9 })] }),
+			repo({ name: 'newer', steps: [stepRead({ since: '2026-11-01', number: 1 })] })
+		],
+		expected: ['newer', 'older']
+	},
+	{
+		behaviour: 'equal first dates put the higher item first',
+		repos: [
+			repo({ name: 'low', steps: [stepRead({ number: 3 })] }),
+			repo({ name: 'high', steps: [stepRead({ number: 8 })] })
+		],
+		expected: ['high', 'low']
+	},
+	{
+		behaviour: 'equal dates and items keep the configured order',
+		repos: [
+			repo({ name: 'first', steps: [stepRead()] }),
+			repo({ name: 'second', steps: [stepRead()] })
+		],
+		expected: ['first', 'second']
+	}
+])('ABRD-199: $behaviour', ({ repos, expected }) => {
+	expect(names(stepGroups(repos))).toEqual(expected);
 });
 
 test('ABRD-199: a repo whose read failed stands last, whatever the others hold', () => {
