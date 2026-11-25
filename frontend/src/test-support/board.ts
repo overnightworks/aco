@@ -140,19 +140,33 @@ export function repo(overrides: Partial<RepoReading> = {}): RepoReading {
 	};
 }
 
-/** A step waiting on the operator, as `GET /api/board` lists it, with its table. */
+/** A step waiting on the operator, as `GET /api/board` lists it, in the paste form. */
 export function stepRead(overrides: Partial<StepRead> = {}): StepRead {
 	return {
 		number: 7,
 		title: 'Release',
 		step: 'Run the release.',
+		form: 'paste',
 		purpose: 'Release the build.',
-		actions: 'open https://example.test/run\nclick Run',
+		paste: 'make release',
+		paste_kind: 'command',
 		expected: 'The page shows green.',
+		actions: null,
 		answer: null,
 		fingerprint: 'step-fingerprint',
 		...overrides
 	};
+}
+
+/** A step stored with `actions`, as `GET /api/board` lists it: the old form. */
+export function oldStepRead(overrides: Partial<StepRead> = {}): StepRead {
+	return stepRead({
+		form: 'old',
+		paste: null,
+		paste_kind: null,
+		actions: 'open https://example.test/run\nclick Run',
+		...overrides
+	});
 }
 
 /** `POST /api/rule`'s answer for a stored card: the written item as listed, with

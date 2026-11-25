@@ -178,14 +178,19 @@ interface ProgressUnknown {
 }
 
 /** A step waiting on the operator (ABRD-157): `step` is its one line; the other fields are
- * `null` for a step marked without a `step` table. */
+ * `null` where the stored `step` table lacks them. `form` is `paste` when its paste keeps the
+ * tool's rules, else `old`, which only a stored older step or a table-less one has. */
 export interface StepRead {
 	number: number;
 	title: string;
 	step: string;
+	form: 'paste' | 'old';
 	purpose: string | null;
-	actions: string | null;
+	paste: string | null;
+	/** `null` unless `form` is `paste`. */
+	paste_kind: 'command' | 'link' | null;
 	expected: string | null;
+	actions: string | null;
 	answer: string | null;
 	/** The step as listed, bound to its repo, item and card (ABRD-163); an answer posts it back. */
 	fingerprint: string;

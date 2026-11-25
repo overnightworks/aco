@@ -80,7 +80,7 @@ export interface Item {
 	/** Whether the item waits on the operator. */
 	waiting?: true;
 	/** The step table of an item that waits on the operator; it waits without `waiting`. */
-	step?: { purpose: string; actions: string; expected: string; answer?: string };
+	step?: StepTable | OldStepTable;
 }
 
 /** The first arranged item's open cards are asked on this day, each later one a day before. */
@@ -207,6 +207,19 @@ export function container(
 	};
 }
 
+interface StepTable {
+	purpose: string;
+	paste: string;
+	expected: string;
+}
+
+interface OldStepTable {
+	purpose: string;
+	actions: string;
+	expected: string;
+	answer?: string;
+}
+
 /** One repository as `GET /api/board` lists it with nothing to show: `overrides` names what the
  * scenario changes, a failed read through `error`. */
 export function repoReading(
@@ -216,8 +229,19 @@ export function repoReading(
 	return { name, error: null, items: [], progress: null, steps: [], ...overrides };
 }
 
-/** A step table the way an item stores it; `overrides` names what the scenario changes. */
-export function stepTable(overrides: Partial<NonNullable<Item['step']>> = {}) {
+/** A step table in the paste form the way an item stores it; `overrides` names what the
+ * scenario changes. */
+export function stepTable(overrides: Partial<StepTable> = {}): StepTable {
+	return {
+		purpose: 'Release the build.',
+		paste: 'make release',
+		expected: 'The page shows green.',
+		...overrides
+	};
+}
+
+/** A step table stored with `actions`, the older form. */
+export function oldStepTable(overrides: Partial<OldStepTable> = {}): OldStepTable {
 	return {
 		purpose: 'Release the build.',
 		actions: 'open https://example.test/run\nclick Run',

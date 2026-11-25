@@ -6,7 +6,11 @@
 		COPY_FAILED_LABEL,
 		COPY_LABEL,
 		NO_STEPS_TEXT,
+		OLD_FORM_LABEL,
+		OPEN_LABEL,
+		pasteOf,
 		stepCount,
+		storedTexts,
 		STEPS_REGION_LABEL
 	} from '../app/model/steps';
 	import type { RepoReading } from '../types';
@@ -65,18 +69,28 @@
 					use:bringIntoView={key === current}
 				>
 					<h3 id="step-{key}"><span class="number">#{step.number}</span> {step.title}</h3>
-					{#if step.purpose === null}
-						<p>{step.step}</p>
+					{#if step.form === 'old'}
+						<p><span class="old-form">{OLD_FORM_LABEL}</span> {step.step}</p>
+						{#each storedTexts(step) as stored, index (index)}
+							<p class="stored">{stored}</p>
+						{/each}
 					{:else}
+						{@const paste = pasteOf(step)}
 						<p>{step.purpose}</p>
-						<pre>{step.actions}</pre>
-						<button type="button" class="copy" onclick={() => copy(copyKey, step.actions ?? '')}>
-							{copies[copyKey] ?? COPY_LABEL}
-						</button>
+						{#if paste !== null && 'link' in paste}
+							<a class="open" href={paste.link} target="_blank" rel="noopener noreferrer">
+								{OPEN_LABEL}
+							</a>
+						{:else if paste !== null}
+							<pre>{paste.command}</pre>
+							<button type="button" class="copy" onclick={() => copy(copyKey, paste.command)}>
+								{copies[copyKey] ?? COPY_LABEL}
+							</button>
+						{/if}
 						<p><b>Expected</b> {step.expected}</p>
 						<p class="answer">{answerText(step)}</p>
-						<StepAnswer repo={repo.name} {step} {decisions} />
 					{/if}
+					<StepAnswer repo={repo.name} {step} {decisions} />
 				</article>
 			{/each}
 		{/if}
@@ -132,7 +146,20 @@
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
-	.copy {
+	.stored {
+		white-space: pre-wrap;
+	}
+	.old-form {
+		padding: 1px 8px;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--surface-2);
+		font-size: 12px;
+		color: var(--fg-2);
+	}
+	.copy,
+	.open {
+		display: inline-block;
 		margin-bottom: 6px;
 		padding: 4px 12px;
 		border: 1px solid var(--line);
@@ -142,6 +169,7 @@
 		font: inherit;
 		font-size: 13px;
 		cursor: pointer;
+		text-decoration: none;
 	}
 	.answer {
 		color: var(--fg-2);

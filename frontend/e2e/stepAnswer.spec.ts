@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { UNDO_SECONDS } from '../src/app/model/decision';
 import { expect, test } from './consoleGuard';
-import { arrange, item, stepTable, storedNow } from './itemFixture';
+import { arrange, item, oldStepTable, stepTable, storedNow } from './itemFixture';
 import { readBoardRuntime } from './runtime';
 
 test.describe.configure({ mode: 'serial' });
@@ -50,6 +50,21 @@ for (const viewport of [
 			expect(await storedNow(7)).toMatch(answeredOnBoard('Erfolgreich'));
 		});
 
+		for (const [name, step] of [
+			['stored with actions', { step: oldStepTable() }],
+			['without a table', { waiting: true as const }]
+		] as const) {
+			test(`ABRD-173: Erfolgreich answers a step ${name}`, async ({ page }) => {
+				await arrange([{ ...item(7, 'Release the build'), ...step }]);
+				await openSteps(page);
+
+				await stepCard(page).getByRole('button', { name: 'Erfolgreich' }).click();
+
+				await expect(stepCard(page)).toHaveCount(0, { timeout: SAVED_WITHIN_MS });
+				expect(await storedNow(7)).toMatch(answeredOnBoard('Erfolgreich'));
+			});
+		}
+
 		test('ABRD-174: Fehlgeschlagen cannot send without a note and stores with one', async ({
 			page
 		}, testInfo) => {
@@ -67,9 +82,11 @@ for (const viewport of [
 			expect(await storedNow(7)).toMatch(answeredOnBoard('Fehlgeschlagen: Stayed red\\.'));
 		});
 
-		test('ABRD-173: a report step stores its report', async ({ page }, testInfo) => {
+		test('ABRD-173: a stored older step that asks for a report stores its report', async ({
+			page
+		}, testInfo) => {
 			await arrange([
-				{ ...item(7, 'Release the build'), step: stepTable({ answer: 'the green run id' }) }
+				{ ...item(7, 'Release the build'), step: oldStepTable({ answer: 'the green run id' }) }
 			]);
 			await openSteps(page);
 
