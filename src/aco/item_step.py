@@ -198,32 +198,11 @@ class StepFailed:
     note: str
 
 
-@dataclass(frozen=True)
-class StepReported:
-    """The operator took the step and gives the report it asks for."""
-
-    report: str
-
-
-type StepResult = StepSucceeded | StepFailed | StepReported
+type StepResult = StepSucceeded | StepFailed
 
 NEXT_OF_STEP_ITEM = "Act on the operator's answer in now."
 """The `next` of an item the step tool opens; a step on an existing item and its answer
 leave that item's `next` as it is."""
-
-
-def asks_for_report(card: StoredStepCard | None) -> bool:
-    """Whether the operator answers `card` with a report; only a stored older step
-    with an `answer` asks for one, every other is answered with yes or no."""
-    return isinstance(card, OldStepCard) and card.answer is not None
-
-
-def result_fits(result: StepResult, card: StoredStepCard | None) -> bool:
-    """Whether `result` answers a step with `card`: a report only a step that asks
-    for one, Erfolgreich only one that does not, a failure either."""
-    if isinstance(result, StepFailed):
-        return True
-    return isinstance(result, StepReported) == asks_for_report(card)
 
 
 class AnswerChannel(StrEnum):
@@ -238,8 +217,6 @@ def answered_now(step: str, result: StepResult, today: date, channel: AnswerChan
     through `channel`."""
     if isinstance(result, StepSucceeded):
         outcome = "Erfolgreich"
-    elif isinstance(result, StepFailed):
-        outcome = f"Fehlgeschlagen: {result.note}"
     else:
-        outcome = result.report
+        outcome = f"Fehlgeschlagen: {result.note}"
     return f'The operator answered "{step}" {channel} on {today.isoformat()}: {outcome}'

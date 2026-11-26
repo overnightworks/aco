@@ -72,8 +72,8 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | a step that breaks a rule of its `step`, `purpose`, `paste` or `expected` | — | — | MCP-90, MCP-91, MCP-92, MCP-93 |
 | a step on a repository not found, or an item missing, a pull request, malformed, closed or a non-member's | — | — | MCP-50 |
 | a step in a repository under `state-ref` storage | — | — | MCP-51 |
-| an `answer_step` of Erfolgreich, of Fehlgeschlagen with a note or of a report | — | — | MCP-72, MCP-73, MCP-76, MCP-77 |
-| an `answer_step` on a step that changed, an item without a step or an answer the step does not ask for | — | — | MCP-74 |
+| an `answer_step` of Erfolgreich or of Fehlgeschlagen with a note | — | — | MCP-72, MCP-73, MCP-76, MCP-77 |
+| an `answer_step` on a step that changed or an item without a step | — | — | MCP-74 |
 | an `answer_step` with arguments that do not fit | — | — | MCP-75 |
 | a step whose body check answers `not verified` or `overwritten` | — | — | MCP-52 |
 | a step whose label fails after the body is written or the item opened | — | — | MCP-53 |
@@ -170,7 +170,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - MCP-46: The rewritten body keeps every other field of the block, every ruling and every byte outside the block; the body is written before the label, both in the item's turn.
 - MCP-47: `step` with a `title` no open item holds opens a task with `wait.operator` `step` and `next` `Act on the operator's answer in now.`, sets the label, `created` true; `read_inbox` lists it (E-MCP-13).
 - MCP-48: A `title` that an open, readable item a member wrote holds with that exact `wait.operator` marks it (highest number of several), `created` false; a changed title or `wait.operator` opens a new item.
-- MCP-49: `step`, `title`, `purpose`, `paste` and `expected` are stripped before use; the stored text and the title matched are the stripped text.
+- MCP-49: `step`, `title`, `purpose`, `paste` and `expected` are stripped before use and before MCP-90 to MCP-93 judge them; the stored text and the title matched are the stripped text.
 - MCP-66: A step written to an item sets its block's `wait` to `operator = <step>` with the `since` the block's operator `wait` already holds, else today; a step opened as a new item gets today.
 - MCP-50: A repository not found, an item missing, a pull request, malformed, closed or written by a non-member is a tool error with the refusal's sentence; nothing is written (see E-MCP-14).
 - MCP-51: A repository under `state-ref` storage is refused before any item is read or written, naming `aco item edit <item> --base <body_hash>` as the way (see E-MCP-15).
@@ -180,7 +180,7 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - MCP-55: An unknown argument, a wrong type, not exactly one of `item` and `title`, or a blank `step`, `title` or card field is a tool error naming each; nothing is read or written (see E-MCP-17).
 - MCP-56: A `record_answer` that is written and verified touches the item's signal (WAIT-12), as `aco rule` does (RULE-44); `ask` and `step` never touch it.
 - MCP-67: `step` requires and stores `purpose`, `paste` and `expected` in the block's `step` table, replacing a table of either form; it takes no `actions` and no `answer` (MCP-55).
-- MCP-68: `steps` lists `purpose`, `paste`, `paste_kind`, `expected`, `actions` and `answer`, null where the stored table lacks the field; `answer`, only in a stored older step, is what the operator reports.
+- MCP-68: `steps` lists `purpose`, `paste`, `paste_kind`, `expected`, `actions` and `answer`, null where the stored table lacks the field; `answer`, only in a stored older step, is what it once asked to report.
 - MCP-69: The same call with the same fields writes no body (MCP-45); other fields replace the `step` table and keep every other field of the block (MCP-46).
 - MCP-70: A missing, non-string or blank `purpose`, `paste` or `expected` is a tool error naming each field and, when missing, what it is for; nothing is read or written (see E-MCP-17).
 - MCP-89: A step has `form` `paste` when its table holds `paste` and the step line, `purpose`, `paste` and `expected` break none of MCP-90 to MCP-93; every other step has `form` `old`.
@@ -194,12 +194,12 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 - MCP-79: `ask` and `step` also answer `link`: the URL `aco board --url` prints for the line asked or the step (BOARD-62, BOARD-64), built by the same producer (ABRD-187).
 - MCP-80: Wherever the link cannot be built (`board_port` unset or malformed, the token file missing, malformed or unreadable), `link` is `null` and the call succeeds all the same.
-- MCP-72: `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich`, `Fehlgeschlagen` or `report`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
+- MCP-72: `answer_step` takes `repository`, `item`, `step` (as shown), `result` (`Erfolgreich` or `Fehlgeschlagen`) and `text`; it answers as `POST /api/step` does, `in chat` (E-MCP-20).
 - MCP-76: It writes through the board's writer in the item's turn: `wait` and `step` go, `now` tells the outcome, `next` stays as it is, the label `needs-operator` goes (ABRD-168, ABRD-169, ABRD-171).
-- MCP-73: `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a `report` answers a step whose `answer` asks for one.
+- MCP-73: `Erfolgreich` clears the wait; `Fehlgeschlagen` with a note keeps it cleared, the item open and writes the note into `now` (#859 line 5); a stored step with an `answer` is answered the same.
 - MCP-77: The answer is `repository`, `item`, `answered` true and, when the forge kept the write over a change aco had not read or refused the label, that `note`.
-- MCP-74: A `step` that is no longer the item's current step, an item with no step for the operator, or a `result` the step does not ask for is a tool error with a sentence; nothing is written.
-- MCP-75: An unknown argument, a wrong type, a `result` outside the three, a blank `step`, or a `text` missing, blank or given with `Erfolgreich` is a tool error; nothing is read or written.
+- MCP-74: A `step` that is no longer the item's current step, or an item with no step for the operator, is a tool error with a sentence; nothing is written.
+- MCP-75: An unknown argument, a wrong type, a `result` outside the two, a blank `step`, or a `text` missing, blank or given with `Erfolgreich` is a tool error; nothing is read or written.
 
 ## Never
 
@@ -416,7 +416,7 @@ Setup: as E-MCP-04; the forge fails the search with `HTTP 502`
 
 ### E-MCP-20 -- the operator's answer to a step, given in chat
 
-Setup: `owner/a` holds the open item `#9` of E-MCP-12, waiting on its step, which asks for no report
+Setup: `owner/a` holds the open item `#9` of E-MCP-12, waiting on its step
 
 ```text
 > {"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"answer_step","arguments":{"repository":"owner/a","item":9,"step":"Rotate the deploy key in the host's settings.","result":"Fehlgeschlagen","text":"The page shows an error."}}}

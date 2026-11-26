@@ -117,16 +117,23 @@ def test_a_missing_or_blank_card_field_is_refused_naming_the_field(
 
 
 @pytest.mark.parametrize(
-    "paste",
+    ("paste", "stored"),
     [
-        pytest.param("cd ~/repo && make rotate", id="cd-and-command"),
-        pytest.param("https://example.test/run", id="link"),
+        pytest.param("cd ~/repo && make rotate", "cd ~/repo && make rotate", id="cd-and-command"),
+        pytest.param("https://example.test/run", "https://example.test/run", id="link"),
+        pytest.param("make rotate\n", "make rotate", id="break-at-the-end-is-stripped"),
+        pytest.param(" make rotate \r\n", "make rotate", id="spaces-and-break-are-stripped"),
     ],
 )
-def test_a_step_that_keeps_every_rule_reaches_the_writer_with_its_paste(
-    paste: str,
+def test_a_step_that_keeps_every_rule_reaches_the_writer_with_its_paste_stripped(
+    paste: str, stored: str
 ) -> None:
     """Spec: MCP-49, MCP-89"""
     result = serve(tool_call(step_arguments(paste=paste), name="step"))["result"]
 
-    assert result["structuredContent"]["card"]["paste"] == paste
+    assert result["structuredContent"]["card"]["paste"] == stored
+
+
+def test_a_paste_with_a_break_inside_is_refused_though_the_strip_comes_first() -> None:
+    """Spec: MCP-49, MCP-91"""
+    assert _refusal(step_arguments(paste="make a\nmake b\n")) == _ONE_LINE

@@ -1,7 +1,7 @@
 """`aco mcp`'s answer_step tool (`specs/mcp.spec.md`) through `cli.main(["mcp", "--direct"])` over
 the board's test forge: an answer given in chat takes the writer of the board's
-`POST /api/step`, and a step that changed, an item without one or an answer the step does
-not ask for is refused with nothing written."""
+`POST /api/step`, and a step that changed or an item without one is refused with nothing
+written."""
 
 from typing import Any
 
@@ -13,13 +13,13 @@ from mcp_lines import call_line, serve_mcp
 from aco import body, workboard
 
 _STEP = OPERATOR_WAIT["operator"]
-_REPORT_STEP = {
+_STORED_ANSWER_STEP = {
     "purpose": "Release the build.",
     "actions": "open https://example.test/run\nclick Run",
     "expected": "The page shows green.",
     "answer": "the run report",
 }
-_YES_NO_STEP = {key: value for key, value in _REPORT_STEP.items() if key != "answer"}
+_YES_NO_STEP = {key: value for key, value in _STORED_ANSWER_STEP.items() if key != "answer"}
 _WRITES = (
     board_forge.ForgeOperation.WRITE_BODY,
     board_forge.ForgeOperation.REMOVE_LABEL,
@@ -69,9 +69,19 @@ def _writes(here: board_forge.BoardForge) -> list[str]:
             {"result": "Fehlgeschlagen", "text": "Stayed red."},
             "Fehlgeschlagen: Stayed red.",
         ),
-        (_REPORT_STEP, {"result": "report", "text": "All 12 passed."}, "All 12 passed."),
+        (_STORED_ANSWER_STEP, {"result": "Erfolgreich"}, "Erfolgreich"),
+        (
+            _STORED_ANSWER_STEP,
+            {"result": "Fehlgeschlagen", "text": "Stayed red."},
+            "Fehlgeschlagen: Stayed red.",
+        ),
     ],
-    ids=["erfolgreich", "fehlgeschlagen-with-a-note", "a-report"],
+    ids=[
+        "erfolgreich",
+        "fehlgeschlagen-with-a-note",
+        "erfolgreich-on-a-stored-answer",
+        "fehlgeschlagen-on-a-stored-answer",
+    ],
 )
 def test_a_chat_answer_clears_the_wait_and_the_step_writes_now_and_keeps_the_item_open(
     here: board_forge.BoardForge,
@@ -80,6 +90,7 @@ def test_a_chat_answer_clears_the_wait_and_the_step_writes_now_and_keeps_the_ite
     arguments: dict[str, object],
     outcome: str,
 ) -> None:
+    """Spec: MCP-72, MCP-73, MCP-76. Example: E-MCP-20."""
     _put_step(here, table)
     before = body.locate_block(here.stored_body(1)).data
 
@@ -114,36 +125,16 @@ def test_a_label_the_forge_refuses_to_remove_keeps_the_answer_and_names_the_repa
     assert "wait" not in body.locate_block(here.stored_body(1)).data
 
 
-def _refusal_cases() -> list[tuple[dict[str, str], dict[str, object], str]]:
-    return [
-        (_YES_NO_STEP, {"step": "Another step."}, "no longer"),
-        (_YES_NO_STEP, {"result": "report", "text": "Done."}, "does not fit"),
-        (_REPORT_STEP, {"result": "Erfolgreich"}, "does not fit"),
-    ]
-
-
-@pytest.mark.parametrize(
-    ("table", "arguments", "reason"),
-    _refusal_cases(),
-    ids=[
-        "changed-step",
-        "report-unasked",
-        "report-missing",
-    ],
-)
-def test_a_chat_answer_that_does_not_fit_is_refused_with_nothing_written(
-    here: board_forge.BoardForge,
-    monkeypatch: pytest.MonkeyPatch,
-    table: dict[str, str],
-    arguments: dict[str, object],
-    reason: str,
+def test_a_chat_answer_to_a_step_that_changed_is_refused_with_nothing_written(
+    here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _put_step(here, table)
+    """Spec: MCP-74"""
+    _put_step(here)
     before = here.stored_body(1)
 
-    refused = _serve(monkeypatch, _answer_line(**arguments))
+    refused = _serve(monkeypatch, _answer_line(step="Another step."))
 
-    assert reason in refused["content"][0]["text"]
+    assert "no longer" in refused["content"][0]["text"]
     assert refused["isError"] is True
     assert here.stored_body(1) == before
     assert _writes(here) == []
@@ -152,6 +143,7 @@ def test_a_chat_answer_that_does_not_fit_is_refused_with_nothing_written(
 def test_a_chat_answer_on_an_item_without_a_step_is_refused_with_nothing_written(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Spec: MCP-74"""
     before = here.stored_body(1)
 
     refused = _serve(monkeypatch, _answer_line())

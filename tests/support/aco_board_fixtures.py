@@ -412,8 +412,8 @@ class BoardClient:
     def answer_step_through_api(
         self, item: int, result: str, text: str | None = None, *, repo: str | None = None
     ) -> Response:
-        """Post `result` (`yes`, `no` or `report`, with `text` for the last two)
-        for the step of `item` exactly as `GET /api/board` lists it now."""
+        """Post `result` (`yes` or `no`, with `text` for `no`) for the step of `item` exactly
+        as `GET /api/board` lists it now."""
         return self.post_step(
             {
                 "repo": self.repo if repo is None else repo,

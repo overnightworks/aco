@@ -61,7 +61,6 @@ class StepRequest:
 
 _STEP_RESULT_YES = "yes"
 _STEP_RESULT_NO = "no"
-_STEP_RESULT_REPORT = "report"
 _TEXT = "text"
 _STEP_POST_KEYS = frozenset({"repo", "item", "fingerprint", "result", _TEXT})
 _CARD_ENTRY_KEYS = frozenset({"line", "fingerprint", "option"})
@@ -232,17 +231,15 @@ def parse_step_request(raw: bytes) -> StepRequest | None:
 
 
 def _step_result(fields: dict[str, object]) -> item_step.StepResult | None:
-    """Erfolgreich names no text; a failure and a report each name one non-blank text."""
+    """Erfolgreich names no text; a failure names one non-blank text."""
     kind = fields.get("result")
     if kind == _STEP_RESULT_YES:
         return item_step.StepSucceeded() if _TEXT not in fields else None
+    if kind != _STEP_RESULT_NO:
+        return None
     text = fields.get(_TEXT)
     stripped = text.strip() if _is_note_text(text) else ""
-    if not stripped:
-        return None
-    if kind == _STEP_RESULT_NO:
-        return item_step.StepFailed(stripped)
-    return item_step.StepReported(stripped) if kind == _STEP_RESULT_REPORT else None
+    return item_step.StepFailed(stripped) if stripped else None
 
 
 def _card_request(fields: dict[str, object]) -> CardRequest | None:

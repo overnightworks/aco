@@ -1,7 +1,8 @@
 """The operator answering a step on the board through the real server, wire form and
 `aco` adapter against the real `aco` over a fake forge (specs/serve.spec.md, ABRD-163 to
-ABRD-171): Erfolgreich, Fehlgeschlagen with a note and a report clear the step's wait,
-step table and label in the item's turn and write the outcome into `now`."""
+ABRD-171): Erfolgreich and Fehlgeschlagen with a note, on a step with a stored answer too,
+clear the step's wait, step table and label in the item's turn and write the outcome into
+`now`."""
 
 from collections.abc import Callable
 
@@ -20,13 +21,13 @@ from aco import body, forge, workboard
 from aco.board.aco_source import WRITTEN_OVER_NOTE
 
 _ITEM = 7
-_REPORT_STEP = {
+_STORED_ANSWER_STEP = {
     "purpose": "Release the build.",
     "actions": "open https://example.test/run\nclick Run",
     "expected": "The page shows green.",
     "answer": "the run report",
 }
-_YES_NO_STEP = {key: value for key, value in _REPORT_STEP.items() if key != "answer"}
+_YES_NO_STEP = {key: value for key, value in _STORED_ANSWER_STEP.items() if key != "answer"}
 _READ = ForgeRequest(ForgeOperation.READ_ITEM, _ITEM)
 _WRITE = ForgeRequest(ForgeOperation.WRITE_BODY, _ITEM)
 _UNLABEL = ForgeRequest(ForgeOperation.REMOVE_LABEL, _ITEM)
@@ -72,10 +73,15 @@ def _unchanged(block: dict[str, object]) -> dict[str, object]:
     [
         (_YES_NO_STEP, "yes", None, _outcome("Erfolgreich")),
         (_YES_NO_STEP, "no", "Stayed red.", _outcome("Fehlgeschlagen: Stayed red.")),
-        (_REPORT_STEP, "no", "No report.", _outcome("Fehlgeschlagen: No report.")),
-        (_REPORT_STEP, "report", "All 12 passed.", _outcome("All 12 passed.")),
+        (_STORED_ANSWER_STEP, "yes", None, _outcome("Erfolgreich")),
+        (_STORED_ANSWER_STEP, "no", "No report.", _outcome("Fehlgeschlagen: No report.")),
     ],
-    ids=["erfolgreich", "fehlgeschlagen-with-a-note", "fehlgeschlagen-on-a-report", "a-report"],
+    ids=[
+        "erfolgreich",
+        "fehlgeschlagen-with-a-note",
+        "erfolgreich-on-a-stored-answer",
+        "fehlgeschlagen-on-a-stored-answer",
+    ],
 )
 def test_an_answer_ends_the_wait_writes_the_outcome_and_removes_the_label_after_the_body(
     repository: BoardForge,
@@ -135,6 +141,7 @@ _ABSENT = object()
         {"result": "no", "text": "\ud800"},
         {"result": "no", "text": 5},
         {"result": "report"},
+        {"result": "report", "text": "All 12 passed."},
         {"result": "yes", "text": "Erfolgreich"},
         {"result": "yes", "text": None},
         {"extra": 1},
@@ -157,6 +164,7 @@ _ABSENT = object()
         "note-with-a-lone-surrogate",
         "note-not-text",
         "report-without-text",
+        "report-with-text",
         "text-beside-success",
         "null-text-beside-success",
         "unknown-key",
@@ -286,24 +294,6 @@ def test_a_second_answer_for_the_same_step_is_refused_and_writes_nothing_more(
 
     assert (first.json(), second.json()) == (_ANSWERED, _STEP_CHANGED)
     assert repository.body_writes() == [_ITEM]
-
-
-@pytest.mark.parametrize(
-    ("table", "result", "text"),
-    [(_REPORT_STEP, "yes", None), (_YES_NO_STEP, "report", "A report.")],
-    ids=["erfolgreich-on-a-report-step", "a-report-on-a-yes-no-step"],
-)
-def test_an_answer_the_step_does_not_ask_for_is_refused_and_nothing_is_written(
-    repository: BoardForge, board: BoardClient, table: dict[str, str], result: str, text: str | None
-) -> None:
-    """ABRD-167."""
-    _put_step(repository, table)
-
-    answer = board.answer_step_through_api(_ITEM, result, text)
-
-    assert answer.json()["status"] == "failed"
-    assert repository.body_writes() == []
-    assert repository.stored_item(_ITEM).labels == [_LABEL]
 
 
 def test_an_unrelated_ruling_between_the_page_read_and_the_post_leaves_the_answer_stored(

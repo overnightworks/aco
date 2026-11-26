@@ -95,8 +95,7 @@ _RESULT: Final = "result"
 _TEXT: Final = "text"
 _SUCCEEDED: Final = "Erfolgreich"
 _FAILED: Final = "Fehlgeschlagen"
-_REPORT: Final = "report"
-_RESULT_KINDS: Final = (_SUCCEEDED, _FAILED, _REPORT)
+_RESULT_KINDS: Final = (_SUCCEEDED, _FAILED)
 _ANSWER_STEP_KEYS: Final = (*_ENVELOPE_KEYS, STEP, _RESULT, _TEXT)
 _RECORD_KEYS: Final = (*_ENVELOPE_KEYS, "line", "card_hash", _OPTION, _OTHER)
 
@@ -206,11 +205,10 @@ def _answer_step_schema() -> dict[str, object]:
                 "type": "string",
                 "enum": list(_RESULT_KINDS),
                 "description": (
-                    f"{_SUCCEEDED}: it worked; {_FAILED}: it failed, with text saying how; "
-                    f"{_REPORT}: the report the step asks for, as text"
+                    f"{_SUCCEEDED}: it worked; {_FAILED}: it failed, with text saying how"
                 ),
             },
-            _TEXT: _string(f"the note of {_FAILED} or the {_REPORT}; give it for those only"),
+            _TEXT: _string(f"the note of {_FAILED}; give it for that result only"),
         },
         "required": [*_ENVELOPE_KEYS, STEP, _RESULT],
         "additionalProperties": False,
@@ -300,12 +298,11 @@ _TOOLS: Final = (
         "title": "Record the operator's answer to a step",
         "description": (
             "Records the answer the operator gave in this chat to the step an item waits "
-            "on, as the board records it: Erfolgreich, Fehlgeschlagen with the note that says "
-            "how, or the report a step that asks for one wants. Use it only for an answer he "
-            "gave, never for your own. Give the step line exactly as read_inbox shows it; a "
-            "step that changed since, an item without a step or an answer the step does not "
-            "ask for is refused and nothing is written. The item's wait, step and label "
-            "needs-operator go and the answer is written into now; the item stays open."
+            "on, as the board records it: Erfolgreich, or Fehlgeschlagen with the note that "
+            "says how. Use it only for an answer he gave, never for your own. Give the step "
+            "line exactly as read_inbox shows it; a step that changed since or an item "
+            "without a step is refused and nothing is written. The item's wait, step and "
+            "label needs-operator go and the answer is written into now; the item stays open."
         ),
         "inputSchema": _answer_step_schema(),
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False},
@@ -483,14 +480,9 @@ def _answer_step(answer_step: AnswerStep, arguments: Mapping[str, object]) -> Ma
     """The call of the step answer writer with arguments whose defects were already
     refused."""
     text = cast(str, arguments[_TEXT]).strip() if _TEXT in arguments else ""
-    result: item_step.StepResult
-    match arguments[_RESULT]:
-        case "Fehlgeschlagen":
-            result = item_step.StepFailed(text)
-        case "report":
-            result = item_step.StepReported(text)
-        case _:
-            result = item_step.StepSucceeded()
+    result: item_step.StepResult = (
+        item_step.StepFailed(text) if arguments[_RESULT] == _FAILED else item_step.StepSucceeded()
+    )
     return answer_step(
         cast(str, arguments[_REPOSITORY]),
         cast(int, arguments[_ITEM]),
@@ -583,9 +575,9 @@ def _step_defects(arguments: Mapping[str, object]) -> list[str]:
 
 def _answer_step_defects(arguments: Mapping[str, object]) -> list[str]:
     """Every defect of `answer_step`'s arguments: the envelope's, a `step` that is no
-    string or blank, a `result` that is none of the three, a `text` that is no string,
-    blank where `result` needs one, or given with Erfolgreich. Whether the step and the
-    answer fit the item is the writer's to judge."""
+    string or blank, a `result` that is neither of the two, a `text` that is no string,
+    blank where `result` needs one, or given with Erfolgreich. Whether the step fits the
+    item is the writer's to judge."""
     defects = _envelope_defects(arguments, _ANSWER_STEP_KEYS)
     if not isinstance(arguments.get(STEP), str) or _is_blank(arguments, STEP):
         defects.append(f"{STEP} must be the non-blank step line read_inbox showed")
@@ -597,7 +589,7 @@ def _answer_step_defects(arguments: Mapping[str, object]) -> list[str]:
         defects.append(f"{_TEXT} must be a string")
     elif kind == _SUCCEEDED and _TEXT in arguments:
         defects.append(f"{_TEXT} must not be given with {_SUCCEEDED}")
-    elif kind in (_FAILED, _REPORT) and (text is None or _is_blank(arguments, _TEXT)):
+    elif kind == _FAILED and (text is None or _is_blank(arguments, _TEXT)):
         defects.append(f"{_TEXT} is required with {kind} and must not be blank")
     return defects
 
