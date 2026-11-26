@@ -189,7 +189,7 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         "operands",
         nargs="+",
         action=_ItemAndFileAction,
-        metavar="[ITEM] FILE",
+        metavar=("ITEM_OR_FILE", "FILE"),
         help="the claimed item then the lane record file; the file alone with --branch",
     )
     _add_branch_argument(add)
