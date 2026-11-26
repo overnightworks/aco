@@ -1,0 +1,8 @@
+claim_id = "b27999fa97f242879c563a5349b3ee5f"
+agent = "Claude 91521ccc-2668-4cfa-8624-55fc58e8de62"
+role = "builder"
+base = "64f7b841a94c1772b3e082a5845c74c3cb471032"
+branch = "claude/issue-1108-every-claim-kind-stores-its-lane-runs-la"
+scope = ["quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/lane-record.spec.md", "src/aco/cmd_lane_record.py", "tests/support/adoption_world.py", "tests/support/landing_world_parts.py", "tests/support/lane_record_fixtures.py", "tests/support/lane_record_runs_world.py", "tests/support/lane_run_entries.py", "tests/test_cmd_land_lane_record.py", "tests/test_cmd_land_runs.py", "tests/test_cmd_lane_record_branch.py", "tests/test_cmd_lane_record_runs.py", "tests/test_cmd_lane_record_runs_usage.py", "tests/test_cmd_lane_record_show.py", "tests/test_release_record.py"]
+opened_commit = "1c878156d15475c264f29784cf5eb7bc384ceda3"
+whole_reason = "One optional flag on three subcommands of one production file; the rest is the spec and the tests that pin those commands and the no-run lane landing."
