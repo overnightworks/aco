@@ -1,0 +1,8 @@
+claim_id = "a0b69494926b4cafa48ce3ca1c733bd4"
+agent = "Claude 91521ccc-2668-4cfa-8624-55fc58e8de62"
+role = "builder"
+base = "7b4b7f8f5c37a75f4aad8eef622a7f4634919602"
+branch = "claude/issue-1079-aco-brief-names-the-touched-paths-a-repo"
+scope = [".aco/ahead-of-caller.toml", "README.md", "specs/brief.spec.md", "specs/storage-pin.spec.md", "src/aco/cmd_brief.py", "src/aco/workboard.py", "tests/test_board.py", "tests/test_cmd_brief.py", "tests/test_workboard_path_entries.py"]
+opened_commit = "e48d2dd7c1394f69bee434c8870358e5009b1c4e"
+whole_reason = "One key from its declaration through its brief field to its two specs, its README row and the tests that pin the key sets."
