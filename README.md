@@ -118,6 +118,8 @@ operator's chat answer to a step through the board's writer, and its tool
 `wait.operator` to the step, leaves its `next` as it is, and sets the label
 `needs-operator` as its GitHub view, or opens such an item
 (`specs/mcp.spec.md`).
+The read-only tool `read_next` returns, for each of those repositories, what
+`aco next --json` answers in its checkout, or why its board could not be read.
 A reinstall of aco reaches a running session at its next call; only a change to the relay
 or to a tool's schema needs `/mcp` → Reconnect.
 For one session, `claude --strict-mcp-config
