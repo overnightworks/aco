@@ -122,6 +122,7 @@ class _BriefComposition:
     observed_at: datetime
     tip: str | None
     touched: tuple[str, ...]
+    touched_surfaces: tuple[str, ...]
     step_rules: workboard.BriefStepRules | None
     lane_shared: LaneSharedReading
 
@@ -179,6 +180,14 @@ def _brief_claim_json(
     }
 
 
+def _touched_surfaces(touched: tuple[str, ...], surface_paths: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        path
+        for path in touched
+        if any(workboard.repository_path_entry_covers(entry, path) for entry in surface_paths)
+    )
+
+
 def _brief_json(composition: _BriefComposition) -> int:
     live = composition.live
     payload: dict[str, object] = {
@@ -193,6 +202,7 @@ def _brief_json(composition: _BriefComposition) -> int:
         else list(
             paths_outside_claim(live.claim.scope, composition.lane_shared, composition.touched)
         ),
+        "touched_surfaces": list(composition.touched_surfaces),
     }
     step_rules = composition.step_rules
     if step_rules is not None:
@@ -276,6 +286,7 @@ def _brief_report(parsed: argparse.Namespace, context: RunContext) -> int:
         observed_at,
         tip,
         touched,
+        _touched_surfaces(touched, context.config.surface_paths),
         step_rules,
         trunk_lane_shared_reading(context.configured_canonical_remote, context.toplevel),
     )

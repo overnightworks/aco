@@ -282,7 +282,7 @@ def test_brief_json_tells_a_forge_it_could_not_reach_from_one_that_refused(
 def test_brief_json_prints_one_object_with_body_claim_tip_and_touched(
     lane: Lane, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: BRIEF-06, BRIEF-10, BRIEF-27."""
+    """Spec: BRIEF-06, BRIEF-10, BRIEF-27, BRIEF-32."""
     result = brief(capsys, "--json")
 
     expected = {
@@ -303,6 +303,7 @@ def test_brief_json_prints_one_object_with_body_claim_tip_and_touched(
         "tip": lane.tip,
         "touched": ["README.md"],
         "outside_claim": [],
+        "touched_surfaces": [],
     }
     assert (result.status, result.stderr, result.stdout) == (0, "", json.dumps(expected) + "\n")
 
@@ -360,6 +361,81 @@ def test_brief_json_names_touched_paths_neither_the_claim_scope_nor_lane_shared_
     assert (result.status, result.stderr) == (0, "")
     payload = json.loads(result.stdout)
     assert (payload["claim"] is None, payload["outside_claim"]) == (not claimed, outside_claim)
+
+
+@pytest.mark.parametrize(
+    ("claimed", "board_toml", "touched", "surfaces"),
+    [
+        pytest.param(
+            True,
+            'surface_paths = ["ui/"]\n',
+            ["ui/a.css", "ui/b.css"],
+            ["ui/a.css", "ui/b.css"],
+            id="directory-entry",
+        ),
+        pytest.param(
+            True,
+            'surface_paths = ["page.html"]\n',
+            ["page.html", "page.html.bak", "sub/page.html"],
+            ["page.html"],
+            id="file-entry",
+        ),
+        pytest.param(
+            True,
+            'surface_paths = ["ui/", "page.html"]\n',
+            ["notes.txt", "page.html", "ui/a.css"],
+            ["page.html", "ui/a.css"],
+            id="order-follows-touched",
+        ),
+        pytest.param(True, "lane_shared = []\n", ["ui/a.css"], [], id="none-declared"),
+        pytest.param(True, 'surface_paths = ["ui/"]\n', ["docs/a.md"], [], id="none-covered"),
+        pytest.param(False, 'surface_paths = ["ui/"]\n', ["ui/a.css"], [], id="no-claim"),
+        pytest.param(
+            True,
+            'surface_paths = ["page.html"]\ndependency_paths = ["page.html"]\n',
+            ["page.html"],
+            ["page.html"],
+            id="independent-of-other-keys",
+        ),
+    ],
+)
+def test_brief_json_lists_touched_paths_a_surface_path_covers(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    github_clone: Path,
+    bare_remote: Path,
+    served_body: FakeForge,
+    capsys: pytest.CaptureFixture[str],
+    claimed: bool,
+    board_toml: str,
+    touched: list[str],
+    surfaces: list[str],
+) -> None:
+    """Spec: BRIEF-32, PIN-63."""
+    track_board_config(github_clone, board_toml)
+    real_git(github_clone, "push", "-q", "origin", "main")
+    world = make_lane(monkeypatch, tmp_path, github_clone, bare_remote, claimed=claimed)
+    for name in touched:
+        commit_file(world.directory, name, "x\n")
+
+    result = brief(capsys, "--json")
+
+    assert (result.status, result.stderr) == (0, "")
+    payload = json.loads(result.stdout)
+    assert payload["touched_surfaces"] == surfaces
+    assert payload["outside_claim"] == (touched if claimed else None)
+
+
+def test_brief_text_shows_no_surface(lane: Lane, capsys: pytest.CaptureFixture[str]) -> None:
+    """Spec: BRIEF-33."""
+    undeclared = brief(capsys)
+    write_repository_config(lane.directory, 'surface_paths = ["README.md"]\n')
+    real_git(lane.directory, "add", workboard.CONFIG_PATH.as_posix())
+
+    declared = brief(capsys)
+
+    assert (undeclared.status, undeclared.stderr) == (0, "")
+    assert (declared.status, declared.stderr, declared.stdout) == (0, "", undeclared.stdout)
 
 
 @pytest.mark.parametrize("flags", [(), ("--json",)], ids=["text", "json"])
@@ -486,7 +562,7 @@ def test_brief_without_step_ignores_the_tracked_brief_config(
 def test_brief_step_json_adds_rules_and_checks_to_the_object(
     lane: Lane, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: BRIEF-14."""
+    """Spec: BRIEF-14, BRIEF-32."""
     track_brief_config(lane.directory, BRIEF_TOML)
 
     result = brief(capsys, "--step", "build", "--json")
@@ -509,6 +585,7 @@ def test_brief_step_json_adds_rules_and_checks_to_the_object(
         "tip": lane.tip,
         "touched": ["README.md"],
         "outside_claim": [],
+        "touched_surfaces": [],
         "rules": ["Stay in scope."],
         "checks": ["ruff check ."],
     }

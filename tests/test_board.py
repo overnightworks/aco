@@ -1863,12 +1863,14 @@ def test_board_configuration_refuses_an_unknown_key_by_name(tmp_path: Path) -> N
 
 
 def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> None:
+    """Spec: PIN-63."""
     config_path = tmp_path / "board.toml"
     config_path.write_text(
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
         'canonical_remote = "upstream"\n'
         'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py", "tests/"]\n'
         'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
+        'surface_paths = ["ui/"]\n'
     )
 
     assert workboard.load_config(config_path) == BoardConfig(
@@ -1878,47 +1880,8 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         Storage.STATE_REF,
         ("scripts/whitelist.py", "tests/"),
         dependency_paths=("pyproject.toml", "uv.lock", ".github/workflows/"),
+        surface_paths=("ui/",),
     )
-
-
-def unusable_entry(entry: str) -> str:
-    return f"lane_shared entry '{entry}' is not a canonical path inside the repository"
-
-
-@pytest.mark.parametrize(
-    ("lane_shared", "refusal"),
-    [
-        pytest.param('["/etc/passwd"]', unusable_entry("/etc/passwd"), id="absolute"),
-        pytest.param(
-            '["../sibling/registry.txt"]',
-            unusable_entry("../sibling/registry.txt"),
-            id="climbs-out",
-        ),
-        pytest.param('["scripts//"]', unusable_entry("scripts//"), id="doubled-trailing-slash"),
-        pytest.param('["/"]', unusable_entry("/"), id="only-a-slash"),
-        pytest.param(
-            '"scripts/registry.txt"',
-            "lane_shared must be a list of unique repository paths",
-            id="not-a-list",
-        ),
-        pytest.param(
-            '["a.txt", "a.txt"]',
-            "lane_shared must be a list of unique repository paths",
-            id="duplicate",
-        ),
-    ],
-)
-def test_board_configuration_refuses_a_lane_shared_entry_that_is_no_repository_path(
-    lane_shared: str, refusal: str
-) -> None:
-    """A registry every lane may write is named by its
-    canonical path inside the repository; anything else is a defective
-    configuration. Only the syntax is judged, so `land` and every reader
-    judge alike."""
-    with pytest.raises(ClaimError) as refused:
-        workboard.parse_config(f"lane_shared = {lane_shared}\n", workboard.CONFIG_PATH)
-
-    assert str(refused.value) == f"board configuration {workboard.CONFIG_PATH} {refusal}"
 
 
 def test_load_brief_config_returns_none_when_the_file_does_not_exist(tmp_path: Path) -> None:
@@ -3419,15 +3382,22 @@ def test_names_parent_requires_an_exact_first_line(raw: str, label: str, expecte
         ],
     ],
 )
-def test_board_configuration_refuses_invalid_dependency_paths(value: str, reason: str) -> None:
+@pytest.mark.parametrize("key", workboard.REPOSITORY_PATH_KEYS)
+def test_board_configuration_refuses_invalid_repository_paths(
+    key: str, value: str, reason: str
+) -> None:
+    """Spec: PIN-38, PIN-39, PIN-45, PIN-46, PIN-55, PIN-56, PIN-64, PIN-65."""
     with pytest.raises(ClaimError) as refused:
-        workboard.parse_config(f"dependency_paths = {value}\n", workboard.CONFIG_PATH)
-    assert str(refused.value) == f"board configuration .aco/board.toml dependency_paths {reason}"
+        workboard.parse_config(f"{key} = {value}\n", workboard.CONFIG_PATH)
+    assert str(refused.value) == f"board configuration .aco/board.toml {key} {reason}"
 
 
-@pytest.mark.parametrize("text", ["", "dependency_paths = []"])
-def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> None:
-    assert workboard.parse_config(text, workboard.CONFIG_PATH).dependency_paths == ()
+@pytest.mark.parametrize("key", workboard.REPOSITORY_PATH_KEYS)
+@pytest.mark.parametrize("text", ["", "{key} = []"])
+def test_board_configuration_has_no_repository_paths_unless_named(key: str, text: str) -> None:
+    config = workboard.parse_config(text.format(key=key), workboard.CONFIG_PATH)
+
+    assert getattr(config, key) == ()
 
 
 @pytest.mark.parametrize(

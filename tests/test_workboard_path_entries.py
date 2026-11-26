@@ -1,11 +1,11 @@
-"""How a board path entry (`lane_shared`, `dependency_paths`, `production_paths`) is read."""
+"""How a board path entry is read."""
 
 import pytest
 
 from aco import workboard
 
 
-@pytest.mark.parametrize("key", ["lane_shared", "dependency_paths", "production_paths"])
+@pytest.mark.parametrize("key", workboard.REPOSITORY_PATH_KEYS)
 @pytest.mark.parametrize("entry", ["frontend/*", "src/a?b.py"])
 def test_board_configuration_keeps_a_path_entry_holding_a_glob_character(
     key: str, entry: str
