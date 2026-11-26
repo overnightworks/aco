@@ -43,7 +43,6 @@ line's 1-based index, `<repo>` a found repository's label, its forge name `owner
 | an item that waits on the operator | ABRD-157, ABRD-159, ABRD-160, ABRD-161, ABRD-163, ABRD-195, ABRD-196, ABRD-197, ABRD-198, ABRD-199 | — | ABRD-168, ABRD-169, ABRD-171, ABRD-172, ABRD-173, ABRD-174, ABRD-175, ABRD-176, ABRD-177, ABRD-178 |
 | a malformed step answer | — | — | ABRD-164, ABRD-165 |
 | a step that changed, was answered, closed or removed since the page read it | — | — | ABRD-166 |
-| an answer that does not fit its step | — | — | ABRD-167 |
 | a step answer written over a change aco had not read, lost or not verified | — | — | ABRD-170 |
 | a card post naming one or more open option lines of its item | — | ABRD-77, ABRD-78, ABRD-80 | — |
 | a card post naming a changed or non-option line | — | ABRD-79 | — |
@@ -261,25 +260,25 @@ A closed child counts however it closed, not-planned included. A container whose
 - ABRD-161: A step with no `[step]` table shows its number, title, one-line `step` and the mark `alte Form` (ABRD-197), with `Erfolgreich` and `Fehlgeschlagen` and no `Copy`.
 - ABRD-162: With no step the tab says `No step is waiting for you.`; a repo that could not be read shows `Not read` and its sentence instead, never an empty list.
 - ABRD-163: Each `steps` entry also carries `fingerprint`, which follows its repo, item, `step`, `since` and the stored fields of its card, so it changes when any of them does.
-- ABRD-164: `POST /api/step` takes `repo`, `item`, `fingerprint` and `result`: `yes` with no `text`, or `no` or `report` with a `text`; any other key or shape is refused `bad request: step` (see E-ABRD-22).
+- ABRD-164: `POST /api/step` takes `repo`, `item`, `fingerprint` and `result`: `yes` with no `text`, or `no` with a `text`; any other key or shape, `report` too, is refused `bad request: step` (E-ABRD-22).
 - ABRD-165: A step answer's `text` follows ABRD-05's rules and is not blank; a refused one reaches no forge.
 - ABRD-166: A step no longer as shown on the item's fresh read (ABRD-113), because it changed, was answered, closed or removed, answers `failed` `This step changed; reload.`, nothing written (see E-ABRD-23).
-- ABRD-167: A `yes` on a step that asks for a report, or a `report` on one that does not, answers `failed` with a sentence, nothing written; `no` fits every step (see E-ABRD-24).
-- ABRD-168: A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" <channel> on <date>: ` and `Erfolgreich`, `Fehlgeschlagen: <note>` or the report (see E-ABRD-25).
+- ABRD-167 (retired).
+- ABRD-168: A stored answer removes `wait` and `step` and writes `now` as `The operator answered "<step>" <channel> on <date>: ` and `Erfolgreich` or `Fehlgeschlagen: <note>` (see E-ABRD-25).
 - ABRD-178: The `<channel>` of ABRD-168 is `on the board` for `POST /api/step` and `in chat` for the MCP tool `answer_step` (MCP-72).
 - ABRD-169: Under `storage = "github"` the label `needs-operator` goes after the body write; a refused removal keeps the answer and adds a `note` naming `gh issue edit <n> --remove-label needs-operator`.
 - ABRD-170: A write the forge's body check keeps answers `answered` with ABRD-129's note and removes the label; a lost or unverified write answers `failed` with the forge's sentence and leaves the label.
 - ABRD-171: The board never closes the item, never writes an expectation line and never touches the item's signal (WAIT-12); every other field and byte of the body stays.
 - ABRD-172: A stored answer leaves `next` as it is, in one body write, and answers `answered` with no `item`.
 
-- ABRD-173: Every step shows `Erfolgreich` and `Fehlgeschlagen`; `Erfolgreich` posts `yes`. A stored step that names an answer shows a text field `Bericht` with `Senden` instead, which posts `report`.
+- ABRD-173: Every step shows `Erfolgreich` and `Fehlgeschlagen`, whatever its table stores; `Erfolgreich` posts `yes`. No step shows a report field.
 - ABRD-174: `Fehlgeschlagen` opens a field `Notiz`; `Senden` stays disabled while it is blank and then posts `no` with the note.
 - ABRD-175: An answer starts the 8 second window of ABRD-58 with the strip `Saves shortly: <answer> · #n` and `Undo` in the card; `Undo` posts nothing, and leaving the page posts it at once (ABRD-152).
 - ABRD-176: A stored answer removes the card after a re-read; a refused one keeps the card and shows its sentence, with `Neu laden`; the answer buttons stay disabled until `Neu laden`.
 - ABRD-177: `Copied` reads `Copy` again once the step's card has changed.
 - ABRD-195: A paste of kind `command` shows in a box with `Copy`; one of kind `link` shows as the button `Öffnen` and no box.
 - ABRD-196: `Öffnen` links to the paste and opens it in a new tab with `rel="noopener noreferrer"`; only a step of form `paste` and kind `link` renders as a link, no other scheme and no old step.
-- ABRD-197: A step of form `old` shows the mark `alte Form` and its stored purpose, actions or paste, and expected as plain text, with no `Copy` and no `Öffnen`.
+- ABRD-197: A step of form `old` shows the mark `alte Form` and its stored purpose, actions or paste, expected and answer as plain text, with no `Copy` and no `Öffnen`.
 - ABRD-198: Each step, old form too, shows `wartet seit <DD.MM.YYYY>` from `since` and `#<n>` as a link to `url`, in a new tab with `rel="noopener noreferrer"`; a `null` `url` leaves `#<n>` plain.
 - ABRD-199: The Steps view has one group per repository with a step, by its first step's `since` newest first, then higher item; ties keep configured order; a repository whose read failed stands last.
 
@@ -636,15 +635,15 @@ forge requests: read #7, no write
 answer 200: {"status": "failed", "message": "This step changed; reload."}
 ```
 
-### E-ABRD-24 -- an Erfolgreich answer to a step that asks for a report
+### E-ABRD-24 -- an Erfolgreich answer to a step that stores an answer
 
 Setup: test-forge, item `#7` waiting on the operator whose `step` table names `answer = "the run report"`
 
 ```text
 request: POST /api/step, header X-Board-Token: <board token>
 body: {"repo": "<repo>", "item": 7, "fingerprint": "<as listed>", "result": "yes"}
-forge requests: read #7, no write
-answer 200: {"status": "failed", "message": "#7 asks for a report; the answer does not fit"}
+forge requests: read #7, write #7's body, remove the label needs-operator from #7
+answer 200: {"status": "answered", "message": null}
 ```
 
 ### E-ABRD-25 -- Fehlgeschlagen with a note

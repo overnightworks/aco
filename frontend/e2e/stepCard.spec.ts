@@ -79,7 +79,11 @@ for (const viewport of [
 			const stored = page.getByRole('article', { name: /Release the build/ });
 			await expect(stored.getByText('alte Form')).toBeVisible();
 			await expect(stored.getByText('click Run')).toBeVisible();
-			await expect(stored.getByLabel('Bericht')).toBeVisible();
+			await expect(stored.getByText('the green run id')).toBeVisible();
+			await expect(stored.getByRole('button', { name: 'Erfolgreich' })).toBeVisible();
+			await expect(stored.getByRole('button', { name: 'Fehlgeschlagen' })).toBeVisible();
+			await expect(stored.getByLabel('Bericht')).toHaveCount(0);
+			await expect(stored.getByRole('button', { name: 'Senden' })).toHaveCount(0);
 			const tableless = page.getByRole('article', { name: /Old step/ });
 			await expect(tableless.getByText('alte Form')).toBeVisible();
 			await expect(tableless.getByRole('button', { name: 'Erfolgreich' })).toBeVisible();

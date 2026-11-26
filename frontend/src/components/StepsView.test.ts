@@ -100,17 +100,30 @@ test.each([
 });
 
 test.each([
-	['actions', oldStepRead({ actions: 'click Run' })],
-	['an answer', oldStepRead({ actions: 'click Run', answer: 'the report' })],
-	['a rule-breaking paste', oldStepRead({ actions: null, paste: 'make a; make b' })]
+	[
+		'actions',
+		oldStepRead({ actions: 'click Run' }),
+		['Release the build.', 'click Run', 'The page shows green.']
+	],
+	[
+		'an answer',
+		oldStepRead({ actions: 'click Run', answer: 'the report' }),
+		['Release the build.', 'click Run', 'The page shows green.', 'the report']
+	],
+	[
+		'a rule-breaking paste',
+		oldStepRead({ actions: null, paste: 'make a; make b' }),
+		['Release the build.', 'make a; make b', 'The page shows green.']
+	]
 ])(
 	'ABRD-197: an old step with %s shows alte Form and its stored text, no Copy or Öffnen',
-	(_name, step) => {
+	(_name, step, stored) => {
 		render(StepsView, { repos: [repo({ steps: [step] })], decisions: store() });
 
 		expect(screen.getByText('alte Form')).toBeInTheDocument();
-		expect(screen.getByText(step.actions ?? step.paste ?? '')).toBeInTheDocument();
-		expect(screen.getByText('The page shows green.')).toBeInTheDocument();
+		for (const text of stored) {
+			expect(screen.getByText(text)).toBeInTheDocument();
+		}
 		expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Öffnen' })).toBeNull();
 		expect(document.querySelector('pre')).toBeNull();
@@ -191,18 +204,16 @@ test('ABRD-174: Fehlgeschlagen cannot send without a note', async () => {
 	expect(send).toBeEnabled();
 });
 
-test('ABRD-173: a stored older step that asks for a report offers a report field with Senden and no Erfolgreich', async () => {
+test('ABRD-173: an old step that stores an answer offers Erfolgreich and Fehlgeschlagen and no report field', () => {
 	render(StepsView, {
 		repos: [repo({ steps: [oldStepRead({ answer: 'the green run id' })] })],
 		decisions: store()
 	});
 
-	expect(screen.queryByRole('button', { name: 'Erfolgreich' })).toBeNull();
-	const send = screen.getByRole('button', { name: 'Senden' });
-	expect(send).toBeDisabled();
-	await fireEvent.input(screen.getByLabelText('Bericht'), { target: { value: 'run 4' } });
-
-	expect(send).toBeEnabled();
+	expect(screen.getByRole('button', { name: 'Erfolgreich' })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Fehlgeschlagen' })).toBeInTheDocument();
+	expect(screen.queryByLabelText('Bericht')).toBeNull();
+	expect(screen.queryByRole('button', { name: 'Senden' })).toBeNull();
 });
 
 test('ABRD-175: Undo inside the window removes the strip and brings the buttons back', async () => {

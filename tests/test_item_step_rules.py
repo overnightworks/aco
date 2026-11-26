@@ -77,7 +77,6 @@ def test_a_step_line_purpose_and_expected_keep_to_their_words_and_one_line(
     "paste",
     [
         pytest.param("a\nb", id="two-lines"),
-        pytest.param("a\n", id="trailing-newline"),
         pytest.param("a\rb", id="carriage-return"),
         pytest.param("https://example.test/a\nhttps://example.test/b", id="two-links"),
     ],

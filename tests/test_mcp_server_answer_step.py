@@ -45,13 +45,13 @@ def test_the_step_description_sends_an_answer_in_chat_to_answer_step() -> None:
     [
         ({"result": "Erfolgreich"}, {}),
         ({"result": "Fehlgeschlagen", "text": " Stayed red. "}, {"note": "Stayed red."}),
-        ({"result": "report", "text": "All passed."}, {"report": "All passed."}),
     ],
-    ids=["erfolgreich", "fehlgeschlagen", "report"],
+    ids=["erfolgreich", "fehlgeschlagen"],
 )
 def test_an_answer_step_call_hands_the_step_line_and_the_result_to_the_writer(
     arguments: dict[str, object], result: dict[str, str]
 ) -> None:
+    """Spec: MCP-72"""
     answered = _answer_step(**{"step": " Set it. ", **arguments})
 
     assert answered["structuredContent"] == {
@@ -66,29 +66,62 @@ def test_an_answer_step_call_hands_the_step_line_and_the_result_to_the_writer(
     "arguments",
     [
         {"result": "Fehlgeschlagen"},
-        {"result": "report", "text": " "},
+        {"result": "Fehlgeschlagen", "text": " "},
         {"result": "Erfolgreich", "text": "Extra."},
-        {"result": "yes"},
         {"result": "Erfolgreich", "step": " "},
+        {"result": "Erfolgreich", "report": "All passed."},
     ],
     ids=[
         "failure-no-text",
-        "blank-report",
+        "failure-blank-text",
         "text-with-erfolgreich",
-        "unknown-result",
         "blank-step",
+        "unknown-argument",
     ],
 )
-def test_an_answer_step_call_with_a_defective_answer_never_reaches_the_writer(
+def test_an_answer_step_call_with_a_defective_answer_is_a_tool_error(
     arguments: dict[str, object],
 ) -> None:
+    """Spec: MCP-75"""
     result = _answer_step(**arguments)
 
     assert result["isError"] is True
 
 
+@pytest.mark.parametrize(
+    "kind",
+    [
+        pytest.param("report", id="report"),
+        pytest.param("yes", id="yes"),
+        pytest.param(None, id="none"),
+    ],
+)
+def test_an_answer_step_result_outside_the_two_is_a_tool_error_naming_them(
+    kind: str | None,
+) -> None:
+    """Spec: MCP-75"""
+    result = _answer_step(result=kind, text="All passed.")
+
+    assert result["isError"] is True
+    assert "result must be one of Erfolgreich, Fehlgeschlagen" in result["content"][0]["text"]
+
+
 def test_an_answer_step_call_with_a_text_that_is_no_string_says_so() -> None:
-    result = _answer_step(result="report", text=3)
+    """Spec: MCP-75"""
+    result = _answer_step(result="Fehlgeschlagen", text=3)
 
     assert result["isError"] is True
     assert "text must be a string" in result["content"][0]["text"]
+
+
+def test_the_answer_step_schema_offers_the_two_results_and_names_no_report() -> None:
+    """Spec: MCP-72"""
+    tools = _reply("tools/list")["result"]["tools"]
+
+    [answer_step] = [tool for tool in tools if tool["name"] == "answer_step"]
+
+    assert answer_step["inputSchema"]["properties"]["result"]["enum"] == [
+        "Erfolgreich",
+        "Fehlgeschlagen",
+    ]
+    assert "report" not in json.dumps(answer_step)

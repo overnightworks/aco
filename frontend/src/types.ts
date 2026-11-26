@@ -276,12 +276,12 @@ export type DecisionResult =
 	| { status: 'ruled' | 'returned'; message: null; item: BoardItem; note?: string }
 	| { status: 'already_ruled' | 'failed'; message: string | null };
 
-/** `POST /api/step`'s body (ABRD-164): `yes` carries no `text`, `no` and `report` do. */
+/** `POST /api/step`'s body (ABRD-164): `yes` carries no `text`, `no` does. */
 export interface StepRequest {
 	repo: string;
 	item: number;
 	fingerprint: string;
-	result: 'yes' | 'no' | 'report';
+	result: 'yes' | 'no';
 	text?: string;
 }
 

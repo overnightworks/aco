@@ -470,13 +470,8 @@ def answer_step(
     item: the `wait` and the `step` table go and `now` tells the outcome, every other
     field (`next` included) and byte is kept. The body is written once; only after
     a write that stands, verified or kept over a change aco had not read, the label of
-    the step is removed (a state-ref item has none). The item stays open. Raises
-    `protocol.ClaimError` by name before the write for a `result` the step does not ask
-    for, and the forge's own error for a write that was lost or not verified, leaving
-    the label."""
-    if not item_step.result_fits(result, step.card):
-        asked = "a report" if item_step.asks_for_report(step.card) else "Erfolgreich or a failure"
-        raise protocol.ClaimError(f"#{fresh.number} asks for {asked}; the answer does not fit")
+    the step is removed (a state-ref item has none). The item stays open. Raises the
+    forge's own error for a write that was lost or not verified, leaving the label."""
     now = item_step.answered_now(step.wait_text, result, context.today(), channel)
     new_body = body.replace_block(fresh.body, fresh.located, {**_without_step(fresh), "now": now})
     written_over = False

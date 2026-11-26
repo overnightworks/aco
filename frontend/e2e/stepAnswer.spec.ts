@@ -42,6 +42,7 @@ for (const viewport of [
 
 		for (const [name, step] of [
 			['stored with actions', { step: oldStepTable() }],
+			['stored with an answer', { step: oldStepTable({ answer: 'the green run id' }) }],
 			['without a table', { waiting: true as const }]
 		] as const) {
 			test(`ABRD-173: Erfolgreich answers a step ${name}`, async ({ page }) => {
@@ -70,24 +71,6 @@ for (const viewport of [
 
 			await expect(stepCard(page)).toHaveCount(0, { timeout: SAVED_WITHIN_MS });
 			expect(await storedNow(7)).toMatch(answeredOnBoard('Fehlgeschlagen: Stayed red\\.'));
-		});
-
-		test('ABRD-173: a stored older step that asks for a report stores its report', async ({
-			page
-		}, testInfo) => {
-			await arrange([
-				{ ...item(7, 'Release the build'), step: oldStepTable({ answer: 'the green run id' }) }
-			]);
-			await openSteps(page);
-
-			await expect(stepCard(page).getByRole('button', { name: 'Erfolgreich' })).toHaveCount(0);
-			await expect(stepCard(page).getByRole('button', { name: 'Senden' })).toBeDisabled();
-			await stepCard(page).getByLabel('Bericht').fill('run 4711');
-			await page.screenshot({ path: testInfo.outputPath(`step-report-${viewport.width}.png`) });
-			await stepCard(page).getByRole('button', { name: 'Senden' }).click();
-
-			await expect(stepCard(page)).toHaveCount(0, { timeout: SAVED_WITHIN_MS });
-			expect(await storedNow(7)).toMatch(answeredOnBoard('run 4711'));
 		});
 
 		test('ABRD-175: Undo inside the window posts nothing', async ({ page }) => {

@@ -131,8 +131,8 @@ def answer_step(
     """Records the operator's chat `result` to the step of item `number` of the
     discovered repository `label` through `decide.answer_step_in_turn`, the turn
     `POST /api/step` takes; refused when no repository found has that label, when the
-    item's step is not `step_text` or the item holds none, and when `result` does not
-    fit the step. Answers the sentences the answer is owed, when there are any."""
+    item's step is not `step_text` or the item holds none. Answers the sentences the answer
+    is owed, when there are any."""
     context = _context_of(label)
     answered = decide.answer_step_in_turn(
         context,
