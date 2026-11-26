@@ -67,7 +67,7 @@ test('ABRD-174: a failure posts no with its trimmed note', async () => {
 test('ABRD-175: undo posts nothing', async () => {
 	const { send, store } = stepStore();
 
-	store.answerStep('repo', step, 'report', 'run 4');
+	store.answerStep('repo', step, 'no', 'Stayed red.');
 	store.undo(entryKey(card, []));
 	await vi.advanceTimersByTimeAsync(UNDO_SECONDS * 1000);
 

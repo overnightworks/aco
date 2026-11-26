@@ -1,12 +1,6 @@
 <script lang="ts">
 	import { NOTE_MAX_LENGTH, stepKey } from '../app/model/decision';
-	import {
-		FAILURE_LABEL,
-		NOTE_LABEL,
-		REPORT_LABEL,
-		SEND_LABEL,
-		SUCCESS_LABEL
-	} from '../app/model/steps';
+	import { FAILURE_LABEL, NOTE_LABEL, SEND_LABEL, SUCCESS_LABEL } from '../app/model/steps';
 	import { locksCard, type DecisionStore } from '../app/state/decision.svelte';
 	import type { StepRead } from '../types';
 	import RefusalBanner from './RefusalBanner.svelte';
@@ -21,9 +15,7 @@
 	const busy = $derived(
 		pending !== null || decisions.isSaving(key) || decisions.isReading(key) || locksCard(banner)
 	);
-	const asksReport = $derived(step.answer !== null);
 
-	let report = $state('');
 	let note = $state('');
 	let failing = $state(false);
 </script>
@@ -39,30 +31,14 @@
 		<RefusalBanner {banner} onReload={() => void decisions.reloadAfterBanner(key)} />
 	{/if}
 	<div class="answer-row">
-		{#if asksReport}
-			<label>
-				{REPORT_LABEL}
-				<textarea bind:value={report} maxlength={NOTE_MAX_LENGTH} rows="2" disabled={busy}
-				></textarea>
-			</label>
-			<button
-				type="button"
-				class="primary"
-				disabled={busy || report.trim() === ''}
-				onclick={() => decisions.answerStep(repo, step, 'report', report)}
-			>
-				{SEND_LABEL}
-			</button>
-		{:else}
-			<button
-				type="button"
-				class="primary"
-				disabled={busy}
-				onclick={() => decisions.answerStep(repo, step, 'yes', '')}
-			>
-				{SUCCESS_LABEL}
-			</button>
-		{/if}
+		<button
+			type="button"
+			class="primary"
+			disabled={busy}
+			onclick={() => decisions.answerStep(repo, step, 'yes', '')}
+		>
+			{SUCCESS_LABEL}
+		</button>
 		<button
 			type="button"
 			aria-expanded={failing}

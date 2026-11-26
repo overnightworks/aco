@@ -191,18 +191,25 @@ test('ABRD-174: Fehlgeschlagen cannot send without a note', async () => {
 	expect(send).toBeEnabled();
 });
 
-test('ABRD-173: a stored older step that asks for a report offers a report field with Senden and no Erfolgreich', async () => {
+test('ABRD-173: an old step that stores an answer offers Erfolgreich and Fehlgeschlagen and no report field', () => {
 	render(StepsView, {
 		repos: [repo({ steps: [oldStepRead({ answer: 'the green run id' })] })],
 		decisions: store()
 	});
 
-	expect(screen.queryByRole('button', { name: 'Erfolgreich' })).toBeNull();
-	const send = screen.getByRole('button', { name: 'Senden' });
-	expect(send).toBeDisabled();
-	await fireEvent.input(screen.getByLabelText('Bericht'), { target: { value: 'run 4' } });
+	expect(screen.getByRole('button', { name: 'Erfolgreich' })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Fehlgeschlagen' })).toBeInTheDocument();
+	expect(screen.queryByLabelText('Bericht')).toBeNull();
+	expect(screen.queryByRole('button', { name: 'Senden' })).toBeNull();
+});
 
-	expect(send).toBeEnabled();
+test('ABRD-197: an old step shows the answer it stored as plain text', () => {
+	render(StepsView, {
+		repos: [repo({ steps: [oldStepRead({ answer: 'the green run id' })] })],
+		decisions: store()
+	});
+
+	expect(screen.getByText('the green run id')).toBeInTheDocument();
 });
 
 test('ABRD-175: Undo inside the window removes the strip and brings the buttons back', async () => {

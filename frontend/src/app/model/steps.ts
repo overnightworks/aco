@@ -11,12 +11,8 @@ export const OPEN_LABEL = 'Öffnen';
 export const OLD_FORM_LABEL = 'alte Form';
 const WAITING_SINCE_LABEL = 'wartet seit';
 
-const YES_OR_NO_ANSWER = 'Ja / Nein';
-
-/** How the step asks to be answered: yes or no, or the report it names (ABRD-159). */
-export function answerText(step: StepRead): string {
-	return `Antwort: ${step.answer ?? YES_OR_NO_ANSWER}`;
-}
+/** How every step is answered (ABRD-159). */
+export const ANSWER_TEXT = 'Antwort: Ja / Nein';
 
 /** The paste to copy, or the link to open. */
 export function pasteOf(step: PasteStepRead): { command: string } | { link: string } {
@@ -24,9 +20,11 @@ export function pasteOf(step: PasteStepRead): { command: string } | { link: stri
 }
 
 /** What an old-form step stored besides its line, as plain text: purpose, actions or paste,
- * expected, those it holds. */
+ * expected and answer, those it holds. */
 export function storedTexts(step: OldStepRead): string[] {
-	return [step.purpose, step.actions ?? step.paste, step.expected].filter((text) => text !== null);
+	return [step.purpose, step.actions ?? step.paste, step.expected, step.answer].filter(
+		(text) => text !== null
+	);
 }
 
 /** Written once for each step: `wartet seit 01.11.2026`. */
@@ -58,12 +56,10 @@ export const SUCCESS_LABEL = 'Erfolgreich';
 export const FAILURE_LABEL = 'Fehlgeschlagen';
 export const SEND_LABEL = 'Senden';
 export const NOTE_LABEL = 'Notiz';
-export const REPORT_LABEL = 'Bericht';
 
 const RESULT_LABEL: Record<StepRequest['result'], string> = {
 	yes: SUCCESS_LABEL,
-	no: FAILURE_LABEL,
-	report: REPORT_LABEL
+	no: FAILURE_LABEL
 };
 
 /** What the undo strip says an answer to step `number` will store: `Erfolgreich · #7`. */

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { NOT_READ_LABEL } from '../app/model/boardSummary';
 	import {
-		answerText,
+		ANSWER_TEXT,
 		COPIED_LABEL,
 		COPY_FAILED_LABEL,
 		COPY_LABEL,
@@ -102,7 +102,7 @@
 							</button>
 						{/if}
 						<p><b>Expected</b> {step.expected}</p>
-						<p class="answer">{answerText(step)}</p>
+						<p class="answer">{ANSWER_TEXT}</p>
 					{/if}
 					<StepAnswer repo={repo.name} {step} {decisions} />
 				</article>
