@@ -436,7 +436,8 @@ def _print_shown(label: str, runs: lane_runs.RunsFile, lane: Mapping[str, object
         if entry.added is not None:
             print(f"  record {_compact(lane_runs.record_object(entry.added.record))}")
     state = "complete" if lane_runs.is_complete(runs) else "incomplete"
-    print(f"lane {label}: {state}")
+    named = label if label.startswith("lane ") else f"lane {label}"
+    print(f"{named}: {state}")
     print(f"  record {_compact(lane)}")
 
 

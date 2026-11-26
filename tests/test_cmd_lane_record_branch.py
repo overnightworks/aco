@@ -43,6 +43,8 @@ def test_a_lane_claim_stores_and_shows_its_runs_by_branch(
     label = lane_record_lane_world.label
     assert began.stdout == f"BEGAN run {FIRST_RUN} of {label}\n"
     assert added.stdout == f"ADDED run {FIRST_RUN} to {label}: 1 stored\n"
+    assert f"{label}: complete\n" in shown.stdout
+    assert f"lane {label}" not in shown.stdout
     assert shown.stdout.splitlines()[0].startswith(f"run {FIRST_RUN} of {label}: start none, end ")
     assert (began.status, added.status, shown.status) == (0, 0, 0)
     assert lane_record_lane_world.runs_files() == [
