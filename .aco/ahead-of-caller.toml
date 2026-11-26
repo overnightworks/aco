@@ -1,4 +1,0 @@
-[[code]]
-path = "src/aco/cmd_brief.py"
-item = "overnightworks/marketplace#1003"
-reason = "touched_surfaces in aco brief --json is read by #1003's builder and tester advice, which is not built yet"
