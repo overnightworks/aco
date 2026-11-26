@@ -727,16 +727,23 @@ def _reached_levels(
 _ITEM_ARGUMENT_TYPES = frozenset({workboard.parse_item_reference, _parse_check_subject})
 
 
+def _is_item_argument(action: argparse.Action) -> bool:
+    """Whether `action` parses an item reference: a typed one, or `lane-record add`'s operand
+    that is the item only beside a file."""
+    return action.type in _ITEM_ARGUMENT_TYPES or isinstance(
+        action, cmd_lane_record.ItemAndFileAction
+    )
+
+
 def _item_arguments(
     root: usage.UsageErrorParser, given: list[str], parsed: argparse.Namespace
 ) -> Iterator[int]:
     """Every item number this invocation named: the parsed integer of each
-    argument an `_ITEM_ARGUMENT_TYPES` parser types, on every parser the
-    parse reached."""
+    argument `_is_item_argument` finds, on every parser the parse reached."""
     for parser, _tokens in _reached_levels(root, given):
         for action in parser.declared_actions:
             value = getattr(parsed, action.dest, None)
-            if action.type in _ITEM_ARGUMENT_TYPES and isinstance(value, int):
+            if _is_item_argument(action) and isinstance(value, int):
                 yield value
 
 

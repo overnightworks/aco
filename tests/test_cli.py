@@ -8468,6 +8468,35 @@ def test_cli_repository_refusals_preserve_pin_and_handler_error_order(
         assert_json_refusal_object(captured.err, captured.out, reason=reason)
 
 
+@pytest.mark.parametrize(
+    "operands",
+    [
+        pytest.param(["begin", "16777216"], id="begin"),
+        pytest.param(["show", "16777216"], id="show"),
+        pytest.param(["add", "16777216", "record.json"], id="add-item-and-file"),
+    ],
+)
+def test_a_lane_record_item_past_the_id_space_is_refused_before_any_lookup(
+    empty_checkout: Path, capsys: pytest.CaptureFixture[str], operands: list[str]
+) -> None:
+    """Spec: PIN-31. Every lane-record form that names an item, `add`'s positional item
+    included, is refused under `storage = "state-ref"` before the command looks it up."""
+    _write_state_ref_pin(empty_checkout)
+    run = {
+        "begin": ["--run", "r1"],
+        "add": ["--run", "r1", "--end-tip", "a" * 40, "--ran", "gate"],
+    }.get(operands[0], [])
+
+    status = issue_claim.main(["lane-record", *operands, *run, "--json"])
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.err == (
+        "ERROR: 16777216 names no state-ref item; an item id ends at aco-ffffff\n"
+    )
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")
+
+
 def test_cli_module_entry_point_exits_with_mains_return_code(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -10225,10 +10254,7 @@ def test_every_item_or_json_argument_is_recorded_as_declared() -> None:
         f"{each.prog} {action.dest}"
         for each in _every_parser(issue_claim._parser())
         for action in each._actions
-        if (
-            report.JSON_FLAG in action.option_strings
-            or action.type in issue_claim._ITEM_ARGUMENT_TYPES
-        )
+        if (report.JSON_FLAG in action.option_strings or issue_claim._is_item_argument(action))
         and action not in cast(issue_claim.usage.UsageErrorParser, each).declared_actions
     ]
 
