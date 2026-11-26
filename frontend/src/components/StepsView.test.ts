@@ -3,7 +3,6 @@ import type { postStep } from '../client';
 import { UNDO_SECONDS } from '../app/model/decision';
 import { afterEach, expect, test, vi } from 'vitest';
 import { inertBoard, oldStepRead, repo, stepRead } from '../test-support/board';
-import { storedTexts } from '../app/model/steps';
 import { DecisionStore } from '../app/state/decision.svelte';
 import StepsView from './StepsView.svelte';
 
@@ -101,17 +100,29 @@ test.each([
 });
 
 test.each([
-	['actions', oldStepRead({ actions: 'click Run' })],
-	['an answer', oldStepRead({ actions: 'click Run', answer: 'the report' })],
-	['a rule-breaking paste', oldStepRead({ actions: null, paste: 'make a; make b' })]
+	[
+		'actions',
+		oldStepRead({ actions: 'click Run' }),
+		['Release the build.', 'click Run', 'The page shows green.']
+	],
+	[
+		'an answer',
+		oldStepRead({ actions: 'click Run', answer: 'the report' }),
+		['Release the build.', 'click Run', 'The page shows green.', 'the report']
+	],
+	[
+		'a rule-breaking paste',
+		oldStepRead({ actions: null, paste: 'make a; make b' }),
+		['Release the build.', 'make a; make b', 'The page shows green.']
+	]
 ])(
 	'ABRD-197: an old step with %s shows alte Form and its stored text, no Copy or Öffnen',
-	(_name, step) => {
+	(_name, step, stored) => {
 		render(StepsView, { repos: [repo({ steps: [step] })], decisions: store() });
 
 		expect(screen.getByText('alte Form')).toBeInTheDocument();
-		for (const stored of storedTexts(step)) {
-			expect(screen.getByText(stored)).toBeInTheDocument();
+		for (const text of stored) {
+			expect(screen.getByText(text)).toBeInTheDocument();
 		}
 		expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
 		expect(screen.queryByRole('link', { name: 'Öffnen' })).toBeNull();
