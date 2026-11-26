@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 from board_fixtures import REPOSITORY, complete_contract
-from claim_worktrees import ISSUE, StandIn, held_by_ada, make_stand_in
+from claim_worktrees import ISSUE, StandIn, held_by_ada, lane_held_by_ada, make_stand_in
 from cli_fixtures import CliRun, real_git, run_cli
 from lane_record_fixtures import lane_record_object, write_lane_record_file
 from lane_run_entries import commit_runs_file
@@ -21,6 +21,7 @@ from aco.routing_line import RoutingStage
 
 TRUNK_FILES = ("src/widget.py",)
 HELD_SCOPE = ("src/widget.py",)
+LANE_RECORD_BRANCH = "fix/lane-record"
 FIRST_RUN = "run-1"
 SECOND_RUN = "run-2"
 THIRD_RUN = "run-3"
@@ -92,10 +93,12 @@ CHAINED_RUNS = (FIRST_RUN, SECOND_RUN, THIRD_RUN)
 
 @dataclass(frozen=True)
 class World:
-    """A claimed item under one storage, the checkout a command runs in and its bare remote."""
+    """A claimed item (`item` is empty for a lane claim) under one storage, the arguments that name
+    its claim, the checkout a command runs in and its bare remote."""
 
     storage: body.Storage
     item: str
+    claim_target: tuple[str, ...]
     label: str
     arguments_before_command: tuple[str, ...]
     directory: Path
@@ -163,6 +166,7 @@ def lane_record_runs_world(
         return World(
             body.Storage.GITHUB,
             str(ISSUE),
+            (str(ISSUE),),
             f"#{ISSUE}",
             ("--repo", REPOSITORY),
             standpoint.directory,
@@ -178,7 +182,35 @@ def lane_record_runs_world(
     item = minted.stdout.strip()
     claimed = run_cli(["claim", item, "--agent", "Ada", "--scope", "src"], capsys)
     assert claimed.status == 0, claimed.stderr
-    return World(body.Storage.STATE_REF, item, item, (), standpoint.directory, bare_remote, scratch)
+    return World(
+        body.Storage.STATE_REF, item, (item,), item, (), standpoint.directory, bare_remote, scratch
+    )
+
+
+@pytest.fixture
+def lane_record_lane_world(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    github_clone: Path,
+    bare_remote: Path,
+) -> World:
+    """The issue-less lane `LANE_RECORD_BRANCH`, claimed by Ada, whose claim `--branch` names."""
+    stand_in: StandIn = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, TRUNK_FILES)
+    standpoint = stand_in(
+        branch=LANE_RECORD_BRANCH, standing=lane_held_by_ada(LANE_RECORD_BRANCH, HELD_SCOPE)
+    )
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    return World(
+        body.Storage.GITHUB,
+        "",
+        ("--branch", LANE_RECORD_BRANCH),
+        f"lane {LANE_RECORD_BRANCH}",
+        ("--repo", REPOSITORY),
+        standpoint.directory,
+        bare_remote,
+        scratch,
+    )
 
 
 def stale_runs_sentence(label: str) -> str:
@@ -266,7 +298,7 @@ def commit_on(directory: Path, name: str) -> str:
 
 
 def begin_arguments(world: World, run: str = FIRST_RUN, *flags: str) -> tuple[str, ...]:
-    return ("lane-record", "begin", world.item, "--run", run, *flags)
+    return ("lane-record", "begin", *world.claim_target, "--run", run, *flags)
 
 
 def add_arguments(
@@ -282,7 +314,7 @@ def add_arguments(
     return (
         "lane-record",
         "add",
-        world.item,
+        *world.claim_target,
         str(record),
         "--run",
         run,

@@ -41,7 +41,7 @@ from lane_record_runs_world import (
 from aco import lane_runs, protocol, store, workboard
 from aco.routing_line import RoutingStage
 
-ENVELOPE_KEYS = ["ok", "reason", "item", "claim_id", "runs", "complete", "lane"]
+ENVELOPE_KEYS = ["ok", "reason", "item", "branch", "claim_id", "runs", "complete", "lane"]
 NO_STAGES = dict.fromkeys(RoutingStage, UNKNOWN)
 
 
@@ -97,7 +97,7 @@ def show(
     world: World, capsys: pytest.CaptureFixture[str], *flags: str
 ) -> tuple[int | str | None, str, str]:
     """The status, stdout and stderr of `aco lane-record show`."""
-    shown = world.run(capsys, "lane-record", "show", world.item, *flags)
+    shown = world.run(capsys, "lane-record", "show", *world.claim_target, *flags)
     return shown.status, shown.stdout, shown.stderr
 
 
@@ -132,6 +132,7 @@ def test_a_claim_without_runs_shows_none_and_a_null_lane(
         "ok": True,
         "reason": "shown",
         "item": workboard.parse_item_reference(world.item),
+        "branch": world.claim().branch,
         "claim_id": world.claim().claim_id,
         "runs": [],
         "complete": None,
@@ -152,6 +153,7 @@ def test_one_run_that_ran_build_and_review_shows_its_record_and_the_lane_compute
         "ok": True,
         "reason": "shown",
         "item": workboard.parse_item_reference(world.item),
+        "branch": world.claim().branch,
         "claim_id": world.claim().claim_id,
         "runs": [
             {
