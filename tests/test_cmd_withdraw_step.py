@@ -186,8 +186,8 @@ def test_an_item_with_no_operator_wait_refuses_before_any_write(
     raw: str,
     as_json: bool,
 ) -> None:
-    """Spec: WITHDRAW-21, WITHDRAW-24 -- `no_step` in text and `--json`, nothing
-    written."""
+    """Spec: WITHDRAW-21, WITHDRAW-24 -- `no_step` in text and `--json`,
+    nothing written."""
     client = serve_forge(monkeypatch, _served(raw))
     result = run_cli(["withdraw", "7", "--step", *(["--json"] if as_json else [])], capsys)
     message = "#7 waits on no step of the operator"
@@ -387,3 +387,7 @@ class TestStateRef:
             2,
             "ERROR: --repo is meaningless under storage = state-ref\n",
         )
+        json_result = run_cli(
+            ["--repo", "acme/items", "withdraw", STATE_REF_ITEM, "--step", "--json"], capsys
+        )
+        assert json.loads(json_result.stdout)["reason"] == "invalid_usage"
