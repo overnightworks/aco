@@ -348,22 +348,22 @@ def context_in_checkout_of(discovery: repositories.Discovery, label: str) -> ses
 
 
 @dataclass(frozen=True)
-class Answered[Result]:
+class Answered[Value]:
     """What reading one repository gave."""
 
     repository: str
-    result: Result
+    result: Value
 
 
-def read_each[Result](
-    discovery: repositories.Discovery, read_one: Callable[[repositories.Repository], Result]
-) -> tuple[Answered[Result] | Unavailable, ...]:
+def read_each[Value](
+    discovery: repositories.Discovery, read_one: Callable[[repositories.Repository], Value]
+) -> tuple[Answered[Value] | Unavailable, ...]:
     """What `read_one` gives for every repository of `discovery`, in discovery's
     order, the repositories read concurrently; one whose read raises
     `protocol.ClaimError` or `OSError` is listed as unavailable and the others
     are still read."""
 
-    def guarded(repository: repositories.Repository) -> Answered[Result] | Unavailable:
+    def guarded(repository: repositories.Repository) -> Answered[Value] | Unavailable:
         try:
             return Answered(repository.label, read_one(repository))
         except (protocol.ClaimError, OSError) as error:
