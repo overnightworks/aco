@@ -4,6 +4,12 @@ legacy = "fail"
 
 [[gate.loosened]]
 what = 'import contract "Layers" changes layers'
+item = "#1115"
+date = 2026-11-26
+reason = "cmd_board leaves the command row for its own row below it, so cmd_mcp may import the board projection read_startable reuses"
+
+[[gate.loosened]]
+what = 'import contract "Layers" changes layers'
 item = "#665"
 date = 2026-11-06
 reason = "aco.metrics leaves with the size statistics, so the row that held it beside expectation_grammar loses it"
