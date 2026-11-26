@@ -2,13 +2,12 @@
 # ruff: noqa: T201 - the board command writes its URL to stdout
 
 import argparse
-from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import cast
 
-from . import board_link, board_read, protocol, recurring_audit, report, store, workboard
+from . import board_link, board_read, protocol, report, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -154,50 +153,6 @@ def board_payload(board: workboard.Board) -> dict[str, object]:
     for finding in cast(_JsonRows, payload["uncut"]):
         _project_uncut_row_scope(finding)
     return cast(_JsonObject, _tuples_to_lists(payload))
-
-
-def startable_payload(
-    board: workboard.Board, audits: Iterable[recurring_audit.Finding]
-) -> dict[str, object]:
-    """What can start on `board`, the embedded read `aco mcp` serves: every item of
-    `ready_now` in rank order, every container with an uncut slice, and the names of
-    the due recurring `audits`."""
-    return {
-        "startable": [
-            {
-                "number": item.number,
-                "title": item.title,
-                "kind": item.kind,
-                "size": item.size,
-                "priority_bucket": item.priority_bucket,
-                "next": item.contract.next,
-            }
-            for item in board.ready_now
-        ],
-        "uncut": [
-            {
-                "item": uncut.item,
-                "index": uncut.rows[0].index,
-                "title": uncut.rows[0].title,
-                "rows": len(uncut.rows),
-            }
-            for uncut in board.uncut
-        ],
-        "audits_due": [finding.entry.name for finding in audits if finding.is_due],
-    }
-
-
-def startable_reading(context: RunContext) -> dict[str, object]:
-    """`startable_payload` of the board `context` is bound to; raises
-    `protocol.ClaimError` when that board cannot be read. The state ref is peeked, so
-    the read leaves no lineage stamp or lock in the checkout."""
-    context.observation = store.peek_state(
-        worktree=context.toplevel, remote=context.configured_canonical_remote
-    )
-    observed = board_read.observed_board(context)
-    return startable_payload(
-        observed.board, board_read.recurring_audit_reading(context, observed.trunk_landings)
-    )
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

@@ -42,7 +42,7 @@ flowchart LR
     Relay["aco mcp (relay)<br/>cmd_mcp.py, mcp_relay.py"] -->|"each message to a fresh process"| Mcp
     Mcp --> Repos
     Mcp --> Inbox
-    Mcp -->|"read_startable: the board's startable work in each checkout"| Startable["startable projection<br/>cmd_board.py"]
+    Mcp -->|"read_startable: the board's startable work in each checkout"| Startable["startable projection<br/>inbox.py"]
     Plans["aco fleet-plans<br/>cmd_fleet_plans.py"]
     Plans --> Repos
     Plans --> Inbox

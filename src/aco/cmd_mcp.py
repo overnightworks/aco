@@ -11,7 +11,6 @@ from typing import TextIO
 from . import (
     board_link,
     body,
-    cmd_board,
     decide,
     earlier_rulings,
     expectation_grammar,
@@ -47,7 +46,7 @@ def read_startable() -> dict[str, object]:
     whose board cannot be read is listed with the sentence."""
     discovery = inbox.discovered()
     entries = inbox.read_each(
-        discovery, lambda repository: cmd_board.startable_reading(inbox.context_of(repository))
+        discovery, lambda repository: inbox.startable_reading(inbox.context_of(repository))
     )
     return {
         "root": str(discovery.root),

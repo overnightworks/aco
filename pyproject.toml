@@ -81,8 +81,7 @@ exhaustive = true
 layers = [
     "__main__",
     "cli",
-    "cmd_adopt | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_fleet_plans | cmd_handover | cmd_item | cmd_land | cmd_lane_record | cmd_mcp | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_stats | cmd_status | cmd_wait | cmd_withdraw",
-    "cmd_board",
+    "cmd_adopt | cmd_board | cmd_bootstrap | cmd_brief | cmd_check | cmd_claim | cmd_cut | cmd_fleet_plans | cmd_handover | cmd_item | cmd_land | cmd_lane_record | cmd_mcp | cmd_next | cmd_release | cmd_rescope | cmd_reset | cmd_rule | cmd_rulings | cmd_serve | cmd_start | cmd_stats | cmd_status | cmd_wait | cmd_withdraw",
     "cmd_land_merge | cmd_land_queue | landed_worktree",
     "cmd_item_edit",
     "cmd_item_common",
