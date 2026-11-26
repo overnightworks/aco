@@ -60,12 +60,8 @@ def _waiting(raw: str, wait: Mapping[str, object]) -> str:
     return body.replace_block(raw, located, {**located.data, "wait": wait})
 
 
-def _without_step(raw: str) -> dict[str, object]:
-    return {
-        key: value
-        for key, value in body.locate_block(raw).data.items()
-        if key not in ("wait", "step")
-    }
+def _unheld_data() -> dict[str, object]:
+    return dict(body.locate_block(item_body(card())).data)
 
 
 def _surrounding_bytes(raw: str) -> tuple[str, str]:
@@ -94,15 +90,15 @@ class TestStepWithdrawn:
         capsys: pytest.CaptureFixture[str],
         step: dict[str, str] | None,
     ) -> None:
-        """Spec: WITHDRAW-19, WITHDRAW-20, WITHDRAW-22, Never 8 -- one body write of
-        exactly the body
-        read, `now` and `next` kept, the label removed after it, a step of any stored form."""
+        """Spec: WITHDRAW-19, WITHDRAW-20, WITHDRAW-22, Never 8 -- one body write of exactly
+        the body read, `now` and `next` kept, the label removed after it, a step of any
+        stored form."""
         raw = _stepped(step)
         client = serve_forge(monkeypatch, _served(raw))
         result = run_cli(["withdraw", "7", "--step"], capsys)
         written = client.item_bodies[7]
         assert (result.status, result.stdout, result.stderr) == (0, "WITHDRAWN #7 step\n", "")
-        assert body.locate_block(written).data == _without_step(raw)
+        assert body.locate_block(written).data == _unheld_data()
         assert _surrounding_bytes(written) == _surrounding_bytes(raw)
         assert (client.body_replacings, client.removed_labels) == ([raw], [(7, LABEL)])
         assert run_cli(["check", "-"], capsys, stdin=written).status == 0
@@ -128,7 +124,7 @@ class TestStepWithdrawn:
         client = serve_forge(monkeypatch, served)
         result = run_cli(["withdraw", "7", "--step"], capsys)
         assert (result.status, result.stdout) == (0, "WITHDRAWN #7 step\n")
-        assert body.locate_block(client.item_bodies[7]).data == _without_step(_stepped(PASTE_STEP))
+        assert body.locate_block(client.item_bodies[7]).data == _unheld_data()
 
     def test_the_option_line_stays_byte_for_byte(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
@@ -236,7 +232,7 @@ def test_a_label_the_forge_will_not_remove_keeps_the_written_body_and_warns(
         True,
         True,
     )
-    assert body.locate_block(client.item_bodies[7]).data == _without_step(raw)
+    assert body.locate_block(client.item_bodies[7]).data == _unheld_data()
     if as_json:
         envelope = json.loads(result.stdout)
         assert (list(envelope), envelope["note"]) == (
@@ -382,7 +378,7 @@ class TestStateRef:
         )
         assert {"wait", "step"}.isdisjoint(body.locate_block(stored).data)
 
-    def test_repo_names_no_state_ref_store(
+    def test_repo_is_refused_as_invalid_usage_under_state_ref(
         self, seeded: None, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Spec: WITHDRAW-12 -- `--repo` refuses under `state-ref`, as for `--line`."""
