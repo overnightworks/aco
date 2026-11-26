@@ -3,6 +3,6 @@ agent = "Claude 91521ccc-2668-4cfa-8624-55fc58e8de62"
 role = "builder"
 base = "348989a41430fbe7a256cf7288a6f27c467f3b63"
 branch = "claude/issue-1115-ceo-cross-board-read"
-scope = ["README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/mcp.spec.md", "specs/next.spec.md", "src/aco/cmd_mcp.py", "src/aco/cmd_next.py", "src/aco/inbox.py", "src/aco/mcp_server.py", "tests/support/mcp_echoes.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_next.py", "tests/test_cmd_next.py", "tests/test_mcp_server.py"]
+scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "scripts/vulture_whitelist.py", "specs/mcp.spec.md", "specs/next.spec.md", "src/aco/cmd_board.py", "src/aco/cmd_mcp.py", "src/aco/cmd_next.py", "src/aco/inbox.py", "src/aco/mcp_server.py", "src/aco/report.py", "tests/support/mcp_echoes.py", "tests/support/mcp_lines.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_next.py", "tests/test_cmd_mcp_startable.py", "tests/test_cmd_next.py", "tests/test_mcp_server.py", "tests/test_mcp_server_answer_step.py"]
 opened_commit = "013245f0d95677d616a3135c99e706bd29b5a49e"
 whole_reason = "One read-only MCP tool that reuses next's computation and the inbox's discovery; it touches the tool declaration, its wiring, the split of next's compute from its print, and the spec, docs and tests that pin the tool list."
