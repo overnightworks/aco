@@ -116,7 +116,7 @@ def _by_repository(structured: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def test_every_startable_item_is_listed_in_rank_order_and_an_empty_board_answers_empty_lists(
     fleet: _Fleet, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: MCP-99, MCP-100"""
+    """Spec: MCP-95, MCP-96"""
     busy = fleet.add("busy", _busy())
     fleet.add("idle", FakeForge())
     ready_now = _board_ready_now(busy, monkeypatch, capsys)
@@ -149,7 +149,7 @@ def test_every_startable_item_is_listed_in_rank_order_and_an_empty_board_answers
 def test_a_container_with_uncut_slices_and_a_due_audit_are_named(
     fleet: _Fleet, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: MCP-101"""
+    """Spec: MCP-97"""
     fleet.add("busy", _busy(), entry_toml())
 
     answered = _by_repository(_read_startable(monkeypatch))["example/busy"]
@@ -161,7 +161,7 @@ def test_a_container_with_uncut_slices_and_a_due_audit_are_named(
 def test_a_repository_whose_board_is_refused_is_unavailable_with_the_sentence_beside_the_others(
     fleet: _Fleet, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: MCP-102"""
+    """Spec: MCP-98"""
     fleet.add("down", _DownForge())
     fleet.add("ready", _work())
 
@@ -176,7 +176,7 @@ def test_a_repository_whose_board_is_refused_is_unavailable_with_the_sentence_be
 def test_a_checkout_discovery_cannot_read_is_listed_as_unreadable(
     fleet: _Fleet, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: MCP-99"""
+    """Spec: MCP-95"""
     fleet.add("ready", _work())
     broken = unreadable_checkout(fleet.root / "broken", "https://github.com/example/broken.git")
 
@@ -189,7 +189,7 @@ def test_a_checkout_discovery_cannot_read_is_listed_as_unreadable(
 def test_reading_writes_nothing_and_a_repeat_answers_the_same(
     fleet: _Fleet, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec: MCP-99"""
+    """Spec: MCP-95"""
     busy = _busy()
     fleet.add("busy", busy)
     refs_before = fleet.refs()

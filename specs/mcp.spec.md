@@ -57,9 +57,9 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | an unknown argument, or a value of the wrong type, or not exactly one of `option` and `other`, or a blank `other` | — | — | MCP-35 |
 | the forge's check of the answer's write answers `not verified` or `overwritten` | — | — | MCP-36 |
 | `read_inbox` with arguments | — | — | MCP-37 |
-| `read_startable` | — | — | MCP-99, MCP-100, MCP-101 |
-| `read_startable` over a repository whose board `aco board` refuses | — | — | MCP-102 |
-| `read_startable` with arguments | — | — | MCP-103 |
+| `read_startable` | — | — | MCP-95, MCP-96, MCP-97 |
+| `read_startable` over a repository whose board `aco board` refuses | — | — | MCP-98 |
+| `read_startable` with arguments | — | — | MCP-99 |
 | an open item a member wrote whose block has an operator `wait` | — | — | MCP-39, MCP-41, MCP-94 |
 | an item labelled `needs-operator` without an operator `wait` | — | — | MCP-71 |
 | such an item a non-member wrote, or one the store could not read | — | — | MCP-42 |
@@ -206,11 +206,11 @@ A head that asks a card is shown what the operator already ruled in the card's a
 
 ## Reading what can start
 
-- MCP-99: `read_startable` answers `structuredContent` and the same JSON as text: `root`, per `repository` its `startable`, `uncut`, `audits_due` or `unavailable`, and `unreadable` (E-MCP-23).
-- MCP-100: A repository's `startable` is every item of its board's `ready_now` in `aco board --json`'s order, each `number`, `title`, `kind`, `size`, `priority_bucket` and its contract's `next` (E-MCP-23).
-- MCP-101: `uncut` is every container with an uncut slice: `item`, its first uncut row's `index` and `title`, `rows` (the count of uncut rows); `audits_due` the names of its due audits (E-MCP-23).
-- MCP-102: A repository whose board `aco board` refuses is `unavailable` with the refusal's sentence; the others are still answered, and the call is no tool error.
-- MCP-103: `read_startable` called with any argument is a tool error `read_startable takes no arguments`; nothing is read.
+- MCP-95: `read_startable` answers `structuredContent` and the same JSON as text: `root`, per `repository` its `startable`, `uncut`, `audits_due` or `unavailable`, and `unreadable` (E-MCP-23).
+- MCP-96: A repository's `startable` is every item of its board's `ready_now` in `aco board --json`'s order, each `number`, `title`, `kind`, `size`, `priority_bucket` and its contract's `next` (E-MCP-23).
+- MCP-97: `uncut` is every container with an uncut slice: `item`, its first uncut row's `index` and `title`, `rows` (the count of uncut rows); `audits_due` the names of its due audits (E-MCP-23).
+- MCP-98: A repository whose board `aco board` refuses is `unavailable` with the refusal's sentence; the others are still answered, and the call is no tool error.
+- MCP-99: `read_startable` called with any argument is a tool error `read_startable takes no arguments`; nothing is read.
 
 ## Never
 

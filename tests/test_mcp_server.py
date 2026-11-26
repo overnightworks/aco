@@ -225,7 +225,7 @@ def test_the_ask_schema_offers_no_state_key(state_key: str) -> None:
 def test_a_read_call_returns_its_answer_as_structured_content_and_as_text(
     name: str, answer: dict[str, object], arguments: object
 ) -> None:
-    """Spec: MCP-11, MCP-99"""
+    """Spec: MCP-11, MCP-95"""
     result = serve(tool_call(arguments, name=name))["result"]
 
     assert result["isError"] is False
@@ -529,7 +529,7 @@ def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool
 
 @pytest.mark.parametrize("name", ["read_inbox", "read_startable"])
 def test_a_read_tool_called_with_a_key_is_a_tool_error_naming_it(name: str) -> None:
-    """Spec: MCP-37, MCP-103"""
+    """Spec: MCP-37, MCP-99"""
     result = serve(tool_call({"limit": 1}, name=name), read_startable=reaches_nothing)["result"]
 
     assert result["isError"] is True
