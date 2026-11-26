@@ -150,3 +150,44 @@ def test_a_branch_of_an_issue_claim_refuses_like_a_branch_without_a_lane_claim(
         2,
         f"ERROR: lane '{branch}' has no active build claim\n",
     )
+
+
+def with_the_file_after_the_first_option(arguments: tuple[str, ...]) -> tuple[str, ...]:
+    """`arguments` of `add <item> <file> --run ...` with the file moved behind the first option and
+    its value, the other order a shell caller may give."""
+    head, file, tail = arguments[:3], arguments[3], arguments[4:]
+    return (*head, *tail[:2], file, *tail[2:])
+
+
+def test_an_add_accepts_its_file_after_an_option_that_follows_the_item(
+    lane_record_runs_world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-52, LANREC-55."""
+    world = lane_record_runs_world
+    world.run(capsys, *begin_arguments(world))
+
+    added = world.run(capsys, *with_the_file_after_the_first_option(add_arguments(world)))
+
+    assert (added.status, added.stdout) == (
+        0,
+        f"ADDED run {FIRST_RUN} to {world.label}: 1 stored\n",
+    )
+
+
+def test_an_item_and_a_branch_around_the_file_refuse_with_the_either_or_sentence(
+    lane_record_lane_world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-68, LANREC-89."""
+    world = lane_record_lane_world
+    tip = world.state_tip()
+    adjacent = command_line(world, "add", item="7", branch=LANE_RECORD_BRANCH)
+    moved = (*adjacent[:3], "--branch", LANE_RECORD_BRANCH, *adjacent[3:-2])
+
+    refused = world.run(capsys, *moved)
+
+    assert (refused.status, refused.stdout, refused.stderr) == (
+        2,
+        "",
+        f"ERROR: {usage.ITEM_OR_BRANCH_SENTENCE}\n",
+    )
+    assert world.state_tip() == tip

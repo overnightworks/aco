@@ -125,7 +125,8 @@ class _StagesAction(argparse.Action):
 
 
 class _ItemAndFileAction(argparse.Action):
-    """`add`'s operands: the file alone, or the item and then the file."""
+    """`add`'s second operand: with it the first is the item and it the file; without it the
+    first is the file, for a lane named by --branch."""
 
     def __call__(
         self,
@@ -134,13 +135,13 @@ class _ItemAndFileAction(argparse.Action):
         values: str | Sequence[str] | None,
         option_string: str | None = None,
     ) -> None:
-        *item, file = list(values or ())
-        if len(item) > 1:
-            raise argparse.ArgumentError(
-                self, "is the file, after the item unless --branch is given"
-            )
-        namespace.item = workboard.parse_item_reference(item[0]) if item else None
-        namespace.file = file
+        first: str = namespace.first_operand
+        if values is None:
+            namespace.item = None
+            namespace.file = first
+        else:
+            namespace.item = workboard.parse_item_reference(first)
+            namespace.file = values
 
 
 def _add_branch_argument(command: argparse.ArgumentParser) -> None:
@@ -186,11 +187,16 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         "add", help="store the lane record of a begun run with its claim, as its holder"
     )
     add.add_argument(
-        "operands",
-        nargs="+",
-        action=_ItemAndFileAction,
-        metavar=("ITEM_OR_FILE", "FILE"),
+        "first_operand",
+        metavar="ITEM_OR_FILE",
         help="the claimed item then the lane record file; the file alone with --branch",
+    )
+    add.add_argument(
+        "second_operand",
+        nargs="?",
+        action=_ItemAndFileAction,
+        metavar="FILE",
+        help=argparse.SUPPRESS,
     )
     _add_branch_argument(add)
     _add_run_arguments(add)
