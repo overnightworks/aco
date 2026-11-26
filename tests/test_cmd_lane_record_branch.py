@@ -3,9 +3,12 @@
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
+from board_fixtures import write_repository_config
 from claim_worktrees import assert_json_refusal_object
+from cli_fixtures import stub_board_config_tracked
 from lane_record_runs_world import (
     FIRST_RUN,
     LANE_RECORD_BRANCH,
@@ -14,7 +17,7 @@ from lane_record_runs_world import (
     begin_arguments,
 )
 
-from aco import usage, workboard
+from aco import cli, usage, workboard
 
 
 def command_line(
@@ -193,3 +196,36 @@ def test_an_item_and_a_branch_around_the_file_refuse_with_the_either_or_sentence
         f"ERROR: {usage.ITEM_OR_BRANCH_SENTENCE}\n",
     )
     assert world.state_tip() == tip
+
+
+@pytest.mark.parametrize(
+    "operands",
+    [
+        pytest.param(["begin", "16777216"], id="begin"),
+        pytest.param(["show", "16777216"], id="show"),
+        pytest.param(["add", "16777216", "record.json"], id="add-item-and-file"),
+    ],
+)
+def test_a_lane_record_item_past_the_id_space_is_refused_before_any_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+    empty_checkout: Path,
+    capsys: pytest.CaptureFixture[str],
+    operands: list[str],
+) -> None:
+    """Spec: PIN-31. Every lane-record form that names an item, `add`'s positional item
+    included, is refused under `storage = "state-ref"` before the command looks it up."""
+    stub_board_config_tracked(monkeypatch)
+    write_repository_config(empty_checkout, 'storage = "state-ref"\n')
+    run = {
+        "begin": ["--run", "r1"],
+        "add": ["--run", "r1", "--end-tip", "a" * 40, "--ran", "gate"],
+    }.get(operands[0], [])
+
+    status = cli.main(["lane-record", *operands, *run, "--json"])
+
+    captured = capsys.readouterr()
+    assert status == 2
+    assert captured.err == (
+        "ERROR: 16777216 names no state-ref item; an item id ends at aco-ffffff\n"
+    )
+    assert_json_refusal_object(captured.err, captured.out, reason="invalid_usage")

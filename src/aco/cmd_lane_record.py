@@ -124,7 +124,7 @@ class _StagesAction(argparse.Action):
         setattr(namespace, self.dest, stages)
 
 
-class ItemAndFileAction(argparse.Action):
+class _ItemAndFileAction(argparse.Action):
     """`add`'s second operand: with it the first is the item and it the file; without it the
     first is the file, for a lane named by --branch. It stores the parsed item as `item`, where
     the pre-dispatch item guard reads it."""
@@ -205,7 +205,7 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
     add.add_argument(
         "second_operand",
         nargs="?",
-        action=ItemAndFileAction,
+        action=_ItemAndFileAction,
         metavar="FILE",
         help=argparse.SUPPRESS,
     )
