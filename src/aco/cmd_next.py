@@ -424,7 +424,7 @@ def _ahead_json(
     }
 
 
-def _next_json(next_report: _NextReport, storage: body.Storage) -> dict[str, object]:
+def _next_json(next_report: _NextReport, storage: body.Storage) -> None:
     reason = (
         _next_action_reason(next_report.action)
         if next_report.action is not None
@@ -462,7 +462,7 @@ def _next_json(next_report: _NextReport, storage: body.Storage) -> dict[str, obj
     }
     if next_report.action is not None:
         payload.update(_next_action_payload(next_report.action, storage, site=next_report.site))
-    return report.json_envelope(next_report.action is not None, reason, **payload)
+    report.emit_json(next_report.action is not None, reason, **payload)
 
 
 def _next_action_lines(
@@ -568,51 +568,42 @@ def _with_head(
     return tuple((number, indexes) for number, indexes in named if indexes)
 
 
-def _read_report(context: session.RunContext) -> _NextReport:
-    """Everything `next` shows for the board `context` is bound to; raises
-    `protocol.ClaimError` when that board cannot be read."""
-    issues = context.forge.list_open_board_issues()
-    observed = board_read.observed_board(context, listings=board_read.OpenListings(issues))
-    storage = context.config.storage
-    projected = observed.board
-    action = workboard.next_action(projected)
+def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
+    as_json = parsed.json
+    try:
+        issues = context.forge.list_open_board_issues()
+        observed = board_read.observed_board(context, listings=board_read.OpenListings(issues))
+        storage = context.config.storage
+        projected = observed.board
+        action = workboard.next_action(projected)
+        site = _pull_site(action, context)
+    except session.RepoMeaninglessUnderStateRefError as error:
+        return report.refuse(_NextReason.INVALID_USAGE, error, as_json=as_json)
+    except protocol.ClaimError as error:
+        return report.refuse(_NextReason.UNAVAILABLE, error, as_json=as_json)
     close = workboard.zero_cost_closes(projected)
     waiting = workboard.waiting_on_operator(projected)
     ideas = workboard.ideas(projected)
+    with_head = _with_head(issues, storage)
     already_named = {_next_action_container_number(action), *close, *waiting, *ideas}
-    return _NextReport(
+    skipped = tuple(item for item in _unworkable(projected) if item.number not in already_named)
+    audits = board_read.recurring_audit_reading(context, observed.trunk_landings)
+    next_report = _NextReport(
         action=action,
-        skipped=tuple(item for item in _unworkable(projected) if item.number not in already_named),
+        skipped=skipped,
         recovery=projected.recovery,
         parallel=workboard.parallel_set(projected, observed.live_claims, action),
         close=close,
         waiting=waiting,
         ideas=ideas,
-        with_head=_with_head(issues, storage),
-        site=_pull_site(action, context),
+        with_head=with_head,
+        site=site,
         ahead=board_read.ahead_of_caller_reading(context),
-        audits=board_read.recurring_audit_reading(context, observed.trunk_landings),
+        audits=audits,
         trunk_ref=context.trunk_ref,
     )
-
-
-def json_answer(context: session.RunContext) -> dict[str, object]:
-    """What `aco next --json` prints, as an object, run in the checkout `context`
-    is bound to; raises `protocol.ClaimError` when that board cannot be read."""
-    return _next_json(_read_report(context), context.config.storage)
-
-
-def run(parsed: argparse.Namespace, context: session.RunContext) -> int:
-    as_json = parsed.json
-    try:
-        next_report = _read_report(context)
-    except session.RepoMeaninglessUnderStateRefError as error:
-        return report.refuse(_NextReason.INVALID_USAGE, error, as_json=as_json)
-    except protocol.ClaimError as error:
-        return report.refuse(_NextReason.UNAVAILABLE, error, as_json=as_json)
-    storage = context.config.storage
     if as_json:
-        report.emit_envelope(_next_json(next_report, storage))
+        _next_json(next_report, storage)
     else:
         _next(next_report, storage)
-    return 0 if next_report.action is not None else 3
+    return 0 if action is not None else 3

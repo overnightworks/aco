@@ -9,7 +9,7 @@ from typing import Any, NoReturn, cast
 import pytest
 from mcp_echoes import (
     INBOX,
-    NEXT,
+    STARTABLE,
     echoing_answer_step,
     echoing_ask,
     echoing_record,
@@ -80,7 +80,7 @@ def _tools() -> dict[str, dict[str, Any]]:
     return {tool["name"]: tool for tool in tools}
 
 
-@pytest.mark.parametrize("name", ["read_inbox", "read_next"])
+@pytest.mark.parametrize("name", ["read_inbox", "read_startable"])
 def test_tools_list_offers_each_read_tool_as_read_only_without_arguments(name: str) -> None:
     """Spec: MCP-08"""
     tool = _tools()[name]
@@ -99,7 +99,7 @@ def test_tools_list_offers_ask_as_a_repeatable_write_that_destroys_nothing() -> 
         "record_answer",
         "step",
         "answer_step",
-        "read_next",
+        "read_startable",
     ]
     assert tool["annotations"] == {
         "readOnlyHint": False,
@@ -218,12 +218,14 @@ def test_the_ask_schema_offers_no_state_key(state_key: str) -> None:
 
 @pytest.mark.parametrize("arguments", [None, {}], ids=["absent", "empty"])
 @pytest.mark.parametrize(
-    ("name", "answer"), [("read_inbox", INBOX), ("read_next", NEXT)], ids=["inbox", "next"]
+    ("name", "answer"),
+    [("read_inbox", INBOX), ("read_startable", STARTABLE)],
+    ids=["inbox", "startable"],
 )
 def test_a_read_call_returns_its_answer_as_structured_content_and_as_text(
     name: str, answer: dict[str, object], arguments: object
 ) -> None:
-    """Spec: MCP-11, MCP-95"""
+    """Spec: MCP-11, MCP-99"""
     result = serve(tool_call(arguments, name=name))["result"]
 
     assert result["isError"] is False
@@ -444,7 +446,7 @@ _WRITING_CALLS = [
     ("tool", "arguments", "reason"),
     [
         pytest.param("read_inbox", None, "/config.toml does not exist", id="read_inbox"),
-        pytest.param("read_next", None, "/config.toml does not exist", id="read_next"),
+        pytest.param("read_startable", None, "/config.toml does not exist", id="read_startable"),
         *(pytest.param(*call, id=call[0]) for call in _WRITING_CALLS),
     ],
 )
@@ -464,7 +466,7 @@ def test_a_refused_tool_call_is_a_tool_error_carrying_its_reason(
     ("tool", "arguments"),
     [
         pytest.param("read_inbox", None, id="read_inbox"),
-        pytest.param("read_next", None, id="read_next"),
+        pytest.param("read_startable", None, id="read_startable"),
         *(pytest.param(tool, arguments, id=tool) for tool, arguments, _ in _WRITING_CALLS),
     ],
 )
@@ -512,7 +514,7 @@ def test_every_envelope_defect_is_named_in_one_error(
 
 
 @pytest.mark.parametrize(
-    "name", ["read_inbox", "read_next", "ask", "record_answer", "step", "answer_step"]
+    "name", ["read_inbox", "read_startable", "ask", "record_answer", "step", "answer_step"]
 )
 @pytest.mark.parametrize("arguments", [[], "card", 3, None], ids=["list", "string", "int", "null"])
 def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool(
@@ -525,10 +527,10 @@ def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool
     assert error["code"] == -32602
 
 
-@pytest.mark.parametrize("name", ["read_inbox", "read_next"])
+@pytest.mark.parametrize("name", ["read_inbox", "read_startable"])
 def test_a_read_tool_called_with_a_key_is_a_tool_error_naming_it(name: str) -> None:
-    """Spec: MCP-37, MCP-98"""
-    result = serve(tool_call({"limit": 1}, name=name), read_next=reaches_nothing)["result"]
+    """Spec: MCP-37, MCP-103"""
+    result = serve(tool_call({"limit": 1}, name=name), read_startable=reaches_nothing)["result"]
 
     assert result["isError"] is True
     assert result["content"] == [{"type": "text", "text": f"{name} takes no arguments"}]
@@ -571,7 +573,7 @@ def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
         echoing_record,
         echoing_step,
         echoing_answer_step,
-        lambda: NEXT,
+        lambda: STARTABLE,
     )
 
     assert mcp_server.reply(json.dumps(message), tools) is None

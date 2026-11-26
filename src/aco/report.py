@@ -73,7 +73,7 @@ def read_piped_body() -> str:
         ) from error
 
 
-def json_envelope(ok: bool, reason: StrEnum, **payload: object) -> dict[str, object]:
+def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
     """The one `--json` envelope owner (`specs/output.spec.md`):
     `ok` and `reason` always print first, in that order -- `reason` a
     stable enum token, never an `error` object -- then the payload in the
@@ -87,17 +87,7 @@ def json_envelope(ok: bool, reason: StrEnum, **payload: object) -> dict[str, obj
     envelope.update(payload)
     if message is not None:
         envelope["message"] = message
-    return envelope
-
-
-def emit_envelope(envelope: dict[str, object]) -> None:
-    """Prints a `json_envelope` as one line."""
     print(json.dumps(envelope))
-
-
-def emit_json(ok: bool, reason: StrEnum, **payload: object) -> None:
-    """Prints `json_envelope` of the arguments as one line."""
-    emit_envelope(json_envelope(ok, reason, **payload))
 
 
 def render_error(error: protocol.ClaimError | str) -> int:

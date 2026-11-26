@@ -11,9 +11,9 @@ import pytest
 from aco import expectations, item_step, mcp_server
 
 INBOX: dict[str, object] = {"root": "/work", "repositories": [], "unreadable": []}
-NEXT: dict[str, object] = {
+STARTABLE: dict[str, object] = {
     "root": "/work",
-    "repositories": [{"repository": "owner/a", "next": {"ok": True, "reason": "work_item"}}],
+    "repositories": [{"repository": "owner/a", "startable": [], "uncut": [], "audits_due": []}],
     "unreadable": [],
 }
 
@@ -63,9 +63,9 @@ def serve(
     record_answer: mcp_server.RecordAnswer = echoing_record,
     step: mcp_server.Step = echoing_step,
     answer_step: mcp_server.AnswerStep = echoing_answer_step,
-    read_next: mcp_server.ReadNext = lambda: NEXT,
+    read_startable: mcp_server.ReadStartable = lambda: STARTABLE,
 ) -> dict[str, Any]:
-    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step, read_next)
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step, read_startable)
     line = mcp_server.reply(message if isinstance(message, str) else json.dumps(message), tools)
     assert line is not None
     assert "\n" not in line

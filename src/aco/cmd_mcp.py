@@ -1,5 +1,5 @@
-"""The `mcp` command (`specs/mcp.spec.md`): the stdio loop, the inbox and next
-reads and the card, answer and step writes it serves."""
+"""The `mcp` command (`specs/mcp.spec.md`): the stdio loop, the inbox and
+startable reads and the card, answer and step writes it serves."""
 
 import argparse
 import os
@@ -11,7 +11,7 @@ from typing import TextIO
 from . import (
     board_link,
     body,
-    cmd_next,
+    cmd_board,
     decide,
     earlier_rulings,
     expectation_grammar,
@@ -42,19 +42,19 @@ def read_inbox() -> dict[str, object]:
     return inbox.inbox_json(inbox.read(inbox.discovered(), inbox.read_repository))
 
 
-def read_next() -> dict[str, object]:
-    """What `aco next --json` answers in the checkout of every repository the scan
-    found; a repository whose board cannot be read is listed with the sentence."""
+def read_startable() -> dict[str, object]:
+    """What can start on the board of every repository the scan found; a repository
+    whose board cannot be read is listed with the sentence."""
     discovery = inbox.discovered()
     entries = inbox.read_each(
-        discovery, lambda repository: cmd_next.json_answer(inbox.context_of(repository))
+        discovery, lambda repository: cmd_board.startable_reading(inbox.context_of(repository))
     )
     return {
         "root": str(discovery.root),
         "repositories": [
             {"repository": entry.repository, "unavailable": entry.reason}
             if isinstance(entry, inbox.Unavailable)
-            else {"repository": entry.repository, "next": entry.result}
+            else {"repository": entry.repository, **entry.result}
             for entry in entries
         ],
         "unreadable": inbox.unreadable_json(discovery.unavailable),
@@ -266,7 +266,7 @@ def _mark_in_turn(
 def serve(requests: Iterable[bytes], replies: TextIO) -> None:
     """Answer each line of `requests` on `replies` until the lines end; a line
     that is no UTF-8 is answered as unparsable."""
-    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step, read_next)
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step, read_startable)
 
     def answer(request: bytes) -> str | None:
         try:

@@ -4,7 +4,7 @@ answer write, the step write and the step answer write are passed in.
 
 Speaks the `initialize` era of the protocol: `initialize`, `ping`, `tools/list`
 and `tools/call`, with the tools `read_inbox`, `ask`, `record_answer`, `step`,
-`answer_step` and `read_next`.
+`answer_step` and `read_startable`.
 """
 
 import json
@@ -22,14 +22,14 @@ ASK: Final = "ask"
 RECORD_ANSWER: Final = "record_answer"
 STEP: Final = "step"
 ANSWER_STEP: Final = "answer_step"
-READ_NEXT: Final = "read_next"
+READ_STARTABLE: Final = "read_startable"
 
 type ReadInbox = Callable[[], Mapping[str, object]]
 """The inbox as JSON; raises `protocol.ClaimError` when it cannot be read."""
 
-type ReadNext = Callable[[], Mapping[str, object]]
-"""What `aco next --json` answers in every repository, as JSON; raises
-`protocol.ClaimError` when no repository can be found."""
+type ReadStartable = Callable[[], Mapping[str, object]]
+"""What can start on every board, as JSON; raises `protocol.ClaimError` when no
+repository can be found."""
 
 type Ask = Callable[[str, int, Mapping[str, object]], Mapping[str, object]]
 """Puts a card on an item of a repository, named as `read_inbox` lists it, and
@@ -64,7 +64,7 @@ class Tools:
     record_answer: RecordAnswer
     step: Step
     answer_step: AnswerStep
-    read_next: ReadNext
+    read_startable: ReadStartable
 
 
 _PARSE_ERROR: Final = -32700
@@ -78,7 +78,7 @@ _INSTRUCTIONS: Final = (
     f"this machine with {READ_INBOX}, put a decision card of your own on an item with {ASK}, "
     f"record the answer the operator gave in this chat with {RECORD_ANSWER}, and mark a step "
     f"only the operator can take with {STEP}; record the operator's chat answer to such a step "
-    f"with {ANSWER_STEP}. Read what runs next on every board with {READ_NEXT}."
+    f"with {ANSWER_STEP}. Read what can start on every board with {READ_STARTABLE}."
 )
 _REPOSITORY: Final = "repository"
 _REPOSITORY_DESCRIPTION: Final = "the repository as read_inbox lists it, owner/repo"
@@ -314,13 +314,13 @@ _TOOLS: Final = (
         "annotations": {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False},
     },
     {
-        "name": READ_NEXT,
-        "title": "Read what runs next on every board",
+        "name": READ_STARTABLE,
+        "title": "Read what can start on every board",
         "description": (
-            "What aco next --json answers in the main checkout of every repository found under "
-            "the configured root: per repository its next object, or the sentence of the refusal "
-            "when its board could not be read, and the checkouts that could not be scanned. "
-            "Nothing is written."
+            "What can start on the board of every repository found under the configured root: "
+            "per repository every startable item in rank order, every container with an uncut "
+            "slice and the due recurring audits, or the sentence of the refusal when its board "
+            "could not be read, and the checkouts that could not be scanned. Nothing is written."
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "annotations": {"readOnlyHint": True},
@@ -434,7 +434,9 @@ class _Handler:
 def _handlers(tools: Tools) -> dict[str, _Handler]:
     return {
         READ_INBOX: _Handler(_no_arguments(READ_INBOX), lambda arguments: tools.read_inbox()),
-        READ_NEXT: _Handler(_no_arguments(READ_NEXT), lambda arguments: tools.read_next()),
+        READ_STARTABLE: _Handler(
+            _no_arguments(READ_STARTABLE), lambda arguments: tools.read_startable()
+        ),
         ASK: _Handler(_ask_defects, lambda arguments: _ask(tools.ask, arguments)),
         RECORD_ANSWER: _Handler(
             _record_answer_defects, lambda arguments: _record_answer(tools.record_answer, arguments)

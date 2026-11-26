@@ -138,7 +138,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         "record_answer",
         "step",
         "answer_step",
-        "read_next",
+        "read_startable",
     ]
     assert inbox["isError"] is False
     structured = inbox["structuredContent"]
@@ -151,7 +151,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
     assert (exit_code, rest, stderr) == (0, "", "")
 
 
-def test_a_session_lists_read_next_read_only_and_reads_every_repository_in_order(
+def test_a_session_lists_read_startable_read_only_and_reads_every_repository_in_order(
     root: Path,
 ) -> None:
     repository_with_card(root / "here", 1, "Here")
@@ -161,14 +161,18 @@ def test_a_session_lists_read_next_read_only_and_reads_every_repository_in_order
         child.ask(1, "initialize", {"protocolVersion": "2025-06-18"})
         child.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         listed = child.ask(2, "tools/list")
-        read_next = child.ask(3, "tools/call", {"name": "read_next", "arguments": {}})["result"]
+        read_startable = child.ask(3, "tools/call", {"name": "read_startable", "arguments": {}})[
+            "result"
+        ]
         _finish(child)
 
-    assert next(tool for tool in listed["result"]["tools"] if tool["name"] == "read_next")[
+    assert next(tool for tool in listed["result"]["tools"] if tool["name"] == "read_startable")[
         "annotations"
     ] == {"readOnlyHint": True}
-    assert read_next["isError"] is False
-    assert [entry["repository"] for entry in read_next["structuredContent"]["repositories"]] == [
+    assert read_startable["isError"] is False
+    assert [
+        entry["repository"] for entry in read_startable["structuredContent"]["repositories"]
+    ] == [
         "board-forge/elsewhere",
         "board-forge/here",
     ]
