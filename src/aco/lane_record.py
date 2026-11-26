@@ -16,6 +16,7 @@ from typing import cast
 from . import body, checkout, protocol, workboard
 from .routing_line import (
     EXPERIMENT_TAG,
+    NO_STAGE,
     RoutingLine,
     RoutingStage,
     parse_routing_line,
@@ -658,7 +659,10 @@ def _stage_choices(value: object) -> dict[RoutingStage, str]:
     for stage in RoutingStage:
         choice = members[stage]
         if not isinstance(choice, str) or not stage_choice_fits(stage, choice):
-            raise RecordFileError(f"stage {stage} must be <model>/<effort> or none")
+            allowed = "<model>/<effort>"
+            if stage_choice_fits(stage, NO_STAGE):
+                allowed += f" or {NO_STAGE}"
+            raise RecordFileError(f"stage {stage} must be {allowed}")
         choices[stage] = choice
     return choices
 

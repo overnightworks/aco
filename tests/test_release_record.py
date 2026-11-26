@@ -85,6 +85,33 @@ def test_a_run_begun_after_an_added_one_leaves_the_build_stage_of_the_added_one(
     assert expected_runs == stored
 
 
+@pytest.mark.parametrize(
+    ("entries", "expected_build_trailers"),
+    [
+        pytest.param(
+            (added("run-1", "review"), added("run-2", "review")),
+            ("lane_build: none",),
+            id="no-run-ran-build-writes-none",
+        ),
+        pytest.param(
+            (added("run-1", "review"), begun("run-2")),
+            (),
+            id="a-lost-run-writes-no-build-trailer",
+        ),
+    ],
+)
+def test_a_release_writes_build_none_where_no_run_ran_build_and_nothing_where_a_run_is_lost(
+    repository: Path,
+    entries: tuple[lane_runs.RunEntry, ...],
+    expected_build_trailers: tuple[str, ...],
+) -> None:
+    """Spec: LANREC-77, LANREC-79."""
+    trailers, _expected_runs = release(repository, runs_blob(repository, entries))
+
+    build_trailers = tuple(line for line in trailers if line.startswith("lane_build:"))
+    assert build_trailers == expected_build_trailers
+
+
 def test_the_per_stage_sums_clamp_at_999_before_the_total_which_does_not(
     repository: Path,
 ) -> None:

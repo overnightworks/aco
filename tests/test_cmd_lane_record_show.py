@@ -262,6 +262,20 @@ def test_a_lost_run_makes_the_lane_incomplete_and_the_figures_it_could_state_unk
     assert_shown(world, capsys, steps, expected)
 
 
+def test_a_lane_in_which_no_run_ran_build_shows_build_none_and_a_judged_review(
+    world: World, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Spec: LANREC-77, LANREC-79."""
+    steps = (Step(FIRST_RUN, ran=(RoutingStage.REVIEW,), changes={"stages": marked("one")}),)
+    expected: dict[str, object] = {
+        "complete": True,
+        "lane.stages.build": "none",
+        "lane.stages.review": "review-one/low",
+    }
+
+    assert_shown(world, capsys, steps, expected)
+
+
 def test_two_chained_runs_show_the_first_build_the_last_review_summed_counts_and_both_verdicts(
     world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:

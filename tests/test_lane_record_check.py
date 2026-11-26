@@ -47,6 +47,7 @@ VALID_RECORDS = [
     pytest.param(json.dumps(lane_record_object(verdicts=[])), id="no-verdict"),
     pytest.param(record_text_with("stages", "fix", "grok-4.6/high"), id="a-fix-stage-that-ran"),
     pytest.param(record_text_with("blocking", "ci", 999), id="the-largest-count"),
+    pytest.param(record_text_with("stages", "build", "none"), id="a-build-stage-no-agent-ran"),
 ]
 
 MALFORMED_RECORDS = [
@@ -122,9 +123,19 @@ MALFORMED_RECORDS = [
         id="a-stage-with-whitespace",
     ),
     pytest.param(
-        record_text_with("stages", "build", "none"),
-        "stage build must be <model>/<effort> or none",
-        id="a-build-stage-that-did-not-run",
+        record_text_with("stages", "test", "sonnet 5/high"),
+        "stage test must be <model>/<effort> or none",
+        id="a-test-stage-with-whitespace",
+    ),
+    pytest.param(
+        record_text_with("stages", "review", "none"),
+        "stage review must be <model>/<effort>",
+        id="a-review-stage-that-did-not-run",
+    ),
+    pytest.param(
+        record_text_with("stages", "land", "none"),
+        "stage land must be <model>/<effort>",
+        id="a-land-stage-that-did-not-run",
     ),
     pytest.param(
         record_text_with("stages", "land", MISSING),
@@ -244,7 +255,7 @@ def test_a_valid_record_file_is_accepted_and_left_as_it_is(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str
 ) -> None:
     """Spec: LANREC-30, LANREC-32, LANREC-33, LANREC-34, LANREC-35, LANREC-36,
-    LANREC-37, LANREC-48."""
+    LANREC-37, LANREC-48, LANREC-105."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
@@ -263,7 +274,7 @@ def test_a_malformed_record_file_is_refused_with_its_defect(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str, defect: str
 ) -> None:
     """Spec: LANREC-31, LANREC-32, LANREC-33, LANREC-34, LANREC-35, LANREC-36,
-    LANREC-37, LANREC-48, LANREC-49."""
+    LANREC-37, LANREC-48, LANREC-49, LANREC-104. Example: E-LANREC-23."""
     path = tmp_path / "lane-record.json"
     path.write_text(text, encoding="utf-8")
 
