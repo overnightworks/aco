@@ -1,7 +1,0 @@
-claim_id = "cf04a5518d3c4a78968373e45143d172"
-agent = "Claude 91521ccc-2668-4cfa-8624-55fc58e8de62"
-role = "builder"
-base = "2fd8314c12c6502d10734ed4b1704f9d566857e6"
-branch = "fix/withdraw-step-followups"
-scope = ["src/aco/cmd_wait.py", "src/aco/report.py", "tests/test_cmd_withdraw_step.py"]
-opened_commit = "0530a5b279fb309a52ad11c1ba2dd1610f3bbc85"
