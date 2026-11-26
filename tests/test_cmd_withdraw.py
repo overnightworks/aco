@@ -380,8 +380,13 @@ def test_context_refuses_before_the_forge(
     [
         pytest.param(
             ["withdraw", "7"],
-            "aco withdraw: error: the following arguments are required: --line",
-            id="no-line",
+            "aco withdraw: error: one of the arguments --line --step is required",
+            id="neither-line-nor-step",
+        ),
+        pytest.param(
+            ["withdraw", "7", "--line", "2", "--step"],
+            "aco withdraw: error: argument --step: not allowed with argument --line",
+            id="line-and-step",
         ),
         pytest.param(
             ["withdraw", "7", "--line", "2", "--via", "chat"],
@@ -398,17 +403,19 @@ def test_context_refuses_before_the_forge(
 def test_the_parser_refuses_before_the_command(
     capsys: pytest.CaptureFixture[str], arguments: list[str], sentence: str
 ) -> None:
-    """Spec: the reason table's parser row, Never 4 -- `--line` is required; `--via` and
-    `--card-hash` are no flags of this command."""
+    """Spec: WITHDRAW-23, the reason table's parser row, Never 4 -- one of `--line` and `--step`
+    is required and they exclude each other; `--via` and `--card-hash` are no flags of this
+    command."""
     result = run_cli(arguments, capsys)
     assert (result.status, result.stderr.splitlines()[-1]) == (2, sentence)
 
 
-@pytest.mark.parametrize("flag", ["--line", "--json"])
+@pytest.mark.parametrize("flag", ["--line", "--step", "--json"])
 def test_help_names_each_flag_with_a_help_line(
     capsys: pytest.CaptureFixture[str], flag: str
 ) -> None:
-    """Spec: the intro -- `--line` and `--json`, each with its own help line."""
+    """Spec: WITHDRAW-23, the intro -- `--line`, `--step` and `--json`, each with its own
+    help line."""
     lines = [line.strip() for line in run_cli(["withdraw", "--help"], capsys).stdout.splitlines()]
     entry = next(index for index, line in enumerate(lines) if line.split()[:1] == [flag])
     invocation_and_help = re.split(r"\s{2,}", lines[entry], maxsplit=1)

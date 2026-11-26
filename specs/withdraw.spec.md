@@ -6,8 +6,10 @@ its head. It is the head's own act on its own question; the operator's
 decisions go through `aco rule` (`specs/rule.spec.md`). A withdrawn line keeps
 its index and its `text` and gains `withdrawn_on`, the form
 `specs/body-block.spec.md` owns (BODY-104..106); every reader leaves it off
-the board and out of the open count. `--help` lists `--line` and `--json`,
-each with a help line. This file owns the `WITHDRAWN` line, `withdraw`'s own
+the board and out of the open count. `aco withdraw ITEM --step [--json]`
+takes back the head's own step: the item's `wait` on the operator and its
+`[step]` table, as the line form takes back a line. `--help` lists `--line`,
+`--step` and `--json`, each with a help line. This file owns the `WITHDRAWN` line, `withdraw`'s own
 refusals and its `reason` vocabulary; `specs/output.spec.md` owns the
 `--json` envelope itself (OUT-nn), and `specs/storage-pin.spec.md` the
 state-ref forge gate (PIN-04). `<n>` is the item's own number, a printed
@@ -18,23 +20,27 @@ left, never a withdrawn one.
 
 ## Behavior table
 
-| state \ trigger | `aco withdraw ITEM --line N` | `--json` |
-|---|---|---|
-| an open option line | WITHDRAW-01, WITHDRAW-02 | WITHDRAW-03 |
-| an option line with its head | WITHDRAW-01, WITHDRAW-02 | WITHDRAW-03 |
-| several named lines | WITHDRAW-04, WITHDRAW-05 | WITHDRAW-05 |
-| `N` out of range | WITHDRAW-06 | WITHDRAW-14 |
-| line `N` already withdrawn | WITHDRAW-07 | WITHDRAW-14 |
-| line `N` ruled, an option line or a yes/no line | WITHDRAW-08 | WITHDRAW-14 |
-| a line named twice | WITHDRAW-09 | WITHDRAW-14 |
-| item does not exist, or is a pull request | WITHDRAW-10 | WITHDRAW-14 |
-| item body malformed | WITHDRAW-11 | WITHDRAW-14 |
-| `--repo` given, `storage = "state-ref"` | WITHDRAW-12 | WITHDRAW-14 |
-| a forge failure, the body write included | WITHDRAW-13 | WITHDRAW-13 |
-| the body check answers the write | WITHDRAW-17 | WITHDRAW-17 |
-| the item's lock cannot be taken | WITHDRAW-16 | WITHDRAW-16 |
-| two writers of one item on this machine | WITHDRAW-15 | — |
-| a withdrawal written | WITHDRAW-18 | — |
+| state \ trigger | `aco withdraw ITEM --line N` | `aco withdraw ITEM --step` | `--json` |
+|---|---|---|---|
+| an open option line | WITHDRAW-01, WITHDRAW-02 | — | WITHDRAW-03 |
+| an option line with its head | WITHDRAW-01, WITHDRAW-02 | — | WITHDRAW-03 |
+| several named lines | WITHDRAW-04, WITHDRAW-05 | — | WITHDRAW-05 |
+| `N` out of range | WITHDRAW-06 | — | WITHDRAW-14 |
+| line `N` already withdrawn | WITHDRAW-07 | — | WITHDRAW-14 |
+| line `N` ruled, an option line or a yes/no line | WITHDRAW-08 | — | WITHDRAW-14 |
+| a line named twice | WITHDRAW-09 | — | WITHDRAW-14 |
+| an operator `wait`, with a step table of any form or none | — | WITHDRAW-19, WITHDRAW-20, WITHDRAW-22 | WITHDRAW-24 |
+| the label cannot be removed | — | WITHDRAW-25 | WITHDRAW-24 |
+| no operator `wait` (none, a date, a trigger) | — | WITHDRAW-21 | WITHDRAW-14 |
+| item does not exist, or is a pull request | WITHDRAW-10 | WITHDRAW-10 | WITHDRAW-14 |
+| item body malformed | WITHDRAW-11 | WITHDRAW-11 | WITHDRAW-14 |
+| `--repo` given, `storage = "state-ref"` | WITHDRAW-12 | WITHDRAW-12 | WITHDRAW-14 |
+| both `--line` and `--step`, or neither | WITHDRAW-23 | WITHDRAW-23 | WITHDRAW-23 |
+| a forge failure, the body write included | WITHDRAW-13 | WITHDRAW-13 | WITHDRAW-13 |
+| the body check answers the write | WITHDRAW-17 | WITHDRAW-17 | WITHDRAW-17 |
+| the item's lock cannot be taken | WITHDRAW-16 | WITHDRAW-16 | WITHDRAW-16 |
+| two writers of one item on this machine | WITHDRAW-15 | WITHDRAW-15 | — |
+| a withdrawal written | WITHDRAW-18 | WITHDRAW-18 | — |
 
 - WITHDRAW-01: An open or returned option line makes `aco withdraw ITEM --line N` print `WITHDRAWN #<n> line <k>; <m> line(s) still open`, exit `0` (see E-WITHDRAW-01).
 - WITHDRAW-02: That line's entry becomes its `text` and today's UTC `withdrawn_on`, nothing else, at the same index; every other entry keeps its values (BODY-88, BODY-104).
@@ -48,12 +54,19 @@ left, never a withdrawn one.
 - WITHDRAW-10: A missing item refuses `<label> does not exist`, a pull request `#<n> is a pull request, not an issue; withdraw needs an issue`, exit `2`, before any write.
 - WITHDRAW-11: A MALFORMED item body refuses `<label> <body defect sentence>; withdraw needs a valid aco block`, exit `2`, before any write; PIN-14/PIN-15's sentence replaces it under `state-ref`.
 - WITHDRAW-12: Under `storage = "state-ref"` it resolves the state-ref forge like `rule` (PIN-30's label); `--repo` there refuses the same as PIN-04.
-- WITHDRAW-17: A withdrawal write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the withdrawal is written (see E-WITHDRAW-06).
+- WITHDRAW-17: A withdrawal write the body check answers (OUT-10) refuses with its sentence, exit `2`, `--json` OUT-11's `reason` and `kept`; the withdrawal is written, a step's label stays (see E-WITHDRAW-06).
 - WITHDRAW-13: Every other forge failure, the read and the write included, refuses `ERROR: <sentence>`, exit `2`, `--json` `reason: "unavailable"`; under `state-ref` a write since the read refuses with CAS-20.
 - WITHDRAW-15: Every withdrawal runs in the item's turn (RULE-40): writers of one item on this machine are serialized, so a withdrawal and a ruling on distinct lines both land; a held lock prints RULE-42's line.
 - WITHDRAW-16: A lock that the item's turn cannot take refuses as RULE-41 does, `--json` `reason: "unavailable"`, nothing read or written (see E-WITHDRAW-05).
-- WITHDRAW-18: A verified withdrawal touches the item's signal (WAIT-12); a signal that fails changes neither result nor exit status (WAIT-13); a refused write touches nothing.
+- WITHDRAW-18: A verified line withdrawal touches the item's signal (WAIT-12), a step withdrawal none; a failed signal changes no result or exit status (WAIT-13); a refused write touches nothing.
 - WITHDRAW-14: `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WITHDRAW-04).
+- WITHDRAW-19: `aco withdraw ITEM --step` takes back the head's own step: its `wait` and `[step]` table go, then the `github` label `needs-operator`; it prints `WITHDRAWN #<n> step`, exit `0` (see E-WITHDRAW-07).
+- WITHDRAW-20: It writes no other field (`now` and `next` included), never closes the item, writes the body once in the item's turn (WITHDRAW-15) and removes the label after that write stands.
+- WITHDRAW-21: An item whose block holds no operator `wait` (none, a date or a trigger) refuses `#<n> waits on no step of the operator`, exit `2`, before any write; `reason` is `no_step` (see E-WITHDRAW-08).
+- WITHDRAW-22: The item's state decides nothing: a closed item, one a non-member wrote and a step of any stored form (a `paste` table, an old `actions` table, none) are withdrawn alike.
+- WITHDRAW-23: `--line` and `--step` exclude each other and one is required: both, or neither, refuse as the parser does (`invalid_usage`); `--help` lists `--step` with a help line.
+- WITHDRAW-24: `--json` prints `reason: "withdrawn"`, `"item": <n>`, `"step": "<the step line>"` and, with WITHDRAW-25, `"note": "<its sentence>"` (see E-WITHDRAW-07).
+- WITHDRAW-25: A label the forge will not remove keeps the written body: stderr gets `WARNING: <note>`, which names `gh issue edit <n> --remove-label needs-operator`, exit `0`.
 
 `reason`, by which refusal fired:
 
@@ -63,7 +76,8 @@ left, never a withdrawn one.
 | WITHDRAW-08 (ruled) | `already_ruled` |
 | WITHDRAW-06 (out of range) | `line_out_of_range` |
 | WITHDRAW-10 (missing item, pull request), WITHDRAW-11 (malformed body) | `invalid_item` |
-| WITHDRAW-09 (a line named twice), WITHDRAW-12 (`--repo` under `storage = state-ref`), the parser's own refusals | `invalid_usage` |
+| WITHDRAW-09 (a line named twice), WITHDRAW-12 (`--repo` under `storage = state-ref`), WITHDRAW-23 (both forms, or neither), the parser's own refusals | `invalid_usage` |
+| WITHDRAW-21 (no operator `wait`) | `no_step` |
 | WITHDRAW-13 (a forge failure), WITHDRAW-16 (the item's lock) | `unavailable` |
 | WITHDRAW-17 (the body check answers the write) | `overwritten` (with `kept`) or `not_verified`, as OUT-11 |
 
@@ -80,6 +94,7 @@ the write may have landed, tells "done" from "stop, it is ruled".
 - `aco withdraw` never checks who runs it: aco cannot tell a head from another session, and the forge's edit history is the record.
 - `aco serve`'s decision board never calls `aco withdraw`.
 - `aco withdraw` reaches the same checkout-less refusal `specs/check.spec.md` owns (CHECK-10) before it resolves the forge or the item.
+- `aco withdraw --step` never answers the step, never writes `now` and never touches an option line; the operator's own way stays the board's and `answer_step`'s (ABRD-168, MCP-72).
 
 ## Examples
 
@@ -165,3 +180,34 @@ $ aco withdraw 7 --line 2 --json
 {"ok": false, "reason": "not_verified", "message": "#7 body written, not verified (<cause>)"}
 exit 2
 ```
+
+### E-WITHDRAW-07 — taking back a step, text and `--json`
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, item `#7` open, labelled `needs-operator`, waiting on `Decide.` with a `step` table
+
+```console
+$ aco withdraw 7 --step
+WITHDRAWN #7 step
+exit 0
+$ aco withdraw 7 --step --json
+{"ok": true, "reason": "withdrawn", "item": 7, "step": "Decide."}
+exit 0
+```
+
+Forge requests of one call: read #7, write #7's body, remove the label `needs-operator` from #7. The stored block has no `wait` and no `[step]`; `now` and `next` are as they were.
+
+### E-WITHDRAW-08 — an item without a step
+
+Setup: bare-remote, `storage = "github"`, fake `gh`, item `#7` open with no `wait`
+
+```console
+$ aco withdraw 7 --step
+2> ERROR: #7 waits on no step of the operator
+exit 2
+$ aco withdraw 7 --step --json
+2> ERROR: #7 waits on no step of the operator
+{"ok": false, "reason": "no_step", "message": "#7 waits on no step of the operator"}
+exit 2
+```
+
+Forge requests of one call: read #7, no write.

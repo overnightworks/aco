@@ -2,7 +2,7 @@
 `specs/withdraw.spec.md`, `specs/mcp.spec.md`): `aco rule`, `aco withdraw`, the
 decision board and the MCP `ask`, `record_answer`, `step` and `answer_step` read an item through the
 target gate and write its folded body once, here, so every ruling, withdrawal, card and
-step takes the same path, and a ruling or withdrawal touches the item's signal
+step takes the same path, and a ruling or a line withdrawal touches the item's signal
 (`specs/wait.spec.md`). `item_lock` serializes the writers of one item on this
 machine; `turn` is that lock plus the fresh read, and a writer that judges from
 another read (`aco cut`) holds `item_lock` alone."""
@@ -420,6 +420,45 @@ def _unlabelled_as_a_step(client: forge.ForgeWriter, number: int) -> str | None:
     return None
 
 
+def _without_step(fresh: FreshItem) -> dict[str, object]:
+    """The fresh block's fields but its `wait` and `[step]` table, whatever form the table has."""
+    return {
+        key: value
+        for key, value in fresh.located.data.items()
+        if key not in (item_wait.WAIT_KEY, item_step.STEP_KEY)
+    }
+
+
+class NoStepError(protocol.ClaimError):
+    """WITHDRAW-21: an item whose block holds no `wait` on the operator."""
+
+
+@dataclass(frozen=True)
+class StepWithdrawn:
+    """The step a head took back, as its `wait` named it, and why the label of the step
+    could not be removed, when it could not."""
+
+    step: str
+    label_note: str | None
+
+
+def withdraw_step(context: RunContext, fresh: FreshItem) -> StepWithdrawn:
+    """Takes back the step of the fresh item: its `wait` and `step` table go, every other
+    field and byte is kept, and the item stays open and its signal untouched (WITHDRAW-20).
+    The body is written once; only after a write that stands is the label removed (a state-ref
+    item has none). Raises `NoStepError` before the write unless the item's `wait` names the
+    operator, and the forge's own error for a write that was not verified, leaving the label."""
+    wait = item_wait.parse_wait(fresh.located.data)
+    if not item_wait.waits_on_operator(wait):
+        raise NoStepError(
+            f"{workboard.item_label(fresh.number, fresh.storage)} waits on no step of the operator"
+        )
+    _committed(context, fresh, body.replace_block(fresh.body, fresh.located, _without_step(fresh)))
+    if fresh.storage is not body.Storage.GITHUB:
+        return StepWithdrawn(wait.step, None)
+    return StepWithdrawn(wait.step, _unlabelled_as_a_step(context.forge_writer, fresh.number))
+
+
 def answer_step(
     context: RunContext,
     fresh: FreshItem,
@@ -438,13 +477,8 @@ def answer_step(
     if not item_step.result_fits(result, step.card):
         asked = "a report" if item_step.asks_for_report(step.card) else "Erfolgreich or a failure"
         raise protocol.ClaimError(f"#{fresh.number} asks for {asked}; the answer does not fit")
-    kept = {
-        key: value
-        for key, value in fresh.located.data.items()
-        if key not in (item_wait.WAIT_KEY, item_step.STEP_KEY)
-    }
     now = item_step.answered_now(step.wait_text, result, context.today(), channel)
-    new_body = body.replace_block(fresh.body, fresh.located, {**kept, "now": now})
+    new_body = body.replace_block(fresh.body, fresh.located, {**_without_step(fresh), "now": now})
     written_over = False
     try:
         write_item_body(context.forge_writer, fresh.number, new_body, replacing=fresh.body)
