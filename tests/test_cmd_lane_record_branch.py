@@ -33,7 +33,7 @@ def command_line(
 def test_a_lane_claim_stores_and_shows_its_runs_by_branch(
     lane_record_lane_world: World, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: LANREC-52, LANREC-55, LANREC-60, LANREC-71. Example: E-LANREC-24."""
+    """Spec: LANREC-52, LANREC-55, LANREC-60, LANREC-71, LANREC-74. Example: E-LANREC-24."""
     began = lane_record_lane_world.run(capsys, *begin_arguments(lane_record_lane_world))
     added = lane_record_lane_world.run(capsys, *add_arguments(lane_record_lane_world))
     shown = lane_record_lane_world.run(
