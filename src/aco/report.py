@@ -11,7 +11,7 @@ import sys
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 
-from . import forge, protocol, refusal_text, usage, workboard
+from . import forge, protocol, refusal_text, workboard
 
 CLI_ERROR_PREFIX = refusal_text.CLI_ERROR_PREFIX
 REFUSAL_LINE_LENGTH_LIMIT = refusal_text.REFUSAL_LINE_LENGTH_LIMIT
@@ -27,19 +27,6 @@ def add_json_flag(parser: argparse.ArgumentParser, help_text: str = _JSON_HELP) 
     argparse refuses before any namespace is filled, so the flag needs a
     single owner. A command with no human output passes its own `help_text`."""
     parser.add_argument(JSON_FLAG, action="store_true", help=help_text)
-
-
-def add_lines_command_parser(
-    commands: usage.Subcommands, name: str, *, help: str, item_help: str, lines_help: str
-) -> None:
-    """The parser of a command that names option lines of one item (`withdraw`):
-    the item, the repeatable `--line N` and `--json`, all required but `--json`."""
-    add_lines_arguments(
-        commands.add_parser(name, help=help),
-        item_help=item_help,
-        lines_help=lines_help,
-        optional=False,
-    )
 
 
 def add_lines_arguments(

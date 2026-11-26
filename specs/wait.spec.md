@@ -63,9 +63,9 @@ option line neither ruled nor returned to its head (RUL-02's `open`).
   - a later read that fails transiently prints one `WARNING: the item could not be read, still waiting: <sentence>` to stderr for a run of failed reads; the wait goes on and the next read that answers decides (WAIT-01, WAIT-04)
 - WAIT-11: `--json` on a refusal prints the envelope with the table's `reason` and the refusal sentence as `message`, exit `2` (see E-WAIT-03).
 - WAIT-12: Every write of a ruled, returned or withdrawn line that aco makes touches one file per item, after the write has been verified (see E-WAIT-04):
-  - the writers are `aco rule`, `aco withdraw`, the board's decision and the `record_answer` tool
+  - the writers are `aco rule`, `aco withdraw --line`, the board's decision and the `record_answer` tool
   - the file is `item-signals/<digest>` under aco's state directory, `<digest>` the one that names the item's lock file (RULE-40)
-  - `ask`, `step`, the board's step answer, `aco rescope` and `aco item edit` never touch it
+  - `ask`, `step`, the board's step answer, `aco withdraw --step`, `aco rescope` and `aco item edit` never touch it
 - WAIT-13: A signal that cannot be created or touched leaves the write standing, its result and exit status unchanged, and prints one warning line to stderr (see E-WAIT-04):
   - `WARNING: the ruling stands, but its signal at <signal path> could not be touched: <detail>`
   - a waiting session then learns the answer by WAIT-08
