@@ -9,6 +9,7 @@ from typing import Any, NoReturn, cast
 import pytest
 from mcp_echoes import (
     INBOX,
+    STARTABLE,
     echoing_answer_step,
     echoing_ask,
     echoing_record,
@@ -56,6 +57,7 @@ def test_initialize_answers_the_clients_version_when_supported_else_the_newest(
 
 
 def test_the_instructions_name_every_tool_the_server_lists() -> None:
+    """Spec: MCP-06"""
     instructions = serve(rpc_request("initialize"))["result"]["instructions"]
 
     named = set(re.findall(r"\bwith (\w+)", instructions)) & set(_tools())
@@ -78,8 +80,10 @@ def _tools() -> dict[str, dict[str, Any]]:
     return {tool["name"]: tool for tool in tools}
 
 
-def test_tools_list_offers_the_read_only_inbox_tool_without_arguments() -> None:
-    tool = _tools()["read_inbox"]
+@pytest.mark.parametrize("name", ["read_inbox", "read_startable"])
+def test_tools_list_offers_each_read_tool_as_read_only_without_arguments(name: str) -> None:
+    """Spec: MCP-08"""
+    tool = _tools()[name]
 
     assert tool["annotations"] == {"readOnlyHint": True}
     assert tool["inputSchema"]["type"] == "object"
@@ -89,7 +93,14 @@ def test_tools_list_offers_the_read_only_inbox_tool_without_arguments() -> None:
 def test_tools_list_offers_ask_as_a_repeatable_write_that_destroys_nothing() -> None:
     tool = _tools()["ask"]
 
-    assert list(_tools()) == ["read_inbox", "ask", "record_answer", "step", "answer_step"]
+    assert list(_tools()) == [
+        "read_inbox",
+        "ask",
+        "record_answer",
+        "step",
+        "answer_step",
+        "read_startable",
+    ]
     assert tool["annotations"] == {
         "readOnlyHint": False,
         "destructiveHint": False,
@@ -206,12 +217,20 @@ def test_the_ask_schema_offers_no_state_key(state_key: str) -> None:
 
 
 @pytest.mark.parametrize("arguments", [None, {}], ids=["absent", "empty"])
-def test_a_call_returns_the_inbox_as_structured_content_and_as_text(arguments: object) -> None:
-    result = serve(tool_call(arguments))["result"]
+@pytest.mark.parametrize(
+    ("name", "answer"),
+    [("read_inbox", INBOX), ("read_startable", STARTABLE)],
+    ids=["inbox", "startable"],
+)
+def test_a_read_call_returns_its_answer_as_structured_content_and_as_text(
+    name: str, answer: dict[str, object], arguments: object
+) -> None:
+    """Spec: MCP-11, MCP-95"""
+    result = serve(tool_call(arguments, name=name))["result"]
 
     assert result["isError"] is False
-    assert result["structuredContent"] == INBOX
-    assert json.loads(result["content"][0]["text"]) == INBOX
+    assert result["structuredContent"] == answer
+    assert json.loads(result["content"][0]["text"]) == answer
     assert result["content"][0]["type"] == "text"
 
 
@@ -427,6 +446,7 @@ _WRITING_CALLS = [
     ("tool", "arguments", "reason"),
     [
         pytest.param("read_inbox", None, "/config.toml does not exist", id="read_inbox"),
+        pytest.param("read_startable", None, "/config.toml does not exist", id="read_startable"),
         *(pytest.param(*call, id=call[0]) for call in _WRITING_CALLS),
     ],
 )
@@ -446,6 +466,7 @@ def test_a_refused_tool_call_is_a_tool_error_carrying_its_reason(
     ("tool", "arguments"),
     [
         pytest.param("read_inbox", None, id="read_inbox"),
+        pytest.param("read_startable", None, id="read_startable"),
         *(pytest.param(tool, arguments, id=tool) for tool, arguments, _ in _WRITING_CALLS),
     ],
 )
@@ -492,7 +513,9 @@ def test_every_envelope_defect_is_named_in_one_error(
     assert [sentence for sentence in sentences if sentence not in text] == []
 
 
-@pytest.mark.parametrize("name", ["read_inbox", "ask", "record_answer", "step", "answer_step"])
+@pytest.mark.parametrize(
+    "name", ["read_inbox", "read_startable", "ask", "record_answer", "step", "answer_step"]
+)
 @pytest.mark.parametrize("arguments", [[], "card", 3, None], ids=["list", "string", "int", "null"])
 def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool(
     name: str, arguments: object
@@ -504,11 +527,13 @@ def test_arguments_that_are_no_object_are_an_invalid_params_error_for_every_tool
     assert error["code"] == -32602
 
 
-def test_read_inbox_called_with_a_key_is_a_tool_error_naming_it() -> None:
-    result = serve(tool_call({"limit": 1}))["result"]
+@pytest.mark.parametrize("name", ["read_inbox", "read_startable"])
+def test_a_read_tool_called_with_a_key_is_a_tool_error_naming_it(name: str) -> None:
+    """Spec: MCP-37, MCP-99"""
+    result = serve(tool_call({"limit": 1}, name=name), read_startable=reaches_nothing)["result"]
 
     assert result["isError"] is True
-    assert result["content"] == [{"type": "text", "text": "read_inbox takes no arguments"}]
+    assert result["content"] == [{"type": "text", "text": f"{name} takes no arguments"}]
 
 
 @pytest.mark.parametrize(
@@ -543,7 +568,12 @@ def test_any_other_method_is_not_found(method: str) -> None:
 )
 def test_a_notification_is_never_answered(message: dict[str, object]) -> None:
     tools = mcp_server.Tools(
-        lambda: INBOX, echoing_ask, echoing_record, echoing_step, echoing_answer_step
+        lambda: INBOX,
+        echoing_ask,
+        echoing_record,
+        echoing_step,
+        echoing_answer_step,
+        lambda: STARTABLE,
     )
 
     assert mcp_server.reply(json.dumps(message), tools) is None

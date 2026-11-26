@@ -33,6 +33,7 @@ from . import (
     lane_record,
     progress,
     protocol,
+    recurring_audit,
     repositories,
     rulings,
     session,
@@ -259,11 +260,16 @@ def _recorded_lanes(context: session.RunContext) -> tuple[lane_record.RecordedLa
         return None
 
 
-def read_repository(repository: repositories.Repository) -> Reading:
-    """`read_context` of the checkout `repository` names."""
+def context_of(repository: repositories.Repository) -> session.RunContext:
+    """The run context in the checkout `repository` names."""
     # Looked up on the module at every call, so a replaced `run_context` (the
     # board's test forge) reaches every read.
-    return read_context(session.run_context(None).for_directory(repository.directory))
+    return session.run_context(None).for_directory(repository.directory)
+
+
+def read_repository(repository: repositories.Repository) -> Reading:
+    """`read_context` of the checkout `repository` names."""
+    return read_context(context_of(repository))
 
 
 type IssueReader = Callable[[repositories.Repository], Reading]
@@ -342,22 +348,45 @@ def context_in_checkout_of(discovery: repositories.Discovery, label: str) -> ses
     return session.run_context(None).for_directory(found[label].directory)
 
 
+@dataclass(frozen=True)
+class Answered[Value]:
+    """What reading one repository gave."""
+
+    repository: str
+    result: Value
+
+
+def read_each[Value](
+    discovery: repositories.Discovery, read_one: Callable[[repositories.Repository], Value]
+) -> tuple[Answered[Value] | Unavailable, ...]:
+    """What `read_one` gives for every repository of `discovery`, in discovery's
+    order, the repositories read concurrently; one whose read raises
+    `protocol.ClaimError` or `OSError` is listed as unavailable and the others
+    are still read."""
+
+    def guarded(repository: repositories.Repository) -> Answered[Value] | Unavailable:
+        try:
+            return Answered(repository.label, read_one(repository))
+        except (protocol.ClaimError, OSError) as error:
+            return Unavailable(repository.label, str(error))
+
+    with ThreadPoolExecutor(max_workers=max(1, len(discovery.repositories))) as pool:
+        return tuple(pool.map(guarded, discovery.repositories))
+
+
 def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbox:
     """What waits on the operator in every repository of `discovery`, the
     repositories read concurrently; one that cannot be read is listed as
     unavailable and the others are still read."""
 
-    def read_one(repository: repositories.Repository) -> Waiting | Unavailable:
-        try:
-            reading = read_issues_of(repository)
-            return Waiting(
-                repository.label, waiting_rows(reading.rows), reading.steps, reading.plans
-            )
-        except (protocol.ClaimError, OSError) as error:
-            return Unavailable(repository.label, str(error))
+    def waiting(repository: repositories.Repository) -> Waiting:
+        reading = read_issues_of(repository)
+        return Waiting(repository.label, waiting_rows(reading.rows), reading.steps, reading.plans)
 
-    with ThreadPoolExecutor(max_workers=max(1, len(discovery.repositories))) as pool:
-        entries = tuple(pool.map(read_one, discovery.repositories))
+    entries = tuple(
+        entry.result if isinstance(entry, Answered) else entry
+        for entry in read_each(discovery, waiting)
+    )
     return Inbox(discovery.root, entries, discovery.unavailable)
 
 
@@ -396,8 +425,58 @@ def inbox_json(inbox: Inbox) -> dict[str, object]:
             }
             for entry in inbox.entries
         ],
-        "unreadable": [
-            {"directory": str(checkout.directory), "reason": checkout.reason}
-            for checkout in inbox.unreadable
-        ],
+        "unreadable": unreadable_json(inbox.unreadable),
     }
+
+
+def unreadable_json(
+    unreadable: Iterable[repositories.UnavailableCheckout],
+) -> list[dict[str, str]]:
+    """The checkouts discovery could not read, as the `unreadable` entry of a read."""
+    return [
+        {"directory": str(checkout.directory), "reason": checkout.reason} for checkout in unreadable
+    ]
+
+
+def startable_payload(
+    board: workboard.Board, audits: Iterable[recurring_audit.Finding]
+) -> dict[str, object]:
+    """What can start on `board`, the embedded read `aco mcp` serves: every item of
+    `ready_now` in rank order, every container with an uncut slice, and the names of
+    the due recurring `audits`."""
+    return {
+        "startable": [
+            {
+                "number": item.number,
+                "title": item.title,
+                "kind": item.kind,
+                "size": item.size,
+                "priority_bucket": item.priority_bucket,
+                "next": item.contract.next,
+            }
+            for item in board.ready_now
+        ],
+        "uncut": [
+            {
+                "item": uncut.item,
+                "index": uncut.rows[0].index,
+                "title": uncut.rows[0].title,
+                "rows": len(uncut.rows),
+            }
+            for uncut in board.uncut
+        ],
+        "audits_due": [finding.entry.name for finding in audits if finding.is_due],
+    }
+
+
+def startable_reading(context: session.RunContext) -> dict[str, object]:
+    """`startable_payload` of the board `context` is bound to; raises
+    `protocol.ClaimError` when that board cannot be read. The state ref is peeked, so
+    the read leaves no lineage stamp or lock in the checkout."""
+    context.observation = store.peek_state(
+        worktree=context.toplevel, remote=context.configured_canonical_remote
+    )
+    observed = board_read.observed_board(context)
+    return startable_payload(
+        observed.board, board_read.recurring_audit_reading(context, observed.trunk_landings)
+    )

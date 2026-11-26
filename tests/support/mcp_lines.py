@@ -11,7 +11,10 @@ import board_forge
 import pytest
 from option_cards import ask_card
 
-from aco import cli, session
+from aco import cli, forge, session
+
+type ContextFactory = Callable[[forge.RepositoryId | None], session.RunContext]
+"""What builds a run, as `session.run_context` does."""
 
 
 class Script:
@@ -49,13 +52,17 @@ def ask_line(request_id: int, repository: str = "board-forge/here", item: int = 
 
 
 def run_mcp(
-    monkeypatch: pytest.MonkeyPatch, *steps: str | bytes | Callable[[], None]
+    monkeypatch: pytest.MonkeyPatch,
+    *steps: str | bytes | Callable[[], None],
+    run_context: ContextFactory | None = board_forge.run_context,
 ) -> tuple[int, list[dict[str, Any]]]:
     """The exit code and every answer line of `cli.main(["mcp", "--direct"])` over the board's
-    test forge, reading `steps` as its standard input."""
+    test forge, over `run_context` when given, or over the real run when it is None,
+    reading `steps` as its standard input."""
     replies = io.StringIO()
     with monkeypatch.context() as served:
-        served.setattr(session, "run_context", board_forge.run_context)
+        if run_context is not None:
+            served.setattr(session, "run_context", run_context)
         served.setattr(sys, "stdin", Script(*steps))
         served.setattr(sys, "stdout", replies)
         exit_code = cli.main(["mcp", "--direct"])
@@ -76,8 +83,12 @@ def relay_mcp(
     return exit_code, [json.loads(line) for line in replies.getvalue().splitlines()]
 
 
-def serve_mcp(monkeypatch: pytest.MonkeyPatch, *lines: str) -> list[dict[str, Any]]:
+def serve_mcp(
+    monkeypatch: pytest.MonkeyPatch,
+    *lines: str,
+    run_context: ContextFactory | None = board_forge.run_context,
+) -> list[dict[str, Any]]:
     """Every answer line `aco mcp` writes for `lines`, which must end with exit code 0."""
-    exit_code, replies = run_mcp(monkeypatch, *lines)
+    exit_code, replies = run_mcp(monkeypatch, *lines, run_context=run_context)
     assert exit_code == 0
     return replies

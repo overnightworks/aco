@@ -1,14 +1,14 @@
 # `aco mcp`
 
 `aco mcp` is a stdio MCP server an agent host starts for one session. Its tool `read_inbox` gives that session the decisions and the steps waiting on the operator across every
-repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take; its tool `answer_step` records the operator's chat answer to such a step. It takes no `--repo` and no flag but the hidden `--direct` (MCP-84), starts from any working directory and writes only through `ask`, `record_answer`, `step` and `answer_step`: the CLI stays complete without it.
+repository under the configured root; its tool `ask` puts one decision card on an item there and shows the earlier rulings of its area; its tool `record_answer` records the answer the operator gave in the chat on a card's option line; its tool `step` marks a step only the operator can take; its tool `answer_step` records the operator's chat answer to such a step; its tool `read_startable` gives what can start on every board there. It takes no `--repo` and no flag but the hidden `--direct` (MCP-84), starts from any working directory and writes only through `ask`, `record_answer`, `step` and `answer_step`: the CLI stays complete without it.
 The process the host starts holds no tool code: it hands each message to a fresh `aco mcp --direct` process of the installed package and writes that process's answer (MCP-81), so a reinstall reaches a running session at its next call.
 It speaks the protocol of the `initialize` era, revisions `2025-11-25` and `2025-06-18`. The items and lines it returns are the ones `specs/rulings.spec.md` owns (RUL-10),
 so an agent holds the line index and the `card_hash` that `aco rule` takes. Which repositories exist and how the root is found is `specs/serve.spec.md`'s (ABRD-14, ABRD-108..ABRD-111).
 
 ## Behavior table
 
-| state \ trigger | start | a message arrives | the `read_inbox`, `ask`, `record_answer`, `step` or `answer_step` call |
+| state \ trigger | start | a message arrives | the `read_inbox`, `read_startable`, `ask`, `record_answer`, `step` or `answer_step` call |
 |---|---|---|---|
 | the global `aco --repo OWNER/REPO` before `mcp` | MCP-01 | — | — |
 | stdin ends | MCP-02 | — | — |
@@ -57,6 +57,9 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | an unknown argument, or a value of the wrong type, or not exactly one of `option` and `other`, or a blank `other` | — | — | MCP-35 |
 | the forge's check of the answer's write answers `not verified` or `overwritten` | — | — | MCP-36 |
 | `read_inbox` with arguments | — | — | MCP-37 |
+| `read_startable` | — | — | MCP-95, MCP-96, MCP-97 |
+| `read_startable` over a repository whose board `aco board` refuses | — | — | MCP-98 |
+| `read_startable` with arguments | — | — | MCP-99 |
 | an open item a member wrote whose block has an operator `wait` | — | — | MCP-39, MCP-41, MCP-94 |
 | an item labelled `needs-operator` without an operator `wait` | — | — | MCP-71 |
 | such an item a non-member wrote, or one the store could not read | — | — | MCP-42 |
@@ -87,9 +90,9 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 - MCP-03: A host that closed the pipe ends the process, exit `0`, with no traceback on stderr.
 - MCP-04: One message is one line holding one JSON object. Unparsable JSON is answered error `-32700`; an array (no batching), another JSON value or a non-request object, error `-32600`; each with a null `id`.
 - MCP-05: A message without an `id` is a notification and is never answered; an empty line is skipped.
-- MCP-06: `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all five tools.
+- MCP-06: `initialize` is answered with the client's `protocolVersion` if `2025-11-25` or `2025-06-18`, else `2025-11-25`, plus `tools`, `serverInfo` (`aco`, its version), `instructions` naming all six tools.
 - MCP-07: `ping` is answered with the empty result.
-- MCP-08: `tools/list` lists `read_inbox` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step` and `answer_step` (`destructiveHint` true); the last four: `readOnlyHint` false.
+- MCP-08: `tools/list` lists `read_inbox`, `read_startable` (`readOnlyHint` true), `ask` (`destructiveHint` false), `record_answer`, `step`, `answer_step` (`destructiveHint` true); rest `readOnlyHint` false.
 - MCP-78: `ask`, `record_answer` and `step` are listed with `idempotentHint` true, `answer_step` with `idempotentHint` false.
 - MCP-09: `server/discover` and every other method are answered error `-32601`.
 - MCP-10: `tools/call` of an unknown tool, or of any tool with arguments that are no object, is answered error `-32602`.
@@ -201,9 +204,17 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - MCP-74: A `step` that is no longer the item's current step, or an item with no step for the operator, is a tool error with a sentence; nothing is written.
 - MCP-75: An unknown argument, a wrong type, a `result` outside the two, a blank `step`, or a `text` missing, blank or given with `Erfolgreich` is a tool error; nothing is read or written.
 
+## Reading what can start
+
+- MCP-95: `read_startable` answers `structuredContent` and the same JSON as text: `root`, per `repository` its `startable`, `uncut`, `audits_due` or `unavailable`, and `unreadable` (E-MCP-23).
+- MCP-96: A repository's `startable` is every item of its board's `ready_now` in `aco board --json`'s order, each `number`, `title`, `kind`, `size`, `priority_bucket` and its contract's `next` (E-MCP-23).
+- MCP-97: `uncut` is every container with an uncut slice: `item`, its first uncut row's `index` and `title`, `rows` (the count of uncut rows); `audits_due` the names of its due audits (E-MCP-23).
+- MCP-98: A repository whose board `aco board` refuses is `unavailable` with the refusal's sentence; the others are still answered, and the call is no tool error.
+- MCP-99: `read_startable` called with any argument is a tool error `read_startable takes no arguments`; nothing is read.
+
 ## Never
 
-- `aco mcp` writes only through `ask`, `record_answer`, `step` and `answer_step`: `ask` and `record_answer` one line per call, `answer_step` one item's step answer, `step` one item's `wait` and `step` table in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` is read-only.
+- `aco mcp` writes only through `ask`, `record_answer`, `step` and `answer_step`: `ask` and `record_answer` one line per call, `answer_step` one item's step answer, `step` one item's `wait` and `step` table in that item's turn, or one new item, per call, never another repository or the operator's configuration; `read_inbox` and `read_startable` are read-only: no claim, item, state ref or lock is written.
 - `step` never clears `wait.operator` and never removes the label `needs-operator`: the board's step answer and `answer_step` do both (ABRD-168, ABRD-169, MCP-72).
 - `record_answer` never checks that the operator spoke: it records what the agent says he answered, and the forge's edit history is the record after the fact.
 - It never answers a refusal as an empty inbox: a missing config file, a bad root and finding no repository are tool errors (MCP-15, MCP-16).
@@ -447,3 +458,16 @@ Setup: as E-MCP-12, with `paste` a newline between `a` and `b`, `ftp://host/x` o
 ```
 
 Nothing is read or written.
+
+### E-MCP-23 -- the boards read, one refused, and an argument
+
+Setup: `owner/a` holds a ready item `#7` of size `M` and a container `#9` whose body has two uncut slices, and its recurring audit `security` is due; `owner/b` holds nothing; the forge of `owner/c` fails its listing with `the forge is down`
+
+```text
+> {"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"read_startable"}}
+< {"jsonrpc":"2.0","id":25,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","startable":[{"number":7,"title":"Work","kind":"task","size":"M","priority_bucket":"unlabelled","next":"Do the work."}],"uncut":[{"item":9,"index":1,"title":"First slice","rows":2}],"audits_due":["security"]},{"repository":"owner/b","startable":[],"uncut":[],"audits_due":[]},{"repository":"owner/c","unavailable":"the forge is down"}],"unreadable":[]},"isError":false}}
+> {"jsonrpc":"2.0","id":26,"method":"tools/call","params":{"name":"read_startable","arguments":{"limit":1}}}
+< {"jsonrpc":"2.0","id":26,"result":{"content":[{"type":"text","text":"read_startable takes no arguments"}],"isError":true}}
+```
+
+Each `startable` item is one of its board's `ready_now`. Nothing is written.

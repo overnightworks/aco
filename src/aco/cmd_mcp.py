@@ -1,5 +1,5 @@
-"""The `mcp` command (`specs/mcp.spec.md`): the stdio loop, the inbox read and
-the card, answer and step writes it serves."""
+"""The `mcp` command (`specs/mcp.spec.md`): the stdio loop, the inbox and
+startable reads and the card, answer and step writes it serves."""
 
 import argparse
 import os
@@ -39,6 +39,25 @@ _GLOBAL_REPO_MESSAGE = "aco mcp finds its repositories itself; --repo does not a
 def read_inbox() -> dict[str, object]:
     """The read of every repository the scan found."""
     return inbox.inbox_json(inbox.read(inbox.discovered(), inbox.read_repository))
+
+
+def read_startable() -> dict[str, object]:
+    """What can start on the board of every repository the scan found; a repository
+    whose board cannot be read is listed with the sentence."""
+    discovery = inbox.discovered()
+    entries = inbox.read_each(
+        discovery, lambda repository: inbox.startable_reading(inbox.context_of(repository))
+    )
+    return {
+        "root": str(discovery.root),
+        "repositories": [
+            {"repository": entry.repository, "unavailable": entry.reason}
+            if isinstance(entry, inbox.Unavailable)
+            else {"repository": entry.repository, **entry.result}
+            for entry in entries
+        ],
+        "unreadable": inbox.unreadable_json(discovery.unavailable),
+    }
 
 
 def _context_in(discovery: repositories.Discovery, label: str) -> RunContext:
@@ -246,7 +265,7 @@ def _mark_in_turn(
 def serve(requests: Iterable[bytes], replies: TextIO) -> None:
     """Answer each line of `requests` on `replies` until the lines end; a line
     that is no UTF-8 is answered as unparsable."""
-    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step)
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step, read_startable)
 
     def answer(request: bytes) -> str | None:
         try:

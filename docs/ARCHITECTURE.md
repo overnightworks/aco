@@ -42,6 +42,7 @@ flowchart LR
     Relay["aco mcp (relay)<br/>cmd_mcp.py, mcp_relay.py"] -->|"each message to a fresh process"| Mcp
     Mcp --> Repos
     Mcp --> Inbox
+    Mcp -->|"read_startable: the board's startable work in each checkout"| Startable["startable projection<br/>inbox.py"]
     Plans["aco fleet-plans<br/>cmd_fleet_plans.py"]
     Plans --> Repos
     Plans --> Inbox
@@ -146,8 +147,10 @@ from an item a member of the repository wrote (GitHub's `OWNER`, `MEMBER` or
 stranger's; a state-ref item counts as a member's, since only a writer of the
 state ref can create one), because in a public repository a stranger can open an
 issue carrying a card. `inbox.py` owns that per-repository read; `aco rulings`
-and `aco next` stay unfiltered. `aco mcp` and `aco fleet-plans` read the same
-listing and keep no state. The write tools of `aco mcp` and the
+and `aco next` stay unfiltered, and so is `read_startable` of `aco mcp`, which
+projects the board `aco board --json` builds in each repository's checkout. It
+and `aco fleet-plans` share the discovery and the concurrent read and keep no
+state. The write tools of `aco mcp` and the
 board's step answer each write one line or wait in the item's turn
 (`specs/mcp.spec.md`, `specs/serve.spec.md`); `record_answer` refuses neither a
 closed item nor a non-member's, because the card's hash binds the answer to what
