@@ -3,6 +3,7 @@ before it writes."""
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 from board_fixtures import REPOSITORY
@@ -28,10 +29,22 @@ def record_without_misses() -> dict[str, object]:
     return record
 
 
+def record_with_build_none() -> dict[str, object]:
+    record = lane_record_object()
+    stages = cast(dict[str, object], record["stages"])
+    stages["build"] = "none"
+    return record
+
+
 @pytest.mark.parametrize(
     ("content", "expected_trailers"),
     [
         pytest.param(lane_record_object(), LANE_RECORD_TRAILERS, id="a-file-that-states-misses"),
+        pytest.param(
+            record_with_build_none(),
+            ("lane_build: none", *LANE_RECORD_TRAILERS[1:]),
+            id="a-file-whose-build-no-agent-ran-writes-build-none",
+        ),
         pytest.param(
             record_without_misses(),
             LANE_RECORD_TRAILERS_WITHOUT_MISSES,
@@ -48,8 +61,8 @@ def test_an_abandoned_release_with_a_record_file_leaves_the_files_figures_not_th
     content: dict[str, object],
     expected_trailers: tuple[str, ...],
 ) -> None:
-    """Spec: LANREC-41, LANREC-42, LANREC-43, LANREC-50 -- the reason's routing line is not
-    read."""
+    """Spec: LANREC-41, LANREC-42, LANREC-43, LANREC-50, LANREC-105 -- the reason's routing line
+    is not read."""
     stand_in = make_stand_in(monkeypatch, tmp_path, github_clone, bare_remote, ("src/widget.py",))
     stand_in(branch=LANE_BRANCH, standing=lane_held_by_ada(LANE_BRANCH, ("src/widget.py",)))
     record = write_lane_record_file(tmp_path, content)

@@ -223,7 +223,18 @@ def test_the_rounds_and_the_experiment_are_never_read_from_a_finding(
             id="a-stage-with-capitals-is-unknown",
         ),
         pytest.param(
-            "build none; test none", ((RoutingStage.TEST, "none"),), id="build-has-no-none"
+            "build none; test none",
+            ((RoutingStage.BUILD, "none"), (RoutingStage.TEST, "none")),
+            id="build-may-be-none",
+        ),
+        pytest.param(
+            "build none; fix none; review none; test none; land none",
+            (
+                (RoutingStage.BUILD, "none"),
+                (RoutingStage.FIX, "none"),
+                (RoutingStage.TEST, "none"),
+            ),
+            id="review-and-land-have-no-none",
         ),
         pytest.param("build a/b; build c/d", (), id="a-stage-named-twice-is-unknown"),
         pytest.param("build a b; fix", (), id="no-model-and-effort"),

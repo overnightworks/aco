@@ -18,7 +18,7 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 | a state ref that cannot be read | STATS-14 | STATS-14 |
 | a checkout without a usable configuration, or none | STATS-18, STATS-19 | STATS-18, STATS-19 |
 | `--help` | STATS-20 | — |
-| a stage's choices | STATS-10 | STATS-21 |
+| a stage's choices | STATS-10, STATS-27 | STATS-21 |
 | a group with a control character | STATS-22 | STATS-22 |
 | no state ref, or none with a record | STATS-15 | STATS-15 |
 | a risk class and its stage figures | STATS-23..STATS-25 | STATS-26 |
@@ -47,6 +47,7 @@ append-only state ref. `specs/output.spec.md` owns the `--json` envelope (OUT-nn
 
 - STATS-11: Success is `{"ok": true, "reason": "compared", "a": <group>, "b": <group>}`; a group has `group`, `lanes`, `outcomes`, `figures` (`median` `null` if unknown, `n`, `unknown`), `stages` and `risks`.
 - STATS-26: `risks` lists the blocks as `{risk, lanes, outcomes, stages}`, `risk` `null` for `(none)`; `stages` maps a stage to `fix_rounds` and `misses`, each `{total, n, unknown}`, `total` `null` if unknown.
+- STATS-27: A stage a lane states as `none` counts under `none` for that stage, `build` included, as `fix: none 1` does; `none` is no model and no count names one for it.
 
 ## Refusals
 

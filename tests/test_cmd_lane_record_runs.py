@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from claim_worktrees import assert_json_refusal_object
 from cli_fixtures import real_git, run_cli
+from lane_record_fixtures import marked
 from lane_record_runs_world import (
     END_TIP,
     FIRST_RUN,
@@ -217,18 +218,18 @@ def test_an_add_of_a_run_that_was_not_begun_refuses_naming_the_begin_command(
     assert world.runs_files() == []
 
 
+@pytest.mark.parametrize("stage", [RoutingStage.BUILD, RoutingStage.GATE])
 def test_an_add_whose_ran_stage_is_none_in_the_file_refuses_contradicting_it(
-    world: World, capsys: pytest.CaptureFixture[str]
+    world: World, capsys: pytest.CaptureFixture[str], stage: RoutingStage
 ) -> None:
     """Spec: LANREC-66."""
     world.run(capsys, *begin_arguments(world))
+    file = world.record_file(stages={**marked("x"), stage: "none"})
 
-    refused = world.run(
-        capsys, *add_arguments(world, stages=(RoutingStage.BUILD, RoutingStage.GATE))
-    )
+    refused = world.run(capsys, *add_arguments(world, file=file, stages=(stage,)))
 
     assert refused.status == 2
-    assert refused.stderr == "ERROR: the record's stage gate is none, which --ran contradicts\n"
+    assert refused.stderr == f"ERROR: the record's stage {stage} is none, which --ran contradicts\n"
 
 
 def test_an_add_of_a_file_that_check_refuses_refuses_with_the_same_sentence(
