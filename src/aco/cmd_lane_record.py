@@ -203,6 +203,11 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         choices=[str(stage) for stage in lane_runs.RAN_STAGES],
         help="each stage the run ran, once",
     )
+    add.usage = (
+        "%(prog)s [-h] [--branch BRANCH] --run RUN [--agent AGENT] [--json]\n"
+        "                           --end-tip END_TIP --ran STAGE [STAGE ...]\n"
+        "                           [ITEM] FILE"
+    )
     show = command.subcommands.add_parser(
         "show", help="print the runs stored with a claim and the lane figures computed from them"
     )

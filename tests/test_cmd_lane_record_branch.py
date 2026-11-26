@@ -2,11 +2,11 @@
 (`specs/lane-record.spec.md`, "Stored runs")."""
 
 import json
+from dataclasses import replace
 
 import pytest
 from claim_worktrees import assert_json_refusal_object
 from lane_record_runs_world import (
-    END_TIP,
     FIRST_RUN,
     LANE_RECORD_BRANCH,
     World,
@@ -25,22 +25,9 @@ def command_line(
     named = () if branch is None else ("--branch", branch)
     if command == "show":
         return ("lane-record", "show", *operands, *named, *flags)
-    run = ("--run", FIRST_RUN)
-    if command == "begin":
-        return ("lane-record", "begin", *operands, *named, *run, *flags)
-    return (
-        "lane-record",
-        "add",
-        *operands,
-        str(world.record_file()),
-        *named,
-        *run,
-        "--end-tip",
-        END_TIP,
-        "--ran",
-        "build",
-        *flags,
-    )
+    targeted = replace(world, claim_target=operands)
+    builder = begin_arguments if command == "begin" else add_arguments
+    return (*builder(targeted), *named, *flags)
 
 
 def test_a_lane_claim_stores_and_shows_its_runs_by_branch(
