@@ -1,8 +1,0 @@
-claim_id = "921bfa705bf54f558523c4fcd875b024"
-agent = "Claude 91521ccc-2668-4cfa-8624-55fc58e8de62"
-role = "builder"
-base = "6a2260b0302fe4a3176ddf93488ff614cd8ad389"
-branch = "claude/issue-1081-each-step-shows-since-when-it-waits-and"
-scope = ["frontend/e2e/decideRow.ts", "frontend/e2e/itemFixture.ts", "frontend/e2e/stepCard.spec.ts", "frontend/src/app/model/steps.test.ts", "frontend/src/app/model/steps.ts", "frontend/src/components/StepsView.svelte", "frontend/src/components/StepsView.test.ts", "frontend/src/test-support/board.ts", "frontend/src/types.ts", "quality/baseline.toml", "specs/mcp.spec.md", "specs/serve.spec.md", "src/aco/board/board.py", "src/aco/board/static", "src/aco/inbox.py", "tests/board/test_aco_source_state_ref.py", "tests/board/test_board_api_steps.py", "tests/support/board_fixtures.py", "tests/support/e2e_server.py", "tests/test_cmd_mcp.py", "tests/test_cmd_mcp_step.py", "tests/test_inbox.py"]
-opened_commit = "b16cfe9c057d15f4c357165a82bfdbb49e2f3b38"
-whole_reason = "The slice reads one field and a link through one vertical path (inbox read, board wire, Steps view, their specs, fixtures and rebuilt assets); it has no seam to split without a board that lists dates it cannot show or shows dates it cannot order."
