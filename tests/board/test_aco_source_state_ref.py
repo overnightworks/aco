@@ -363,7 +363,7 @@ def test_a_step_answer_on_a_state_ref_item_clears_the_step_and_writes_now_withou
 def test_a_hand_written_paste_step_on_a_state_ref_item_is_listed_in_the_paste_form(
     checkout: _StateRefCheckout, state_ref_board: BoardClient
 ) -> None:
-    """Spec: ABRD-157"""
+    """Spec: ABRD-157, MCP-94"""
     step = {"purpose": "Why.", "paste": "make rotate", "expected": "See it."}
     checkout.seed({f"{_FIRST_ID}.md": _item_file(wait=OPERATOR_WAIT, step=step)})
 
@@ -374,6 +374,7 @@ def test_a_hand_written_paste_step_on_a_state_ref_item_is_listed_in_the_paste_fo
         "command",
         "make rotate",
     )
+    assert (listed["since"], listed["url"]) == ("2026-08-31", None)
 
 
 def test_an_item_edit_on_a_state_ref_item_keeps_an_older_step_table_with_its_answer_key_for_key(

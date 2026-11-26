@@ -1,4 +1,5 @@
-import type { OldStepRead, PasteStepRead, StepRead, StepRequest } from '../../types';
+import type { OldStepRead, PasteStepRead, RepoReading, StepRead, StepRequest } from '../../types';
+import { displayDate } from './optionCard';
 
 export const STEPS_TAB_LABEL = 'Steps';
 export const STEPS_REGION_LABEL = 'Steps for you';
@@ -8,6 +9,7 @@ export const COPIED_LABEL = 'Copied';
 export const COPY_FAILED_LABEL = 'Copy failed, try again';
 export const OPEN_LABEL = 'Öffnen';
 export const OLD_FORM_LABEL = 'alte Form';
+const WAITING_SINCE_LABEL = 'wartet seit';
 
 const YES_OR_NO_ANSWER = 'Ja / Nein';
 
@@ -25,6 +27,26 @@ export function pasteOf(step: PasteStepRead): { command: string } | { link: stri
  * expected, those it holds. */
 export function storedTexts(step: OldStepRead): string[] {
 	return [step.purpose, step.actions ?? step.paste, step.expected].filter((text) => text !== null);
+}
+
+/** Written once for each step: `wartet seit 01.11.2026`. */
+export function waitingSinceText(step: StepRead): string {
+	return `${WAITING_SINCE_LABEL} ${displayDate(step.since)}`;
+}
+
+/** The repos the Steps view shows as groups (ABRD-199): those with a step, by their first
+ * step's `since` newest first, then higher item; ties keep the configured order, and a repo
+ * whose read failed stands last. Each repo's steps arrive newest first (MCP-43). */
+export function stepGroups(repos: RepoReading[]): RepoReading[] {
+	const failed = repos.filter((repo) => repo.error !== null);
+	const withFirst = repos.flatMap((repo) => {
+		const [first] = repo.steps;
+		return repo.error === null && first !== undefined ? [{ repo, first }] : [];
+	});
+	withFirst.sort(
+		(a, b) => b.first.since.localeCompare(a.first.since) || b.first.number - a.first.number
+	);
+	return [...withFirst.map(({ repo }) => repo), ...failed];
 }
 
 /** The steps of every repo that could be read; a repo that failed has none to count. */

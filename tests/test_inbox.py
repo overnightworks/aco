@@ -36,9 +36,12 @@ from aco.lane_record import LaneOutcome, LaneRecord
 from aco.routing_line import RoutingLine
 
 _CARD = card_body(card())
+_REPOSITORY = forge.RepositoryId("github.com", ("owner",), "repo")
 _NO_CARD = {
     **dict.fromkeys(("purpose", "paste", "paste_kind", "expected", "actions", "answer")),
     "form": "old",
+    "since": "2026-11-01",
+    "url": "https://github.com/owner/repo/issues/9",
 }
 
 
@@ -256,9 +259,17 @@ def _step_issue(
 def test_a_members_item_with_an_operator_wait_is_a_step_without_the_label() -> None:
     issues = (_step_issue(9, wait={"operator": "Rotate the key.", "since": date(2026, 11, 1)}),)
 
-    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+    found = inbox.steps(issues, repository=_REPOSITORY, storage=body.Storage.GITHUB)
 
-    assert found == (inbox.Step(9, "Item 9", "Rotate the key."),)
+    assert found == (
+        inbox.Step(
+            9,
+            "Item 9",
+            "Rotate the key.",
+            date(2026, 11, 1),
+            url="https://github.com/owner/repo/issues/9",
+        ),
+    )
 
 
 def test_a_labelled_item_without_an_operator_wait_is_no_step() -> None:
@@ -270,7 +281,7 @@ def test_a_labelled_item_without_an_operator_wait_is_no_step() -> None:
         _step_issue(7, labels=labelled, body_text="Prose only, no block."),
     )
 
-    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+    found = inbox.steps(issues, repository=_REPOSITORY, storage=body.Storage.GITHUB)
 
     assert found == ()
 
@@ -279,7 +290,7 @@ def test_a_steps_text_is_its_operator_wait_not_the_blocks_next() -> None:
     wait = {"operator": "Rotate the key.", "since": date(2026, 11, 1)}
     issues = (_step_issue(9, body_text=complete_contract("Cut the slice.", wait=wait)),)
 
-    [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
+    [found] = inbox.steps(issues, repository=_REPOSITORY, storage=body.Storage.GITHUB)
 
     assert found.wait_text == "Rotate the key."
 
@@ -295,7 +306,7 @@ def _listed(table: dict[str, object] | None, step: str = "Rotate.") -> dict[str,
     wait = {"operator": step, "since": date(2026, 11, 1)}
     fields: dict[str, Any] = {} if table is None else {"step": table}
     issues = (_step_issue(9, body_text=complete_contract("Work.", wait=wait, **fields)),)
-    [found] = inbox.steps(issues, storage=body.Storage.GITHUB)
+    [found] = inbox.steps(issues, repository=_REPOSITORY, storage=body.Storage.GITHUB)
     return inbox.step_json(found)
 
 
@@ -345,7 +356,7 @@ def _listed(table: dict[str, object] | None, step: str = "Rotate.") -> dict[str,
 def test_a_step_is_of_the_paste_form_only_when_its_card_keeps_the_rules(
     table: dict[str, object] | None, step: str, listed: dict[str, object]
 ) -> None:
-    """Spec: MCP-39, MCP-68, MCP-89"""
+    """Spec: MCP-39, MCP-68, MCP-89, MCP-94"""
     assert _listed(table, step) == {**listed, "number": 9, "title": "Item 9", "step": step}
 
 
@@ -358,17 +369,47 @@ def test_only_an_item_a_member_wrote_and_the_store_could_read_is_a_step() -> Non
         _step_issue(7),
     )
 
-    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+    found = inbox.steps(issues, repository=_REPOSITORY, storage=body.Storage.GITHUB)
 
     assert [step.number for step in found] == [7]
 
 
-def test_steps_come_by_descending_number() -> None:
-    issues = (_step_issue(2), _step_issue(11), _step_issue(5))
+@pytest.mark.parametrize(
+    ("waiting_since", "ordered"),
+    [
+        pytest.param({2: 3, 11: 1, 5: 2}, [2, 5, 11], id="the-newer-since-comes-first"),
+        pytest.param({2: 1, 11: 1, 5: 1}, [11, 5, 2], id="equal-since-falls-back-to-the-number"),
+        pytest.param({2: 2, 11: 1, 5: 2}, [5, 2, 11], id="ties-break-by-the-higher-number"),
+    ],
+)
+def test_steps_come_newest_since_first_then_by_descending_number(
+    waiting_since: dict[int, int], ordered: list[int]
+) -> None:
+    """Spec: MCP-43"""
+    issues = tuple(
+        _step_issue(number, wait={"operator": "Rotate.", "since": date(2026, 11, day)})
+        for number, day in waiting_since.items()
+    )
 
-    found = inbox.steps(issues, storage=body.Storage.GITHUB)
+    found = inbox.steps(issues, repository=_REPOSITORY, storage=body.Storage.GITHUB)
 
-    assert [step.number for step in found] == [11, 5, 2]
+    assert [step.number for step in found] == ordered
+
+
+@pytest.mark.parametrize(
+    ("storage", "url"),
+    [
+        pytest.param(body.Storage.GITHUB, "https://github.com/owner/repo/issues/9", id="github"),
+        pytest.param(body.Storage.STATE_REF, None, id="state-ref"),
+    ],
+)
+def test_a_steps_url_is_its_items_page_and_none_without_item_pages(
+    storage: body.Storage, url: str | None
+) -> None:
+    """Spec: MCP-94"""
+    [found] = inbox.steps((_step_issue(9),), repository=_REPOSITORY, storage=storage)
+
+    assert found.url == url
 
 
 def test_an_item_with_an_operator_wait_and_a_waiting_line_is_in_both_lists() -> None:
@@ -377,7 +418,7 @@ def test_an_item_with_an_operator_wait_and_a_waiting_line_is_in_both_lists() -> 
         5, body_text=complete_contract("Work.", wait=wait, expectation=[open_option_entry()])
     )
 
-    reading = inbox.read_issues((carded,), storage=body.Storage.GITHUB)
+    reading = inbox.read_issues((carded,), repository=_REPOSITORY, storage=body.Storage.GITHUB)
 
     assert [row.number for row in reading.rows] == [5]
     assert [step.number for step in reading.steps] == [5]
@@ -389,7 +430,13 @@ def test_the_answer_lists_steps_always_and_gives_an_unavailable_entry_none() -> 
         (_repository("a/steps", Path("/a")), _repository("b/none", Path("/b"))),
         (),
     )
-    step = inbox.Step(9, "Item 9", "Rotate the key.")
+    step = inbox.Step(
+        9,
+        "Item 9",
+        "Rotate the key.",
+        date(2026, 11, 1),
+        url="https://github.com/owner/repo/issues/9",
+    )
 
     def read_issues(repository: repositories.Repository) -> inbox.Reading:
         return inbox.Reading((), (step,) if repository.label == "a/steps" else ())

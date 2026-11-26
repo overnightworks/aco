@@ -10,8 +10,10 @@
 		OPEN_LABEL,
 		pasteOf,
 		stepCount,
+		stepGroups,
 		storedTexts,
-		STEPS_REGION_LABEL
+		STEPS_REGION_LABEL,
+		waitingSinceText
 	} from '../app/model/steps';
 	import type { RepoReading } from '../types';
 	import type { DecisionStore } from '../app/state/decision.svelte';
@@ -41,6 +43,7 @@
 		}
 	}
 
+	const groups = $derived(stepGroups(repos));
 	const failed = $derived(repos.filter((repo) => repo.error !== null));
 	const empty = $derived(failed.length === 0 && stepCount(repos) === 0);
 </script>
@@ -49,7 +52,7 @@
 	{#if empty}
 		<p class="quiet">{NO_STEPS_TEXT}</p>
 	{/if}
-	{#each repos as repo (repo.name)}
+	{#each groups as repo (repo.name)}
 		{#if repo.error !== null}
 			<h2>{repo.name}</h2>
 			<p class="bad-line" role="alert">
@@ -68,7 +71,17 @@
 					class:current={key === current}
 					use:bringIntoView={key === current}
 				>
-					<h3 id="step-{key}"><span class="number">#{step.number}</span> {step.title}</h3>
+					<h3 id="step-{key}">
+						{#if step.url !== null}
+							<a class="number" href={step.url} target="_blank" rel="noopener noreferrer">
+								#{step.number}
+							</a>
+						{:else}
+							<span class="number">#{step.number}</span>
+						{/if}
+						{step.title}
+					</h3>
+					<p class="since">{waitingSinceText(step)}</p>
 					{#if step.form === 'old'}
 						<p><span class="old-form">{OLD_FORM_LABEL}</span> {step.step}</p>
 						{#each storedTexts(step) as stored, index (index)}
@@ -131,6 +144,11 @@
 		overflow-wrap: anywhere;
 	}
 	.number {
+		color: var(--fg-3);
+	}
+	.since {
+		margin: 0 0 6px;
+		font-size: 13px;
 		color: var(--fg-3);
 	}
 	p {

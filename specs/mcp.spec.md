@@ -57,7 +57,7 @@ so an agent holds the line index and the `card_hash` that `aco rule` takes. Whic
 | an unknown argument, or a value of the wrong type, or not exactly one of `option` and `other`, or a blank `other` | — | — | MCP-35 |
 | the forge's check of the answer's write answers `not verified` or `overwritten` | — | — | MCP-36 |
 | `read_inbox` with arguments | — | — | MCP-37 |
-| an open item a member wrote whose block has an operator `wait` | — | — | MCP-39, MCP-41 |
+| an open item a member wrote whose block has an operator `wait` | — | — | MCP-39, MCP-41, MCP-94 |
 | an item labelled `needs-operator` without an operator `wait` | — | — | MCP-71 |
 | such an item a non-member wrote, or one the store could not read | — | — | MCP-42 |
 | several such items in one repository, or one that also has a waiting line | — | — | MCP-43 |
@@ -155,10 +155,11 @@ A head that asks a card is shown what the operator already ruled in the card's a
 - MCP-37: `read_inbox` called with any argument is a tool error `read_inbox takes no arguments`; without arguments it answers the inbox as before.
 - MCP-38: No tool schema has a top-level `oneOf`, `anyOf` or `allOf`; `record_answer` takes `repository`, `item`, `line`, `card_hash`, `option` or `other`, no `via`.
 - MCP-40 (retired).
-- MCP-39: An open item a member wrote whose readable block's `wait` names `operator` is a step: `steps` lists its `number`, `title`, `step` (that wait's text), `form` and card (MCP-67, MCP-89, E-MCP-11).
+- MCP-39: A member's open, readable item whose `wait` names `operator` is a step: `steps` lists its `number`, `title`, `step`, `since`, `url`, `form` and card (MCP-67, MCP-89, MCP-94, E-MCP-11).
 - MCP-41: `steps` is present in every repository that was read, an empty list when none waits; a repository listed with `unavailable` has no `steps`.
 - MCP-42: Only items a member of the repository wrote are steps, as for cards (MCP-14); an item the store could not read is no step.
-- MCP-43: Steps come by descending item number; an item with an operator wait and a waiting line is in `items` and in `steps`; one listing of a repository's open items serves both.
+- MCP-43: Steps come newest `since` first, then by descending item number; an item with an operator wait and a waiting line is in `items` and `steps`; one listing of the open items serves both.
+- MCP-94: A step's `since` is its operator `wait`'s date as `YYYY-MM-DD`; its `url` is `https://<host>/<owner>/<repository>/issues/<n>`, `null` under `storage = "state-ref"`, which has no item pages.
 
 ## Marking a step
 
@@ -326,7 +327,7 @@ Setup: `owner/a` holds item `#9` titled `Rotate the key`, whose block has `wait 
 
 ```text
 > {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_inbox"}}
-< {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[],"steps":[{"number":9,"title":"Rotate the key","step":"Rotate the deploy key in the host's settings.","form":"paste","purpose":"The old key leaked.","paste":"make rotate-key","paste_kind":"command","expected":"A new key shows.","actions":null,"answer":null}]}],"unreadable":[]},"isError":false}}
+< {"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"<the structured content>"}],"structuredContent":{"root":"<root>","repositories":[{"repository":"owner/a","items":[],"steps":[{"number":9,"title":"Rotate the key","step":"Rotate the deploy key in the host's settings.","since":"2026-11-01","url":"https://github.com/owner/a/issues/9","form":"paste","purpose":"The old key leaked.","paste":"make rotate-key","paste_kind":"command","expected":"A new key shows.","actions":null,"answer":null}]}],"unreadable":[]},"isError":false}}
 ```
 
 An item labelled `needs-operator` without an operator `wait` is not listed (MCP-71), and a step without a `[step]` table has `form` `old` and `purpose`, `paste`, `paste_kind`, `expected`, `actions` and `answer` null.

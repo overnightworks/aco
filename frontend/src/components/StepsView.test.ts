@@ -91,7 +91,7 @@ test.each([
 	['ftp://', 'ftp://host/x']
 ])('ABRD-196: a stored %s paste of the old form is no link', (_name, paste) => {
 	render(StepsView, {
-		repos: [repo({ steps: [oldStepRead({ actions: null, paste, expected: 'Done.' })] })],
+		repos: [repo({ steps: [oldStepRead({ actions: null, paste, expected: 'Done.', url: null })] })],
 		decisions: store()
 	});
 
@@ -246,4 +246,46 @@ test('ABRD-176: a refused answer keeps every answer button disabled until Neu la
 	expect(screen.getByRole('alert')).toHaveTextContent('This step changed');
 	expect(screen.getByRole('button', { name: 'Erfolgreich' })).toBeDisabled();
 	expect(screen.getByRole('button', { name: 'Fehlgeschlagen' })).toBeDisabled();
+});
+
+test.each([
+	['paste', stepRead()],
+	['old', oldStepRead()],
+	['without a table', oldStepRead({ purpose: null, actions: null, expected: null })]
+])('ABRD-198: a step of the %s form shows wartet seit and its date', (_name, step) => {
+	render(StepsView, { repos: [repo({ steps: [step] })], decisions: store() });
+
+	expect(screen.getByText('wartet seit 01.11.2026')).toBeInTheDocument();
+});
+
+test('ABRD-198: #n links to the item in a new tab without an opener', () => {
+	render(StepsView, { repos: [repo({ steps: [stepRead()] })], decisions: store() });
+
+	const link = screen.getByRole('link', { name: '#7' });
+	expect(link).toHaveAttribute('href', 'https://github.com/owner/repo/issues/7');
+	expect(link).toHaveAttribute('target', '_blank');
+	expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+});
+
+test('ABRD-198: a step without a url shows #n as plain text', () => {
+	render(StepsView, { repos: [repo({ steps: [stepRead({ url: null })] })], decisions: store() });
+
+	expect(screen.getByText('#7')).toBeInTheDocument();
+	expect(screen.queryByRole('link', { name: '#7' })).toBeNull();
+});
+
+test('ABRD-199: the group of the newer step stands first, and a failed repo stands last with its alert', () => {
+	render(StepsView, {
+		repos: [
+			repo({ name: 'broken', error: 'GitHub is down', steps: [] }),
+			repo({ name: 'older', steps: [stepRead({ since: '2026-10-01' })] }),
+			repo({ name: 'newer', steps: [stepRead({ since: '2026-11-01' })] })
+		],
+		decisions: store()
+	});
+
+	expect(
+		screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+	).toEqual(['newer', 'older', 'broken']);
+	expect(screen.getByRole('alert')).toHaveTextContent('GitHub is down');
 });

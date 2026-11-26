@@ -108,7 +108,7 @@ def _witness_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, operation: st
 def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_turn(
     here: board_forge.BoardForge, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Spec: MCP-66, MCP-67, MCP-39"""
+    """Spec: MCP-66, MCP-67, MCP-39, MCP-94"""
     here.put_item(1, complete_contract("S1 Prepare the vault.\nS2 Rotate the key."), title="Key")
     before = body.locate_block(here.stored_body(1)).data
     lock_held_at_body = _witness_lock(monkeypatch, tmp_path, "update_item_body")
@@ -136,6 +136,8 @@ def test_a_step_on_an_item_is_one_body_write_then_one_label_both_in_the_items_tu
             "number": 1,
             "title": "Key",
             "step": STEP,
+            "since": board_forge.RULING_DAY.isoformat(),
+            "url": "https://github.com/board-forge/here/issues/1",
             "form": "paste",
             "purpose": "The old key must not outlive the rotation.",
             "paste": "make rotate",

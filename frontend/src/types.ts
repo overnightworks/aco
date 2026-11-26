@@ -182,6 +182,10 @@ interface StepBase {
 	number: number;
 	title: string;
 	step: string;
+	/** The day the step's wait began, `YYYY-MM-DD` (MCP-94). */
+	since: string;
+	/** The item's page; `null` where the item has none (MCP-94). */
+	url: string | null;
 	answer: string | null;
 	/** The step as listed, bound to its repo, item and card (ABRD-163); an answer posts it back. */
 	fingerprint: string;
@@ -219,7 +223,7 @@ export interface RepoReading {
 	items: BoardItem[];
 	/** `null` once this repo's read failed. */
 	progress: ProgressRead | ProgressUnknown | null;
-	/** The members' steps waiting on the operator, newest first (ABRD-157). */
+	/** The members' steps waiting on the operator, newest `since` first (ABRD-157, MCP-43). */
 	steps: StepRead[];
 }
 
