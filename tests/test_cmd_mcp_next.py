@@ -14,12 +14,11 @@ from discovery_fixtures import discovered_checkout, unreadable_checkout
 from github_fixtures import FakeForge
 from mcp_lines import call_line, serve_mcp
 
-from aco import forge, github, protocol, session, workboard
+from aco import forge, github, protocol, workboard
 
 pytestmark = pytest.mark.usefixtures("config_file", "isolated_global_git_config")
 
 _READ_NEXT = call_line(1, "read_next")
-_real_context = session.run_context
 _FORGE_DOWN = "the forge is down"
 
 
@@ -84,7 +83,7 @@ def _next_in(
 
 
 def _read_next(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    [answer] = serve_mcp(monkeypatch, _READ_NEXT, run_context=_real_context)
+    [answer] = serve_mcp(monkeypatch, _READ_NEXT, run_context=None)
     result = answer["result"]
     assert result["isError"] is False
     assert json.loads(result["content"][0]["text"]) == result["structuredContent"]
