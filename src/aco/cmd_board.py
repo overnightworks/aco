@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import cast
 
-from . import board_link, board_read, protocol, recurring_audit, report, workboard
+from . import board_link, board_read, protocol, recurring_audit, report, store, workboard
 from .session import RepoMeaninglessUnderStateRefError, RunContext
 
 
@@ -189,7 +189,11 @@ def startable_payload(
 
 def startable_reading(context: RunContext) -> dict[str, object]:
     """`startable_payload` of the board `context` is bound to; raises
-    `protocol.ClaimError` when that board cannot be read."""
+    `protocol.ClaimError` when that board cannot be read. The state ref is peeked, so
+    the read leaves no lineage stamp or lock in the checkout."""
+    context.observation = store.peek_state(
+        worktree=context.toplevel, remote=context.configured_canonical_remote
+    )
     observed = board_read.observed_board(context)
     return startable_payload(
         observed.board, board_read.recurring_audit_reading(context, observed.trunk_landings)

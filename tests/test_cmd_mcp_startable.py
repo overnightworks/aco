@@ -55,6 +55,10 @@ class _Fleet:
             if directory.is_dir()
         ]
 
+    def aco_files(self) -> list[Path]:
+        """Every file aco keeps inside the checkouts' git directories."""
+        return sorted(path for path in self.root.glob("*/.git/aco/**/*") if path.is_file())
+
 
 @pytest.fixture
 def fleet(root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _Fleet:
@@ -198,5 +202,6 @@ def test_reading_writes_nothing_and_a_repeat_answers_the_same(
     second = _read_startable(monkeypatch)
 
     assert fleet.refs() == refs_before
+    assert fleet.aco_files() == []
     assert (busy.body_writes, busy.added_labels, busy.created_issues) == ([], [], [])
     assert second == first
