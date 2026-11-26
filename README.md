@@ -77,6 +77,7 @@ other key is refused by name (`specs/storage-pin.spec.md`).
 | `lane_shared` | paths a lane may change beyond its scope; a trailing `/` covers a directory |
 | `dependency_paths` | paths a `No-Item: deps` pull request may change; a trailing `/` covers a directory |
 | `production_paths` | paths whose changes count toward a lane record's production size; a trailing `/` covers a directory; paths also listed in `dependency_paths` do not count |
+| `surface_paths` | paths whose touched files `aco brief --json` lists as `touched_surfaces`; a trailing `/` covers a directory |
 | `audit` | recurring audits as `[[audit]]` tables (`name`, `label`, `landings`, `days`, `run`); `aco next` prints one as due once its landings or days passed since the commit named by the newest `audited through <sha>` line of an issue with the label (`specs/next.spec.md`); none by default |
 
 Code built ahead of its caller is listed in a tracked

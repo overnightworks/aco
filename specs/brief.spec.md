@@ -32,12 +32,12 @@ object. A refusal reaching the shared collection point prints
 
 | state \ trigger | `aco brief <item>` (text) | `aco brief <item> --json` |
 |---|---|---|
-| a live issue claim, lane branch resolves | BRIEF-01, BRIEF-02, BRIEF-11, BRIEF-26, BRIEF-05, BRIEF-29, BRIEF-30, BRIEF-31 | BRIEF-06, BRIEF-10, BRIEF-27 |
-| a live issue claim, lane branch gone | BRIEF-04 | BRIEF-06, BRIEF-10, BRIEF-27 |
+| a live issue claim, lane branch resolves | BRIEF-01, BRIEF-02, BRIEF-11, BRIEF-26, BRIEF-05, BRIEF-29, BRIEF-30, BRIEF-31, BRIEF-33 | BRIEF-06, BRIEF-10, BRIEF-27, BRIEF-32 |
+| a live issue claim, lane branch gone | BRIEF-04 | BRIEF-06, BRIEF-10, BRIEF-27, BRIEF-32 |
 | a live issue claim, lane branch read or `<trunk>` diff fails outright | BRIEF-18 | BRIEF-18 |
 | a live issue claim, lane branch resolves, no `<trunk>`, `<remote>` has no branch | BRIEF-20 | BRIEF-20 |
 | a live issue claim, lane branch resolves, no `<trunk>`, `<remote>` has branches | BRIEF-21 | BRIEF-21 |
-| no live issue claim | BRIEF-03, BRIEF-29, BRIEF-30, BRIEF-31 | BRIEF-06, BRIEF-27 |
+| no live issue claim | BRIEF-03, BRIEF-29, BRIEF-30, BRIEF-31 | BRIEF-06, BRIEF-27, BRIEF-32 |
 | `<item>` names no item at all | BRIEF-08 | BRIEF-08 |
 | the body holds a display control | BRIEF-23 | BRIEF-06 |
 | the live claim's text holds a display control | BRIEF-28 | BRIEF-28 |
@@ -68,6 +68,8 @@ object. A refusal reaching the shared collection point prints
 
 - BRIEF-06: `aco brief <item> --json` prints `specs/output.spec.md`'s envelope, `reason: "composed"`, `"body", "claim", "tip", "touched"` (as `TOUCHED`), `"claim"` `null` without a live claim (see E-BRIEF-14).
 - BRIEF-27: `"outside_claim"`, after `"touched"`, lists each touched path, in order, that LAND-88 leaves uncovered, `[]` when none, `null` without a live claim (see E-BRIEF-04).
+- BRIEF-32: `"touched_surfaces"`, after `"outside_claim"`, lists each touched path, in order, that a `surface_paths` entry (PIN-63) covers, `[]` when none does or no claim is live (see E-BRIEF-20).
+- BRIEF-33: Text `aco brief` shows no surface: its four sections stay as BRIEF-01 says, whatever `surface_paths` names.
 - BRIEF-28: Text `aco brief` shows each display control in the `CLAIM` line's agent, role, branch and in its `whole:` line as NEXT-37 does; `--json`'s `claim` carries them as stored.
 - BRIEF-10: A non-`null` `"claim"` object is `{"agent", "role", "branch", "base", "scope", "whole", "age"}` then STAT-22's keys, `"whole"` `null` without one (see E-BRIEF-04).
 
@@ -192,7 +194,7 @@ one commit on `ada/issue-42` past `<base>` touching `README.md`, pushed to
 
 ```console
 $ aco brief 42 --json
-{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"], "outside_claim": []}
+{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"], "outside_claim": [], "touched_surfaces": []}
 exit 0
 ```
 
@@ -264,7 +266,7 @@ Setup: as E-BRIEF-07
 
 ```console
 $ aco brief 42 --step build --json
-{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"], "rules": ["Stay in scope."], "checks": ["ruff check ."]}
+{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"], "outside_claim": [], "touched_surfaces": [], "rules": ["Stay in scope."], "checks": ["ruff check ."]}
 exit 0
 ```
 
@@ -357,7 +359,7 @@ Setup: as E-BRIEF-04, then another lane lands `b.py` on `origin/main`, and
 
 ```console
 $ aco brief 42 --json
-{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"]}
+{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md"], "outside_claim": [], "touched_surfaces": []}
 exit 0
 ```
 
@@ -449,3 +451,15 @@ TIP
 TOUCHED
 exit 0
 ````
+
+### E-BRIEF-20 -- touched surfaces
+
+Setup: as E-BRIEF-04, but the tracked `.aco/board.toml` names
+`surface_paths = ["ui/", "page.html"]` and the one commit on `ada/issue-42`
+past `<base>` touches `README.md`, `ui/a.css` and `page.html`
+
+```console
+$ aco brief 42 --json
+{"ok": true, "reason": "composed", "body": "The item's own body.", "claim": {"agent": "Ada", "role": "builder", "branch": "ada/issue-42", "base": "<base>", "scope": ["README.md"], "whole": null, "age": "0h 0m", "lane_shared": [], "lane_shared_unavailable": null}, "tip": "<tip>", "touched": ["README.md", "page.html", "ui/a.css"], "outside_claim": ["page.html", "ui/a.css"], "touched_surfaces": ["page.html", "ui/a.css"]}
+exit 0
+```

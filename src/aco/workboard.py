@@ -529,6 +529,7 @@ class BoardConfig:
     merge_method: MergeMethod | None = None
     dependency_paths: tuple[str, ...] = ()
     production_paths: tuple[str, ...] = ()
+    surface_paths: tuple[str, ...] = ()
     audit: tuple[recurring_audit.RecurringAudit, ...] = ()
 
     def covers_dependency_path(self, path: str) -> bool:
@@ -538,6 +539,7 @@ class BoardConfig:
 # Every key `.aco/board.toml` defines; anything else is a typo, and
 # `_refuse_unknown_config_keys` names it rather than reading past it.
 CONFIG_KEYS = frozenset({setting.name for setting in fields(BoardConfig)})
+REPOSITORY_PATH_KEYS = ("lane_shared", "dependency_paths", "production_paths", "surface_paths")
 
 
 class Stage(StrEnum):
@@ -704,7 +706,7 @@ def _validated_merge_method(raw: dict[str, object], path: Path) -> MergeMethod |
 
 
 def repository_path_entry_covers(entry: str, path: str) -> bool:
-    """Whether a validated `lane_shared` or `dependency_paths` `entry` names
+    """Whether a validated board path `entry` names
     `path`: a directory entry (one ending `/`) every canonical path below it,
     any other exactly one path. A path that is not a canonical
     repository-relative path is named by no entry."""
@@ -787,9 +789,7 @@ def parse_config(text: str, path: Path) -> BoardConfig:
         canonical_remote=_validated_canonical_remote(raw, path),
         storage=_validated_storage(raw, path),
         merge_method=_validated_merge_method(raw, path),
-        lane_shared=_validated_repository_paths(raw, path, "lane_shared"),
-        dependency_paths=_validated_repository_paths(raw, path, "dependency_paths"),
-        production_paths=_validated_repository_paths(raw, path, "production_paths"),
+        **{key: _validated_repository_paths(raw, path, key) for key in REPOSITORY_PATH_KEYS},
         audit=recurring_audit.parse_entries(raw.get("audit"), path),
     )
 

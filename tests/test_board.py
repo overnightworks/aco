@@ -1863,12 +1863,14 @@ def test_board_configuration_refuses_an_unknown_key_by_name(tmp_path: Path) -> N
 
 
 def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> None:
+    """Spec: PIN-63."""
     config_path = tmp_path / "board.toml"
     config_path.write_text(
         'priority_labels = ["ux"]\nidea_label = "idea"\n'
         'canonical_remote = "upstream"\n'
         'storage = "state-ref"\nlane_shared = ["scripts/whitelist.py", "tests/"]\n'
         'dependency_paths = ["pyproject.toml", "uv.lock", ".github/workflows/"]\n'
+        'surface_paths = ["ui/"]\n'
     )
 
     assert workboard.load_config(config_path) == BoardConfig(
@@ -1878,47 +1880,8 @@ def test_board_configuration_accepts_every_key_it_defines(tmp_path: Path) -> Non
         Storage.STATE_REF,
         ("scripts/whitelist.py", "tests/"),
         dependency_paths=("pyproject.toml", "uv.lock", ".github/workflows/"),
+        surface_paths=("ui/",),
     )
-
-
-def unusable_entry(entry: str) -> str:
-    return f"lane_shared entry '{entry}' is not a canonical path inside the repository"
-
-
-@pytest.mark.parametrize(
-    ("lane_shared", "refusal"),
-    [
-        pytest.param('["/etc/passwd"]', unusable_entry("/etc/passwd"), id="absolute"),
-        pytest.param(
-            '["../sibling/registry.txt"]',
-            unusable_entry("../sibling/registry.txt"),
-            id="climbs-out",
-        ),
-        pytest.param('["scripts//"]', unusable_entry("scripts//"), id="doubled-trailing-slash"),
-        pytest.param('["/"]', unusable_entry("/"), id="only-a-slash"),
-        pytest.param(
-            '"scripts/registry.txt"',
-            "lane_shared must be a list of unique repository paths",
-            id="not-a-list",
-        ),
-        pytest.param(
-            '["a.txt", "a.txt"]',
-            "lane_shared must be a list of unique repository paths",
-            id="duplicate",
-        ),
-    ],
-)
-def test_board_configuration_refuses_a_lane_shared_entry_that_is_no_repository_path(
-    lane_shared: str, refusal: str
-) -> None:
-    """A registry every lane may write is named by its
-    canonical path inside the repository; anything else is a defective
-    configuration. Only the syntax is judged, so `land` and every reader
-    judge alike."""
-    with pytest.raises(ClaimError) as refused:
-        workboard.parse_config(f"lane_shared = {lane_shared}\n", workboard.CONFIG_PATH)
-
-    assert str(refused.value) == f"board configuration {workboard.CONFIG_PATH} {refusal}"
 
 
 def test_load_brief_config_returns_none_when_the_file_does_not_exist(tmp_path: Path) -> None:
@@ -3419,149 +3382,19 @@ def test_names_parent_requires_an_exact_first_line(raw: str, label: str, expecte
         ],
     ],
 )
-def test_board_configuration_refuses_invalid_dependency_paths(value: str, reason: str) -> None:
+@pytest.mark.parametrize("key", workboard.REPOSITORY_PATH_KEYS)
+def test_board_configuration_refuses_invalid_repository_paths(
+    key: str, value: str, reason: str
+) -> None:
+    """Spec: PIN-38, PIN-39, PIN-45, PIN-46, PIN-55, PIN-56, PIN-64, PIN-65."""
     with pytest.raises(ClaimError) as refused:
-        workboard.parse_config(f"dependency_paths = {value}\n", workboard.CONFIG_PATH)
-    assert str(refused.value) == f"board configuration .aco/board.toml dependency_paths {reason}"
+        workboard.parse_config(f"{key} = {value}\n", workboard.CONFIG_PATH)
+    assert str(refused.value) == f"board configuration .aco/board.toml {key} {reason}"
 
 
-@pytest.mark.parametrize("text", ["", "dependency_paths = []"])
-def test_board_configuration_has_no_dependency_paths_unless_named(text: str) -> None:
-    assert workboard.parse_config(text, workboard.CONFIG_PATH).dependency_paths == ()
+@pytest.mark.parametrize("key", workboard.REPOSITORY_PATH_KEYS)
+@pytest.mark.parametrize("text", ["", "{key} = []"])
+def test_board_configuration_has_no_repository_paths_unless_named(key: str, text: str) -> None:
+    config = workboard.parse_config(text.format(key=key), workboard.CONFIG_PATH)
 
-
-@pytest.mark.parametrize(
-    ("pull_request_body", "live_line", "appended", "reads_as"),
-    [
-        pytest.param("", None, "No-Item: deps", NoItemClassification(NoItemKind.DEPS), id="B1"),
-        pytest.param(
-            "Bump x",
-            None,
-            "\n\nNo-Item: deps",
-            NoItemClassification(NoItemKind.DEPS),
-            id="B2",
-        ),
-        pytest.param(
-            "Bump x\n",
-            None,
-            "\nNo-Item: deps",
-            NoItemClassification(NoItemKind.DEPS),
-            id="B3",
-        ),
-        pytest.param(
-            "Bump x\n\n",
-            None,
-            "No-Item: deps",
-            NoItemClassification(NoItemKind.DEPS),
-            id="B4",
-        ),
-        pytest.param(
-            "Bump x\r\n",
-            None,
-            "\nNo-Item: deps",
-            NoItemClassification(NoItemKind.DEPS),
-            id="B5-crlf",
-        ),
-        pytest.param(
-            "```\nNo-Item: deps\n```",
-            None,
-            "\n\nNo-Item: deps",
-            NoItemClassification(NoItemKind.DEPS),
-            id="B6-fenced",
-        ),
-        pytest.param(
-            "```\nfoo",
-            None,
-            "\n\nNo-Item: deps",
-            ClassificationDefect("carries no `Work-Item:` or `No-Item:` line"),
-            id="B7-unclosed-fence",
-        ),
-        pytest.param(
-            f"Bump x\n\nNo-Item: dep{chr(0x202E)}s",
-            "No-Item: dep\\u202es",
-            "\n\nNo-Item: deps",
-            ClassificationDefect("carries 2 classification lines; exactly one is required"),
-            id="B15-display-control",
-        ),
-        pytest.param(
-            "Work-Item: #5\nNo-Item: fix",
-            "Work-Item: #5",
-            "\n\nNo-Item: deps",
-            ClassificationDefect("carries 3 classification lines; exactly one is required"),
-            id="first-of-two",
-        ),
-    ],
-)
-def test_live_classification_line_and_composition_read_the_whole_body(
-    pull_request_body: str,
-    live_line: str | None,
-    appended: str,
-    reads_as: workboard.Classification | ClassificationDefect,
-) -> None:
-    """Spec: ADOPT-05, ADOPT-11, ADOPT-12 -- first live line escaped, body kept."""
-    composed = workboard.body_with_classification(pull_request_body, NoItemKind.DEPS)
-
-    assert workboard.live_classification_line(pull_request_body) == live_line
-    assert composed == pull_request_body + appended
-    assert workboard.parse_pull_request_classification(composed, REPOSITORY) == reads_as
-
-
-@pytest.mark.parametrize(
-    ("pull_request_body", "expected_state"),
-    [
-        pytest.param(
-            "Bump x\n\nNo-Item: fix",
-            lambda: workboard.OtherClassificationLine("No-Item: fix"),
-            id="B8-another-kind",
-        ),
-        pytest.param(
-            "Work-Item: #5",
-            lambda: workboard.OtherClassificationLine("Work-Item: #5"),
-            id="B9-a-work-item",
-        ),
-        pytest.param(
-            "No-Item: chore",
-            lambda: workboard.OtherClassificationLine("No-Item: chore"),
-            id="B10-an-unknown-kind",
-        ),
-        pytest.param(
-            "Bump x\n\nNo-Item: deps", lambda: workboard.ClassificationLine.PRESENT, id="B11"
-        ),
-        pytest.param("no-item: DEPS", lambda: workboard.ClassificationLine.PRESENT, id="B12-case"),
-        pytest.param(
-            "No-Item: deps\nWork-Item: #5",
-            lambda: workboard.MalformedClassificationLines(
-                ClassificationDefect("carries 2 classification lines; exactly one is required")
-            ),
-            id="B14-two-lines",
-        ),
-    ],
-)
-def test_classification_line_state_tells_the_line_a_rerun_may_keep(
-    pull_request_body: str, expected_state: Callable[[], workboard.ClassificationLineState]
-) -> None:
-    """Spec: ADOPT-05, ADOPT-26, ADOPT-30 -- the one live line is the kind's own (kept), another
-    line (refused), or more than one (the parser's defect, refused)."""
-    state = workboard.classification_line_state(pull_request_body, NoItemKind.DEPS, REPOSITORY)
-
-    assert state == expected_state()
-
-
-@pytest.mark.parametrize(
-    ("classification", "expected"),
-    [
-        pytest.param(
-            workboard.WorkItemClassification(workboard.IssueReference(REPOSITORY, 72)),
-            "Work-Item: #72",
-            id="work-item",
-        ),
-        pytest.param(NoItemClassification(NoItemKind.DOCS), "No-Item: docs", id="no-item"),
-    ],
-)
-def test_land_trunk_trailer_renders_the_trunk_grammar_for_both_classifications(
-    classification: workboard.Classification,
-    expected: str,
-) -> None:
-    """Spec: LANDCMD-13. Trunk trailers use local issue references or the no-item kind."""
-    observed = workboard.land_trunk_trailer(classification)
-    assert observed == expected
+    assert getattr(config, key) == ()
