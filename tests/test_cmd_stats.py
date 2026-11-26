@@ -185,6 +185,27 @@ def test_the_text_compares_two_groups_figure_by_figure(
     ]
 
 
+def test_a_build_stage_no_agent_ran_counts_under_none_and_names_no_model(
+    clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: STATS-10, STATS-27."""
+    publish_claims_from_a_second_clone(clone, bare_remote, ())
+    lane = LaneRecord(
+        LaneOutcome.LANDED,
+        routing=routing({RoutingStage.BUILD: "none"}, fix_rounds=0, blocking=0, experiment="x"),
+    )
+    message = release_message(lane.trailers())
+    push_release_commit(monkeypatch, clone, bare_remote, message, at("2026-11-02T12:00:00"))
+
+    status, stdout, stderr = stats(capsys, "2026-11-01..2026-11-07", UNUSED_TAG)
+
+    assert (status, stderr) == (0, "")
+    assert "  build: none 1, unknown 0" in stdout.splitlines()
+
+
 def test_json_carries_the_same_figures_under_the_shared_envelope(
     recorded: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

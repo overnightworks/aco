@@ -24,7 +24,9 @@ class RoutingStage(StrEnum):
 
 _STAGE_ORDER = tuple(RoutingStage)
 NO_STAGE = "none"
-_STAGES_THAT_MAY_BE_ABSENT = frozenset({RoutingStage.FIX, RoutingStage.TEST, RoutingStage.GATE})
+_STAGES_THAT_MAY_BE_ABSENT = frozenset(
+    {RoutingStage.BUILD, RoutingStage.FIX, RoutingStage.TEST, RoutingStage.GATE}
+)
 
 _LINE = re.compile(r"^Routing: (.*)$", re.MULTILINE)
 _MODEL_AND_EFFORT = re.compile(r"[a-z0-9][a-z0-9.-]*/[a-z0-9-]+")

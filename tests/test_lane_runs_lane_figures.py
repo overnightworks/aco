@@ -51,7 +51,7 @@ def counts_of(figures: lane_record.LaneFigures, kind: str) -> tuple[int | None, 
             id="a-lost-run-after-the-run-that-ran-build",
         ),
         pytest.param(
-            (added("one", "review"), added("two", "review")), UNKNOWN, id="no-run-ran-build"
+            (added("one", "review"), added("two", "review")), "none", id="no-run-ran-build"
         ),
         pytest.param(
             (added("one", "review"), not_following("two", "build", marker="y")),
@@ -115,16 +115,17 @@ def test_a_later_stage_is_the_choice_of_the_last_lost_or_stage_running_element(
     ("stage", "expected"),
     [
         pytest.param("review", UNKNOWN, id="review-is-unknown"),
+        pytest.param("build", "none", id="build-is-none"),
         pytest.param("fix", "none", id="fix-is-none"),
         pytest.param("test", "none", id="test-is-none"),
         pytest.param("gate", "none", id="gate-is-none"),
     ],
 )
-def test_a_stage_no_run_ran_is_none_for_fix_test_and_gate_and_unknown_for_review(
+def test_a_stage_no_run_ran_is_none_but_for_review_which_is_unknown(
     stage: str, expected: str | None
 ) -> None:
     """Spec: LANREC-79."""
-    figures = figures_of(added("one", "build"))
+    figures = figures_of(added("one"))
 
     assert figures.stages[RoutingStage(stage)] == expected
 

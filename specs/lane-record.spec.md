@@ -26,7 +26,7 @@ last verdict judged and `<reviewed>` the `--head` value of `aco land`.
 | item size class | LANREC-28 | — |
 | the routing line, without `--record` or stored runs | LANREC-13..LANREC-15 | LANREC-13, LANREC-14 |
 | the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 |
-| `aco lane-record check <file>` | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49 | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49 |
+| `aco lane-record check <file>` | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49, LANREC-104, LANREC-105 | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49, LANREC-104, LANREC-105 |
 | `--record <file>` | LANREC-31, LANREC-38..LANREC-40, LANREC-42..LANREC-46, LANREC-49, LANREC-50, LANREC-99 | LANREC-31, LANREC-41..LANREC-43, LANREC-45, LANREC-46, LANREC-49, LANREC-50 |
 | `aco lane-record begin <item> --run <run>` | LANREC-52..LANREC-54, LANREC-58..LANREC-60, LANREC-62..LANREC-65, LANREC-68..LANREC-70, LANREC-89 | LANREC-52..LANREC-54, LANREC-58..LANREC-60, LANREC-62..LANREC-65, LANREC-68..LANREC-70, LANREC-89 |
 | `aco lane-record add <item> <file> --run <run>` | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89 | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89 |
@@ -63,14 +63,14 @@ and the bracketed part comes from the third fix round on. The line `Experiment: 
 may stand anywhere after the stages and before `Blocking:`.
 
 ```text
-Routing: build <model>/<effort>; fix <model>/<effort>|none; review <model>/<effort>; test <model>/<effort>|none; gate <model>/<effort>|none; land <model>/<effort>. Fix rounds: <n>[, hard: <why>]. Experiment: <tag>. Blocking: <finding> → <stage>; …|none
+Routing: build <model>/<effort>|none; fix <model>/<effort>|none; review <model>/<effort>; test <model>/<effort>|none; gate <model>/<effort>|none; land <model>/<effort>. Fix rounds: <n>[, hard: <why>]. Experiment: <tag>. Blocking: <finding> → <stage>; …|none
 ```
 
 - LANREC-13: Without stored runs, a landed lane's routing line is read from its merge commit's message, never from the pull request's body, which stays editable after the merge (LAND-64).
 - LANREC-14: Without stored runs, a message or reason with no `Routing:` line, or with more than one, records no routing figure; so does a merge made outside `aco land` that lost the line.
 - LANREC-15: Without stored runs, an abandoned lane's routing line is read from its `--abandoned` reason, which the reason's bound (REL-02) already keeps to one line.
 - LANREC-16: The routing line is one line that starts `Routing: `; the stages `build`, `fix`, `review`, `test`, `gate` and `land` follow in that order, each as `<name> <model>/<effort>`, separated by `; `.
-- LANREC-17: `<model>` is lowercase letters, digits, `.` and `-`, `<effort>` lowercase letters, digits and `-`; `fix`, `test`, `gate` may be `none`. A stage that does not fit has no trailer; the others still do.
+- LANREC-17: `<model>` is lowercase letters, digits, `.` and `-`, `<effort>` lowercase letters, digits and `-`; all but `review` and `land` may be `none`. A stage that does not fit has no trailer.
 - LANREC-18: `Fix rounds: <n>` takes `<n>` of one to three digits; any other value records no rounds. The text after `, hard:` is never read.
 - LANREC-19: `Blocking:` is `none` (count `0`) or findings split by `; `, each ending one `→ <stage>`. `<n>× <text> → <stage>`, `<n>` 1 to 999, counts `<n>`; any other finding one; `0×` or no arrow: unknown.
 - LANREC-20: `Experiment: <tag>` takes `<tag>` of lowercase letters, digits and `-`, one to 40 characters, as a sentence of its own; any other value records no tag.
@@ -86,10 +86,12 @@ The lane record file is the JSON file a lane hands `aco land` or `aco release` w
 `--record`: counts, model names, tags and shas, never a finding's text (LANREC-05). A file larger than 1048576 bytes `cannot be read` (LANREC-31).
 
 - LANREC-30: `aco lane-record check <file>` reads the file alone, writes nothing, needs no checkout, and prints `lane record <file> is valid`, exit `0`.
-- LANREC-31: A file that `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, `not valid JSON`, LANREC-32..37, 46, 48, 49 (E-LANREC-03).
+- LANREC-31: A file `check`, `land` or `release` cannot use refuses `lane record <file> is invalid: <defect>`, exit `2`: `cannot be read (<reason>)`, `not valid JSON`, LANREC-32..37, 46, 48, 49, 104 (E-LANREC-03).
 - LANREC-32: The file is one JSON object of `version`, `stages`, `fix_rounds`, `blocking`, `verdicts` and the optional `risk`, `misses` and `experiment`; an extra key, a missing one or a key stated twice refuses.
 - LANREC-33: `version` is judged first: `1` passes; a whole number of up to 20 digits refuses `version <n> is unknown; this aco reads version 1`, any other `version must be the whole number 1`.
-- LANREC-34: `stages` names `build`, `fix`, `review`, `test`, `gate` and `land`, each `<model>/<effort>` as LANREC-17 reads it, or `none` for `fix`, `test` and `gate`; `land` is the model dispatched to land.
+- LANREC-34: `stages` names `build`, `fix`, `review`, `test`, `gate` and `land`, each `<model>/<effort>` as LANREC-17 reads it, or `none` but for `review` and `land`; `land` is the model dispatched.
+- LANREC-104: A stage value that does not fit refuses `stage <stage> must be <model>/<effort> or none` where LANREC-34 allows `none`, else `stage <stage> must be <model>/<effort>` (E-LANREC-23).
+- LANREC-105: `none` for `build` means no agent built the lane, as for `fix`: a pull request a bot or a person outside the fleet built is adopted with `"build": "none"` and writes `lane_build: none`.
 - LANREC-35: `fix_rounds` and `blocking` each hold a whole number from `0` to `999` for each finding stage `review`, `gate`, `ci` and `test`; a finding a stand-in raised counts under `gate`.
 - LANREC-47: A fix round counts under the stage whose report raised the blocking findings it fixes; one fixing only folded follow-ups, under the stage that raised them, the first of `review`, `gate`, `ci`, `test`.
 - LANREC-36: `verdicts` lists each review and gate verdict, oldest first, as `stage` (`review` or `gate`), `verdict` (`approve` or `revise`) and the full commit `sha` it judged; the list may be empty.
@@ -145,9 +147,9 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 - LANREC-74: A recorded run's record follows on an indented `record <compact JSON>` line, then `lane <label>: complete|incomplete` and the computed record on an indented `record <compact JSON>` line.
 - LANREC-75: Before each entry that does not follow stands one lost run, and an entry without a record is one.
 - LANREC-76: The lane is complete when no run is lost, judged when `show` runs: a run that shows after its own begin sees an incomplete lane.
-- LANREC-77: `stages.build` is the choice in the record of the first run that is lost or ran `build`; a lost run, or no such run, gives unknown.
+- LANREC-77: `stages.build` is the choice in the record of the first run that is lost or ran `build`; a lost run gives unknown, and where no run ran it LANREC-79 holds.
 - LANREC-78: `stages.review`, `fix`, `test` and `gate` are the choice in the record of the last run that is lost or ran the stage; a lost run gives unknown.
-- LANREC-79: Where no run ran a stage, `fix`, `test` and `gate` are `none` and `review` is unknown; a run's `ran`, never its record's slots, says which stages it ran.
+- LANREC-79: Where no run ran a stage, `build`, `fix`, `test` and `gate` are `none` and `review` is unknown; a run's `ran`, never its record's slots, says which stages it ran.
 - LANREC-80: `stages.land` is the newest entry's record's, unknown when that entry has no record; `risk` is the record's of the newest entry that has one, unknown when none has or it states none.
 - LANREC-81: `fix_rounds`, `blocking` and `misses` per finding stage are the sums over the known records, clamped at `999`.
 - LANREC-82: A count kind is unknown for all four finding stages when a run is lost, and `misses` also when a known record states none.
@@ -522,3 +524,13 @@ exit 2
 ```
 
 Nothing is merged, enqueued or written; the claim stands. The same land with `--record lane-record.json` merges.
+
+### E-LANREC-23 — a stage that may not be none
+
+Setup: a file `lane-record.json` stating `"review": "none"`, no checkout
+
+```console
+$ aco lane-record check lane-record.json
+ERROR: lane record lane-record.json is invalid: stage review must be <model>/<effort>
+exit 2
+```
