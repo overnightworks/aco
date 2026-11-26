@@ -129,6 +129,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         child.send("")
         listed = child.ask(2, "tools/list")
         inbox = child.read_inbox(3)
+        read_next = child.ask(4, "tools/call", {"name": "read_next", "arguments": {}})["result"]
         exit_code, rest, stderr = _finish(child)
 
     assert initialized["result"]["protocolVersion"] == "2025-06-18"
@@ -138,6 +139,7 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         "record_answer",
         "step",
         "answer_step",
+        "read_next",
     ]
     assert inbox["isError"] is False
     structured = inbox["structuredContent"]
@@ -147,6 +149,14 @@ def test_a_session_lists_the_tool_and_reads_the_waiting_lines_of_every_repositor
         for entry in structured["repositories"]
     ] == [("board-forge/elsewhere", [2]), ("board-forge/here", [1])]
     assert structured["unreadable"] == []
+    assert read_next["isError"] is False
+    assert [entry["repository"] for entry in read_next["structuredContent"]["repositories"]] == [
+        "board-forge/elsewhere",
+        "board-forge/here",
+    ]
+    assert next(tool for tool in listed["result"]["tools"] if tool["name"] == "read_next")[
+        "annotations"
+    ] == {"readOnlyHint": True}
     assert (exit_code, rest, stderr) == (0, "", "")
 
 

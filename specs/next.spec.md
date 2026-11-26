@@ -158,6 +158,7 @@ other printable space are text.
 - NEXT-11: A work-item action's `reason` is `work_item` (`ok: true`), adding `number`, `score`, `title`, `next`, `command`, `ruling_landings`/`ruling_old`/`ruling_hint` per NEXT-04 (E-NEXT-07).
 - NEXT-12: A cut proposal's `reason` is `"cut_slice"` (`ok: true`), the object adding `number`, `title`, `slice`, `cut_title`, `command` (see E-NEXT-07).
 - NEXT-13: A close proposal's `reason` is `"close_container"` (`ok: true`), adding `number`, `closed`, `total`, `next_step` (always `null`), never `command`.
+- NEXT-75: The `--json` object is also what `aco mcp`'s `read_next` carries per repository, run in that repository's checkout (MCP-96).
 - NEXT-14: The object always carries `recovery` (`{number, title, step}`), `skipped` (`{number, reason}`), `close`, `waiting_on_operator` (bare number arrays), whatever `reason`; see NEXT-44, NEXT-51, NEXT-52.
 - NEXT-15: `parallel` always carries `first_scope_unknown`, `candidates` (`{number, scope, overlaps}` each, uncapped), and `scope_unknown` (a bare number array).
 - NEXT-58: A candidate's `overlaps` holds one `{issue, lane, claim_id, paths}` per note, `[]` when none: `lane` a lane claim's branch, else `issue` (NEXT-35); `claim_id` null off a claim; `paths` uncapped.

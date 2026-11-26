@@ -11,6 +11,11 @@ import pytest
 from aco import expectations, item_step, mcp_server
 
 INBOX: dict[str, object] = {"root": "/work", "repositories": [], "unreadable": []}
+NEXT: dict[str, object] = {
+    "root": "/work",
+    "repositories": [{"repository": "owner/a", "next": {"ok": True, "reason": "work_item"}}],
+    "unreadable": [],
+}
 
 
 def echoing_ask(label: str, number: int, card: Mapping[str, object]) -> Mapping[str, object]:
@@ -58,8 +63,9 @@ def serve(
     record_answer: mcp_server.RecordAnswer = echoing_record,
     step: mcp_server.Step = echoing_step,
     answer_step: mcp_server.AnswerStep = echoing_answer_step,
+    read_next: mcp_server.ReadNext = lambda: NEXT,
 ) -> dict[str, Any]:
-    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step)
+    tools = mcp_server.Tools(read_inbox, ask, record_answer, step, answer_step, read_next)
     line = mcp_server.reply(message if isinstance(message, str) else json.dumps(message), tools)
     assert line is not None
     assert "\n" not in line

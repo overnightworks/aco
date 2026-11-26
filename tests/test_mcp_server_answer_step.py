@@ -17,7 +17,7 @@ def _nothing(*_arguments: object) -> Mapping[str, object]:
 
 
 def _reply(method: str, params: dict[str, object] | None = None) -> dict[str, Any]:
-    tools = mcp_server.Tools(_nothing, _nothing, _nothing, _nothing, echoing_answer_step)
+    tools = mcp_server.Tools(_nothing, _nothing, _nothing, _nothing, echoing_answer_step, _nothing)
     message: dict[str, object] = {"jsonrpc": "2.0", "id": 1, "method": method}
     if params is not None:
         message["params"] = params

@@ -259,11 +259,16 @@ def _recorded_lanes(context: session.RunContext) -> tuple[lane_record.RecordedLa
         return None
 
 
-def read_repository(repository: repositories.Repository) -> Reading:
-    """`read_context` of the checkout `repository` names."""
+def context_of(repository: repositories.Repository) -> session.RunContext:
+    """The run context in the checkout `repository` names."""
     # Looked up on the module at every call, so a replaced `run_context` (the
     # board's test forge) reaches every read.
-    return read_context(session.run_context(None).for_directory(repository.directory))
+    return session.run_context(None).for_directory(repository.directory)
+
+
+def read_repository(repository: repositories.Repository) -> Reading:
+    """`read_context` of the checkout `repository` names."""
+    return read_context(context_of(repository))
 
 
 type IssueReader = Callable[[repositories.Repository], Reading]
@@ -342,22 +347,45 @@ def context_in_checkout_of(discovery: repositories.Discovery, label: str) -> ses
     return session.run_context(None).for_directory(found[label].directory)
 
 
+@dataclass(frozen=True)
+class Answered[Result]:
+    """What reading one repository gave."""
+
+    repository: str
+    result: Result
+
+
+def read_each[Result](
+    discovery: repositories.Discovery, read_one: Callable[[repositories.Repository], Result]
+) -> tuple[Answered[Result] | Unavailable, ...]:
+    """What `read_one` gives for every repository of `discovery`, in discovery's
+    order, the repositories read concurrently; one whose read raises
+    `protocol.ClaimError` or `OSError` is listed as unavailable and the others
+    are still read."""
+
+    def guarded(repository: repositories.Repository) -> Answered[Result] | Unavailable:
+        try:
+            return Answered(repository.label, read_one(repository))
+        except (protocol.ClaimError, OSError) as error:
+            return Unavailable(repository.label, str(error))
+
+    with ThreadPoolExecutor(max_workers=max(1, len(discovery.repositories))) as pool:
+        return tuple(pool.map(guarded, discovery.repositories))
+
+
 def read(discovery: repositories.Discovery, read_issues_of: IssueReader) -> Inbox:
     """What waits on the operator in every repository of `discovery`, the
     repositories read concurrently; one that cannot be read is listed as
     unavailable and the others are still read."""
 
-    def read_one(repository: repositories.Repository) -> Waiting | Unavailable:
-        try:
-            reading = read_issues_of(repository)
-            return Waiting(
-                repository.label, waiting_rows(reading.rows), reading.steps, reading.plans
-            )
-        except (protocol.ClaimError, OSError) as error:
-            return Unavailable(repository.label, str(error))
+    def waiting(repository: repositories.Repository) -> Waiting:
+        reading = read_issues_of(repository)
+        return Waiting(repository.label, waiting_rows(reading.rows), reading.steps, reading.plans)
 
-    with ThreadPoolExecutor(max_workers=max(1, len(discovery.repositories))) as pool:
-        entries = tuple(pool.map(read_one, discovery.repositories))
+    entries = tuple(
+        entry.result if isinstance(entry, Answered) else entry
+        for entry in read_each(discovery, waiting)
+    )
     return Inbox(discovery.root, entries, discovery.unavailable)
 
 
@@ -396,8 +424,14 @@ def inbox_json(inbox: Inbox) -> dict[str, object]:
             }
             for entry in inbox.entries
         ],
-        "unreadable": [
-            {"directory": str(checkout.directory), "reason": checkout.reason}
-            for checkout in inbox.unreadable
-        ],
+        "unreadable": unreadable_json(inbox.unreadable),
     }
+
+
+def unreadable_json(
+    unreadable: Iterable[repositories.UnavailableCheckout],
+) -> list[dict[str, str]]:
+    """The checkouts discovery could not read, as the `unreadable` entry of a read."""
+    return [
+        {"directory": str(checkout.directory), "reason": checkout.reason} for checkout in unreadable
+    ]
