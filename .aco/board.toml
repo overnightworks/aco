@@ -1,6 +1,7 @@
 lane_shared = ["scripts/vulture_whitelist.py", "quality/baseline.toml"]
 production_paths = ["src/", "specs/", "docs/", "pyproject.toml", "uv.lock"]
 dependency_paths = ["pyproject.toml", "uv.lock", "frontend/package.json", "frontend/pnpm-lock.yaml", ".github/workflows/", "src/aco/board/static/"]
+surface_paths = ["frontend/src/", "frontend/index.html"]
 
 [[audit]]
 name = "tests-and-ownership"
