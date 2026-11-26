@@ -30,22 +30,13 @@ def add_json_flag(parser: argparse.ArgumentParser, help_text: str = _JSON_HELP) 
 
 
 def add_lines_arguments(
-    parser: argparse.ArgumentParser, *, item_help: str, lines_help: str, optional: bool
+    parser: argparse.ArgumentParser, *, item_help: str, lines_help: str
 ) -> None:
-    """The item, the repeatable `--line N` and `--json` of `parser`; `optional`
-    leaves the item and the lines out together, for a command with a form that
-    names neither (`wait`'s board form)."""
+    """The optional item, the repeatable `--line N` and `--json` of `parser`:
+    `wait`'s board form names neither the item nor the lines."""
+    parser.add_argument("item", nargs="?", type=workboard.parse_item_reference, help=item_help)
     parser.add_argument(
-        "item", nargs="?" if optional else None, type=workboard.parse_item_reference, help=item_help
-    )
-    parser.add_argument(
-        "--line",
-        dest="lines",
-        action="append",
-        type=int,
-        required=not optional,
-        metavar="N",
-        help=lines_help,
+        "--line", dest="lines", action="append", type=int, metavar="N", help=lines_help
     )
     add_json_flag(parser)
 

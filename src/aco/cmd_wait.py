@@ -51,7 +51,6 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
         item_help="the item whose lines are waited on; leave it out to wait on the board",
         lines_help="the 1-based expectation line index, as rulings prints it; "
         "repeat it to wait on several lines of the item",
-        optional=True,
     )
 
 
