@@ -730,13 +730,13 @@ _ITEM_ARGUMENT_TYPES = frozenset({workboard.parse_item_reference, _parse_check_s
 def _item_arguments(
     root: usage.UsageErrorParser, given: list[str], parsed: argparse.Namespace
 ) -> Iterator[int]:
-    """Every item number this invocation named: the parsed integer of each
-    argument an `_ITEM_ARGUMENT_TYPES` parser types, on every parser the
-    parse reached."""
+    """Every item number this invocation named: the parsed integer of each argument an
+    `_ITEM_ARGUMENT_TYPES` parser types or stored as `item`, on every parser the parse reached."""
     for parser, _tokens in _reached_levels(root, given):
         for action in parser.declared_actions:
             value = getattr(parsed, action.dest, None)
-            if action.type in _ITEM_ARGUMENT_TYPES and isinstance(value, int):
+            names_item = action.type in _ITEM_ARGUMENT_TYPES or action.dest == "item"
+            if names_item and isinstance(value, int):
                 yield value
 
 

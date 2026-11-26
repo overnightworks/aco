@@ -258,6 +258,30 @@ def test_a_landing_whose_last_stored_verdict_is_no_approval_of_the_head_refuses_
     assert observed == expected
 
 
+def test_an_issue_less_lane_lands_from_its_stored_runs_without_a_record_file(
+    github_clone: Path,
+    bare_remote: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Spec: LANREC-97, LANREC-102. Example: E-LANREC-24."""
+    lane = landed_world(
+        github_clone,
+        bare_remote,
+        monkeypatch,
+        identity=protocol.LaneIdentity(),
+        branch="fix/lane",
+        body="No-Item: fix",
+        stored_run=False,
+    ).landing
+    store_runs(lane, chained_runs(record_stating(verdicts=[verdict("approve", lane.head)])))
+
+    result = run_cli(["land", "12", "--head", lane.head], capsys)
+
+    assert (result.status, result.stderr, lane.forge.landings[12].merged) == (0, "", True)
+    assert runs_files_in_state(lane) == 0
+
+
 @pytest.mark.parametrize(
     "runs",
     [chained_runs(record_stating(verdicts=[])), chained_runs(None)],

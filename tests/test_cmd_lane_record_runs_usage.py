@@ -115,3 +115,31 @@ def test_a_missing_agent_identity_refuses_before_the_record_file_is_read_and_wri
     assert refused.status == 2
     assert "agent identity is required" in refused.stderr
     assert world.state_tip() == tip
+
+
+@pytest.mark.parametrize(
+    ("operands", "stderr_part"),
+    [
+        pytest.param(("7", "{file}", "extra"), "usage:", id="a-third-operand"),
+        pytest.param(
+            ("notanumber", "{file}"), "is not an item reference", id="an-item-off-the-grammar"
+        ),
+    ],
+)
+def test_an_add_operand_off_the_grammar_is_a_refusal_and_writes_nothing(
+    world: World,
+    capsys: pytest.CaptureFixture[str],
+    operands: tuple[str, ...],
+    stderr_part: str,
+) -> None:
+    """Spec: LANREC-55, LANREC-58."""
+    tip = world.state_tip()
+    file = str(world.record_file())
+    stated = tuple(operand.format(file=file) for operand in operands)
+    flags = ("--run", FIRST_RUN, "--end-tip", END_TIP, "--ran", "build")
+
+    refused = world.run(capsys, "lane-record", "add", *stated, *flags)
+
+    assert refused.status == 2
+    assert stderr_part in refused.stderr
+    assert world.state_tip() == tip
