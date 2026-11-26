@@ -1,0 +1,8 @@
+claim_id = "30fb0c2d6ce24bb78a1e77ae6bc1fcfd"
+agent = "Claude 91521ccc-2668-4cfa-8624-55fc58e8de62"
+role = "builder"
+base = "7b4b7f8f5c37a75f4aad8eef622a7f4634919602"
+branch = "claude/issue-1082-lane-record-build-none"
+scope = ["specs/lane-record.spec.md", "specs/stats.spec.md", "src/aco/lane_record.py", "src/aco/routing_line.py", "tests/test_cmd_lane_record_runs.py", "tests/test_cmd_lane_record_show.py", "tests/test_cmd_release_record.py", "tests/test_cmd_stats.py", "tests/test_lane_record_check.py", "tests/test_lane_runs_lane_figures.py", "tests/test_release_record.py", "tests/test_routing_line.py"]
+opened_commit = "a1dfa9580db20af15a8a8b85655e5436da8270ad"
+whole_reason = "One grammar change (build may be none) spans its owner, its refusal sentence, its two specs and one test module per reader; no part is provable without the others."
