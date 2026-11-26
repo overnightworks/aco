@@ -4,7 +4,7 @@
 import argparse
 import json
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import partial
@@ -36,7 +36,8 @@ class _RunsReason(StrEnum):
     """`aco lane-record begin`, `add` and `show`'s own `--json` `reason` vocabulary
     (`specs/lane-record.spec.md`): `begun`, `already_begun`, `added`, `already_added` and `shown`
     are the successes; `precondition_failed` is a claim, a holder or a stored run that does not
-    allow the command, every other refusal `unavailable`."""
+    allow the command, `invalid_usage` a command naming both an item and a branch or neither,
+    every other refusal `unavailable`."""
 
     BEGUN = "begun"
     ALREADY_BEGUN = "already_begun"
@@ -44,11 +45,17 @@ class _RunsReason(StrEnum):
     ALREADY_ADDED = "already_added"
     SHOWN = "shown"
     PRECONDITION_FAILED = "precondition_failed"
+    INVALID_USAGE = "invalid_usage"
     UNAVAILABLE = "unavailable"
+
+
+class _RunsUsageError(protocol.ClaimError):
+    """A begin, an add or a show that names both an item and a branch, or neither."""
 
 
 _REFUSAL_REASONS: report.RefusalReasons[_RunsReason] = (
     (lane_runs.RunsRefusedError, _RunsReason.PRECONDITION_FAILED),
+    (_RunsUsageError, _RunsReason.INVALID_USAGE),
 )
 
 
@@ -117,8 +124,43 @@ class _StagesAction(argparse.Action):
         setattr(namespace, self.dest, stages)
 
 
+class _ItemAndFileAction(argparse.Action):
+    """`add`'s operands: the file alone, or the item and then the file."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[str] | None,
+        option_string: str | None = None,
+    ) -> None:
+        *item, file = list(values or ())
+        if len(item) > 1:
+            raise argparse.ArgumentError(
+                self, "is the file, after the item unless --branch is given"
+            )
+        namespace.item = workboard.parse_item_reference(item[0]) if item else None
+        namespace.file = file
+
+
+def _add_branch_argument(command: argparse.ArgumentParser) -> None:
+    command.add_argument(
+        "--branch",
+        help="the branch of the claimed issue-less lane, in place of the item",
+    )
+
+
+def _add_item_argument(command: argparse.ArgumentParser) -> None:
+    command.add_argument(
+        "item",
+        nargs="?",
+        type=workboard.parse_item_reference,
+        help="the claimed item; give it or --branch",
+    )
+    _add_branch_argument(command)
+
+
 def _add_run_arguments(command: argparse.ArgumentParser) -> None:
-    command.add_argument("item", type=workboard.parse_item_reference, help="the claimed item")
     command.add_argument("--run", required=True, type=_run_id, help="the run's id")
     command.add_argument("--agent", help="the acting agent's name; it must hold the claim")
     report.add_json_flag(command)
@@ -135,15 +177,23 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
     )
     check.add_argument("file", metavar="FILE", help="the lane record file to check")
     begin = command.subcommands.add_parser(
-        "begin", help="mark a run of a claimed item, as its holder"
+        "begin", help="mark a run of a claimed item or lane, as its holder"
     )
+    _add_item_argument(begin)
     _add_run_arguments(begin)
     begin.add_argument("--start-tip", type=_tip, help="the commit the run starts from")
     add = command.subcommands.add_parser(
         "add", help="store the lane record of a begun run with its claim, as its holder"
     )
+    add.add_argument(
+        "operands",
+        nargs="+",
+        action=_ItemAndFileAction,
+        metavar="[ITEM] FILE",
+        help="the claimed item then the lane record file; the file alone with --branch",
+    )
+    _add_branch_argument(add)
     _add_run_arguments(add)
-    add.add_argument("file", metavar="FILE", help="the lane record file")
     add.add_argument("--end-tip", required=True, type=_tip, help="the commit the run ended at")
     add.add_argument(
         "--ran",
@@ -156,7 +206,7 @@ def add_parser(commands: usage.Subcommands, name: str) -> None:
     show = command.subcommands.add_parser(
         "show", help="print the runs stored with a claim and the lane figures computed from them"
     )
-    show.add_argument("item", type=workboard.parse_item_reference, help="the claimed item")
+    _add_item_argument(show)
     report.add_json_flag(show)
 
 
@@ -199,20 +249,31 @@ def _session_agent(parsed: argparse.Namespace) -> str:
 
 @dataclass(frozen=True)
 class _LiveClaim:
-    """The live claim of an item, its label and the oid of the runs stored with it."""
+    """The live claim of an item or lane, its label and the oid of the runs stored with it."""
 
     claim: protocol.ActiveClaim
     label: str
     stored: protocol.ObjectId | None
 
 
+def _require_one_target(parsed: argparse.Namespace) -> None:
+    if (parsed.item is None) == (parsed.branch is None):
+        raise _RunsUsageError(workboard.ITEM_OR_BRANCH_SENTENCE)
+
+
 def _live_claim(parsed: argparse.Namespace, context: RunContext) -> _LiveClaim:
-    """The item's live claim, whoever holds it; an item without one refuses."""
+    """The live claim of the item or lane the command names, whoever holds it; one without a
+    claim refuses."""
     try:
         storage = context.config.storage
-        label = workboard.item_label(parsed.item, storage)
+        if parsed.branch is None:
+            label = workboard.item_label(parsed.item, storage)
+            identity: protocol.ClaimIdentity = protocol.IssueIdentity(parsed.item)
+        else:
+            label = f"lane {parsed.branch}"
+            identity = protocol.LaneIdentity()
         claim = workboard.selected_store_claim(
-            context.observation, protocol.IssueIdentity(parsed.item), None, None, storage
+            context.observation, identity, parsed.branch, None, storage
         )
     except protocol.ClaimError as error:
         raise lane_runs.RunsRefusedError(str(error)) from error
@@ -274,7 +335,14 @@ def _begin(parsed: argparse.Namespace, context: RunContext) -> int:
     assert entry is not None  # noqa: S101 - a begin stores the run or finds it stored
     if parsed.json:
         reason = _RunsReason.BEGUN if merged.changed else _RunsReason.ALREADY_BEGUN
-        report.emit_json(True, reason, item=parsed.item, run=entry.run, follows=entry.follows)
+        report.emit_json(
+            True,
+            reason,
+            item=parsed.item,
+            branch=opened.claim.branch,
+            run=entry.run,
+            follows=entry.follows,
+        )
     else:
         verb = "BEGAN" if merged.changed else "ALREADY BEGUN"
         print(f"{verb} run {parsed.run} of {opened.label}")
@@ -296,7 +364,14 @@ def _add(parsed: argparse.Namespace, context: RunContext) -> int:
     stored = merged.runs.added_count()
     if parsed.json:
         reason = _RunsReason.ADDED if merged.changed else _RunsReason.ALREADY_ADDED
-        report.emit_json(True, reason, item=parsed.item, run=parsed.run, stored=stored)
+        report.emit_json(
+            True,
+            reason,
+            item=parsed.item,
+            branch=opened.claim.branch,
+            run=parsed.run,
+            stored=stored,
+        )
     else:
         verb = "ADDED" if merged.changed else "ALREADY ADDED"
         print(f"{verb} run {parsed.run} to {opened.label}: {stored} stored")
@@ -364,6 +439,7 @@ def _show(parsed: argparse.Namespace, context: RunContext) -> int:
             True,
             _RunsReason.SHOWN,
             item=parsed.item,
+            branch=live.claim.branch,
             claim_id=live.claim.claim_id,
             runs=[_run_object(entry) for entry in stored.runs],
             complete=lane_runs.is_complete(stored) if shown else None,
@@ -379,11 +455,20 @@ def _show(parsed: argparse.Namespace, context: RunContext) -> int:
 _RUNS_COMMANDS = {"begin": _begin, "add": _add, "show": _show}
 
 
+def _run_naming_one_target(
+    work: Callable[[argparse.Namespace, RunContext], int],
+    parsed: argparse.Namespace,
+    context: RunContext,
+) -> int:
+    _require_one_target(parsed)
+    return work(parsed, context)
+
+
 def run(parsed: argparse.Namespace, context: RunContext) -> int:
     work = _RUNS_COMMANDS.get(parsed.lane_record_command)
     if work is not None:
         return report.refusing_by_type(
-            partial(work, parsed, context),
+            partial(_run_naming_one_target, work, parsed, context),
             _REFUSAL_REASONS,
             _RunsReason.UNAVAILABLE,
             as_json=parsed.json,

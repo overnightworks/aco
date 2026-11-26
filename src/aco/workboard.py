@@ -2580,6 +2580,9 @@ def merged_pull_request_floor(issues: tuple[Issue, ...], now: datetime) -> datet
     return oldest_created_at(issues) or now
 
 
+ITEM_OR_BRANCH_SENTENCE = "name either an item or --branch, not both and not neither"
+
+
 def selected_store_claim(
     observed: protocol.ClaimState,
     identity: protocol.ClaimIdentity,

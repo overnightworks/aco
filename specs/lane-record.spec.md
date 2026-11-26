@@ -28,9 +28,9 @@ last verdict judged and `<reviewed>` the `--head` value of `aco land`.
 | the routing fields | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 | LANREC-11, LANREC-12, LANREC-17..LANREC-20, LANREC-23, LANREC-24, LANREC-26, LANREC-27 |
 | `aco lane-record check <file>` | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49, LANREC-104, LANREC-105 | LANREC-30..LANREC-37, LANREC-45, LANREC-46, LANREC-48, LANREC-49, LANREC-104, LANREC-105 |
 | `--record <file>` | LANREC-31, LANREC-38..LANREC-40, LANREC-42..LANREC-46, LANREC-49, LANREC-50, LANREC-99 | LANREC-31, LANREC-41..LANREC-43, LANREC-45, LANREC-46, LANREC-49, LANREC-50 |
-| `aco lane-record begin <item> --run <run>` | LANREC-52..LANREC-54, LANREC-58..LANREC-60, LANREC-62..LANREC-65, LANREC-68..LANREC-70, LANREC-89 | LANREC-52..LANREC-54, LANREC-58..LANREC-60, LANREC-62..LANREC-65, LANREC-68..LANREC-70, LANREC-89 |
-| `aco lane-record add <item> <file> --run <run>` | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89 | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89 |
-| `aco lane-record show <item>` | LANREC-71..LANREC-89 | LANREC-71..LANREC-89 |
+| `aco lane-record begin <claim> --run <run>` | LANREC-52..LANREC-54, LANREC-58..LANREC-60, LANREC-62..LANREC-65, LANREC-68..LANREC-70, LANREC-89, LANREC-106 | LANREC-52..LANREC-54, LANREC-58..LANREC-60, LANREC-62..LANREC-65, LANREC-68..LANREC-70, LANREC-89, LANREC-106 |
+| `aco lane-record add <claim> <file> --run <run>` | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89, LANREC-106 | LANREC-31, LANREC-55..LANREC-60, LANREC-62, LANREC-63, LANREC-66, LANREC-68..LANREC-70, LANREC-89, LANREC-106 |
+| `aco lane-record show <claim>` | LANREC-71..LANREC-89, LANREC-106 | LANREC-71..LANREC-89, LANREC-106 |
 | stored runs and a handover, a rescope, a release or a landing | LANREC-61, LANREC-67 | LANREC-61, LANREC-67 |
 | a release of a claim with stored runs | LANREC-90..LANREC-96 | LANREC-90..LANREC-96 |
 | a landing of a claim with stored runs | LANREC-97..LANREC-99, LANREC-103 | — |
@@ -114,22 +114,23 @@ LANREC-47 and the writer's part of LANREC-48 (Misses and its exclusions) bind th
 
 ## Stored runs
 
-A stored run is one span of a lane's stages, begun and added once; one workflow run may store several in sequence, and a lane may span several workflow runs. `aco lane-record begin` marks a run and `aco lane-record add` stores its record, both under the claim's id: the claim's runs file `runs/<claim-id>.json` of `refs/aco/state` (CAS-27, CAS-28), one file per live claim that has runs, which no command but these, `aco lane-record show` and a release reads. `<run>` is a run id, `<tip>` a full 40-digit commit sha, `<label>` the item as its storage names it (`#42`, `aco-xxxxxx`) and `<stage>` one of `build`, `review`, `fix`, `test`, `gate`.
-- LANREC-52: `aco lane-record begin <item> --run <run> [--start-tip <tip>] [--agent NAME] [--json]` adds a begun entry and prints `BEGAN run <run> of <label>` (E-LANREC-12).
+A stored run is one span of a lane's stages, begun and added once; one workflow run may store several in sequence, and a lane may span several workflow runs. `aco lane-record begin` marks a run and `aco lane-record add` stores its record, both under the claim's id: the claim's runs file `runs/<claim-id>.json` of `refs/aco/state` (CAS-27, CAS-28), one file per live claim that has runs, which no command but these, `aco lane-record show` and a release reads. `<run>` is a run id, `<tip>` a full 40-digit commit sha, `<label>` the item as its storage names it (`#42`, `aco-xxxxxx`) or `lane <branch>`, and `<stage>` one of `build`, `review`, `fix`, `test`, `gate`. `<claim>` names the claim a command works on: an `<item>`, or `--branch <branch>` for an issue-less or adopted lane; an `add` takes the item, if any, before its `<file>`.
+- LANREC-52: `aco lane-record begin <claim> --run <run> [--start-tip <tip>] [--agent NAME] [--json]` adds a begun entry and prints `BEGAN run <run> of <label>` (E-LANREC-12, E-LANREC-24).
 - LANREC-63: Only the claim's holder may begin or add: another session refuses `only the holder may begin a run of <label> (holder='…', this session='…')`, `add a run to` for an add (E-LANREC-13).
-- LANREC-68: A begin or an add for an unclaimed item refuses with the sentence of REL-09.
+- LANREC-68: A begin or an add for an unclaimed item, or for a `--branch` without a live lane claim (an issue claim's branch included), refuses with REL-09's sentence, exit `2` (E-LANREC-25).
+- LANREC-106: A begin, an add or a show naming both an item and `--branch`, or neither, refuses `name either an item or --branch, not both and not neither`, exit `2`, before any read (E-LANREC-25).
 - LANREC-53: The same run id and start tip prints `ALREADY BEGUN run <run> of <label>` and changes nothing; another refuses `run <run> of <label> was begun with start tip <tip>, not <tip>`, `none` if missing.
 - LANREC-64: A begin of a run already added refuses `run <run> of <label> was added already; it cannot be begun again`, exit `2`.
 - LANREC-54: An entry stores whether it follows, judged once at its begin: the first entry when it has no start tip, a later one when the newest stored entry's end tip is its start tip or an ancestor of it.
 - LANREC-65: A start tip or end tip git cannot read, a first entry with a start tip and an earlier entry without an end tip do not follow.
-- LANREC-55: `aco lane-record add <item> <file> --run <run> --end-tip <tip> --ran <stage>... [--agent NAME] [--json]` stores the file's record on that run and prints `ADDED run <run> to <label>: <n> stored`.
+- LANREC-55: `aco lane-record add <claim> <file> --run <run> --end-tip <tip> --ran <stage>... [--agent NAME] [--json]` stores the file's record on that run and prints `ADDED run <run> to <label>: <n> stored`.
 - LANREC-66: An add judges the file as `aco lane-record check` does (LANREC-31); a `--ran` stage whose slot in the file is `none` refuses `the record's stage <stage> is none, which --ran contradicts`.
 - LANREC-56: The same entry again prints `ALREADY ADDED run <run> to <label>: <n> stored` and changes nothing; another entry under an added run id refuses `run <run> of <label> has another entry stored already`.
 - LANREC-57: An add for a run that was not begun refuses `run <run> of <label> was not begun; run aco lane-record begin first`, exit `2` (E-LANREC-14).
 - LANREC-58: A `<run>` is 1 to 128 characters of the claim id's grammar, a `<tip>` 40 lowercase hexadecimal digits, `--ran` given once, naming one or more of the five stages once each; a breach is a usage refusal.
 - LANREC-59: A write that finds the stored runs changed since the command read them refuses `the stored runs of <label> were written since this command read them; run the same command again`.
-- LANREC-60: A begin and an add each land one compare-and-swap commit, `lane-record issue <n>`, with CAS-06's trailers (intent `lane_record`), then `run: <run>`, and no `lane_` trailer: `aco stats` counts no lane.
-- LANREC-69: With `--json` the successes report `begun`, `already_begun`, `added`, `already_added` or `shown`.
+- LANREC-60: A begin or add lands one commit, `lane-record issue <n>` or `lane-record lane <branch>`, with CAS-06's trailers (intent `lane_record`), `run: <run>` and no `lane_` trailer, so no stats lane.
+- LANREC-69: With `--json` the successes report `begun`, `already_begun`, `added`, `already_added` or `shown`, and carry the claim's `branch` beside `item`, which is `null` for a lane.
 - LANREC-70: A begin or an add without `--agent` and without an agent identity in the environment refuses as every writing command does, before it reads anything.
 - LANREC-61: Stored runs survive `aco handover` (the new holder may begin and add, the previous holder's add refuses as a non-holder's) and `aco rescope`.
 - LANREC-67: A release and a landing remove the claim's runs file in the release's own commit; a re-claimed item starts empty.
@@ -141,7 +142,7 @@ The runs file is `{"version": 1, "runs": [...]}` in begin order; an entry holds 
 
 A lane's stored runs make a sequence in begin order, which `aco lane-record show` judges and sums; a run that was lost counts as unknown, never as zero.
 
-- LANREC-71: `aco lane-record show <item> [--json]` prints the runs stored with the item's live claim, whether the lane is complete and the computed record (E-LANREC-15, E-LANREC-16).
+- LANREC-71: `aco lane-record show <claim> [--json]` prints the runs stored with the live claim, whether the lane is complete and the computed record (E-LANREC-15, E-LANREC-16).
 - LANREC-72: Any session may call `show`, which needs no more identity than every command does and writes nothing.
 - LANREC-73: The text is one line per run, `run <run> of <label>: start <tip>|none, end <tip>, ran <stage>..., follows|does not follow`; a run not added has `no record` for `end <tip>, ran <stage>...`.
 - LANREC-74: A recorded run's record follows on an indented `record <compact JSON>` line, then `lane <label>: complete|incomplete` and the computed record on an indented `record <compact JSON>` line.
@@ -154,11 +155,11 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 - LANREC-81: `fix_rounds`, `blocking` and `misses` per finding stage are the sums over the known records, clamped at `999`.
 - LANREC-82: A count kind is unknown for all four finding stages when a run is lost, and `misses` also when a known record states none.
 - LANREC-83: `verdicts` are the known records' concatenated in run order; `experiment` is the tag when no run is lost and every known record states the same tag, else unknown.
-- LANREC-84: With `--json` the output is `{"ok": true, "reason": "shown", "item", "claim_id", "runs", "complete", "lane"}`, unknown being `null`.
+- LANREC-84: With `--json` the output is `{"ok": true, "reason": "shown", "item", "branch", "claim_id", "runs", "complete", "lane"}`, unknown being `null`.
 - LANREC-85: A run is `{"run", "start_tip", "follows", "end_tip", "ran", "record"}`, the record as its file stated it (an omitted key stays absent), the last three `null` for a run not added.
 - LANREC-86: `lane` is `{"stages", "fix_rounds", "blocking", "misses", "verdicts", "risk", "experiment"}`: `stages` holds every stage, a count kind is an object of the four finding stages or `null`.
-- LANREC-87: An item without a live claim refuses with the sentence of REL-09, `precondition_failed`; stored runs that cannot be used refuse as LANREC-62, `unavailable`.
-- LANREC-89: With `--json`, LANREC-57, 63..68, 70 and 87's unclaimed item report `precondition_failed`; LANREC-59, 62 and 87's unusable stored runs `unavailable`.
+- LANREC-87: An item or branch without a live claim refuses with the sentence of REL-09, `precondition_failed`; stored runs that cannot be used refuse as LANREC-62, `unavailable`.
+- LANREC-89: With `--json`, LANREC-57, 63..68, 70 and 87's unclaimed item or branch report `precondition_failed`; LANREC-106 `invalid_usage`; LANREC-59, 62 and 87's unusable stored runs `unavailable`.
 - LANREC-88: A claim without stored runs prints `<label> has no stored runs`, and its JSON has `runs` `[]` with `complete` and `lane` `null`.
 
 ## Releasing a lane with stored runs
@@ -181,7 +182,7 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 - LANREC-99: `aco land` refuses a lane whose record, file or stored runs (LANREC-80), states no risk class: `the lane record states no risk class; record risk as material or normal`, exit `2` (E-LANREC-21).
 - LANREC-100: `aco land` refuses a claim without runs or `--record`: `<label> has no lane record (no stored runs, no --record), so no review is known to have judged <reviewed>`, nothing merged, enqueued or written.
 - LANREC-101: LANREC-100 judges the claim LANDCMD-10 authorized, only where `aco land` merges or enqueues, so a rerun finding it merged or queued (LANDCMD-18, LANDCMD-69) skips it; a routing line is no record.
-- LANREC-102: LANREC-99 and LANREC-100 hold for every claim kind, the latter with exit `2` (E-LANREC-22); an issue-less or adopted lane, which stores no runs (LANREC-52 takes an item), lands with `--record`.
+- LANREC-102: LANREC-99 and LANREC-100 hold for every claim kind, the latter with exit `2` (E-LANREC-22); such a lane lands from its stored runs (E-LANREC-24), or with `--record` when it stored none.
 - LANREC-103: A stored `risk` not `material` or `normal` is unreadable (LANREC-37): `aco land` refuses it as LANREC-62, `lane-record show` too, a release writes unknown figures (LANREC-93); nothing rewrites it.
 
 ## Failure
@@ -532,5 +533,38 @@ Setup: a file `lane-record.json` stating `"review": "none"`, no checkout
 ```console
 $ aco lane-record check lane-record.json
 ERROR: lane record lane-record.json is invalid: stage review must be <model>/<effort>
+exit 2
+```
+
+### E-LANREC-24 — a fix lane stores runs and lands without a record file
+
+Setup: bare-remote, fake `gh`, a linked worktree on `fix/tidy`, its lane claim held by `Ada`, a valid file `lane-record.json` approving `<head>` and stating `risk` `normal`, pull request `#57` open with every check green on that branch, its head `<head>`, `ACO_AGENT` set to `Ada`
+
+```console
+$ aco lane-record begin --branch fix/tidy --run run-1
+BEGAN run run-1 of lane fix/tidy
+exit 0
+$ aco lane-record add --branch fix/tidy lane-record.json --run run-1 --end-tip <head> --ran build review
+ADDED run run-1 to lane fix/tidy: 1 stored
+exit 0
+$ git log -1 --format=%B refs/aco/state | head -1
+lane-record lane fix/tidy
+$ aco land 57 --head <head>
+exit 0
+```
+
+### E-LANREC-25 — a claim named by both an item and a branch, by neither, or by a branch without a lane claim
+
+Setup: bare-remote, a lane claim held by `Ada` on `fix/tidy`, `ACO_AGENT` set to `Ada`
+
+```console
+$ aco lane-record show 42 --branch fix/tidy
+ERROR: name either an item or --branch, not both and not neither
+exit 2
+$ aco lane-record show
+ERROR: name either an item or --branch, not both and not neither
+exit 2
+$ aco lane-record show --branch fix/other
+ERROR: lane 'fix/other' has no active build claim
 exit 2
 ```
