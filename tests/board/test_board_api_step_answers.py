@@ -91,7 +91,7 @@ def test_an_answer_ends_the_wait_writes_the_outcome_and_removes_the_label_after_
     text: str | None,
     now: str,
 ) -> None:
-    """ABRD-168, ABRD-169, ABRD-171."""
+    """ABRD-168, ABRD-169, ABRD-171. Example: E-ABRD-24."""
     _put_step(repository, table)
     before = _block(repository.stored_body(_ITEM))
 
