@@ -14,7 +14,7 @@ from lane_record_runs_world import (
     begin_arguments,
 )
 
-from aco import workboard
+from aco import usage, workboard
 
 
 @pytest.fixture
@@ -105,14 +105,14 @@ def test_every_json_success_of_an_issue_claim_names_its_item_and_branch(
             "7",
             LANE_RECORD_BRANCH,
             "invalid_usage",
-            workboard.ITEM_OR_BRANCH_SENTENCE,
+            usage.ITEM_OR_BRANCH_SENTENCE,
             id="an-item-and-a-branch",
         ),
         pytest.param(
             None,
             None,
             "invalid_usage",
-            workboard.ITEM_OR_BRANCH_SENTENCE,
+            usage.ITEM_OR_BRANCH_SENTENCE,
             id="neither-an-item-nor-a-branch",
         ),
         pytest.param(

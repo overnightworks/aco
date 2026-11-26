@@ -8,6 +8,8 @@ from typing import NoReturn, TypedDict, Unpack, cast, overload
 
 from . import protocol
 
+ITEM_OR_BRANCH_SENTENCE = "name either an item or --branch, not both and not neither"
+
 
 class UsageError(protocol.ClaimError):
     """One refusal the argument parser itself raises -- an unknown flag, a

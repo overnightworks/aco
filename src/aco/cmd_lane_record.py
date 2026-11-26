@@ -258,7 +258,7 @@ class _LiveClaim:
 
 def _require_one_target(parsed: argparse.Namespace) -> None:
     if (parsed.item is None) == (parsed.branch is None):
-        raise _RunsUsageError(workboard.ITEM_OR_BRANCH_SENTENCE)
+        raise _RunsUsageError(usage.ITEM_OR_BRANCH_SENTENCE)
 
 
 def _live_claim(parsed: argparse.Namespace, context: RunContext) -> _LiveClaim:

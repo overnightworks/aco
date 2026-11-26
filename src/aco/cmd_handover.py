@@ -232,7 +232,7 @@ def _take_over(parsed: argparse.Namespace, context: RunContext) -> int:
         parsed.from_agent, parsed.agent, _bounded_reason(parsed.reason), context.today()
     )
     if (parsed.item is None) == (parsed.branch is None):
-        raise HandoverUsageError(workboard.ITEM_OR_BRANCH_SENTENCE)
+        raise HandoverUsageError(usage.ITEM_OR_BRANCH_SENTENCE)
     if parsed.item is None:
         return _take_over_lane(parsed, context, wanted)
     return _take_over_item(parsed, context, wanted)
