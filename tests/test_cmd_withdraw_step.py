@@ -94,7 +94,7 @@ class TestStepWithdrawn:
         capsys: pytest.CaptureFixture[str],
         step: dict[str, str] | None,
     ) -> None:
-        """Spec: WITHDRAW-19, WITHDRAW-20, WITHDRAW-22, E-WITHDRAW-07, Never 8 -- one body write of
+        """Spec: WITHDRAW-19, WITHDRAW-20, WITHDRAW-22, Never 8 -- one body write of
         exactly the body
         read, `now` and `next` kept, the label removed after it, a step of any stored form."""
         raw = _stepped(step)
@@ -190,7 +190,7 @@ def test_an_item_with_no_operator_wait_refuses_before_any_write(
     raw: str,
     as_json: bool,
 ) -> None:
-    """Spec: WITHDRAW-21, WITHDRAW-24, E-WITHDRAW-08 -- `no_step` in text and `--json`, nothing
+    """Spec: WITHDRAW-21, WITHDRAW-24 -- `no_step` in text and `--json`, nothing
     written."""
     client = serve_forge(monkeypatch, _served(raw))
     result = run_cli(["withdraw", "7", "--step", *(["--json"] if as_json else [])], capsys)
@@ -205,7 +205,7 @@ def test_an_item_with_no_operator_wait_refuses_before_any_write(
 def test_json_names_the_item_and_the_step_in_order(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Spec: WITHDRAW-24, E-WITHDRAW-07 -- the envelope's keys in order, no `note` without a
+    """Spec: WITHDRAW-24 -- the envelope's keys in order, no `note` without a
     refused label."""
     serve_forge(monkeypatch, _served(_stepped(PASTE_STEP)))
     result = run_cli(["withdraw", "7", "--step", "--json"], capsys)
