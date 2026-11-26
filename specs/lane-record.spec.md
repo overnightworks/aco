@@ -145,7 +145,7 @@ A lane's stored runs make a sequence in begin order, which `aco lane-record show
 - LANREC-71: `aco lane-record show <claim> [--json]` prints the runs stored with the live claim, whether the lane is complete and the computed record (E-LANREC-15, E-LANREC-16).
 - LANREC-72: Any session may call `show`, which needs no more identity than every command does and writes nothing.
 - LANREC-73: The text is one line per run, `run <run> of <label>: start <tip>|none, end <tip>, ran <stage>..., follows|does not follow`; a run not added has `no record` for `end <tip>, ran <stage>...`.
-- LANREC-74: A recorded run's record follows on an indented `record <compact JSON>` line, then `lane <label>: complete|incomplete` (`<label>: complete|incomplete` for a lane claim, whose label already begins `lane`) and the computed record on an indented `record <compact JSON>` line.
+- LANREC-74: A recorded run's line is followed by its indented `record <compact JSON>` line, then `lane <label>: complete|incomplete` (a lane claim's label begins `lane`) and the computed record, indented.
 - LANREC-75: Before each entry that does not follow stands one lost run, and an entry without a record is one.
 - LANREC-76: The lane is complete when no run is lost, judged when `show` runs: a run that shows after its own begin sees an incomplete lane.
 - LANREC-77: `stages.build` is the choice in the record of the first run that is lost or ran `build`; a lost run gives unknown, and where no run ran it LANREC-79 holds.
