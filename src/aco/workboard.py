@@ -1957,10 +1957,7 @@ def _qualifying_actions(board: Board) -> Iterator[NextAction]:
             rows = () if uncut is None else uncut.rows
             yield WorkItemAction(item, _work_item_scope(item.scope, rows))
             continue
-        container = item.container
-        if item.kind is not ItemKind.CONTAINER or container is None or container.open_count:
-            continue
-        action = _container_next_action(item, container)
+        action = container_next_action(item)
         if action is not None:
             yield action
 
@@ -2128,15 +2125,18 @@ def closable_container_number(
     return parent.reference.number if required else None
 
 
-def _container_next_action(item: BoardItem, container: ContainerProgress) -> NextAction | None:
-    """The action a childless container qualifies for, read off its one `childless_verdict`, or
-    `None` to skip it: a non-`VALID` body names its own finding elsewhere, and a container waiting
-    on the operator's cards (NEXT-70), a `wait` or an open blocker is only closed, never cut."""
+def container_next_action(item: BoardItem) -> NextAction | None:
+    """The action a container with no open child qualifies for, read off its one
+    `childless_verdict`, or `None` to skip it: not a container, one still holding an open child, a
+    non-`VALID` body (it names its own finding elsewhere), or a container waiting on the operator's
+    cards (NEXT-70), a `wait` or an open blocker is only closed, never cut."""
+    container = item.container
+    if item.kind is not ItemKind.CONTAINER or container is None or container.open_count:
+        return None
     if item.idea or item.read_state is not BodyReadState.VALID:
         return None
-    verdict = item.childless_verdict
     held = item.is_waiting or item.waits_on_operator or bool(item.open_blockers)
-    match verdict:
+    match item.childless_verdict:
         case CutVerdict(title=cut_title) if not held:
             return CutSliceAction(item, container, cut_title)
         case CloseVerdict():

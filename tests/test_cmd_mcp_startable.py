@@ -3,13 +3,20 @@
 remotes under one configured root; the forge is the only fake."""
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
 from audit_world import entry_toml
-from board_fixtures import board_issue, complete_contract, slice_entries
+from board_fixtures import (
+    OPERATOR_WAIT,
+    block_dependency,
+    board_issue,
+    complete_contract,
+    slice_entries,
+)
 from cli_fixtures import init_bare_repository, real_git, run_cli, set_git_identity
 from discovery_fixtures import discovered_checkout, unreadable_checkout
 from github_fixtures import FakeForge
@@ -97,6 +104,62 @@ def _busy() -> FakeForge:
     )
 
 
+def _uncut_container(
+    number: int,
+    title: str,
+    wait: dict[str, date] | dict[str, Any] | None = None,
+    slice_title: str = "First slice",
+    labels: tuple[str, ...] = (),
+) -> workboard.Issue:
+    entries = slice_entries(slice_title)
+    contract = (
+        complete_contract("Cut it.", slice=entries)
+        if wait is None
+        else complete_contract("Cut it.", slice=entries, wait=wait)
+    )
+    return board_issue(
+        number,
+        title,
+        contract,
+        labels=labels,
+        kind=ItemKind.CONTAINER,
+        children_closed=0,
+        children_total=0,
+    )
+
+
+def _held_container_forges() -> dict[str, FakeForge]:
+    """One forge per hold: container 10 is free, container 11 is held for the named reason."""
+    free = _uncut_container(10, "Free")
+    waiting = _uncut_container(
+        11, "Held", wait={"until": date(2099, 1, 1), "since": date(2026, 11, 1)}
+    )
+    operator_wait = _uncut_container(11, "Held", wait=OPERATOR_WAIT)
+    idea = _uncut_container(11, "Held", labels=(workboard.DEFAULT_IDEA_LABEL,))
+    malformed = board_issue(
+        11,
+        "Held",
+        complete_contract("Cut it.", slice=slice_entries("First slice"), whole="x" * 513),
+        kind=ItemKind.CONTAINER,
+        children_closed=0,
+        children_total=0,
+    )
+    return {
+        "future-until-wait": FakeForge(board_issues=(free, waiting)),
+        "operator-wait": FakeForge(board_issues=(free, operator_wait)),
+        "idea": FakeForge(board_issues=(free, idea)),
+        "malformed-body": FakeForge(board_issues=(free, malformed)),
+        "open-blocker": FakeForge(
+            board_issues=(free, replace(_uncut_container(11, "Held"), blocked_by_count=1)),
+            board_dependencies={11: (block_dependency(99),)},
+        ),
+        "open-child": FakeForge(
+            board_issues=(free, replace(_uncut_container(11, "Held"), children_total=1)),
+            children={11: (workboard.ChildItem(14, workboard.ChildState.OPEN, "Open child"),)},
+        ),
+    }
+
+
 def _board_ready_now(
     directory: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> list[dict[str, Any]]:
@@ -160,6 +223,18 @@ def test_a_container_with_uncut_slices_and_a_due_audit_are_named(
 
     assert answered["uncut"] == [{"item": 9, "index": 1, "title": "First slice", "rows": 2}]
     assert answered["audits_due"] == ["scenario"]
+
+
+@pytest.mark.parametrize("hold", _held_container_forges())
+def test_uncut_lists_only_the_containers_next_would_cut(
+    hold: str, fleet: _Fleet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Spec: MCP-97"""
+    fleet.add("held", _held_container_forges()[hold])
+
+    answered = _by_repository(_read_startable(monkeypatch))["example/held"]
+
+    assert answered["uncut"] == [{"item": 10, "index": 1, "title": "First slice", "rows": 1}]
 
 
 def test_a_repository_whose_board_is_refused_is_unavailable_with_the_sentence_beside_the_others(

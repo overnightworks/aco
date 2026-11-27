@@ -318,8 +318,8 @@ _TOOLS: Final = (
         "title": "Read what can start on every board",
         "description": (
             "What can start on the board of every repository found under the configured root: "
-            "per repository every startable item in rank order, every container with an uncut "
-            "slice and the due recurring audits, or the sentence of the refusal when its board "
+            "per repository every startable item in rank order, every container `aco next` would "
+            "cut and the due recurring audits, or the sentence of the refusal when its board "
             "could not be read, and the checkouts that could not be scanned. Nothing is written."
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
