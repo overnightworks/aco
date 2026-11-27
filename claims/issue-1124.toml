@@ -3,6 +3,6 @@ agent = "Claude 219f4fdb-994b-4109-be7f-933667b2ce2d"
 role = "builder"
 base = "559492d537bf291881695062273bc8c48b076093"
 branch = "claude/issue-1124-startable-uncut-cut-verdict"
-scope = ["quality/baseline.toml", "specs/mcp.spec.md", "src/aco/inbox.py", "src/aco/workboard.py", "tests/test_cmd_mcp_startable.py", "tests/test_inbox_startable.py"]
+scope = ["README.md", "quality/baseline.toml", "specs/mcp.spec.md", "src/aco/inbox.py", "src/aco/mcp_server.py", "src/aco/workboard.py", "tests/test_cmd_mcp_startable.py", "tests/test_inbox_startable.py"]
 opened_commit = "392a672e527b0107cab3f7b7ae881987c42dcf20"
 whole_reason = "One projection filter that reuses next's cut decider, its spec line, its tests and the size offset in the capped board file."
