@@ -442,8 +442,13 @@ def startable_payload(
     board: workboard.Board, audits: Iterable[recurring_audit.Finding]
 ) -> dict[str, object]:
     """What can start on `board`, the embedded read `aco mcp` serves: every item of
-    `ready_now` in rank order, every container with an uncut slice, and the names of
+    `ready_now` in rank order, every container `aco next` would cut, and the names of
     the due recurring `audits`."""
+    cut_containers = {
+        action.container.number
+        for item in board.items
+        if isinstance(action := workboard.container_next_action(item), workboard.CutSliceAction)
+    }
     return {
         "startable": [
             {
@@ -464,6 +469,7 @@ def startable_payload(
                 "rows": len(uncut.rows),
             }
             for uncut in board.uncut
+            if uncut.item in cut_containers
         ],
         "audits_due": [finding.entry.name for finding in audits if finding.is_due],
     }
