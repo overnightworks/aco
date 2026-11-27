@@ -119,7 +119,7 @@ operator's chat answer to a step through the board's writer, and its tool
 `needs-operator` as its GitHub view, or opens such an item
 (`specs/mcp.spec.md`).
 The read-only tool `read_startable` returns, for each of those repositories,
-every startable item in rank order, every container with an uncut slice and the
+every startable item in rank order, every container `aco next` would cut and the
 due recurring audits, or why its board could not be read.
 A reinstall of aco reaches a running session at its next call; only a change to the relay
 or to a tool's schema needs `/mcp` → Reconnect.
