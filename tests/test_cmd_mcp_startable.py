@@ -98,11 +98,19 @@ def _busy() -> FakeForge:
     )
 
 
-def _uncut_container(number: int, title: str, **block_entries: object) -> workboard.Issue:
+def _uncut_container(
+    number: int, title: str, wait: dict[str, date] | None = None
+) -> workboard.Issue:
+    entries = slice_entries("First slice")
+    contract = (
+        complete_contract("Cut it.", slice=entries)
+        if wait is None
+        else complete_contract("Cut it.", slice=entries, wait=wait)
+    )
     return board_issue(
         number,
         title,
-        complete_contract("Cut it.", slice=slice_entries("First slice"), **block_entries),
+        contract,
         kind=ItemKind.CONTAINER,
         children_closed=0,
         children_total=0,
