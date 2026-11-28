@@ -1,0 +1,8 @@
+claim_id = "a883f7a82b584e72a69595c4f32a821a"
+agent = "Claude 144f82b7-7819-4157-bfed-c9a339cdd8c7"
+role = "builder"
+base = "a07c8ac67bd3764e2347fa2b00ec66b7ca8d2315"
+branch = "claude/issue-1133-card-picture-module"
+scope = ["pyproject.toml", "quality/baseline.toml", "src/aco/card_picture.py", "src/aco/expectation_grammar.py", "tests/test_board.py", "tests/test_card_picture.py"]
+opened_commit = "81d78f5a828ac328648aaa7b439865a94a065466"
+whole_reason = "A pure move of one rule family: the new module, its one importer, its layer row, the moved tests and the baseline have to land together or the gate is red."
