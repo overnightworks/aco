@@ -1,0 +1,8 @@
+claim_id = "eb3140c2553149a6a073c313d409df86"
+agent = "Claude 144f82b7-7819-4157-bfed-c9a339cdd8c7"
+role = "builder"
+base = "a07c8ac67bd3764e2347fa2b00ec66b7ca8d2315"
+branch = "claude/issue-1132-attempt-table"
+scope = ["pyproject.toml", "quality/baseline.toml", "specs/body-block.spec.md", "src/aco/body.py", "src/aco/body_outside.py", "src/aco/item_attempt.py", "tests/test_body_attempt.py", "tests/test_body_outside_tables.py", "tests/test_cmd_check_attempt.py", "tests/test_item_attempt.py"]
+opened_commit = "2b0441ac419b7b909a25cbffb706a26a695b7ba8"
+whole_reason = "One new block key needs its owner module, the extracted outside-header check, body.py's wiring, the layer row, the spec and their tests together; split, no part proves the key."
