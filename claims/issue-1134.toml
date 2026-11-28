@@ -1,0 +1,8 @@
+claim_id = "a557941b22b148a5a47cc8e2ee588c92"
+agent = "Claude 144f82b7-7819-4157-bfed-c9a339cdd8c7"
+role = "builder"
+base = "a07c8ac67bd3764e2347fa2b00ec66b7ca8d2315"
+branch = "claude/issue-1134-recording-store"
+scope = ["README.md", "docs/ARCHITECTURE.md", "pyproject.toml", "quality/baseline.toml", "specs/bootstrap.spec.md", "specs/check.spec.md", "specs/recording.spec.md", "specs/serve.spec.md", "src/aco/cli.py", "src/aco/cmd_recording.py", "src/aco/cmd_rulings.py", "src/aco/recordings.py", "tests/test_cmd_recording.py", "tests/test_recordings.py"]
+opened_commit = "5f3f365dba0550a93420c7d9755f02cbf25bd8f7"
+whole_reason = "The store has no caller without its command, and the command needs its parser room in cli.py, its layer rows, its spec and the three usage pins in the same landing."
